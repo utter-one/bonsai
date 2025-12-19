@@ -3,6 +3,9 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import 'dotenv/config';
 
+/**
+ * Runs database migrations using Drizzle ORM migrator
+ */
 async function runMigrations() {
   const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',

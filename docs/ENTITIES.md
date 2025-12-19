@@ -197,8 +197,8 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 | `globalActions` | JSON Array | Not Null, Default: `[]` | Which global actions to use ([] for all) |
 | `variables` | JSON Object | Not Null, Default: `{}` | Variable definitions for this stage |
 | `actions` | JSON Object | Not Null, Default: `{}` | Action definitions for this stage |
-| `classifierId` | String | Foreign Key (Classifier), Nullable | Reference to classifier for user input analysis |
-| `transformerId` | String | Foreign Key (ContextTransformer), Nullable | Reference to context transformer for data transformation |
+| `classifierIds` | JSON Array | Not Null, Default: `[]` | Array of classifier IDs for user input analysis |
+| `transformerIds` | JSON Array | Not Null, Default: `[]` | Array of context transformer IDs for data transformation |
 | `metadata` | JSON Object | Nullable | Additional stage-specific data |
 | `version` | Integer | Not Null | Version number for optimistic locking |
 | `createdAt` | Timestamp | Auto-managed | Record creation timestamp |
@@ -206,15 +206,13 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 
 ### Relationships
 - **Many-to-One** with Persona (`personaId`)
-- **Many-to-One** with Classifier (`classifierId`)
-- **Many-to-One** with ContextTransformer (`transformerId`)
+- References multiple Classifiers via `classifierIds` array
+- References multiple ContextTransformers via `transformerIds` array
 - Referenced by Conversation (`stageId`)
 
 ### Indexes
 - Primary key on `stageId`
 - Foreign key index on `personaId`
-- Foreign key index on `classifierId`
-- Foreign key index on `transformerId`
 
 ### Variables Structure
 Defines variables to extract from user input with definitions and examples.
@@ -244,7 +242,7 @@ Represents a reusable classifier for user input analysis that can be shared acro
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
 ### Relationships
-- **One-to-Many** with ConversationStage (referenced by `classifierId`)
+- Referenced by ConversationStage via `classifierIds` array
 
 ### Indexes
 - Primary key on `id`
@@ -272,7 +270,7 @@ Represents a reusable context transformer for data transformation that can be sh
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
 ### Relationships
-- **One-to-Many** with ConversationStage (referenced by `transformerId`)
+- Referenced by ConversationStage via `transformerIds` array
 
 ### Indexes
 - Primary key on `id`

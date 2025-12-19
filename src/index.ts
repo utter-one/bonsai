@@ -1,8 +1,13 @@
 import "dotenv/config";
+import "./container"; // Initialize DI container
 import { db } from "./db/index";
 import logger from "./utils/logger";
 import { sql } from "drizzle-orm";
+import { startServer } from "./server";
 
+/**
+ * Main application entry point - initializes database connection and starts the backend
+ */
 async function main() {
   // Initialize database connection
   try {
@@ -13,8 +18,10 @@ async function main() {
     throw error;
   }
 
-  console.log("Nexus backend is running...");
-  // Additional startup logic can be added here
+  const port = parseInt(process.env.PORT || "3000", 10);
+  startServer(port);
+
+  logger.info("Nexus backend is running...");
 }
 
 main().catch((err) => {

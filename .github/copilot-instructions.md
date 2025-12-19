@@ -1,0 +1,13 @@
+## Important Notes
+- Try to make changes in batches, not one-by-one (especially easy ones)
+- When changing contracts, use files in /src/api
+- Don't create example usages of newly created components
+- When creating database entities, don't forget to add models
+- Make all logger calls one-liners (even if very long) and do not use event field
+- Do not use complex inline types. Instead create dedicated types.
+- Never use require() to import type. Always use import at the beginning of files.
+- Prefer types over interfaces
+- Add new types of exceptions (extends Error) to /src/errors.ts
+- Always create and update JSDoc comments for functions, methods and classes if necessary
+- Use Zod schemas as the source of truth for API contracts
+- When creating these contracts in /src/api make sure to add comments. Include information of parameters from query string that are missing in the schema.

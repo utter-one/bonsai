@@ -123,8 +123,8 @@ export const conversationStages = pgTable('conversation_stages', {
   globalActions: jsonb('global_actions').notNull().default([]).$type<string[]>(),
   variables: jsonb('variables').notNull().default({}).$type<Record<string, any>>(),
   actions: jsonb('actions').notNull().default({}).$type<Record<string, any>>(),
-  classifierId: text('classifier_id').references(() => classifiers.id),
-  transformerId: text('transformer_id').references(() => contextTransformers.id),
+  classifierIds: jsonb('classifier_ids').notNull().default([]).$type<string[]>(),
+  transformerIds: jsonb('transformer_ids').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -260,14 +260,6 @@ export const conversationStagesRelations = relations(conversationStages, ({ one 
   persona: one(personas, {
     fields: [conversationStages.personaId],
     references: [personas.id],
-  }),
-  classifier: one(classifiers, {
-    fields: [conversationStages.classifierId],
-    references: [classifiers.id],
-  }),
-  transformer: one(contextTransformers, {
-    fields: [conversationStages.transformerId],
-    references: [contextTransformers.id],
   }),
 }));
 
