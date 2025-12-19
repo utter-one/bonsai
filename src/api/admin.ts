@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
+
+extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 

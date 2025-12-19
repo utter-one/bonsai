@@ -2,10 +2,12 @@ import 'reflect-metadata';
 import express from 'express';
 import { useExpressServer, useContainer } from 'routing-controllers';
 import { container } from 'tsyringe';
+import swaggerUi from 'swagger-ui-express';
 import { AdminController } from './controllers/AdminController';
 import { errorHandler } from './middleware/errorHandler';
 import { authContextMiddleware } from './middleware/authContext';
 import { ValidationMiddleware } from './middleware/validation';
+import { getOpenAPISpec } from './swagger';
 import logger from './utils/logger';
 
 /**
@@ -20,6 +22,10 @@ export function createApp(): express.Application {
     logger.info({ method: req.method, url: req.url }, 'Incoming request');
     next();
   });
+
+  // Swagger UI
+  const swaggerSpec = getOpenAPISpec();
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   app.use(authContextMiddleware);
 

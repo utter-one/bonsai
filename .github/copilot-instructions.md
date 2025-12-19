@@ -18,9 +18,19 @@
   - Include information about query string parameters that are missing in the schema
   - Export schemas as constants (e.g., `export const createAdminSchema = z.object({...})`)
   - Export corresponding TypeScript types (e.g., `export type CreateAdminRequest = z.infer<typeof createAdminSchema>`)
+  - Extend Zod with OpenAPI using `extendZodWithOpenApi(z)` at the top of each API file
 - In controllers, use `@Validated(schema)` decorator on parameters that need validation:
   - For body: `@Validated(createAdminSchema) @Body() body: CreateAdminRequest`
   - For query: `@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams`
   - For params: `@Validated(routeParamsSchema, 'params') @Params() params: RouteParams`
 - Never call `.parse()` manually in controllers - validation happens automatically via middleware
 - Import both the schema and type from API contract files in controllers
+
+## OpenAPI/Swagger Documentation
+- OpenAPI documentation is generated from Zod schemas in /src/swagger.ts
+- DO NOT add OpenAPI decorators to controllers - this creates duplication
+- Zod schemas are the single source of truth for both validation and API documentation
+- When adding new endpoints, register them in /src/swagger.ts using `registry.registerPath()`
+- Use Zod schemas directly in path registration for request/response bodies
+- For path parameters, create dedicated Zod schemas with `.openapi()` metadata
+- Swagger UI is available at /api-docs endpoint
