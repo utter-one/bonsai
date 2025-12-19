@@ -15,6 +15,7 @@
 - All API contracts are defined in /src/api using Zod schemas
 - When creating schemas in /src/api:
   - Add comprehensive JSDoc comments to schemas
+  - **Add `.describe()` to every schema field to provide descriptions visible in Swagger UI**
   - Include information about query string parameters that are missing in the schema
   - Export schemas as constants (e.g., `export const createAdminSchema = z.object({...})`)
   - Export corresponding TypeScript types (e.g., `export type CreateAdminRequest = z.infer<typeof createAdminSchema>`)
@@ -33,4 +34,5 @@
 - When adding new endpoints, register them in /src/swagger.ts using `registry.registerPath()`
 - Use Zod schemas directly in path registration for request/response bodies
 - For path parameters, create dedicated Zod schemas with `.openapi()` metadata
+- **ALWAYS add tags to group endpoints by controller** (e.g., `tags: ['Admins']`, `tags: ['Users']`) - this organizes endpoints in Swagger UI
 - Swagger UI is available at /api-docs endpoint

@@ -13,11 +13,11 @@ export { listParamsSchema, type ListParams };
  * Optional fields: metadata
  */
 export const createAdminSchema = z.object({
-  id: z.string().min(1),
-  displayName: z.string().min(1),
-  roles: z.array(z.string().min(1)).min(1),
-  password: z.string().min(1),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  id: z.string().min(1).describe('Unique identifier for the admin user'),
+  displayName: z.string().min(1).describe('Display name for the admin user'),
+  roles: z.array(z.string().min(1)).min(1).describe('Array of role identifiers assigned to the admin (at least one required)'),
+  password: z.string().min(1).describe('Admin user password (will be hashed)'),
+  metadata: z.record(z.string(), z.unknown()).optional().describe('Optional metadata as key-value pairs'),
 });
 
 /**
@@ -26,11 +26,11 @@ export const createAdminSchema = z.object({
  * Optional fields: displayName, roles, password, metadata
  */
 export const updateAdminBodySchema = z.object({
-  version: z.number().int().positive(),
-  displayName: z.string().min(1).optional(),
-  roles: z.array(z.string().min(1)).min(1).optional(),
-  password: z.string().min(1).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  version: z.number().int().positive().describe('Current version number for optimistic locking (prevents concurrent updates)'),
+  displayName: z.string().min(1).optional().describe('Updated display name for the admin user'),
+  roles: z.array(z.string().min(1)).min(1).optional().describe('Updated array of role identifiers'),
+  password: z.string().min(1).optional().describe('New password (will be hashed)'),
+  metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata (merges with existing)'),
 });
 
 /**
@@ -38,7 +38,7 @@ export const updateAdminBodySchema = z.object({
  * Required fields: version (for optimistic locking to prevent concurrent deletions)
  */
 export const deleteAdminBodySchema = z.object({
-  version: z.number().int().positive(),
+  version: z.number().int().positive().describe('Current version number for optimistic locking (prevents concurrent deletions)'),
 });
 
 /**
@@ -47,13 +47,13 @@ export const deleteAdminBodySchema = z.object({
  * Includes: id, displayName, roles, metadata, version, createdAt, updatedAt
  */
 export const adminResponseSchema = z.object({
-  id: z.string(),
-  displayName: z.string(),
-  roles: z.array(z.string()),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  version: z.number().int(),
-  createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date(),
+  id: z.string().describe('Unique identifier for the admin user'),
+  displayName: z.string().describe('Display name of the admin user'),
+  roles: z.array(z.string()).describe('Array of role identifiers assigned to the admin'),
+  metadata: z.record(z.string(), z.unknown()).optional().describe('Metadata as key-value pairs'),
+  version: z.number().int().describe('Current version number for optimistic locking'),
+  createdAt: z.coerce.date().describe('Timestamp when the admin user was created'),
+  updatedAt: z.coerce.date().describe('Timestamp when the admin user was last updated'),
 });
 
 /**
@@ -61,10 +61,10 @@ export const adminResponseSchema = z.object({
  * Includes pagination metadata: items, total count, offset, and limit
  */
 export const adminListResponseSchema = z.object({
-  items: z.array(adminResponseSchema),
-  total: z.number().int().min(0),
-  offset: z.number().int().min(0),
-  limit: z.number().int().positive().nullable(),
+  items: z.array(adminResponseSchema).describe('Array of admin users in the current page'),
+  total: z.number().int().min(0).describe('Total number of admin users matching the query'),
+  offset: z.number().int().min(0).describe('Starting index of the current page'),
+  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
 });
 
 /** Request body for creating a new admin user */

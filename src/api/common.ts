@@ -8,7 +8,7 @@ extendZodWithOpenApi(z);
  * Supports: eq, ne, gt, gte, lt, lte, like, in, nin, between
  */
 const listFilterOperationSchema = z.object({
-  op: z.enum(['like', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'between']),
+  op: z.enum(['like', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'between']).describe('Filter operator: eq (equals), ne (not equals), gt (greater than), gte (>=), lt (less than), lte (<=), like (pattern match), in (value in array), nin (not in array), between (range)'),
   value: z.union([
     z.string(),
     z.number(),
@@ -16,7 +16,7 @@ const listFilterOperationSchema = z.object({
     z.array(z.string()),
     z.array(z.number()),
     z.array(z.boolean()),
-  ]),
+  ]).describe('Filter value to compare against. For "in", "nin", and "between" operations, use an array'),
 });
 
 /**
@@ -44,12 +44,12 @@ const listFilterSchema = z.union([
  * - filters: Dynamic field filters as key-value pairs
  */
 export const listParamsSchema = z.object({
-  offset: z.coerce.number().int().min(0).default(0),
-  limit: z.coerce.number().int().positive().nullable().optional(),
-  textSearch: z.string().nullable().optional(),
-  orderBy: z.union([z.string(), z.array(z.string())]).nullable().optional(),
-  groupBy: z.union([z.string(), z.array(z.string())]).nullable().optional(),
-  filters: z.record(z.string(), listFilterSchema).nullable().optional(),
+  offset: z.coerce.number().int().min(0).default(0).describe('Starting index for pagination (default: 0)'),
+  limit: z.coerce.number().int().positive().nullable().optional().describe('Maximum number of items to return (optional, null for no limit)'),
+  textSearch: z.string().nullable().optional().describe('Full-text search query string (optional)'),
+  orderBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to sort by. Use "-" prefix for descending order (e.g., "-createdAt")'),
+  groupBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to group results by (optional)'),
+  filters: z.record(z.string(), listFilterSchema).nullable().optional().describe('Dynamic field filters as key-value pairs. Values can be direct values, arrays (for IN), or operation objects'),
 });
 
 /** Filter operation with explicit operator (eq, ne, gt, gte, lt, lte, like, in, nin, between) and value */

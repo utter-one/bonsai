@@ -13,8 +13,8 @@ export { listParamsSchema, type ListParams };
  * Profile is a flexible JSON object containing user-specific data
  */
 export const createUserSchema = z.object({
-  id: z.string().min(1),
-  profile: z.record(z.string(), z.unknown()),
+  id: z.string().min(1).describe('Unique identifier for the user'),
+  profile: z.record(z.string(), z.unknown()).describe('User profile data as flexible key-value pairs'),
 });
 
 /**
@@ -23,7 +23,7 @@ export const createUserSchema = z.object({
  * Profile updates are merged with existing profile data
  */
 export const updateUserBodySchema = z.object({
-  profile: z.record(z.string(), z.unknown()).optional(),
+  profile: z.record(z.string(), z.unknown()).optional().describe('Updated profile data (merges with existing profile)'),
 });
 
 /**
@@ -31,10 +31,10 @@ export const updateUserBodySchema = z.object({
  * Includes: id, profile, createdAt, updatedAt
  */
 export const userResponseSchema = z.object({
-  id: z.string(),
-  profile: z.record(z.string(), z.unknown()),
-  createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date(),
+  id: z.string().describe('Unique identifier for the user'),
+  profile: z.record(z.string(), z.unknown()).describe('User profile data as key-value pairs'),
+  createdAt: z.coerce.date().describe('Timestamp when the user was created'),
+  updatedAt: z.coerce.date().describe('Timestamp when the user was last updated'),
 });
 
 /**
@@ -42,10 +42,10 @@ export const userResponseSchema = z.object({
  * Includes pagination metadata: items, total count, offset, and limit
  */
 export const userListResponseSchema = z.object({
-  items: z.array(userResponseSchema),
-  total: z.number().int().min(0),
-  offset: z.number().int().min(0),
-  limit: z.number().int().positive().nullable(),
+  items: z.array(userResponseSchema).describe('Array of users in the current page'),
+  total: z.number().int().min(0).describe('Total number of users matching the query'),
+  offset: z.number().int().min(0).describe('Starting index of the current page'),
+  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
 });
 
 /** Request body for creating a new user */

@@ -38,6 +38,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'post',
     path: '/api/admins',
+    tags: ['Admins'],
     summary: 'Create a new admin user',
     description: 'Creates a new admin user with the specified credentials and roles',
     request: {
@@ -66,6 +67,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'get',
     path: '/api/admins/{id}',
+    tags: ['Admins'],
     summary: 'Get admin user by ID',
     description: 'Retrieves a single admin user by their unique identifier',
     request: {
@@ -87,6 +89,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'get',
     path: '/api/admins',
+    tags: ['Admins'],
     summary: 'List admin users',
     description: 'Retrieves a paginated list of admin users with optional filtering',
     request: {
@@ -108,6 +111,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'put',
     path: '/api/admins/{id}',
+    tags: ['Admins'],
     summary: 'Update admin user',
     description: 'Updates an existing admin user with optimistic locking',
     request: {
@@ -138,6 +142,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'delete',
     path: '/api/admins/{id}',
+    tags: ['Admins'],
     summary: 'Delete admin user',
     description: 'Deletes an admin user with optimistic locking',
     request: {
@@ -161,6 +166,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'get',
     path: '/api/admins/{id}/audit-logs',
+    tags: ['Admins'],
     summary: 'Get admin audit logs',
     description: 'Retrieves audit logs for a specific admin user',
     request: {
@@ -183,6 +189,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'post',
     path: '/api/users',
+    tags: ['Users'],
     summary: 'Create a new user',
     description: 'Creates a new user with the specified profile data',
     request: {
@@ -211,6 +218,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'get',
     path: '/api/users/{id}',
+    tags: ['Users'],
     summary: 'Get user by ID',
     description: 'Retrieves a single user by their unique identifier',
     request: {
@@ -232,6 +240,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'get',
     path: '/api/users',
+    tags: ['Users'],
     summary: 'List users',
     description: 'Retrieves a paginated list of users with optional filtering',
     request: {
@@ -253,6 +262,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'put',
     path: '/api/users/{id}',
+    tags: ['Users'],
     summary: 'Update user',
     description: 'Updates an existing user',
     request: {
@@ -282,6 +292,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'delete',
     path: '/api/users/{id}',
+    tags: ['Users'],
     summary: 'Delete user',
     description: 'Deletes a user',
     request: {
@@ -296,6 +307,7 @@ export function getOpenAPISpec(): any {
   registry.registerPath({
     method: 'get',
     path: '/api/users/{id}/audit-logs',
+    tags: ['Users'],
     summary: 'Get user audit logs',
     description: 'Retrieves audit logs for a specific user',
     request: {
