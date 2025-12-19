@@ -5,6 +5,7 @@ import { container } from 'tsyringe';
 import { AdminController } from './controllers/AdminController';
 import { errorHandler } from './middleware/errorHandler';
 import { authContextMiddleware } from './middleware/authContext';
+import { ValidationMiddleware } from './middleware/validation';
 import logger from './utils/logger';
 
 /**
@@ -28,6 +29,7 @@ export function createApp(): express.Application {
 
   useExpressServer(app, {
     controllers: [AdminController],
+    middlewares: [ValidationMiddleware],
     defaultErrorHandler: false,
   });
 
