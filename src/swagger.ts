@@ -2,13 +2,18 @@ import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-open
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from './api/admin';
+import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './api/user';
 import { listParamsSchema } from './api/common';
 
 extendZodWithOpenApi(z);
 
 // Define param schemas
-const idParamSchema = z.object({
+const adminIdParamSchema = z.object({
   id: z.string().openapi({ description: 'Admin user ID', example: 'admin-123' }),
+});
+
+const userIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'User ID', example: 'user-123' }),
 });
 
 /**
@@ -23,6 +28,10 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteAdminRequest', deleteAdminBodySchema);
   registry.register('AdminResponse', adminResponseSchema);
   registry.register('AdminListResponse', adminListResponseSchema);
+  registry.register('CreateUserRequest', createUserSchema);
+  registry.register('UpdateUserRequest', updateUserBodySchema);
+  registry.register('UserResponse', userResponseSchema);
+  registry.register('UserListResponse', userListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Register API paths
@@ -60,7 +69,7 @@ export function getOpenAPISpec(): any {
     summary: 'Get admin user by ID',
     description: 'Retrieves a single admin user by their unique identifier',
     request: {
-      params: idParamSchema,
+      params: adminIdParamSchema,
     },
     responses: {
       200: {
@@ -102,7 +111,7 @@ export function getOpenAPISpec(): any {
     summary: 'Update admin user',
     description: 'Updates an existing admin user with optimistic locking',
     request: {
-      params: idParamSchema,
+      params: adminIdParamSchema,
       body: {
         content: {
           'application/json': {
@@ -132,7 +141,7 @@ export function getOpenAPISpec(): any {
     summary: 'Delete admin user',
     description: 'Deletes an admin user with optimistic locking',
     request: {
-      params: idParamSchema,
+      params: adminIdParamSchema,
       body: {
         content: {
           'application/json': {
@@ -155,7 +164,7 @@ export function getOpenAPISpec(): any {
     summary: 'Get admin audit logs',
     description: 'Retrieves audit logs for a specific admin user',
     request: {
-      params: idParamSchema,
+      params: adminIdParamSchema,
     },
     responses: {
       200: {
@@ -167,6 +176,141 @@ export function getOpenAPISpec(): any {
         },
       },
       404: { description: 'Admin user not found' },
+    },
+  });
+
+  // User API paths
+  registry.registerPath({
+    method: 'post',
+    path: '/api/users',
+    summary: 'Create a new user',
+    description: 'Creates a new user with the specified profile data',
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: createUserSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'User created successfully',
+        content: {
+          'application/json': {
+            schema: userResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid request body' },
+      409: { description: 'User already exists' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/users/{id}',
+    summary: 'Get user by ID',
+    description: 'Retrieves a single user by their unique identifier',
+    request: {
+      params: userIdParamSchema,
+    },
+    responses: {
+      200: {
+        description: 'User retrieved successfully',
+        content: {
+          'application/json': {
+            schema: userResponseSchema,
+          },
+        },
+      },
+      404: { description: 'User not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/users',
+    summary: 'List users',
+    description: 'Retrieves a paginated list of users with optional filtering',
+    request: {
+      query: listParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'List of users retrieved successfully',
+        content: {
+          'application/json': {
+            schema: userListResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid query parameters' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/users/{id}',
+    summary: 'Update user',
+    description: 'Updates an existing user',
+    request: {
+      params: userIdParamSchema,
+      body: {
+        content: {
+          'application/json': {
+            schema: updateUserBodySchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'User updated successfully',
+        content: {
+          'application/json': {
+            schema: userResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid request body' },
+      404: { description: 'User not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/users/{id}',
+    summary: 'Delete user',
+    description: 'Deletes a user',
+    request: {
+      params: userIdParamSchema,
+    },
+    responses: {
+      204: { description: 'User deleted successfully' },
+      404: { description: 'User not found' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/users/{id}/audit-logs',
+    summary: 'Get user audit logs',
+    description: 'Retrieves audit logs for a specific user',
+    request: {
+      params: userIdParamSchema,
+    },
+    responses: {
+      200: {
+        description: 'Audit logs retrieved successfully',
+        content: {
+          'application/json': {
+            schema: z.array(z.object({})),
+          },
+        },
+      },
+      404: { description: 'User not found' },
     },
   });
 
