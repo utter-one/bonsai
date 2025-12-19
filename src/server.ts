@@ -26,7 +26,14 @@ export function createApp(): express.Application {
 
   // Swagger UI
   const swaggerSpec = getOpenAPISpec();
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    swaggerOptions: {
+      defaultModelsExpandDepth: 1,
+      defaultModelExpandDepth: 3,
+      docExpansion: 'list',
+      filter: true,
+    },
+  }));
 
   app.use(authContextMiddleware);
 
