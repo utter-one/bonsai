@@ -5,6 +5,7 @@ import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
 import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
+import { PersonaController } from './controllers/PersonaController';
 import { errorHandler } from './middleware/errorHandler';
 import { authContextMiddleware } from './middleware/authContext';
 import { ValidationMiddleware } from './middleware/validation';
@@ -42,7 +43,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AdminController, UserController],
+    controllers: [AdminController, UserController, PersonaController],
     middlewares: [ValidationMiddleware],
     defaultErrorHandler: false,
   });

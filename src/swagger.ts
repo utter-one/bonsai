@@ -1,9 +1,16 @@
+import 'reflect-metadata';
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from './api/admin';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './api/user';
+import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './api/persona';
 import { listParamsSchema } from './api/common';
+import { getOpenAPIMetadata } from './decorators/openapi';
+import { AdminController } from './controllers/AdminController';
+import { UserController } from './controllers/UserController';
+import { PersonaController } from './controllers/PersonaController';
+import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
 
@@ -16,8 +23,12 @@ const userIdParamSchema = z.object({
   id: z.string().openapi({ description: 'User ID', example: 'user-123' }),
 });
 
+const personaIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Persona ID', example: 'persona-123' }),
+});
+
 /**
- * Generate OpenAPI specification from Zod schemas
+ * Generate OpenAPI specification from Zod schemas and controller decorators
  */
 export function getOpenAPISpec(): any {
   const registry = new OpenAPIRegistry();
@@ -32,299 +43,62 @@ export function getOpenAPISpec(): any {
   registry.register('UpdateUserRequest', updateUserBodySchema);
   registry.register('UserResponse', userResponseSchema);
   registry.register('UserListResponse', userListResponseSchema);
+  registry.register('CreatePersonaRequest', createPersonaSchema);
+  registry.register('UpdatePersonaRequest', updatePersonaBodySchema);
+  registry.register('DeletePersonaRequest', deletePersonaBodySchema);
+  registry.register('PersonaResponse', personaResponseSchema);
+  registry.register('PersonaListResponse', personaListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
-  // Register API paths
-  registry.registerPath({
-    method: 'post',
-    path: '/api/admins',
-    tags: ['Admins'],
-    summary: 'Create a new admin user',
-    description: 'Creates a new admin user with the specified credentials and roles',
-    request: {
-      body: {
-        content: {
-          'application/json': {
-            schema: createAdminSchema,
-          },
-        },
-      },
-    },
-    responses: {
-      201: {
-        description: 'Admin user created successfully',
-        content: {
-          'application/json': {
-            schema: adminResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      409: { description: 'Admin user already exists' },
-    },
-  });
+  // Get routing-controllers metadata
+  const metadata = getMetadataArgsStorage();
+  const controllers = [AdminController, UserController, PersonaController];
 
-  registry.registerPath({
-    method: 'get',
-    path: '/api/admins/{id}',
-    tags: ['Admins'],
-    summary: 'Get admin user by ID',
-    description: 'Retrieves a single admin user by their unique identifier',
-    request: {
-      params: adminIdParamSchema,
-    },
-    responses: {
-      200: {
-        description: 'Admin user retrieved successfully',
-        content: {
-          'application/json': {
-            schema: adminResponseSchema,
-          },
-        },
-      },
-      404: { description: 'Admin user not found' },
-    },
-  });
+  // Map of param schemas for different routes
+  const paramSchemaMap: Record<string, any> = {
+    '/api/admins/:id': adminIdParamSchema,
+    '/api/users/:id': userIdParamSchema,
+    '/api/personas/:id': personaIdParamSchema,
+  };
 
-  registry.registerPath({
-    method: 'get',
-    path: '/api/admins',
-    tags: ['Admins'],
-    summary: 'List admin users',
-    description: 'Retrieves a paginated list of admin users with optional filtering',
-    request: {
-      query: listParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'List of admin users retrieved successfully',
-        content: {
-          'application/json': {
-            schema: adminListResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid query parameters' },
-    },
-  });
+  // Register API paths from controller metadata
+  for (const controllerClass of controllers) {
+    const controllerMetadata = metadata.controllers.find(c => c.target === controllerClass);
+    if (!controllerMetadata) continue;
 
-  registry.registerPath({
-    method: 'put',
-    path: '/api/admins/{id}',
-    tags: ['Admins'],
-    summary: 'Update admin user',
-    description: 'Updates an existing admin user with optimistic locking',
-    request: {
-      params: adminIdParamSchema,
-      body: {
-        content: {
-          'application/json': {
-            schema: updateAdminBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'Admin user updated successfully',
-        content: {
-          'application/json': {
-            schema: adminResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      404: { description: 'Admin user not found' },
-      409: { description: 'Version conflict - entity was modified' },
-    },
-  });
+    const actions = metadata.actions.filter(a => a.target === controllerClass);
 
-  registry.registerPath({
-    method: 'delete',
-    path: '/api/admins/{id}',
-    tags: ['Admins'],
-    summary: 'Delete admin user',
-    description: 'Deletes an admin user with optimistic locking',
-    request: {
-      params: adminIdParamSchema,
-      body: {
-        content: {
-          'application/json': {
-            schema: deleteAdminBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      204: { description: 'Admin user deleted successfully' },
-      400: { description: 'Invalid request body' },
-      404: { description: 'Admin user not found' },
-      409: { description: 'Version conflict - entity was modified' },
-    },
-  });
+    for (const action of actions) {
+      const openAPIConfig = getOpenAPIMetadata(controllerClass.prototype, action.method);
+      if (!openAPIConfig || !openAPIConfig.responses) continue;
 
-  registry.registerPath({
-    method: 'get',
-    path: '/api/admins/{id}/audit-logs',
-    tags: ['Admins'],
-    summary: 'Get admin audit logs',
-    description: 'Retrieves audit logs for a specific admin user',
-    request: {
-      params: adminIdParamSchema,
-    },
-    responses: {
-      200: {
-        description: 'Audit logs retrieved successfully',
-        content: {
-          'application/json': {
-            schema: z.array(z.object({})),
-          },
-        },
-      },
-      404: { description: 'Admin user not found' },
-    },
-  });
+      // Build the full path
+      const basePath = controllerMetadata.route || '';
+      const actionPath = action.route || '';
+      const fullPath = `${basePath}${actionPath}`.replace(/\/\//g, '/');
 
-  // User API paths
-  registry.registerPath({
-    method: 'post',
-    path: '/api/users',
-    tags: ['Users'],
-    summary: 'Create a new user',
-    description: 'Creates a new user with the specified profile data',
-    request: {
-      body: {
-        content: {
-          'application/json': {
-            schema: createUserSchema,
-          },
-        },
-      },
-    },
-    responses: {
-      201: {
-        description: 'User created successfully',
-        content: {
-          'application/json': {
-            schema: userResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      409: { description: 'User already exists' },
-    },
-  });
+      // Determine if this route has params
+      const hasParams = fullPath.includes(':id');
+      const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '');
+      const paramSchema = hasParams && !fullPath.includes('/audit-logs') ? paramSchemaMap[paramKey] : undefined;
 
-  registry.registerPath({
-    method: 'get',
-    path: '/api/users/{id}',
-    tags: ['Users'],
-    summary: 'Get user by ID',
-    description: 'Retrieves a single user by their unique identifier',
-    request: {
-      params: userIdParamSchema,
-    },
-    responses: {
-      200: {
-        description: 'User retrieved successfully',
-        content: {
-          'application/json': {
-            schema: userResponseSchema,
-          },
-        },
-      },
-      404: { description: 'User not found' },
-    },
-  });
+      // Build request object
+      const request: any = { ...openAPIConfig.request };
+      if (paramSchema) {
+        request.params = paramSchema;
+      }
 
-  registry.registerPath({
-    method: 'get',
-    path: '/api/users',
-    tags: ['Users'],
-    summary: 'List users',
-    description: 'Retrieves a paginated list of users with optional filtering',
-    request: {
-      query: listParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'List of users retrieved successfully',
-        content: {
-          'application/json': {
-            schema: userListResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid query parameters' },
-    },
-  });
-
-  registry.registerPath({
-    method: 'put',
-    path: '/api/users/{id}',
-    tags: ['Users'],
-    summary: 'Update user',
-    description: 'Updates an existing user',
-    request: {
-      params: userIdParamSchema,
-      body: {
-        content: {
-          'application/json': {
-            schema: updateUserBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'User updated successfully',
-        content: {
-          'application/json': {
-            schema: userResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      404: { description: 'User not found' },
-    },
-  });
-
-  registry.registerPath({
-    method: 'delete',
-    path: '/api/users/{id}',
-    tags: ['Users'],
-    summary: 'Delete user',
-    description: 'Deletes a user',
-    request: {
-      params: userIdParamSchema,
-    },
-    responses: {
-      204: { description: 'User deleted successfully' },
-      404: { description: 'User not found' },
-    },
-  });
-
-  registry.registerPath({
-    method: 'get',
-    path: '/api/users/{id}/audit-logs',
-    tags: ['Users'],
-    summary: 'Get user audit logs',
-    description: 'Retrieves audit logs for a specific user',
-    request: {
-      params: userIdParamSchema,
-    },
-    responses: {
-      200: {
-        description: 'Audit logs retrieved successfully',
-        content: {
-          'application/json': {
-            schema: z.array(z.object({})),
-          },
-        },
-      },
-      404: { description: 'User not found' },
-    },
-  });
+      registry.registerPath({
+        method: action.type as any,
+        path: fullPath,
+        tags: openAPIConfig.tags,
+        summary: openAPIConfig.summary,
+        description: openAPIConfig.description,
+        request,
+        responses: openAPIConfig.responses as any,
+      });
+    }
+  }
 
   const generator = new OpenApiGeneratorV3(registry.definitions);
 

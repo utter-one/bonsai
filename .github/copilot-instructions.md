@@ -30,11 +30,42 @@
 - Import both the schema and type from API contract files in controllers
 
 ## OpenAPI/Swagger Documentation
-- OpenAPI documentation is generated from Zod schemas in /src/swagger.ts
-- DO NOT add OpenAPI decorators to controllers - this creates duplication
-- Zod schemas are the single source of truth for both validation and API documentation
-- When adding new endpoints, register them in /src/swagger.ts using `registry.registerPath()`
-- Use Zod schemas directly in path registration for request/response bodies
-- For path parameters, create dedicated Zod schemas with `.openapi()` metadata
+- OpenAPI documentation is generated from Zod schemas and controller decorators using swagger.ts
+- **Use `@OpenAPI()` decorator on controller methods to define endpoint documentation**
+  - Place decorator immediately before route decorators (`@Post`, `@Get`, etc.)
+  - Include tags, summary, description, request, and responses
+  - The system automatically extracts this metadata and generates OpenAPI spec
 - **ALWAYS add tags to group endpoints by controller** (e.g., `tags: ['Admins']`, `tags: ['Users']`) - this organizes endpoints in Swagger UI
 - Swagger UI is available at /api-docs endpoint
+- Example:
+  ```typescript
+  @OpenAPI({
+    tags: ['Admins'],
+    summary: 'Create a new admin user',
+    description: 'Creates a new admin user with the specified credentials and roles',
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: createAdminSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Admin user created successfully',
+        content: {
+          'application/json': {
+            schema: adminResponseSchema,
+          },
+        },
+      },
+      400: { description: 'Invalid request body' },
+      409: { description: 'Admin user already exists' },
+    },
+  })
+  @Post('/')
+  @HttpCode(201)
+  async createAdmin(@Body() body: CreateAdminRequest) { ... }
+  ```
