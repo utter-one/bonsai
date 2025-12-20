@@ -1,5 +1,4 @@
 import "dotenv/config";
-import "./container"; // Initialize DI container
 import { db } from "./db/index";
 import logger from "./utils/logger";
 import { sql } from "drizzle-orm";

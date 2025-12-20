@@ -331,8 +331,8 @@ export function getOpenAPISpec(): any {
   return generator.generateDocument({
     openapi: '3.0.0',
     info: {
-      title: 'Nexus Backend API',
-      description: 'API documentation for Nexus Backend',
+      title: 'Nexus Admin API',
+      description: 'API documentation for Nexus Admin API',
       version: '0.1.0',
     },
     servers: [
