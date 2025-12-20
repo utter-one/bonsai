@@ -1,5 +1,4 @@
 import { injectable, inject } from 'tsyringe';
-import type { Logger } from 'pino';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { users } from '../db/schema';
@@ -9,13 +8,14 @@ import { userResponseSchema, userListResponseSchema } from '../api/user';
 import { AuditService } from './AuditService';
 import { NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { logger } from '../utils/logger';
 
 /**
  * Service for managing users with full CRUD operations and audit logging
  */
 @injectable()
 export class UserService {
-  constructor(@inject('Logger') private readonly logger: Logger, @inject(AuditService) private readonly auditService: AuditService) {}
+  constructor(@inject(AuditService) private readonly auditService: AuditService) {}
 
   /**
    * Creates a new user and logs the creation in the audit trail
@@ -24,7 +24,7 @@ export class UserService {
    * @returns The created user
    */
   async createUser(input: CreateUserRequest, adminId?: string): Promise<UserResponse> {
-    this.logger.info({ userId: input.id, adminId }, 'Creating user');
+    logger.info({ userId: input.id, adminId }, 'Creating user');
 
     try {
       const user = await db.insert(users).values({ id: input.id, profile: input.profile }).returning();
@@ -33,11 +33,11 @@ export class UserService {
 
       await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, profile: createdUser.profile }, adminId);
 
-      this.logger.info({ userId: createdUser.id }, 'User created successfully');
+      logger.info({ userId: createdUser.id }, 'User created successfully');
 
       return userResponseSchema.parse(createdUser);
     } catch (error) {
-      this.logger.error({ error, userId: input.id }, 'Failed to create user');
+      logger.error({ error, userId: input.id }, 'Failed to create user');
       throw error;
     }
   }
@@ -49,7 +49,7 @@ export class UserService {
    * @throws {NotFoundError} When user is not found
    */
   async getUserById(id: string): Promise<UserResponse> {
-    this.logger.debug({ userId: id }, 'Fetching user by ID');
+    logger.debug({ userId: id }, 'Fetching user by ID');
 
     try {
       const user = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -60,7 +60,7 @@ export class UserService {
 
       return userResponseSchema.parse(user);
     } catch (error) {
-      this.logger.error({ error, userId: id }, 'Failed to fetch user');
+      logger.error({ error, userId: id }, 'Failed to fetch user');
       throw error;
     }
   }
@@ -71,7 +71,7 @@ export class UserService {
    * @returns Paginated array of users matching the criteria
    */
   async listUsers(params?: ListParams): Promise<UserListResponse> {
-    this.logger.debug({ params }, 'Listing users');
+    logger.debug({ params }, 'Listing users');
 
     try {
       const conditions: SQL[] = [];
@@ -88,7 +88,7 @@ export class UserService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
-          const condition = buildFilterCondition(field, filter, columnMap, this.logger);
+          const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
           }
@@ -125,7 +125,7 @@ export class UserService {
         limit,
       });
     } catch (error) {
-      this.logger.error({ error, params }, 'Failed to list users');
+      logger.error({ error, params }, 'Failed to list users');
       throw error;
     }
   }
@@ -139,7 +139,7 @@ export class UserService {
    * @throws {NotFoundError} When user is not found
    */
   async updateUser(id: string, input: UpdateUserRequest, adminId?: string): Promise<UserResponse> {
-    this.logger.info({ userId: id, adminId }, 'Updating user');
+    logger.info({ userId: id, adminId }, 'Updating user');
 
     try {
       const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -158,11 +158,11 @@ export class UserService {
 
       await this.auditService.logUpdate('user', user.id, { id: existingUser.id, profile: existingUser.profile }, { id: user.id, profile: user.profile }, adminId);
 
-      this.logger.info({ userId: user.id }, 'User updated successfully');
+      logger.info({ userId: user.id }, 'User updated successfully');
 
       return userResponseSchema.parse(user);
     } catch (error) {
-      this.logger.error({ error, userId: id }, 'Failed to update user');
+      logger.error({ error, userId: id }, 'Failed to update user');
       throw error;
     }
   }
@@ -173,7 +173,7 @@ export class UserService {
    * @param adminId - Optional ID of the admin performing the action for audit purposes
    */
   async deleteUser(id: string, adminId?: string): Promise<void> {
-    this.logger.info({ userId: id, adminId }, 'Deleting user');
+    logger.info({ userId: id, adminId }, 'Deleting user');
 
     try {
       const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -190,9 +190,9 @@ export class UserService {
 
       await this.auditService.logDelete('user', id, { id: existingUser.id, profile: existingUser.profile }, adminId);
 
-      this.logger.info({ userId: id }, 'User deleted successfully');
+      logger.info({ userId: id }, 'User deleted successfully');
     } catch (error) {
-      this.logger.error({ error, userId: id }, 'Failed to delete user');
+      logger.error({ error, userId: id }, 'Failed to delete user');
       throw error;
     }
   }
@@ -203,12 +203,12 @@ export class UserService {
    * @returns Array of audit log entries for the user
    */
   async getUserAuditLogs(userId: string): Promise<any[]> {
-    this.logger.debug({ userId }, 'Fetching audit logs for user');
+    logger.debug({ userId }, 'Fetching audit logs for user');
 
     try {
       return await this.auditService.getEntityAuditLogs('user', userId);
     } catch (error) {
-      this.logger.error({ error, userId }, 'Failed to fetch user audit logs');
+      logger.error({ error, userId }, 'Failed to fetch user audit logs');
       throw error;
     }
   }

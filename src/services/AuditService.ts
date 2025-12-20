@@ -1,9 +1,9 @@
-import { injectable, inject } from 'tsyringe';
-import type { Logger } from 'pino';
+import { injectable } from 'tsyringe';
 import { db } from '../db/index';
 import { auditLogs } from '../db/schema';
 import type { AuditLog } from '../types/models';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../utils/logger';
 
 export interface AuditLogInput {
   userId?: string;
@@ -19,17 +19,13 @@ export interface AuditLogInput {
  */
 @injectable()
 export class AuditService {
-  constructor(
-    @inject('Logger') private readonly logger: Logger
-  ) {}
-
   /**
    * Log a change to an entity in the audit log
    * @param input - Audit log input containing userId, action, entityId, entityType, and entity snapshots
    * @returns The created audit log entry
    */
   async logChange(input: AuditLogInput): Promise<AuditLog> {
-    this.logger.info({ action: input.action, entityType: input.entityType, entityId: input.entityId, userId: input.userId, }, 'Logging audit change' );
+    logger.info({ action: input.action, entityType: input.entityType, entityId: input.entityId, userId: input.userId, }, 'Logging audit change' );
 
     try {
       const auditLog = await db
@@ -46,14 +42,14 @@ export class AuditService {
         })
         .returning();
 
-      this.logger.debug(
+      logger.debug(
         { auditLogId: auditLog[0].id },
         'Audit log created successfully'
       );
 
       return auditLog[0];
     } catch (error) {
-      this.logger.error(
+      logger.error(
         {
           error,
           action: input.action,
@@ -148,7 +144,7 @@ export class AuditService {
     entityType: string,
     entityId: string
   ): Promise<AuditLog[]> {
-    this.logger.debug(
+    logger.debug(
       { entityType, entityId },
       'Fetching audit logs for entity'
     );
@@ -165,7 +161,7 @@ export class AuditService {
 
       return logs;
     } catch (error) {
-      this.logger.error(
+      logger.error(
         { error, entityType, entityId },
         'Failed to fetch audit logs'
       );
@@ -180,7 +176,7 @@ export class AuditService {
    * @returns Array of audit logs for the specified user, ordered by creation date descending
    */
   async getUserAuditLogs(userId: string, limit = 100): Promise<AuditLog[]> {
-    this.logger.debug({ userId, limit }, 'Fetching audit logs for user');
+    logger.debug({ userId, limit }, 'Fetching audit logs for user');
 
     try {
       const logs = await db.query.auditLogs.findMany({
@@ -191,7 +187,7 @@ export class AuditService {
 
       return logs;
     } catch (error) {
-      this.logger.error({ error, userId }, 'Failed to fetch user audit logs');
+      logger.error({ error, userId }, 'Failed to fetch user audit logs');
       throw error;
     }
   }

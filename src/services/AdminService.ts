@@ -1,5 +1,4 @@
 import { injectable, inject } from 'tsyringe';
-import type { Logger } from 'pino';
 import { eq, and, gte, lte, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { admins } from '../db/schema';
@@ -9,13 +8,14 @@ import { adminResponseSchema, adminListResponseSchema } from '../api/admin';
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { logger } from '../utils/logger';
 
 /**
  * Service for managing admin users with full CRUD operations and audit logging
  */
 @injectable()
 export class AdminService {
-  constructor(@inject('Logger') private readonly logger: Logger, @inject(AuditService) private readonly auditService: AuditService) {}
+  constructor(@inject(AuditService) private readonly auditService: AuditService) {}
 
   /**
    * Creates a new admin user and logs the creation in the audit trail
@@ -24,7 +24,7 @@ export class AdminService {
    * @returns The created admin user (without password)
    */
   async createAdmin(input: CreateAdminRequest, userId?: string): Promise<AdminResponse> {
-    this.logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, userId }, 'Creating admin');
+    logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, userId }, 'Creating admin');
 
     try {
       const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: input.roles, password: input.password, metadata: input.metadata, version: 1 }).returning();
@@ -33,11 +33,11 @@ export class AdminService {
 
       await this.auditService.logCreate('admin', createdAdmin.id, { id: createdAdmin.id, displayName: createdAdmin.displayName, roles: createdAdmin.roles, metadata: createdAdmin.metadata }, userId);
 
-      this.logger.info({ adminId: createdAdmin.id }, 'Admin created successfully');
+      logger.info({ adminId: createdAdmin.id }, 'Admin created successfully');
 
       return adminResponseSchema.parse(createdAdmin);
     } catch (error) {
-      this.logger.error({ error, adminId: input.id }, 'Failed to create admin');
+      logger.error({ error, adminId: input.id }, 'Failed to create admin');
       throw error;
     }
   }
@@ -49,7 +49,7 @@ export class AdminService {
    * @throws {NotFoundError} When admin is not found
    */
   async getAdminById(id: string): Promise<AdminResponse> {
-    this.logger.debug({ adminId: id }, 'Fetching admin by ID');
+    logger.debug({ adminId: id }, 'Fetching admin by ID');
 
     try {
       const admin = await db.query.admins.findFirst({ where: eq(admins.id, id) });
@@ -60,7 +60,7 @@ export class AdminService {
 
       return adminResponseSchema.parse(admin);
     } catch (error) {
-      this.logger.error({ error, adminId: id }, 'Failed to fetch admin');
+      logger.error({ error, adminId: id }, 'Failed to fetch admin');
       throw error;
     }
   }
@@ -71,7 +71,7 @@ export class AdminService {
    * @returns Paginated array of admin users matching the criteria (without passwords)
    */
   async listAdmins(params?: ListParams): Promise<AdminListResponse> {
-    this.logger.debug({ params }, 'Listing admins');
+    logger.debug({ params }, 'Listing admins');
 
     try {
       const conditions: SQL[] = [];
@@ -90,7 +90,7 @@ export class AdminService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
-          const condition = buildFilterCondition(field, filter, columnMap, this.logger);
+          const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
           }
@@ -144,7 +144,7 @@ export class AdminService {
         limit,
       });
     } catch (error) {
-      this.logger.error({ error, params }, 'Failed to list admins');
+      logger.error({ error, params }, 'Failed to list admins');
       throw error;
     }
   }
@@ -160,7 +160,7 @@ export class AdminService {
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
   async updateAdmin(id: string, input: Omit<UpdateAdminRequest, 'version'>, expectedVersion: number, userId?: string): Promise<AdminResponse> {
-    this.logger.info({ adminId: id, expectedVersion, userId }, 'Updating admin');
+    logger.info({ adminId: id, expectedVersion, userId }, 'Updating admin');
 
     try {
       const existingAdmin = await db.query.admins.findFirst({ where: eq(admins.id, id) });
@@ -183,11 +183,11 @@ export class AdminService {
 
       await this.auditService.logUpdate('admin', admin.id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, { id: admin.id, displayName: admin.displayName, roles: admin.roles, metadata: admin.metadata }, userId);
 
-      this.logger.info({ adminId: admin.id, newVersion: admin.version }, 'Admin updated successfully');
+      logger.info({ adminId: admin.id, newVersion: admin.version }, 'Admin updated successfully');
 
       return adminResponseSchema.parse(admin);
     } catch (error) {
-      this.logger.error({ error, adminId: id }, 'Failed to update admin');
+      logger.error({ error, adminId: id }, 'Failed to update admin');
       throw error;
     }
   }
@@ -200,7 +200,7 @@ export class AdminService {
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
   async deleteAdmin(id: string, expectedVersion: number, userId?: string): Promise<void> {
-    this.logger.info({ adminId: id, expectedVersion, userId }, 'Deleting admin');
+    logger.info({ adminId: id, expectedVersion, userId }, 'Deleting admin');
 
     try {
       const existingAdmin = await db.query.admins.findFirst({ where: eq(admins.id, id) });
@@ -221,9 +221,9 @@ export class AdminService {
 
       await this.auditService.logDelete('admin', id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, userId);
 
-      this.logger.info({ adminId: id }, 'Admin deleted successfully');
+      logger.info({ adminId: id }, 'Admin deleted successfully');
     } catch (error) {
-      this.logger.error({ error, adminId: id }, 'Failed to delete admin');
+      logger.error({ error, adminId: id }, 'Failed to delete admin');
       throw error;
     }
   }
@@ -234,12 +234,12 @@ export class AdminService {
    * @returns Array of audit log entries for the admin user
    */
   async getAdminAuditLogs(adminId: string): Promise<any[]> {
-    this.logger.debug({ adminId }, 'Fetching audit logs for admin');
+    logger.debug({ adminId }, 'Fetching audit logs for admin');
 
     try {
       return await this.auditService.getEntityAuditLogs('admin', adminId);
     } catch (error) {
-      this.logger.error({ error, adminId }, 'Failed to fetch admin audit logs');
+      logger.error({ error, adminId }, 'Failed to fetch admin audit logs');
       throw error;
     }
   }

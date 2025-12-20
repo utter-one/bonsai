@@ -9,6 +9,8 @@
 - Prefer types over interfaces
 - Add new types of exceptions (extends Error) to /src/errors.ts
 - Always create and update JSDoc comments for functions, methods and classes if necessary
+- Use IoC container for classes with implicit registration by @singleton or @injectable decorator
+- Always verify changes by running `npm run build`
 
 ## API Contracts and Validation
 - Use Zod schemas as the source of truth for API contracts
