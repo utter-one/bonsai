@@ -12,6 +12,7 @@ import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
+import { PERMISSIONS } from '../config/permissions';
 
 /**
  * Service for managing admin users with full CRUD operations and audit logging
@@ -28,7 +29,8 @@ export class AdminService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created admin user (without password)
    */
-  async createAdmin(input: CreateAdminRequest, context?: RequestContext): Promise<AdminResponse> {
+  async createAdmin(input: CreateAdminRequest, context: RequestContext): Promise<AdminResponse> {
+    this.requirePermission(context, PERMISSIONS.ADMIN_WRITE);
     logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
 
     try {
@@ -167,7 +169,8 @@ export class AdminService extends BaseService {
    * @throws {NotFoundError} When admin is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateAdmin(id: string, input: Omit<UpdateAdminRequest, 'version'>, expectedVersion: number, context?: RequestContext): Promise<AdminResponse> {
+  async updateAdmin(id: string, input: Omit<UpdateAdminRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<AdminResponse> {
+    this.requirePermission(context, PERMISSIONS.ADMIN_WRITE);
     logger.info({ adminId: id, expectedVersion, contextAdminId: context?.adminId }, 'Updating admin');
 
     try {
@@ -220,7 +223,8 @@ export class AdminService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deleteAdmin(id: string, expectedVersion: number, context?: RequestContext): Promise<void> {
+  async deleteAdmin(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+    this.requirePermission(context, PERMISSIONS.ADMIN_DELETE);
     logger.info({ adminId: id, expectedVersion, contextAdminId: context?.adminId }, 'Deleting admin');
 
     try {

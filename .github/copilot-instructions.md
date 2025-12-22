@@ -12,6 +12,35 @@
 - Use IoC container for classes with implicit registration by @singleton or @injectable decorator
 - Always verify changes by running `npm run build`
 
+## Security and Authorization
+- **Defense in depth**: Security checks must be enforced at BOTH controller and service layers
+- **Controller layer** (first line of defense):
+  - Always use `@RequirePermissions([PERMISSIONS.XXX])` decorator on controller endpoints
+  - Place decorator before `@OpenAPI()` decorator
+  - Use appropriate permissions: READ for GET, WRITE for POST/PUT, DELETE for DELETE
+  - Import `PERMISSIONS` from `/src/config/permissions`
+- **Service layer** (critical security boundary):
+  - All write operations (create, update, delete) MUST call `this.requirePermission(context, PERMISSIONS.XXX)` at the start
+  - `context` parameter MUST be required (not optional) for all write operations: `context: RequestContext` not `context?: RequestContext`
+  - Read operations can have optional context but should check if provided
+  - This ensures security even when services are called internally (from other services, background jobs, etc.)
+- **Example pattern**:
+  ```typescript
+  // Controller
+  @RequirePermissions([PERMISSIONS.ADMIN_WRITE])
+  @OpenAPI({ ... })
+  @Post('/')
+  async createAdmin(@Body() body: CreateAdminRequest, @Req() req: Request) {
+    return await this.adminService.createAdmin(body, req.context);
+  }
+  
+  // Service
+  async createAdmin(input: CreateAdminRequest, context: RequestContext): Promise<AdminResponse> {
+    this.requirePermission(context, PERMISSIONS.ADMIN_WRITE);
+    // ... rest of implementation
+  }
+  ```
+
 ## API Contracts and Validation
 - Use Zod schemas as the source of truth for API contracts
 - All API contracts are defined in /src/api using Zod schemas

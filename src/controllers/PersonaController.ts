@@ -3,6 +3,8 @@ import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpC
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
+import { RequirePermissions } from '../decorators/auth';
+import { PERMISSIONS } from '../config/permissions';
 import type { Request } from 'express';
 import { PersonaService } from '../services/PersonaService';
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from '../api/persona';
@@ -22,6 +24,7 @@ export class PersonaController {
    * POST /api/personas
    * Create a new persona
    */
+  @RequirePermissions([PERMISSIONS.PERSONA_WRITE])
   @OpenAPI({
     tags: ['Personas'],
     summary: 'Create a new persona',
@@ -59,6 +62,7 @@ export class PersonaController {
    * GET /api/personas/:id
    * Get a persona by ID
    */
+  @RequirePermissions([PERMISSIONS.PERSONA_READ])
   @OpenAPI({
     tags: ['Personas'],
     summary: 'Get persona by ID',
@@ -85,6 +89,7 @@ export class PersonaController {
    * GET /api/personas
    * List personas with optional filters
    */
+  @RequirePermissions([PERMISSIONS.PERSONA_READ])
   @OpenAPI({
     tags: ['Personas'],
     summary: 'List personas',
@@ -113,6 +118,7 @@ export class PersonaController {
    * PUT /api/personas/:id
    * Update a persona
    */
+  @RequirePermissions([PERMISSIONS.PERSONA_WRITE])
   @OpenAPI({
     tags: ['Personas'],
     summary: 'Update persona',
@@ -151,6 +157,7 @@ export class PersonaController {
    * DELETE /api/personas/:id
    * Delete a persona
    */
+  @RequirePermissions([PERMISSIONS.PERSONA_DELETE])
   @OpenAPI({
     tags: ['Personas'],
     summary: 'Delete persona',
@@ -181,6 +188,7 @@ export class PersonaController {
    * GET /api/personas/:id/audit-logs
    * Get audit logs for a persona
    */
+  @RequirePermissions([PERMISSIONS.AUDIT_READ])
   @OpenAPI({
     tags: ['Personas'],
     summary: 'Get persona audit logs',

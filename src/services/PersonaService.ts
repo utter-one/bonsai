@@ -11,6 +11,7 @@ import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
+import { PERMISSIONS } from '../config/permissions';
 
 /**
  * Service for managing personas with full CRUD operations and audit logging
@@ -27,7 +28,8 @@ export class PersonaService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created persona
    */
-  async createPersona(input: CreatePersonaRequest, context?: RequestContext): Promise<PersonaResponse> {
+  async createPersona(input: CreatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
+    this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
     logger.info({ personaId: input.id, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
@@ -141,12 +143,13 @@ export class PersonaService extends BaseService {
    * @param id - The unique identifier of the persona to update
    * @param input - Persona update data including name, prompt, voiceConfig, and metadata (without version)
    * @param expectedVersion - The expected version number for optimistic locking
-   * @param userId - Optional ID of the user performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @returns The updated persona
    * @throws {NotFoundError} When persona is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updatePersona(id: string, input: Omit<UpdatePersonaRequest, 'version'>, expectedVersion: number, context?: RequestContext): Promise<PersonaResponse> {
+  async updatePersona(id: string, input: Omit<UpdatePersonaRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<PersonaResponse> {
+    this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
     logger.info({ personaId: id, expectedVersion, adminId: context?.adminId }, 'Updating persona');
 
     try {
@@ -187,7 +190,8 @@ export class PersonaService extends BaseService {
    * @throws {NotFoundError} When persona is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deletePersona(id: string, expectedVersion: number, context?: RequestContext): Promise<void> {
+  async deletePersona(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+    this.requirePermission(context, PERMISSIONS.PERSONA_DELETE);
     logger.info({ personaId: id, expectedVersion, adminId: context?.adminId }, 'Deleting persona');
 
     try {

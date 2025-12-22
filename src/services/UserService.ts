@@ -11,6 +11,7 @@ import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
+import { PERMISSIONS } from '../config/permissions';
 
 /**
  * Service for managing users with full CRUD operations and audit logging
@@ -27,7 +28,8 @@ export class UserService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created user
    */
-  async createUser(input: CreateUserRequest, context?: RequestContext): Promise<UserResponse> {
+  async createUser(input: CreateUserRequest, context: RequestContext): Promise<UserResponse> {
+    this.requirePermission(context, PERMISSIONS.USER_WRITE);
     logger.info({ userId: input.id, adminId: context?.adminId }, 'Creating user');
 
     try {
@@ -142,7 +144,8 @@ export class UserService extends BaseService {
    * @returns The updated user
    * @throws {NotFoundError} When user is not found
    */
-  async updateUser(id: string, input: UpdateUserRequest, context?: RequestContext): Promise<UserResponse> {
+  async updateUser(id: string, input: UpdateUserRequest, context: RequestContext): Promise<UserResponse> {
+    this.requirePermission(context, PERMISSIONS.USER_WRITE);
     logger.info({ userId: id, adminId: context?.adminId }, 'Updating user');
 
     try {
@@ -176,7 +179,8 @@ export class UserService extends BaseService {
    * @param id - The unique identifier of the user to delete
    * @param context - Request context for auditing and authorization
    */
-  async deleteUser(id: string, context?: RequestContext): Promise<void> {
+  async deleteUser(id: string, context: RequestContext): Promise<void> {
+    this.requirePermission(context, PERMISSIONS.USER_DELETE);
     logger.info({ userId: id, adminId: context?.adminId }, 'Deleting user');
 
     try {

@@ -11,6 +11,7 @@ import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
+import { PERMISSIONS } from '../config/permissions';
 
 /**
  * Service for managing knowledge base including sections, categories, and items
@@ -32,7 +33,8 @@ export class KnowledgeService extends BaseService {
    * @param context - Request context for auditing
    * @returns The created knowledge section
    */
-  async createKnowledgeSection(input: CreateKnowledgeSectionRequest, context?: RequestContext): Promise<KnowledgeSectionResponse> {
+  async createKnowledgeSection(input: CreateKnowledgeSectionRequest, context: RequestContext): Promise<KnowledgeSectionResponse> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     logger.info({ sectionId: input.id, name: input.name, adminId: context?.adminId }, 'Creating knowledge section');
 
     try {
@@ -130,7 +132,8 @@ export class KnowledgeService extends BaseService {
    * @returns The updated knowledge section
    * @throws {NotFoundError} When section is not found
    */
-  async updateKnowledgeSection(id: string, input: UpdateKnowledgeSectionRequest, context?: RequestContext): Promise<KnowledgeSectionResponse> {
+  async updateKnowledgeSection(id: string, input: UpdateKnowledgeSectionRequest, context: RequestContext): Promise<KnowledgeSectionResponse> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     logger.info({ sectionId: id, adminId: context?.adminId }, 'Updating knowledge section');
 
     try {
@@ -161,7 +164,8 @@ export class KnowledgeService extends BaseService {
    * @param context - Request context for auditing
    * @throws {NotFoundError} When section is not found
    */
-  async deleteKnowledgeSection(id: string, context?: RequestContext): Promise<void> {
+  async deleteKnowledgeSection(id: string, context: RequestContext): Promise<void> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
     logger.info({ sectionId: id, adminId: context?.adminId }, 'Deleting knowledge section');
 
     try {
@@ -192,7 +196,8 @@ export class KnowledgeService extends BaseService {
    * @param context - Request context for auditing
    * @returns The created knowledge category
    */
-  async createKnowledgeCategory(input: CreateKnowledgeCategoryRequest, context?: RequestContext): Promise<KnowledgeCategoryResponse> {
+  async createKnowledgeCategory(input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     logger.info({ categoryId: input.id, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
 
     try {
@@ -294,7 +299,8 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When category is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async updateKnowledgeCategory(id: string, input: Omit<UpdateKnowledgeCategoryRequest, 'version'>, expectedVersion: number, context?: RequestContext): Promise<KnowledgeCategoryResponse> {
+  async updateKnowledgeCategory(id: string, input: Omit<UpdateKnowledgeCategoryRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<KnowledgeCategoryResponse> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     logger.info({ categoryId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge category');
 
     try {
@@ -335,7 +341,8 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When category is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async deleteKnowledgeCategory(id: string, expectedVersion: number, context?: RequestContext): Promise<void> {
+  async deleteKnowledgeCategory(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
     logger.info({ categoryId: id, expectedVersion, adminId: context?.adminId }, 'Deleting knowledge category');
 
     try {
@@ -374,7 +381,8 @@ export class KnowledgeService extends BaseService {
    * @param context - Request context for auditing
    * @returns The created knowledge item
    */
-  async createKnowledgeItem(input: CreateKnowledgeItemRequest, context?: RequestContext): Promise<KnowledgeItemResponse> {
+  async createKnowledgeItem(input: CreateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     logger.info({ itemId: input.id, categoryId: input.categoryId, adminId: context?.adminId }, 'Creating knowledge item');
 
     try {
@@ -478,7 +486,8 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When item is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async updateKnowledgeItem(id: string, input: Omit<UpdateKnowledgeItemRequest, 'version'>, expectedVersion: number, context?: RequestContext): Promise<KnowledgeItemResponse> {
+  async updateKnowledgeItem(id: string, input: Omit<UpdateKnowledgeItemRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<KnowledgeItemResponse> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     logger.info({ itemId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge item');
 
     try {
@@ -519,7 +528,8 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When item is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async deleteKnowledgeItem(id: string, expectedVersion: number, context?: RequestContext): Promise<void> {
+  async deleteKnowledgeItem(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
     logger.info({ itemId: id, expectedVersion, adminId: context?.adminId }, 'Deleting knowledge item');
 
     try {
