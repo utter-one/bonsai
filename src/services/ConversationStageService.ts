@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, and, like, SQL, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/index';
-import { conversationStages } from '../db/schema';
+import { conversationStages, personas, classifiers, contextTransformers, knowledgeSections, globalActions } from '../db/schema';
 import type { CreateConversationStageRequest, UpdateConversationStageRequest, ConversationStageResponse, ConversationStageListResponse } from '../api/conversationStage';
 import type { ListParams } from '../api/common';
 import { conversationStageResponseSchema, conversationStageListResponseSchema } from '../api/conversationStage';
@@ -24,6 +24,69 @@ export class ConversationStageService extends BaseService {
   }
 
   /**
+   * Validates that all referenced entities exist
+   * @param personaId - Persona ID to validate
+   * @param classifierIds - Classifier IDs to validate
+   * @param transformerIds - Transformer IDs to validate
+   * @param knowledgeSectionIds - Knowledge section IDs to validate
+   * @param globalActionIds - Global action IDs to validate
+   * @throws {NotFoundError} When any referenced entity does not exist
+   */
+  private async validateReferencedEntities(personaId: string, classifierIds?: string[], transformerIds?: string[], knowledgeSectionIds?: string[], globalActionIds?: string[]): Promise<void> {
+    const errors: string[] = [];
+
+    // Validate persona exists
+    const persona = await db.query.personas.findFirst({ where: eq(personas.id, personaId) });
+    if (!persona) {
+      errors.push(`Persona with id ${personaId} not found`);
+    }
+
+    // Validate classifiers exist
+    if (classifierIds && classifierIds.length > 0) {
+      const existingClassifiers = await db.query.classifiers.findMany({ where: inArray(classifiers.id, classifierIds) });
+      const existingIds = new Set(existingClassifiers.map(c => c.id));
+      const missingIds = classifierIds.filter(id => !existingIds.has(id));
+      if (missingIds.length > 0) {
+        errors.push(`Classifiers not found: ${missingIds.join(', ')}`);
+      }
+    }
+
+    // Validate transformers exist
+    if (transformerIds && transformerIds.length > 0) {
+      const existingTransformers = await db.query.contextTransformers.findMany({ where: inArray(contextTransformers.id, transformerIds) });
+      const existingIds = new Set(existingTransformers.map(t => t.id));
+      const missingIds = transformerIds.filter(id => !existingIds.has(id));
+      if (missingIds.length > 0) {
+        errors.push(`Context transformers not found: ${missingIds.join(', ')}`);
+      }
+    }
+
+    // Validate knowledge sections exist
+    if (knowledgeSectionIds && knowledgeSectionIds.length > 0) {
+      const existingSections = await db.query.knowledgeSections.findMany({ where: inArray(knowledgeSections.id, knowledgeSectionIds) });
+      const existingIds = new Set(existingSections.map(s => s.id));
+      const missingIds = knowledgeSectionIds.filter(id => !existingIds.has(id));
+      if (missingIds.length > 0) {
+        errors.push(`Knowledge sections not found: ${missingIds.join(', ')}`);
+      }
+    }
+
+    // Validate global actions exist
+    if (globalActionIds && globalActionIds.length > 0) {
+      const existingActions = await db.query.globalActions.findMany({ where: inArray(globalActions.id, globalActionIds) });
+      const existingIds = new Set(existingActions.map(a => a.id));
+      const missingIds = globalActionIds.filter(id => !existingIds.has(id));
+      if (missingIds.length > 0) {
+        errors.push(`Global actions not found: ${missingIds.join(', ')}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new NotFoundError(`Referenced entities validation failed: ${errors.join('; ')}`);
+    }
+  }
+
+  /**
    * Creates a new conversation stage and logs the creation in the audit trail
    * @param input - Conversation stage creation data including stageId, prompt, personaId, and configuration
    * @param context - Request context for auditing and authorization
@@ -34,6 +97,9 @@ export class ConversationStageService extends BaseService {
     logger.info({ stageId: input.stageId, personaId: input.personaId, adminId: context?.adminId }, 'Creating conversation stage');
 
     try {
+      // Validate referenced entities exist
+      await this.validateReferencedEntities(input.personaId, input.classifierIds, input.transformerIds, input.knowledgeSections, input.globalActions);
+
       const stage = await db.insert(conversationStages).values({ stageId: input.stageId, prompt: input.prompt, llmProvider: input.llmProvider ?? null, llmProviderConfig: input.llmProviderConfig ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? {}, useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdStage = stage[0];
@@ -165,6 +231,15 @@ export class ConversationStageService extends BaseService {
       if (existingStage.version !== expectedVersion) {
         throw new OptimisticLockError(`Conversation stage version mismatch. Expected ${expectedVersion}, got ${existingStage.version}`);
       }
+
+      // Validate referenced entities if they are being updated
+      const personaIdToValidate = input.personaId ?? existingStage.personaId;
+      const classifierIdsToValidate = input.classifierIds !== undefined ? input.classifierIds : existingStage.classifierIds;
+      const transformerIdsToValidate = input.transformerIds !== undefined ? input.transformerIds : existingStage.transformerIds;
+      const knowledgeSectionsToValidate = input.knowledgeSections !== undefined ? input.knowledgeSections : existingStage.knowledgeSections;
+      const globalActionsToValidate = input.globalActions !== undefined ? input.globalActions : existingStage.globalActions;
+
+      await this.validateReferencedEntities(personaIdToValidate, classifierIdsToValidate, transformerIdsToValidate, knowledgeSectionsToValidate, globalActionsToValidate);
 
       const updateData: any = { version: existingStage.version + 1, updatedAt: new Date() };
       if (input.prompt !== undefined) updateData.prompt = input.prompt;
