@@ -11,7 +11,7 @@ import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
-import { PERMISSIONS } from '../config/permissions';
+import { PERMISSIONS } from '../permissions';
 
 /**
  * Service for managing users with full CRUD operations and audit logging

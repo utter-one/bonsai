@@ -1,6 +1,6 @@
 import type { RequestContext } from '../types/request-context';
-import type { Permission } from '../config/permissions';
-import { hasAllPermissions } from '../config/permissions';
+import type { Permission } from '../permissions';
+import { hasAllPermissions } from '../permissions';
 import { ForbiddenError } from '../errors';
 import { logger } from '../utils/logger';
 

@@ -18,7 +18,7 @@
   - Always use `@RequirePermissions([PERMISSIONS.XXX])` decorator on controller endpoints
   - Place decorator before `@OpenAPI()` decorator
   - Use appropriate permissions: READ for GET, WRITE for POST/PUT, DELETE for DELETE
-  - Import `PERMISSIONS` from `/src/config/permissions`
+  - Import `PERMISSIONS` from `/src/permissions`
 - **Service layer** (critical security boundary):
   - All write operations (create, update, delete) MUST call `this.requirePermission(context, PERMISSIONS.XXX)` at the start
   - `context` parameter MUST be required (not optional) for all write operations: `context: RequestContext` not `context?: RequestContext`

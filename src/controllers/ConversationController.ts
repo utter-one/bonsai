@@ -4,7 +4,7 @@ import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { RequirePermissions } from '../decorators/auth';
-import { PERMISSIONS } from '../config/permissions';
+import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { ConversationService } from '../services/ConversationService';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../api/conversation';

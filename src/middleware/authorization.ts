@@ -2,8 +2,8 @@ import type { Action, InterceptorInterface } from 'routing-controllers';
 import { Interceptor } from 'routing-controllers';
 import type { Request } from 'express';
 import { getRequiredPermissions, isPublicRoute } from '../decorators/auth';
-import { hasAllPermissions } from '../config/permissions';
-import type { Permission } from '../config/permissions';
+import { hasAllPermissions } from '../permissions';
+import type { Permission } from '../permissions';
 import { UnauthorizedError, ForbiddenError } from '../errors';
 import { logger } from '../utils/logger';
 
