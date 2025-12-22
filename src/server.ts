@@ -15,6 +15,7 @@ import { ClassifierController } from './controllers/ClassifierController';
 import { ContextTransformerController } from './controllers/ContextTransformerController';
 import { ToolController } from './controllers/ToolController';
 import { GlobalActionController } from './controllers/GlobalActionController';
+import { EnvironmentController } from './controllers/EnvironmentController';
 import { AuditController } from './controllers/AuditController';
 import { errorHandler } from './middleware/errorHandler';
 import { optionalAuthMiddleware } from './middleware/auth';
@@ -59,7 +60,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, AuditController],
+    controllers: [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,

@@ -50,6 +50,11 @@ export const PERMISSIONS = {
   GLOBAL_ACTION_WRITE: 'global_action:write',
   GLOBAL_ACTION_DELETE: 'global_action:delete',
 
+  // Environment permissions
+  ENVIRONMENT_READ: 'environment:read',
+  ENVIRONMENT_WRITE: 'environment:write',
+  ENVIRONMENT_DELETE: 'environment:delete',
+
   // Knowledge permissions
   KNOWLEDGE_READ: 'knowledge:read',
   KNOWLEDGE_WRITE: 'knowledge:write',
