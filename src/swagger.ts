@@ -12,6 +12,7 @@ import { conversationResponseSchema, conversationListResponseSchema, conversatio
 import { createConversationStageSchema, updateConversationStageBodySchema, deleteConversationStageBodySchema, conversationStageResponseSchema, conversationStageListResponseSchema } from './api/conversationStage';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './api/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './api/contextTransformer';
+import { auditLogResponseSchema, auditLogListResponseSchema } from './api/audit';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
@@ -24,6 +25,7 @@ import { ConversationController } from './controllers/ConversationController';
 import { ConversationStageController } from './controllers/ConversationStageController';
 import { ClassifierController } from './controllers/ClassifierController';
 import { ContextTransformerController } from './controllers/ContextTransformerController';
+import { AuditController } from './controllers/AuditController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
@@ -141,11 +143,13 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteContextTransformerRequest', deleteContextTransformerBodySchema);
   registry.register('ContextTransformerResponse', contextTransformerResponseSchema);
   registry.register('ContextTransformerListResponse', contextTransformerListResponseSchema);
+  registry.register('AuditLogResponse', auditLogResponseSchema);
+  registry.register('AuditLogListResponse', auditLogListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController, ContextTransformerController];
+  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController, ContextTransformerController, AuditController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {

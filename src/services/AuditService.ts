@@ -1,9 +1,12 @@
 import { injectable } from 'tsyringe';
+import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { auditLogs } from '../db/schema';
 import type { AuditLog } from '../types/models';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
+import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import type { ListParams } from '../api/common';
 
 export interface AuditLogInput {
   userId?: string;
@@ -188,6 +191,76 @@ export class AuditService {
       return logs;
     } catch (error) {
       logger.error({ error, userId }, 'Failed to fetch user audit logs');
+      throw error;
+    }
+  }
+
+  /**
+   * Lists all audit logs with flexible filtering, sorting, and pagination
+   * @param params - List parameters including filters, sorting, pagination, and text search
+   * @returns Paginated array of audit logs matching the criteria
+   */
+  async listAuditLogs(params?: ListParams): Promise<{ items: AuditLog[]; total: number; offset: number; limit: number | null }> {
+    logger.debug({ params }, 'Listing audit logs');
+
+    try {
+      const conditions: SQL[] = [];
+      const offset = params?.offset ?? 0;
+      const limit = params?.limit ?? null;
+
+      // Column map for filter and order by operations
+      const columnMap = {
+        id: auditLogs.id,
+        userId: auditLogs.userId,
+        action: auditLogs.action,
+        entityId: auditLogs.entityId,
+        entityType: auditLogs.entityType,
+        version: auditLogs.version,
+        createdAt: auditLogs.createdAt,
+        updatedAt: auditLogs.updatedAt,
+      };
+
+      // Apply filters
+      if (params?.filters) {
+        for (const [field, filter] of Object.entries(params.filters)) {
+          const condition = buildFilterCondition(field, filter, columnMap, logger);
+          if (condition) {
+            conditions.push(condition);
+          }
+        }
+      }
+
+      // Apply text search (searches action, entityId, and entityType)
+      if (params?.textSearch) {
+        const searchTerm = `%${params.textSearch}%`;
+        conditions.push(like(auditLogs.action, searchTerm));
+      }
+
+      // Build order by clause
+      const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+
+      // Get total count
+      const totalResult = await db.query.auditLogs.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+      });
+      const total = totalResult.length;
+
+      // Get paginated results
+      const logsList = await db.query.auditLogs.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+        orderBy: orderByClause.length > 0 ? orderByClause : [desc(auditLogs.createdAt)],
+        limit: limit ?? undefined,
+        offset,
+      });
+
+      return {
+        items: logsList,
+        total,
+        offset,
+        limit,
+      };
+    } catch (error) {
+      logger.error({ error, params }, 'Failed to list audit logs');
       throw error;
     }
   }
