@@ -6,12 +6,14 @@ import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminR
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './api/user';
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './api/persona';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './api/auth';
+import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './api/knowledge';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
 import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
+import { KnowledgeController } from './controllers/KnowledgeController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
@@ -27,6 +29,19 @@ const userIdParamSchema = z.object({
 
 const personaIdParamSchema = z.object({
   id: z.string().openapi({ description: 'Persona ID', example: 'persona-123' }),
+});
+
+const knowledgeSectionIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Knowledge section ID', example: 'section-123' }),
+});
+
+const knowledgeCategoryIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Knowledge category ID', example: 'category-123' }),
+  categoryId: z.string().optional().openapi({ description: 'Knowledge category ID (for nested routes)', example: 'category-123' }),
+});
+
+const knowledgeItemIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Knowledge item ID', example: 'item-123' }),
 });
 
 /**
@@ -54,17 +69,35 @@ export function getOpenAPISpec(): any {
   registry.register('RefreshTokenRequest', refreshTokenSchema);
   registry.register('LoginResponse', loginResponseSchema);
   registry.register('RefreshTokenResponse', refreshTokenResponseSchema);
+  registry.register('CreateKnowledgeSectionRequest', createKnowledgeSectionSchema);
+  registry.register('UpdateKnowledgeSectionRequest', updateKnowledgeSectionSchema);
+  registry.register('KnowledgeSectionResponse', knowledgeSectionResponseSchema);
+  registry.register('KnowledgeSectionListResponse', knowledgeSectionListResponseSchema);
+  registry.register('CreateKnowledgeCategoryRequest', createKnowledgeCategorySchema);
+  registry.register('UpdateKnowledgeCategoryRequest', updateKnowledgeCategoryBodySchema);
+  registry.register('DeleteKnowledgeCategoryRequest', deleteKnowledgeCategoryBodySchema);
+  registry.register('KnowledgeCategoryResponse', knowledgeCategoryResponseSchema);
+  registry.register('KnowledgeCategoryListResponse', knowledgeCategoryListResponseSchema);
+  registry.register('CreateKnowledgeItemRequest', createKnowledgeItemSchema);
+  registry.register('UpdateKnowledgeItemRequest', updateKnowledgeItemBodySchema);
+  registry.register('DeleteKnowledgeItemRequest', deleteKnowledgeItemBodySchema);
+  registry.register('KnowledgeItemResponse', knowledgeItemResponseSchema);
+  registry.register('KnowledgeItemListResponse', knowledgeItemListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController, AuthController];
+  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
     '/api/admins/:id': adminIdParamSchema,
     '/api/users/:id': userIdParamSchema,
     '/api/personas/:id': personaIdParamSchema,
+    '/api/knowledge/sections/:id': knowledgeSectionIdParamSchema,
+    '/api/knowledge/categories/:id': knowledgeCategoryIdParamSchema,
+    '/api/knowledge/categories/:categoryId': knowledgeCategoryIdParamSchema,
+    '/api/knowledge/items/:id': knowledgeItemIdParamSchema,
   };
 
   // Register API paths from controller metadata
@@ -84,9 +117,9 @@ export function getOpenAPISpec(): any {
       const fullPath = `${basePath}${actionPath}`.replace(/\/\//g, '/');
 
       // Determine if this route has params
-      const hasParams = fullPath.includes(':id');
-      const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '');
-      const paramSchema = hasParams && !fullPath.includes('/audit-logs') ? paramSchemaMap[paramKey] : undefined;
+      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId');
+      const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '').replace(/\/items$/, '');
+      const paramSchema = hasParams && !fullPath.includes('/audit-logs') && !fullPath.endsWith('/items') ? paramSchemaMap[paramKey] : undefined;
 
       // Build request object
       const request: any = { ...openAPIConfig.request };

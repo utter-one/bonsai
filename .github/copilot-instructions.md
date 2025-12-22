@@ -59,7 +59,7 @@
 - Import both the schema and type from API contract files in controllers
 
 ## OpenAPI/Swagger Documentation
-- OpenAPI documentation is generated from Zod schemas and controller decorators using swagger.ts
+- OpenAPI documentation is generated from Zod schemas and controller decorators using /src/swagger.ts - make sure to update this file when changing the API contracts
 - **Use `@OpenAPI()` decorator on controller methods to define endpoint documentation**
   - Place decorator immediately before route decorators (`@Post`, `@Get`, etc.)
   - Include tags, summary, description, request, and responses
