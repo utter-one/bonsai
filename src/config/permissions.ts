@@ -30,6 +30,11 @@ export const PERMISSIONS = {
   KNOWLEDGE_WRITE: 'knowledge:write',
   KNOWLEDGE_DELETE: 'knowledge:delete',
 
+  // Issue permissions
+  ISSUE_READ: 'issue:read',
+  ISSUE_WRITE: 'issue:write',
+  ISSUE_DELETE: 'issue:delete',
+
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',
@@ -67,6 +72,8 @@ export const ROLES = {
       PERMISSIONS.USER_READ,
       PERMISSIONS.USER_WRITE,
       PERMISSIONS.CONVERSATION_READ,
+      PERMISSIONS.ISSUE_READ,
+      PERMISSIONS.ISSUE_WRITE,
       PERMISSIONS.AUDIT_READ,
     ],
   },
@@ -78,6 +85,7 @@ export const ROLES = {
       PERMISSIONS.PERSONA_READ,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.KNOWLEDGE_READ,
+      PERMISSIONS.ISSUE_READ,
       PERMISSIONS.SYSTEM_CONFIG,
       PERMISSIONS.AUDIT_READ,
     ],
@@ -90,6 +98,7 @@ export const ROLES = {
       PERMISSIONS.PERSONA_READ,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.KNOWLEDGE_READ,
+      PERMISSIONS.ISSUE_READ,
       PERMISSIONS.AUDIT_READ,
     ],
   },

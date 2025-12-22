@@ -7,6 +7,7 @@ import { createUserSchema, updateUserBodySchema, userResponseSchema, userListRes
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './api/persona';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './api/auth';
 import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './api/knowledge';
+import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './api/issue';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
@@ -14,6 +15,7 @@ import { UserController } from './controllers/UserController';
 import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
 import { KnowledgeController } from './controllers/KnowledgeController';
+import { IssueController } from './controllers/IssueController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
@@ -42,6 +44,10 @@ const knowledgeCategoryIdParamSchema = z.object({
 
 const knowledgeItemIdParamSchema = z.object({
   id: z.string().openapi({ description: 'Knowledge item ID', example: 'item-123' }),
+});
+
+const issueIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Issue ID', example: '1' }),
 });
 
 /**
@@ -83,11 +89,15 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteKnowledgeItemRequest', deleteKnowledgeItemBodySchema);
   registry.register('KnowledgeItemResponse', knowledgeItemResponseSchema);
   registry.register('KnowledgeItemListResponse', knowledgeItemListResponseSchema);
+  registry.register('CreateIssueRequest', createIssueSchema);
+  registry.register('UpdateIssueRequest', updateIssueBodySchema);
+  registry.register('IssueResponse', issueResponseSchema);
+  registry.register('IssueListResponse', issueListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController];
+  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
@@ -98,6 +108,7 @@ export function getOpenAPISpec(): any {
     '/api/knowledge/categories/:id': knowledgeCategoryIdParamSchema,
     '/api/knowledge/categories/:categoryId': knowledgeCategoryIdParamSchema,
     '/api/knowledge/items/:id': knowledgeItemIdParamSchema,
+    '/api/issues/:id': issueIdParamSchema,
   };
 
   // Register API paths from controller metadata
