@@ -32,12 +32,12 @@ export const actionsSchema = z.record(z.string(), z.unknown()).describe('Action 
 export const llmProviderConfigSchema = z.record(z.string(), z.unknown()).optional().describe('LLM provider-specific configuration settings');
 
 /**
- * Schema for creating a new conversation stage
+ * Schema for creating a new stage
  * Required fields: stageId, prompt, personaId
  * Optional fields: llmProvider, llmProviderConfig, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, classifierIds, transformerIds, metadata
  */
-export const createConversationStageSchema = z.object({
-  stageId: z.string().min(1).describe('Unique identifier for the conversation stage'),
+export const createStageSchema = z.object({
+  stageId: z.string().min(1).describe('Unique identifier for the stage'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
   llmProvider: z.string().nullable().optional().describe('LLM provider identifier (e.g., "openai", "anthropic")'),
   llmProviderConfig: llmProviderConfigSchema.describe('LLM provider-specific configuration'),
@@ -55,10 +55,10 @@ export const createConversationStageSchema = z.object({
 });
 
 /**
- * Schema for updating a conversation stage
+ * Schema for updating a stage
  * All fields are optional except version for optimistic locking
  */
-export const updateConversationStageBodySchema = z.object({
+export const updateStageBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated system prompt'),
   llmProvider: z.string().nullable().optional().describe('Updated LLM provider identifier'),
   llmProviderConfig: llmProviderConfigSchema.describe('Updated LLM provider configuration'),
@@ -77,19 +77,19 @@ export const updateConversationStageBodySchema = z.object({
 });
 
 /**
- * Schema for deleting a conversation stage
+ * Schema for deleting a stage
  * Required field: version for optimistic locking
  */
-export const deleteConversationStageBodySchema = z.object({
+export const deleteStageBodySchema = z.object({
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
 
 /**
- * Schema for conversation stage response
+ * Schema for stage response
  * Includes all fields from the database schema
  */
-export const conversationStageResponseSchema = z.object({
-  stageId: z.string().describe('Unique identifier for the conversation stage'),
+export const stageResponseSchema = z.object({
+  stageId: z.string().describe('Unique identifier for the stage'),
   prompt: z.string().describe('System prompt defining the stage behavior'),
   llmProvider: z.string().nullable().describe('LLM provider identifier'),
   llmProviderConfig: llmProviderConfigSchema.describe('LLM provider configuration'),
@@ -110,27 +110,27 @@ export const conversationStageResponseSchema = z.object({
 });
 
 /**
- * Schema for paginated list of conversation stages
+ * Schema for paginated list of stages
  * Includes pagination metadata: items, total count, offset, and limit
  */
-export const conversationStageListResponseSchema = z.object({
-  items: z.array(conversationStageResponseSchema).describe('Array of conversation stages in the current page'),
-  total: z.number().int().min(0).describe('Total number of conversation stages matching the query'),
+export const stageListResponseSchema = z.object({
+  items: z.array(stageResponseSchema).describe('Array of stages in the current page'),
+  total: z.number().int().min(0).describe('Total number of stages matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
   limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
 });
 
-/** Request body for creating a new conversation stage */
-export type CreateConversationStageRequest = z.infer<typeof createConversationStageSchema>;
+/** Request body for creating a new stage */
+export type CreateStageRequest = z.infer<typeof createStageSchema>;
 
-/** Request body for updating a conversation stage */
-export type UpdateConversationStageRequest = z.infer<typeof updateConversationStageBodySchema>;
+/** Request body for updating a stage */
+export type UpdateStageRequest = z.infer<typeof updateStageBodySchema>;
 
-/** Request body for deleting a conversation stage */
-export type DeleteConversationStageRequest = z.infer<typeof deleteConversationStageBodySchema>;
+/** Request body for deleting a stage */
+export type DeleteStageRequest = z.infer<typeof deleteStageBodySchema>;
 
-/** Response for a single conversation stage */
-export type ConversationStageResponse = z.infer<typeof conversationStageResponseSchema>;
+/** Response for a single stage */
+export type StageResponse = z.infer<typeof stageResponseSchema>;
 
-/** Response for paginated list of conversation stages with metadata */
-export type ConversationStageListResponse = z.infer<typeof conversationStageListResponseSchema>;
+/** Response for paginated list of stages with metadata */
+export type StageListResponse = z.infer<typeof stageListResponseSchema>;

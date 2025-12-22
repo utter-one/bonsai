@@ -9,7 +9,7 @@ import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenRespo
 import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './api/knowledge';
 import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './api/issue';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './api/conversation';
-import { createConversationStageSchema, updateConversationStageBodySchema, deleteConversationStageBodySchema, conversationStageResponseSchema, conversationStageListResponseSchema } from './api/conversationStage';
+import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './api/stage';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './api/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './api/contextTransformer';
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './api/tool';
@@ -25,7 +25,7 @@ import { AuthController } from './controllers/AuthController';
 import { KnowledgeController } from './controllers/KnowledgeController';
 import { IssueController } from './controllers/IssueController';
 import { ConversationController } from './controllers/ConversationController';
-import { ConversationStageController } from './controllers/ConversationStageController';
+import { StageController } from './controllers/StageController';
 import { ClassifierController } from './controllers/ClassifierController';
 import { ContextTransformerController } from './controllers/ContextTransformerController';
 import { ToolController } from './controllers/ToolController';
@@ -75,8 +75,8 @@ const conversationEventIdParamSchema = z.object({
   eventId: z.string().openapi({ description: 'Event ID', example: 'event-123' }),
 });
 
-const conversationStageIdParamSchema = z.object({
-  stageId: z.string().openapi({ description: 'Conversation stage ID', example: 'stage-123' }),
+const stageIdParamSchema = z.object({
+  stageId: z.string().openapi({ description: 'Stage ID', example: 'stage-123' }),
 });
 
 const classifierIdParamSchema = z.object({
@@ -146,11 +146,11 @@ export function getOpenAPISpec(): any {
   registry.register('ConversationListResponse', conversationListResponseSchema);
   registry.register('ConversationEventResponse', conversationEventResponseSchema);
   registry.register('ConversationEventListResponse', conversationEventListResponseSchema);
-  registry.register('CreateConversationStageRequest', createConversationStageSchema);
-  registry.register('UpdateConversationStageRequest', updateConversationStageBodySchema);
-  registry.register('DeleteConversationStageRequest', deleteConversationStageBodySchema);
-  registry.register('ConversationStageResponse', conversationStageResponseSchema);
-  registry.register('ConversationStageListResponse', conversationStageListResponseSchema);
+  registry.register('CreateStageRequest', createStageSchema);
+  registry.register('UpdateStageRequest', updateStageBodySchema);
+  registry.register('DeleteStageRequest', deleteStageBodySchema);
+  registry.register('StageResponse', stageResponseSchema);
+  registry.register('StageListResponse', stageListResponseSchema);
   registry.register('CreateClassifierRequest', createClassifierSchema);
   registry.register('UpdateClassifierRequest', updateClassifierBodySchema);
   registry.register('DeleteClassifierRequest', deleteClassifierBodySchema);
@@ -182,7 +182,9 @@ export function getOpenAPISpec(): any {
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController];
+  const controllers = [AuthController, AdminController, UserController, 
+    ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
+    PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, AuditController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
@@ -196,7 +198,7 @@ export function getOpenAPISpec(): any {
     '/api/issues/:id': issueIdParamSchema,
     '/api/conversations/:id': conversationIdParamSchema,
     '/api/conversations/:id/events/:eventId': conversationEventIdParamSchema,
-    '/api/conversation-stages/:stageId': conversationStageIdParamSchema,
+    '/api/stages/:stageId': stageIdParamSchema,
     '/api/classifiers/:id': classifierIdParamSchema,
     '/api/context-transformers/:id': contextTransformerIdParamSchema,
     '/api/tools/:id': toolIdParamSchema,

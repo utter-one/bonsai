@@ -150,7 +150,7 @@ Represents an AI assistant character/personality with voice and behavior configu
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
 ### Relationships
-- Referenced by ConversationStage (`personaId`)
+- Referenced by Stage (`personaId`)
 
 ### Indexes
 - Primary key on `id`
@@ -177,7 +177,7 @@ Represents an AI assistant character/personality with voice and behavior configu
 
 ---
 
-## ConversationStage
+## Stage
 
 Represents a stage in the conversation flow with prompts, variable extraction, action handling, and transition rules.
 
@@ -242,7 +242,7 @@ Represents a reusable classifier for user input analysis that can be shared acro
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
 ### Relationships
-- Referenced by ConversationStage via `classifierIds` array
+- Referenced by Stage via `classifierIds` array
 
 ### Indexes
 - Primary key on `id`
@@ -270,7 +270,7 @@ Represents a reusable context transformer for data transformation that can be sh
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
 ### Relationships
-- Referenced by ConversationStage via `transformerIds` array
+- Referenced by Stage via `transformerIds` array
 
 ### Indexes
 - Primary key on `id`
@@ -299,7 +299,7 @@ Represents a reusable tool that can be invoked during conversation stages for LL
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
 ### Relationships
-None (Tools can be referenced by pipeline nodes in ConversationStage)
+None (Tools can be referenced by pipeline nodes in Stage)
 
 ### Indexes
 - Primary key on `id`
@@ -321,7 +321,7 @@ Represents a section for categorizing knowledge content.
 
 ### Relationships
 - Referenced by KnowledgeCategory (`knowledgeSections`)
-- Referenced by ConversationStage (`knowledgeSections`)
+- Referenced by Stage (`knowledgeSections`)
 
 ### Indexes
 - Primary key on `id`
@@ -565,7 +565,7 @@ The following entities use version-based optimistic locking to prevent concurren
 - **Classifier** (`version` field)
 - **ContextTransformer** (`version` field)
 - **Tool** (`version` field)
-- **ConversationStage** (`version` field)
+- **Stage** (`version` field)
 - **KnowledgeCategory** (`version` field)
 - **KnowledgeItem** (`version` field)
 - **GlobalAction** (`version` field)

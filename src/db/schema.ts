@@ -109,8 +109,8 @@ export const tools = pgTable('tools', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// ConversationStage table
-export const conversationStages = pgTable('conversation_stages', {
+// Stage table
+export const stages = pgTable('stages', {
   stageId: text('stage_id').primaryKey(),
   prompt: text('prompt').notNull(),
   llmProvider: text('llm_provider'),
@@ -256,9 +256,9 @@ export const conversationEventsRelations = relations(conversationEvents, ({ one 
   }),
 }));
 
-export const conversationStagesRelations = relations(conversationStages, ({ one }) => ({
+export const stagesRelations = relations(stages, ({ one }) => ({
   persona: one(personas, {
-    fields: [conversationStages.personaId],
+    fields: [stages.personaId],
     references: [personas.id],
   }),
 }));
