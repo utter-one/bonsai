@@ -11,6 +11,7 @@ import { KnowledgeController } from './controllers/KnowledgeController';
 import { IssueController } from './controllers/IssueController';
 import { ConversationController } from './controllers/ConversationController';
 import { ConversationStageController } from './controllers/ConversationStageController';
+import { ClassifierController } from './controllers/ClassifierController';
 import { errorHandler } from './middleware/errorHandler';
 import { optionalAuthMiddleware } from './middleware/auth';
 import { requestContextMiddleware } from './middleware/requestContext';
@@ -54,7 +55,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController],
+    controllers: [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,

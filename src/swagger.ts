@@ -10,6 +10,7 @@ import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSe
 import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './api/issue';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './api/conversation';
 import { createConversationStageSchema, updateConversationStageBodySchema, deleteConversationStageBodySchema, conversationStageResponseSchema, conversationStageListResponseSchema } from './api/conversationStage';
+import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './api/classifier';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
@@ -20,6 +21,7 @@ import { KnowledgeController } from './controllers/KnowledgeController';
 import { IssueController } from './controllers/IssueController';
 import { ConversationController } from './controllers/ConversationController';
 import { ConversationStageController } from './controllers/ConversationStageController';
+import { ClassifierController } from './controllers/ClassifierController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
@@ -65,6 +67,10 @@ const conversationEventIdParamSchema = z.object({
 
 const conversationStageIdParamSchema = z.object({
   stageId: z.string().openapi({ description: 'Conversation stage ID', example: 'stage-123' }),
+});
+
+const classifierIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Classifier ID', example: 'classifier-123' }),
 });
 
 /**
@@ -119,11 +125,16 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteConversationStageRequest', deleteConversationStageBodySchema);
   registry.register('ConversationStageResponse', conversationStageResponseSchema);
   registry.register('ConversationStageListResponse', conversationStageListResponseSchema);
+  registry.register('CreateClassifierRequest', createClassifierSchema);
+  registry.register('UpdateClassifierRequest', updateClassifierBodySchema);
+  registry.register('DeleteClassifierRequest', deleteClassifierBodySchema);
+  registry.register('ClassifierResponse', classifierResponseSchema);
+  registry.register('ClassifierListResponse', classifierListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController];
+  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
@@ -138,6 +149,7 @@ export function getOpenAPISpec(): any {
     '/api/conversations/:id': conversationIdParamSchema,
     '/api/conversations/:id/events/:eventId': conversationEventIdParamSchema,
     '/api/conversation-stages/:stageId': conversationStageIdParamSchema,
+    '/api/classifiers/:id': classifierIdParamSchema,
   };
 
   // Register API paths from controller metadata
