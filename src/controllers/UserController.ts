@@ -3,6 +3,8 @@ import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpC
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
+import { RequirePermissions } from '../decorators/auth';
+import { PERMISSIONS } from '../config/permissions';
 import type { Request } from 'express';
 import { UserService } from '../services/UserService';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from '../api/user';
@@ -48,10 +50,11 @@ export class UserController {
       409: { description: 'User already exists' },
     },
   })
+  @RequirePermissions([PERMISSIONS.USER_WRITE])
   @Post('/')
   @HttpCode(201)
   async createUser(@Validated(createUserSchema) @Body() body: CreateUserRequest, @Req() req: Request) {
-    const user = await this.userService.createUser(body, req.context?.userId);
+    const user = await this.userService.createUser(body, req.context);
     return user;
   }
 
@@ -75,6 +78,7 @@ export class UserController {
       404: { description: 'User not found' },
     },
   })
+  @RequirePermissions([PERMISSIONS.USER_READ])
   @Get('/:id')
   async getUserById(@Param('id') id: string) {
     const user = await this.userService.getUserById(id);
@@ -104,6 +108,7 @@ export class UserController {
       400: { description: 'Invalid query parameters' },
     },
   })
+  @RequirePermissions([PERMISSIONS.USER_READ])
   @Get('/')
   async listUsers(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
     return await this.userService.listUsers(query);
@@ -139,9 +144,10 @@ export class UserController {
       404: { description: 'User not found' },
     },
   })
+  @RequirePermissions([PERMISSIONS.USER_WRITE])
   @Put('/:id')
   async updateUser(@Param('id') id: string, @Validated(updateUserBodySchema) @Body() body: UpdateUserRequest, @Req() req: Request) {
-    const user = await this.userService.updateUser(id, body, req.context?.userId);
+    const user = await this.userService.updateUser(id, body, req.context);
     return user;
   }
 
@@ -158,10 +164,11 @@ export class UserController {
       404: { description: 'User not found' },
     },
   })
+  @RequirePermissions([PERMISSIONS.USER_DELETE])
   @Delete('/:id')
   @HttpCode(204)
   async deleteUser(@Param('id') id: string, @Req() req: Request) {
-    await this.userService.deleteUser(id, req.context?.userId);
+    await this.userService.deleteUser(id, req.context);
   }
 
   /**
@@ -179,6 +186,7 @@ export class UserController {
       404: { description: 'User not found' },
     },
   })
+  @RequirePermissions([PERMISSIONS.AUDIT_READ])
   @Get('/:id/audit-logs')
   async getUserAuditLogs(@Param('id') id: string) {
     return await this.userService.getUserAuditLogs(id);

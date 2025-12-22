@@ -3,6 +3,8 @@ import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpC
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
+import { RequirePermissions } from '../decorators/auth';
+import { PERMISSIONS } from '../config/permissions';
 import type { Request } from 'express';
 import { AdminService } from '../services/AdminService';
 import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from '../api/admin';
@@ -48,10 +50,11 @@ export class AdminController {
       409: { description: 'Admin user already exists' },
     },
   })
+  @RequirePermissions([PERMISSIONS.ADMIN_WRITE])
   @Post('/')
   @HttpCode(201)
   async createAdmin(@Validated(createAdminSchema) @Body() body: CreateAdminRequest, @Req() req: Request) {
-    const admin = await this.adminService.createAdmin(body, req.context?.userId);
+    const admin = await this.adminService.createAdmin(body, req.context);
     return admin;
   }
 
@@ -75,6 +78,7 @@ export class AdminController {
       404: { description: 'Admin user not found' },
     },
   })
+  @RequirePermissions([PERMISSIONS.ADMIN_READ])
   @Get('/:id')
   async getAdminById(@Param('id') id: string) {
     const admin = await this.adminService.getAdminById(id);
@@ -104,6 +108,7 @@ export class AdminController {
       400: { description: 'Invalid query parameters' },
     },
   })
+  @RequirePermissions([PERMISSIONS.ADMIN_READ])
   @Get('/')
   async listAdmins(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
     return await this.adminService.listAdmins(query);
@@ -140,10 +145,11 @@ export class AdminController {
       409: { description: 'Version conflict - entity was modified' },
     },
   })
+  @RequirePermissions([PERMISSIONS.ADMIN_WRITE])
   @Put('/:id')
   async updateAdmin(@Param('id') id: string, @Validated(updateAdminBodySchema) @Body() body: UpdateAdminRequest, @Req() req: Request) {
     const { version, ...updateData } = body;
-    const admin = await this.adminService.updateAdmin(id, updateData, version, req.context?.userId);
+    const admin = await this.adminService.updateAdmin(id, updateData, version, req.context);
     return admin;
   }
 
@@ -171,11 +177,12 @@ export class AdminController {
       409: { description: 'Version conflict - entity was modified' },
     },
   })
+  @RequirePermissions([PERMISSIONS.ADMIN_DELETE])
   @Delete('/:id')
   @HttpCode(204)
   async deleteAdmin(@Param('id') id: string, @Validated(deleteAdminBodySchema) @Body() body: DeleteAdminRequest, @Req() req: Request) {
     const { version } = body;
-    await this.adminService.deleteAdmin(id, version, req.context?.userId);
+    await this.adminService.deleteAdmin(id, version, req.context);
   }
 
   /**
@@ -193,6 +200,7 @@ export class AdminController {
       404: { description: 'Admin user not found' },
     },
   })
+  @RequirePermissions([PERMISSIONS.AUDIT_READ])
   @Get('/:id/audit-logs')
   async getAdminAuditLogs(@Param('id') id: string) {
     return await this.adminService.getAdminAuditLogs(id);

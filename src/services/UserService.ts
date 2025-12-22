@@ -9,29 +9,33 @@ import { AuditService } from './AuditService';
 import { NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
+import { BaseService } from './BaseService';
+import type { RequestContext } from '../types/request-context';
 
 /**
  * Service for managing users with full CRUD operations and audit logging
  */
 @injectable()
-export class UserService {
-  constructor(@inject(AuditService) private readonly auditService: AuditService) {}
+export class UserService extends BaseService {
+  constructor(@inject(AuditService) private readonly auditService: AuditService) {
+    super();
+  }
 
   /**
    * Creates a new user and logs the creation in the audit trail
    * @param input - User creation data including id and profile
-   * @param adminId - Optional ID of the admin performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @returns The created user
    */
-  async createUser(input: CreateUserRequest, adminId?: string): Promise<UserResponse> {
-    logger.info({ userId: input.id, adminId }, 'Creating user');
+  async createUser(input: CreateUserRequest, context?: RequestContext): Promise<UserResponse> {
+    logger.info({ userId: input.id, adminId: context?.adminId }, 'Creating user');
 
     try {
       const user = await db.insert(users).values({ id: input.id, profile: input.profile }).returning();
 
       const createdUser = user[0];
 
-      await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, profile: createdUser.profile }, adminId);
+      await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, profile: createdUser.profile }, context?.adminId);
 
       logger.info({ userId: createdUser.id }, 'User created successfully');
 
@@ -134,12 +138,12 @@ export class UserService {
    * Updates a user
    * @param id - The unique identifier of the user to update
    * @param input - User update data including profile
-   * @param adminId - Optional ID of the admin performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @returns The updated user
    * @throws {NotFoundError} When user is not found
    */
-  async updateUser(id: string, input: UpdateUserRequest, adminId?: string): Promise<UserResponse> {
-    logger.info({ userId: id, adminId }, 'Updating user');
+  async updateUser(id: string, input: UpdateUserRequest, context?: RequestContext): Promise<UserResponse> {
+    logger.info({ userId: id, adminId: context?.adminId }, 'Updating user');
 
     try {
       const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -156,7 +160,7 @@ export class UserService {
 
       const user = updatedUser[0];
 
-      await this.auditService.logUpdate('user', user.id, { id: existingUser.id, profile: existingUser.profile }, { id: user.id, profile: user.profile }, adminId);
+      await this.auditService.logUpdate('user', user.id, { id: existingUser.id, profile: existingUser.profile }, { id: user.id, profile: user.profile }, context?.adminId);
 
       logger.info({ userId: user.id }, 'User updated successfully');
 
@@ -170,10 +174,10 @@ export class UserService {
   /**
    * Deletes a user
    * @param id - The unique identifier of the user to delete
-   * @param adminId - Optional ID of the admin performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    */
-  async deleteUser(id: string, adminId?: string): Promise<void> {
-    logger.info({ userId: id, adminId }, 'Deleting user');
+  async deleteUser(id: string, context?: RequestContext): Promise<void> {
+    logger.info({ userId: id, adminId: context?.adminId }, 'Deleting user');
 
     try {
       const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -188,7 +192,7 @@ export class UserService {
         throw new NotFoundError(`User with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('user', id, { id: existingUser.id, profile: existingUser.profile }, adminId);
+      await this.auditService.logDelete('user', id, { id: existingUser.id, profile: existingUser.profile }, context?.adminId);
 
       logger.info({ userId: id }, 'User deleted successfully');
     } catch (error) {

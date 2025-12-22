@@ -6,9 +6,12 @@ import swaggerUi from 'swagger-ui-express';
 import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
 import { PersonaController } from './controllers/PersonaController';
+import { AuthController } from './controllers/AuthController';
 import { errorHandler } from './middleware/errorHandler';
-import { authContextMiddleware } from './middleware/authContext';
+import { optionalAuthMiddleware } from './middleware/auth';
+import { requestContextMiddleware } from './middleware/requestContext';
 import { ValidationMiddleware } from './middleware/validation';
+import { PermissionInterceptor } from './middleware/authorization';
 import { getOpenAPISpec } from './swagger';
 import logger from './utils/logger';
 
@@ -36,15 +39,20 @@ export function createApp(): express.Application {
     },
   }));
 
-  app.use(authContextMiddleware);
+  // Authentication middleware (optional - sets req.user if token is valid)
+  app.use(optionalAuthMiddleware);
+  
+  // Request context middleware (creates req.context from req.user)
+  app.use(requestContextMiddleware);
 
   useContainer({
     get: (cls) => container.resolve(cls),
   });
 
   useExpressServer(app, {
-    controllers: [AdminController, UserController, PersonaController],
+    controllers: [AdminController, UserController, PersonaController, AuthController],
     middlewares: [ValidationMiddleware],
+    interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
   });
 

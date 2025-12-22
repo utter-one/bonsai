@@ -6,32 +6,40 @@ import type { CreateAdminRequest, UpdateAdminRequest, AdminResponse, AdminListRe
 import type { ListParams } from '../api/common';
 import { adminResponseSchema, adminListResponseSchema } from '../api/admin';
 import { AuditService } from './AuditService';
+import { AuthService } from './AuthService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
+import { BaseService } from './BaseService';
+import type { RequestContext } from '../types/request-context';
 
 /**
  * Service for managing admin users with full CRUD operations and audit logging
  */
 @injectable()
-export class AdminService {
-  constructor(@inject(AuditService) private readonly auditService: AuditService) {}
+export class AdminService extends BaseService {
+  constructor(@inject(AuditService) private readonly auditService: AuditService, @inject(AuthService) private readonly authService: AuthService) {
+    super();
+  }
 
   /**
    * Creates a new admin user and logs the creation in the audit trail
    * @param input - Admin creation data including id, displayName, roles, password, and optional metadata
-   * @param userId - Optional ID of the user performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @returns The created admin user (without password)
    */
-  async createAdmin(input: CreateAdminRequest, userId?: string): Promise<AdminResponse> {
-    logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, userId }, 'Creating admin');
+  async createAdmin(input: CreateAdminRequest, context?: RequestContext): Promise<AdminResponse> {
+    logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
 
     try {
-      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: input.roles, password: input.password, metadata: input.metadata, version: 1 }).returning();
+      // Hash password before storing
+      const hashedPassword = await this.authService.hashPassword(input.password);
+
+      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: input.roles, password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
 
       const createdAdmin = admin[0];
 
-      await this.auditService.logCreate('admin', createdAdmin.id, { id: createdAdmin.id, displayName: createdAdmin.displayName, roles: createdAdmin.roles, metadata: createdAdmin.metadata }, userId);
+      await this.auditService.logCreate('admin', createdAdmin.id, { id: createdAdmin.id, displayName: createdAdmin.displayName, roles: createdAdmin.roles, metadata: createdAdmin.metadata }, context?.adminId);
 
       logger.info({ adminId: createdAdmin.id }, 'Admin created successfully');
 
@@ -154,13 +162,13 @@ export class AdminService {
    * @param id - The unique identifier of the admin user to update
    * @param input - Admin update data including displayName, roles, password, and metadata (without version)
    * @param expectedVersion - The expected version number for optimistic locking
-   * @param userId - Optional ID of the user performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @returns The updated admin user (without password)
    * @throws {NotFoundError} When admin is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateAdmin(id: string, input: Omit<UpdateAdminRequest, 'version'>, expectedVersion: number, userId?: string): Promise<AdminResponse> {
-    logger.info({ adminId: id, expectedVersion, userId }, 'Updating admin');
+  async updateAdmin(id: string, input: Omit<UpdateAdminRequest, 'version'>, expectedVersion: number, context?: RequestContext): Promise<AdminResponse> {
+    logger.info({ adminId: id, expectedVersion, contextAdminId: context?.adminId }, 'Updating admin');
 
     try {
       const existingAdmin = await db.query.admins.findFirst({ where: eq(admins.id, id) });
@@ -173,7 +181,20 @@ export class AdminService {
         throw new OptimisticLockError(`Admin version mismatch. Expected ${expectedVersion}, got ${existingAdmin.version}`);
       }
 
-      const updatedAdmin = await db.update(admins).set({ displayName: input.displayName, roles: input.roles, password: input.password, metadata: input.metadata, version: existingAdmin.version + 1, updatedAt: new Date() }).where(and(eq(admins.id, id), eq(admins.version, expectedVersion))).returning();
+      // Hash password if it's being updated
+      const updateData: any = {
+        displayName: input.displayName,
+        roles: input.roles,
+        metadata: input.metadata,
+        version: existingAdmin.version + 1,
+        updatedAt: new Date(),
+      };
+
+      if (input.password) {
+        updateData.password = await this.authService.hashPassword(input.password);
+      }
+
+      const updatedAdmin = await db.update(admins).set(updateData).where(and(eq(admins.id, id), eq(admins.version, expectedVersion))).returning();
 
       if (updatedAdmin.length === 0) {
         throw new OptimisticLockError(`Failed to update admin due to version conflict`);
@@ -181,7 +202,7 @@ export class AdminService {
 
       const admin = updatedAdmin[0];
 
-      await this.auditService.logUpdate('admin', admin.id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, { id: admin.id, displayName: admin.displayName, roles: admin.roles, metadata: admin.metadata }, userId);
+      await this.auditService.logUpdate('admin', admin.id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, { id: admin.id, displayName: admin.displayName, roles: admin.roles, metadata: admin.metadata }, context?.adminId);
 
       logger.info({ adminId: admin.id, newVersion: admin.version }, 'Admin updated successfully');
 
@@ -196,11 +217,11 @@ export class AdminService {
    * Deletes an admin user using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the admin user to delete
    * @param expectedVersion - The expected version number for optimistic locking
-   * @param userId - Optional ID of the user performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deleteAdmin(id: string, expectedVersion: number, userId?: string): Promise<void> {
-    logger.info({ adminId: id, expectedVersion, userId }, 'Deleting admin');
+  async deleteAdmin(id: string, expectedVersion: number, context?: RequestContext): Promise<void> {
+    logger.info({ adminId: id, expectedVersion, contextAdminId: context?.adminId }, 'Deleting admin');
 
     try {
       const existingAdmin = await db.query.admins.findFirst({ where: eq(admins.id, id) });
@@ -219,7 +240,7 @@ export class AdminService {
         throw new OptimisticLockError(`Failed to delete admin due to version conflict`);
       }
 
-      await this.auditService.logDelete('admin', id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, userId);
+      await this.auditService.logDelete('admin', id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, context?.adminId);
 
       logger.info({ adminId: id }, 'Admin deleted successfully');
     } catch (error) {

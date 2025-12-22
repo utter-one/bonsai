@@ -38,3 +38,23 @@ export class AccessDeniedError extends Error {
     this.name = 'AccessDeniedError';
   }
 }
+
+/**
+ * Error thrown when authentication is required but not provided
+ */
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+/**
+ * Error thrown when user lacks required permissions
+ */
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}

@@ -5,11 +5,13 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from './api/admin';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './api/user';
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './api/persona';
+import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './api/auth';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
 import { PersonaController } from './controllers/PersonaController';
+import { AuthController } from './controllers/AuthController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
@@ -48,11 +50,15 @@ export function getOpenAPISpec(): any {
   registry.register('DeletePersonaRequest', deletePersonaBodySchema);
   registry.register('PersonaResponse', personaResponseSchema);
   registry.register('PersonaListResponse', personaListResponseSchema);
+  registry.register('LoginRequest', loginSchema);
+  registry.register('RefreshTokenRequest', refreshTokenSchema);
+  registry.register('LoginResponse', loginResponseSchema);
+  registry.register('RefreshTokenResponse', refreshTokenResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController];
+  const controllers = [AdminController, UserController, PersonaController, AuthController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
@@ -102,11 +108,11 @@ export function getOpenAPISpec(): any {
 
   const generator = new OpenApiGeneratorV3(registry.definitions);
 
-  return generator.generateDocument({
+  const document = generator.generateDocument({
     openapi: '3.0.0',
     info: {
       title: 'Nexus Admin API',
-      description: 'API documentation for Nexus Admin API',
+      description: 'API documentation for Nexus Admin API with JWT authentication',
       version: '0.1.0',
     },
     servers: [
@@ -116,4 +122,20 @@ export function getOpenAPISpec(): any {
       },
     ],
   });
+
+  // Add security schemes to the generated document
+  document.components = document.components || {};
+  document.components.securitySchemes = {
+    bearerAuth: {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'JWT access token obtained from /api/auth/login',
+    },
+  };
+
+  // Apply security globally (except for public routes which don't require it)
+  document.security = [{ bearerAuth: [] }];
+
+  return document;
 }

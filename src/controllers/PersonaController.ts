@@ -51,7 +51,7 @@ export class PersonaController {
   @Post('/')
   @HttpCode(201)
   async createPersona(@Validated(createPersonaSchema) @Body() body: CreatePersonaRequest, @Req() req: Request) {
-    const persona = await this.personaService.createPersona(body, req.context?.userId);
+    const persona = await this.personaService.createPersona(body, req.context);
     return persona;
   }
 
@@ -143,7 +143,7 @@ export class PersonaController {
   @Put('/:id')
   async updatePersona(@Param('id') id: string, @Validated(updatePersonaBodySchema) @Body() body: UpdatePersonaRequest, @Req() req: Request) {
     const { version, ...updateData } = body;
-    const persona = await this.personaService.updatePersona(id, updateData, version, req.context?.userId);
+    const persona = await this.personaService.updatePersona(id, updateData, version, req.context);
     return persona;
   }
 
@@ -174,7 +174,7 @@ export class PersonaController {
   @Delete('/:id')
   @HttpCode(204)
   async deletePersona(@Param('id') id: string, @Validated(deletePersonaBodySchema) @Body() body: DeletePersonaRequest, @Req() req: Request) {
-    await this.personaService.deletePersona(id, body.version, req.context?.userId);
+    await this.personaService.deletePersona(id, body.version, req.context);
   }
 
   /**

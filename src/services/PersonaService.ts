@@ -9,29 +9,33 @@ import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
+import { BaseService } from './BaseService';
+import type { RequestContext } from '../types/request-context';
 
 /**
  * Service for managing personas with full CRUD operations and audit logging
  */
 @injectable()
-export class PersonaService {
-  constructor(@inject(AuditService) private readonly auditService: AuditService) {}
+export class PersonaService extends BaseService {
+  constructor(@inject(AuditService) private readonly auditService: AuditService) {
+    super();
+  }
 
   /**
    * Creates a new persona and logs the creation in the audit trail
    * @param input - Persona creation data including id, name, prompt, voiceConfig, and optional metadata
-   * @param userId - Optional ID of the user performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @returns The created persona
    */
-  async createPersona(input: CreatePersonaRequest, userId?: string): Promise<PersonaResponse> {
-    logger.info({ personaId: input.id, name: input.name, userId }, 'Creating persona');
+  async createPersona(input: CreatePersonaRequest, context?: RequestContext): Promise<PersonaResponse> {
+    logger.info({ personaId: input.id, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
       const persona = await db.insert(personas).values({ id: input.id, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
 
       const createdPersona = persona[0];
 
-      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, name: createdPersona.name, prompt: createdPersona.prompt, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, userId);
+      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, name: createdPersona.name, prompt: createdPersona.prompt, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: createdPersona.id }, 'Persona created successfully');
 
@@ -142,8 +146,8 @@ export class PersonaService {
    * @throws {NotFoundError} When persona is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updatePersona(id: string, input: Omit<UpdatePersonaRequest, 'version'>, expectedVersion: number, userId?: string): Promise<PersonaResponse> {
-    logger.info({ personaId: id, expectedVersion, userId }, 'Updating persona');
+  async updatePersona(id: string, input: Omit<UpdatePersonaRequest, 'version'>, expectedVersion: number, context?: RequestContext): Promise<PersonaResponse> {
+    logger.info({ personaId: id, expectedVersion, adminId: context?.adminId }, 'Updating persona');
 
     try {
       const existingPersona = await db.query.personas.findFirst({ where: eq(personas.id, id) });
@@ -164,7 +168,7 @@ export class PersonaService {
 
       const persona = updatedPersona[0];
 
-      await this.auditService.logUpdate('persona', persona.id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, { id: persona.id, name: persona.name, prompt: persona.prompt, voiceConfig: persona.voiceConfig, metadata: persona.metadata }, userId);
+      await this.auditService.logUpdate('persona', persona.id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, { id: persona.id, name: persona.name, prompt: persona.prompt, voiceConfig: persona.voiceConfig, metadata: persona.metadata }, context?.adminId);
 
       logger.info({ personaId: persona.id, newVersion: persona.version }, 'Persona updated successfully');
 
@@ -179,12 +183,12 @@ export class PersonaService {
    * Deletes a persona using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the persona to delete
    * @param expectedVersion - The expected version number for optimistic locking
-   * @param userId - Optional ID of the user performing the action for audit purposes
+   * @param context - Request context for auditing and authorization
    * @throws {NotFoundError} When persona is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deletePersona(id: string, expectedVersion: number, userId?: string): Promise<void> {
-    logger.info({ personaId: id, expectedVersion, userId }, 'Deleting persona');
+  async deletePersona(id: string, expectedVersion: number, context?: RequestContext): Promise<void> {
+    logger.info({ personaId: id, expectedVersion, adminId: context?.adminId }, 'Deleting persona');
 
     try {
       const existingPersona = await db.query.personas.findFirst({ where: eq(personas.id, id) });
@@ -203,7 +207,7 @@ export class PersonaService {
         throw new OptimisticLockError(`Failed to delete persona due to version conflict`);
       }
 
-      await this.auditService.logDelete('persona', id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, userId);
+      await this.auditService.logDelete('persona', id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: id }, 'Persona deleted successfully');
     } catch (error) {

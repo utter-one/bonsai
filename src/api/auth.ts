@@ -1,0 +1,55 @@
+import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+
+extendZodWithOpenApi(z);
+
+/**
+ * Schema for login request
+ * Required fields: id (email/username), password
+ */
+export const loginSchema = z.object({
+  id: z.string().min(1).describe('Admin user ID or email'),
+  password: z.string().min(1).describe('Admin user password'),
+});
+
+/**
+ * Schema for refresh token request
+ * Required fields: refreshToken
+ */
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1).describe('Valid refresh token'),
+});
+
+/**
+ * Schema for login response
+ * Includes access token, refresh token, expiry, and user info
+ */
+export const loginResponseSchema = z.object({
+  accessToken: z.string().describe('JWT access token (expires in 15 minutes)'),
+  refreshToken: z.string().describe('JWT refresh token (expires in 7 days)'),
+  expiresIn: z.number().int().positive().describe('Access token expiry time in seconds'),
+  adminId: z.string().describe('Admin user ID'),
+  displayName: z.string().describe('Admin display name'),
+  roles: z.array(z.string()).describe('Array of role identifiers'),
+});
+
+/**
+ * Schema for refresh token response
+ * Includes new access token and expiry
+ */
+export const refreshTokenResponseSchema = z.object({
+  accessToken: z.string().describe('New JWT access token (expires in 15 minutes)'),
+  expiresIn: z.number().int().positive().describe('Access token expiry time in seconds'),
+});
+
+/** Request body for login */
+export type LoginRequest = z.infer<typeof loginSchema>;
+
+/** Request body for token refresh */
+export type RefreshTokenRequest = z.infer<typeof refreshTokenSchema>;
+
+/** Response for successful login */
+export type LoginResponse = z.infer<typeof loginResponseSchema>;
+
+/** Response for successful token refresh */
+export type RefreshTokenResponse = z.infer<typeof refreshTokenResponseSchema>;

@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { OptimisticLockError, NotFoundError, InvalidOperationError, AccessDeniedError } from '../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, AccessDeniedError, UnauthorizedError, ForbiddenError } from '../errors';
 import logger from '../utils/logger';
 
 /**
@@ -9,6 +9,16 @@ import logger from '../utils/logger';
 export function errorHandler(err: any, req: Request, res: Response, next: NextFunction): void {
   if (err instanceof z.ZodError) {
     res.status(400).json({ error: 'Validation failed', details: err.issues });
+    return;
+  }
+
+  if (err instanceof UnauthorizedError) {
+    res.status(401).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof ForbiddenError) {
+    res.status(403).json({ error: err.message });
     return;
   }
 
