@@ -13,6 +13,7 @@ import { createConversationStageSchema, updateConversationStageBodySchema, delet
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './api/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './api/contextTransformer';
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './api/tool';
+import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from './api/globalAction';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './api/audit';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
@@ -27,6 +28,7 @@ import { ConversationStageController } from './controllers/ConversationStageCont
 import { ClassifierController } from './controllers/ClassifierController';
 import { ContextTransformerController } from './controllers/ContextTransformerController';
 import { ToolController } from './controllers/ToolController';
+import { GlobalActionController } from './controllers/GlobalActionController';
 import { AuditController } from './controllers/AuditController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
@@ -85,6 +87,10 @@ const contextTransformerIdParamSchema = z.object({
 
 const toolIdParamSchema = z.object({
   id: z.string().openapi({ description: 'Tool ID', example: 'tool-123' }),
+});
+
+const globalActionIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Global action ID', example: 'action-123' }),
 });
 
 /**
@@ -154,13 +160,18 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteToolRequest', deleteToolBodySchema);
   registry.register('ToolResponse', toolResponseSchema);
   registry.register('ToolListResponse', toolListResponseSchema);
+  registry.register('CreateGlobalActionRequest', createGlobalActionSchema);
+  registry.register('UpdateGlobalActionRequest', updateGlobalActionBodySchema);
+  registry.register('DeleteGlobalActionRequest', deleteGlobalActionBodySchema);
+  registry.register('GlobalActionResponse', globalActionResponseSchema);
+  registry.register('GlobalActionListResponse', globalActionListResponseSchema);
   registry.register('AuditLogResponse', auditLogResponseSchema);
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController, ContextTransformerController, ToolController, AuditController];
+  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, ConversationStageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, AuditController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
@@ -178,6 +189,7 @@ export function getOpenAPISpec(): any {
     '/api/classifiers/:id': classifierIdParamSchema,
     '/api/context-transformers/:id': contextTransformerIdParamSchema,
     '/api/tools/:id': toolIdParamSchema,
+    '/api/global-actions/:id': globalActionIdParamSchema,
   };
 
   // Register API paths from controller metadata
