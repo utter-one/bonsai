@@ -1,0 +1,273 @@
+import { injectable, inject } from 'tsyringe';
+import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { db } from '../db/index';
+import { conversations, conversationEvents } from '../db/schema';
+import type { ConversationResponse, ConversationListResponse, ConversationEventResponse, ConversationEventListResponse } from '../api/conversation';
+import type { ListParams } from '../api/common';
+import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../api/conversation';
+import { AuditService } from './AuditService';
+import { NotFoundError } from '../errors';
+import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { logger } from '../utils/logger';
+import { BaseService } from './BaseService';
+import type { RequestContext } from '../types/request-context';
+import { PERMISSIONS } from '../config/permissions';
+
+/**
+ * Service for managing conversations with read and delete operations
+ * Create operation is intentionally not exposed as it is reserved for other modules
+ */
+@injectable()
+export class ConversationService extends BaseService {
+  constructor(@inject(AuditService) private readonly auditService: AuditService) {
+    super();
+  }
+
+  /**
+   * Retrieves a conversation by its unique identifier
+   * @param id - The unique identifier of the conversation
+   * @returns The conversation if found
+   * @throws {NotFoundError} When conversation is not found
+   */
+  async getConversationById(id: string): Promise<ConversationResponse> {
+    logger.debug({ conversationId: id }, 'Fetching conversation by ID');
+
+    try {
+      const conversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+
+      if (!conversation) {
+        throw new NotFoundError(`Conversation with id ${id} not found`);
+      }
+
+      return conversationResponseSchema.parse(conversation);
+    } catch (error) {
+      logger.error({ error, conversationId: id }, 'Failed to fetch conversation');
+      throw error;
+    }
+  }
+
+  /**
+   * Lists conversations with flexible filtering, sorting, and pagination
+   * @param params - List parameters including filters, sorting, pagination, and text search
+   * @returns Paginated array of conversations matching the criteria
+   */
+  async listConversations(params?: ListParams): Promise<ConversationListResponse> {
+    logger.debug({ params }, 'Listing conversations');
+
+    try {
+      const conditions: SQL[] = [];
+      const offset = params?.offset ?? 0;
+      const limit = params?.limit ?? null;
+
+      // Column map for filter and order by operations
+      const columnMap = {
+        id: conversations.id,
+        userId: conversations.userId,
+        clientId: conversations.clientId,
+        stageId: conversations.stageId,
+        status: conversations.status,
+        statusReason: conversations.statusReason,
+        createdAt: conversations.createdAt,
+        updatedAt: conversations.updatedAt,
+      };
+
+      // Apply filters
+      if (params?.filters) {
+        for (const [field, filter] of Object.entries(params.filters)) {
+          const condition = buildFilterCondition(field, filter, columnMap, logger);
+          if (condition) {
+            conditions.push(condition);
+          }
+        }
+      }
+
+      // Apply text search (searches id, userId, clientId, stageId, and status)
+      if (params?.textSearch) {
+        const searchTerm = `%${params.textSearch}%`;
+        conditions.push(like(conversations.id, searchTerm));
+      }
+
+      // Build order by clause
+      const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+
+      // Get total count
+      const totalResult = await db.query.conversations.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+      });
+      const total = totalResult.length;
+
+      // Get paginated results
+      const conversationList = await db.query.conversations.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+        orderBy: orderByClause.length > 0 ? orderByClause : [desc(conversations.createdAt)],
+        limit: limit ?? undefined,
+        offset,
+      });
+
+      return conversationListResponseSchema.parse({
+        items: conversationList,
+        total,
+        offset,
+        limit,
+      });
+    } catch (error) {
+      logger.error({ error, params }, 'Failed to list conversations');
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes a conversation and all its associated events (via cascade)
+   * @param id - The unique identifier of the conversation to delete
+   * @param context - Request context for auditing and authorization
+   */
+  async deleteConversation(id: string, context: RequestContext): Promise<void> {
+    this.requirePermission(context, PERMISSIONS.CONVERSATION_DELETE);
+    logger.info({ conversationId: id, adminId: context?.adminId }, 'Deleting conversation');
+
+    try {
+      const existingConversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+
+      if (!existingConversation) {
+        throw new NotFoundError(`Conversation with id ${id} not found`);
+      }
+
+      const deleted = await db.delete(conversations).where(eq(conversations.id, id)).returning();
+
+      if (deleted.length === 0) {
+        throw new NotFoundError(`Conversation with id ${id} not found`);
+      }
+
+      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.adminId);
+
+      logger.info({ conversationId: id }, 'Conversation deleted successfully');
+    } catch (error) {
+      logger.error({ error, conversationId: id }, 'Failed to delete conversation');
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves all events for a specific conversation
+   * @param conversationId - The unique identifier of the conversation
+   * @param params - List parameters including filters, sorting, and pagination
+   * @returns Paginated array of conversation events
+   * @throws {NotFoundError} When conversation is not found
+   */
+  async getConversationEvents(conversationId: string, params?: ListParams): Promise<ConversationEventListResponse> {
+    logger.debug({ conversationId, params }, 'Fetching conversation events');
+
+    try {
+      // Verify conversation exists
+      const conversation = await db.query.conversations.findFirst({ where: eq(conversations.id, conversationId) });
+
+      if (!conversation) {
+        throw new NotFoundError(`Conversation with id ${conversationId} not found`);
+      }
+
+      const conditions: SQL[] = [eq(conversationEvents.conversationId, conversationId)];
+      const offset = params?.offset ?? 0;
+      const limit = params?.limit ?? null;
+
+      // Column map for filter and order by operations
+      const columnMap = {
+        id: conversationEvents.id,
+        conversationId: conversationEvents.conversationId,
+        eventType: conversationEvents.eventType,
+        timestamp: conversationEvents.timestamp,
+      };
+
+      // Apply filters
+      if (params?.filters) {
+        for (const [field, filter] of Object.entries(params.filters)) {
+          const condition = buildFilterCondition(field, filter, columnMap, logger);
+          if (condition) {
+            conditions.push(condition);
+          }
+        }
+      }
+
+      // Apply text search (searches eventType)
+      if (params?.textSearch) {
+        const searchTerm = `%${params.textSearch}%`;
+        conditions.push(like(conversationEvents.eventType, searchTerm));
+      }
+
+      // Build order by clause
+      const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+
+      // Get total count
+      const totalResult = await db.query.conversationEvents.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+      });
+      const total = totalResult.length;
+
+      // Get paginated results
+      const eventList = await db.query.conversationEvents.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+        orderBy: orderByClause.length > 0 ? orderByClause : [desc(conversationEvents.timestamp)],
+        limit: limit ?? undefined,
+        offset,
+      });
+
+      return conversationEventListResponseSchema.parse({
+        items: eventList,
+        total,
+        offset,
+        limit,
+      });
+    } catch (error) {
+      logger.error({ error, conversationId, params }, 'Failed to fetch conversation events');
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves a specific event by ID
+   * @param conversationId - The unique identifier of the conversation
+   * @param eventId - The unique identifier of the event
+   * @returns The conversation event if found
+   * @throws {NotFoundError} When conversation or event is not found
+   */
+  async getConversationEventById(conversationId: string, eventId: string): Promise<ConversationEventResponse> {
+    logger.debug({ conversationId, eventId }, 'Fetching conversation event by ID');
+
+    try {
+      // Verify conversation exists
+      const conversation = await db.query.conversations.findFirst({ where: eq(conversations.id, conversationId) });
+
+      if (!conversation) {
+        throw new NotFoundError(`Conversation with id ${conversationId} not found`);
+      }
+
+      const event = await db.query.conversationEvents.findFirst({
+        where: and(eq(conversationEvents.id, eventId), eq(conversationEvents.conversationId, conversationId)),
+      });
+
+      if (!event) {
+        throw new NotFoundError(`Event with id ${eventId} not found for conversation ${conversationId}`);
+      }
+
+      return conversationEventResponseSchema.parse(event);
+    } catch (error) {
+      logger.error({ error, conversationId, eventId }, 'Failed to fetch conversation event');
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves all audit log entries for a specific conversation
+   * @param conversationId - The unique identifier of the conversation
+   * @returns Array of audit log entries for the conversation
+   */
+  async getConversationAuditLogs(conversationId: string): Promise<any[]> {
+    logger.debug({ conversationId }, 'Fetching audit logs for conversation');
+
+    try {
+      return await this.auditService.getEntityAuditLogs('conversation', conversationId);
+    } catch (error) {
+      logger.error({ error, conversationId }, 'Failed to fetch conversation audit logs');
+      throw error;
+    }
+  }
+}

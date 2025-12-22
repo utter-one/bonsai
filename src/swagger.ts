@@ -8,6 +8,7 @@ import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, 
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './api/auth';
 import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './api/knowledge';
 import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './api/issue';
+import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './api/conversation';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
@@ -16,6 +17,7 @@ import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
 import { KnowledgeController } from './controllers/KnowledgeController';
 import { IssueController } from './controllers/IssueController';
+import { ConversationController } from './controllers/ConversationController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
@@ -48,6 +50,15 @@ const knowledgeItemIdParamSchema = z.object({
 
 const issueIdParamSchema = z.object({
   id: z.string().openapi({ description: 'Issue ID', example: '1' }),
+});
+
+const conversationIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Conversation ID', example: 'conv-123' }),
+});
+
+const conversationEventIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Conversation ID', example: 'conv-123' }),
+  eventId: z.string().openapi({ description: 'Event ID', example: 'event-123' }),
 });
 
 /**
@@ -93,11 +104,15 @@ export function getOpenAPISpec(): any {
   registry.register('UpdateIssueRequest', updateIssueBodySchema);
   registry.register('IssueResponse', issueResponseSchema);
   registry.register('IssueListResponse', issueListResponseSchema);
+  registry.register('ConversationResponse', conversationResponseSchema);
+  registry.register('ConversationListResponse', conversationListResponseSchema);
+  registry.register('ConversationEventResponse', conversationEventResponseSchema);
+  registry.register('ConversationEventListResponse', conversationEventListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController];
+  const controllers = [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
@@ -109,6 +124,8 @@ export function getOpenAPISpec(): any {
     '/api/knowledge/categories/:categoryId': knowledgeCategoryIdParamSchema,
     '/api/knowledge/items/:id': knowledgeItemIdParamSchema,
     '/api/issues/:id': issueIdParamSchema,
+    '/api/conversations/:id': conversationIdParamSchema,
+    '/api/conversations/:id/events/:eventId': conversationEventIdParamSchema,
   };
 
   // Register API paths from controller metadata
@@ -128,9 +145,9 @@ export function getOpenAPISpec(): any {
       const fullPath = `${basePath}${actionPath}`.replace(/\/\//g, '/');
 
       // Determine if this route has params
-      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId');
-      const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '').replace(/\/items$/, '');
-      const paramSchema = hasParams && !fullPath.includes('/audit-logs') && !fullPath.endsWith('/items') ? paramSchemaMap[paramKey] : undefined;
+      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId') || fullPath.includes(':eventId');
+      const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '').replace(/\/items$/, '').replace(/\/events$/, '');
+      const paramSchema = hasParams && !fullPath.includes('/audit-logs') && !fullPath.endsWith('/items') && !fullPath.endsWith('/events') ? paramSchemaMap[paramKey] : undefined;
 
       // Build request object
       const request: any = { ...openAPIConfig.request };
