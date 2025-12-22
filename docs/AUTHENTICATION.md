@@ -228,6 +228,11 @@ Authorization: Bearer <access_token>
   - Delete: `persona:delete`
   - Audit Logs: `audit:read`
 
+- **Knowledge Endpoints** (`/api/knowledge/*`)
+  - List/Get (sections, categories, items): `knowledge:read`
+  - Create/Update (sections, categories, items): `knowledge:write`
+  - Delete (sections, categories, items): `knowledge:delete`
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -339,6 +344,8 @@ async createUser(input: CreateUserRequest, context?: RequestContext): Promise<Us
 1. Add permission to `PERMISSIONS` in `src/config/permissions.ts`:
    ```typescript
    NEW_ENTITY_READ: 'newentity:read',
+   NEW_ENTITY_WRITE: 'newentity:write',
+   NEW_ENTITY_DELETE: 'newentity:delete',
    ```
 
 2. Add to relevant roles in `ROLES` configuration
@@ -363,8 +370,9 @@ async createUser(input: CreateUserRequest, context?: RequestContext): Promise<Us
 | PUT /api/users/:id | `user:write` | super_admin, content_manager, support |
 | DELETE /api/users/:id | `user:delete` | super_admin |
 | GET /api/personas | `persona:read` | super_admin, content_manager, developer, viewer |
-| POST /api/personas | `persona:write` | super_admin, content_manager |
-| Audit Logs | `audit:read` | All roles |
+| POST /api/personas | `persona:write` | super_admin, content_manager || GET /api/knowledge/* (read) | `knowledge:read` | super_admin, content_manager, developer, viewer |
+| POST/PUT /api/knowledge/* | `knowledge:write` | super_admin, content_manager |
+| DELETE /api/knowledge/* | `knowledge:delete` | super_admin || Audit Logs | `audit:read` | All roles |
 
 ## 🚀 Quick Start Guide
 

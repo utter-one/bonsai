@@ -7,6 +7,7 @@ import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
 import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
+import { KnowledgeController } from './controllers/KnowledgeController';
 import { errorHandler } from './middleware/errorHandler';
 import { optionalAuthMiddleware } from './middleware/auth';
 import { requestContextMiddleware } from './middleware/requestContext';
@@ -50,7 +51,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AdminController, UserController, PersonaController, AuthController],
+    controllers: [AdminController, UserController, PersonaController, AuthController, KnowledgeController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,

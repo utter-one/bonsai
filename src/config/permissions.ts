@@ -25,6 +25,11 @@ export const PERMISSIONS = {
   CONVERSATION_WRITE: 'conversation:write',
   CONVERSATION_DELETE: 'conversation:delete',
 
+  // Knowledge permissions
+  KNOWLEDGE_READ: 'knowledge:read',
+  KNOWLEDGE_WRITE: 'knowledge:write',
+  KNOWLEDGE_DELETE: 'knowledge:delete',
+
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',
@@ -42,7 +47,7 @@ export const ROLES = {
   },
   content_manager: {
     name: 'Content Manager',
-    description: 'Manage content entities (personas, conversations, users)',
+    description: 'Manage content entities (personas, conversations, users, knowledge)',
     permissions: [
       PERMISSIONS.USER_READ,
       PERMISSIONS.USER_WRITE,
@@ -50,6 +55,8 @@ export const ROLES = {
       PERMISSIONS.PERSONA_WRITE,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.CONVERSATION_WRITE,
+      PERMISSIONS.KNOWLEDGE_READ,
+      PERMISSIONS.KNOWLEDGE_WRITE,
       PERMISSIONS.AUDIT_READ,
     ],
   },
@@ -70,6 +77,7 @@ export const ROLES = {
       PERMISSIONS.USER_READ,
       PERMISSIONS.PERSONA_READ,
       PERMISSIONS.CONVERSATION_READ,
+      PERMISSIONS.KNOWLEDGE_READ,
       PERMISSIONS.SYSTEM_CONFIG,
       PERMISSIONS.AUDIT_READ,
     ],
@@ -81,6 +89,7 @@ export const ROLES = {
       PERMISSIONS.USER_READ,
       PERMISSIONS.PERSONA_READ,
       PERMISSIONS.CONVERSATION_READ,
+      PERMISSIONS.KNOWLEDGE_READ,
       PERMISSIONS.AUDIT_READ,
     ],
   },
