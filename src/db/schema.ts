@@ -209,6 +209,21 @@ export const environments = pgTable('environments', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Provider table
+export const providers = pgTable('providers', {
+  id: text('id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  description: text('description'),
+  type: text('type').notNull(), // asr, tts, llm, embeddings
+  providerName: text('provider_name').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex
+  config: jsonb('config').notNull().$type<Record<string, any>>(),
+  createdBy: text('created_by').references(() => admins.id),
+  tags: jsonb('tags').$type<string[]>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // AuditLog table
 export const auditLogs = pgTable('audit_logs', {
   id: text('id').primaryKey(),
@@ -283,6 +298,14 @@ export const conversationAssetsRelations = relations(conversationAssets, ({ one 
 
 export const adminsRelations = relations(admins, ({ many }) => ({
   auditLogs: many(auditLogs),
+  providers: many(providers),
+}));
+
+export const providersRelations = relations(providers, ({ one }) => ({
+  creator: one(admins, {
+    fields: [providers.createdBy],
+    references: [admins.id],
+  }),
 }));
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({

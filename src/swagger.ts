@@ -15,6 +15,7 @@ import { createContextTransformerSchema, updateContextTransformerBodySchema, del
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './api/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from './api/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from './api/environment';
+import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './api/provider';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './api/audit';
 import { listParamsSchema } from './api/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
@@ -31,6 +32,7 @@ import { ContextTransformerController } from './controllers/ContextTransformerCo
 import { ToolController } from './controllers/ToolController';
 import { GlobalActionController } from './controllers/GlobalActionController';
 import { EnvironmentController } from './controllers/EnvironmentController';
+import { ProviderController } from './controllers/ProviderController';
 import { AuditController } from './controllers/AuditController';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
@@ -97,6 +99,10 @@ const globalActionIdParamSchema = z.object({
 
 const environmentIdParamSchema = z.object({
   id: z.string().openapi({ description: 'Environment ID', example: 'env-123' }),
+});
+
+const providerIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Provider ID', example: 'provider-123' }),
 });
 
 /**
@@ -176,6 +182,11 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteEnvironmentRequest', deleteEnvironmentBodySchema);
   registry.register('EnvironmentResponse', environmentResponseSchema);
   registry.register('EnvironmentListResponse', environmentListResponseSchema);
+  registry.register('CreateProviderRequest', createProviderSchema);
+  registry.register('UpdateProviderRequest', updateProviderBodySchema);
+  registry.register('DeleteProviderRequest', deleteProviderBodySchema);
+  registry.register('ProviderResponse', providerResponseSchema);
+  registry.register('ProviderListResponse', providerListResponseSchema);
   registry.register('AuditLogResponse', auditLogResponseSchema);
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
   registry.register('ListParams', listParamsSchema);
@@ -184,7 +195,7 @@ export function getOpenAPISpec(): any {
   const metadata = getMetadataArgsStorage();
   const controllers = [AuthController, AdminController, UserController, 
     ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
-    PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, AuditController];
+    PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController, AuditController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
@@ -204,6 +215,7 @@ export function getOpenAPISpec(): any {
     '/api/tools/:id': toolIdParamSchema,
     '/api/global-actions/:id': globalActionIdParamSchema,
     '/api/environments/:id': environmentIdParamSchema,
+    '/api/providers/:id': providerIdParamSchema,
   };
 
   // Register API paths from controller metadata
