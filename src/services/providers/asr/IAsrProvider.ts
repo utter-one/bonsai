@@ -1,5 +1,5 @@
 import type { Conversation } from '../../../types/models';
-
+import type { ErrorCallback } from '../../../types/callbacks';
 
 /**
  * Callback function that is invoked when speech recognition produces text output.
@@ -12,10 +12,10 @@ export type TextRecognitionCallback = (chunkId: string, text: string) => void;
 /**
  * Callback function that is invoked when an ASR service error occurs
  * This allows the error to be sent to the client through WebSocket
- * @param sessionId The session where the error occurred
+ * @param conversationId The conversation where the error occurred
  * @param errorMessage Human-readable error description
  */
-export type AsrServiceErrorCallback = (sessionId: string, errorMessage: string) => Promise<void>;
+export type AsrServiceErrorCallback = (conversationId: string, errorMessage: string) => Promise<void>;
 
 /**
  * Represents a chunk of recognized text from speech recognition
@@ -91,14 +91,14 @@ export interface IAsrProvider {
   /**
    * Registers a callback for handling fatal recognition errors
    * This is called when an unrecoverable error occurs during recognition
-   * @param cb Callback function that receives the error description
+   * @param cb Callback function that receives the error
    */
-  setOnError(cb: (error: string) => void): void;
+  setOnError(cb: ErrorCallback): void;
 
   /**
    * Registers a callback for handling service errors that should be sent to the client
    * This allows providers to communicate service-level errors through the WebSocket
-   * @param cb Callback function that receives session ID and error message
+   * @param cb Callback function that receives conversation ID and error message
    */
   setOnServiceError(cb: AsrServiceErrorCallback): void;
 

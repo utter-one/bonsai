@@ -120,7 +120,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
       if (this.speechRecognizer) {
         this.speechRecognizer.stopContinuousRecognitionAsync();
       }
-      this.handleError(err.errorDetails);
+      await this.handleError(new Error(err.errorDetails));
     };
 
     this.speechRecognizer.sessionStarted = () => {
@@ -159,7 +159,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
           const errorMessage = `Failed to start Azure Speech recognition: ${err}`;
           logger.error(`[ASR] Error starting recognition for conversation ${conversation.id} - ${err}`);
           await this.handleServiceError(errorMessage);
-          this.handleError(err);
+          await this.handleError(new Error(err));
           reject(new Error(errorMessage));
         }
       );
@@ -188,7 +188,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
           const errorMessage = `Failed to stop Azure Speech recognition: ${err}`;
           logger.error(`[ASR] Error stopping recognition for conversation ${conversation.id} - ${err}`);
           await this.handleServiceError(errorMessage);
-          this.handleError(err);
+          await this.handleError(new Error(err));
           reject(new Error(errorMessage));
         }
       );

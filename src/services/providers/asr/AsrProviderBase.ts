@@ -1,5 +1,6 @@
 import { logger } from '../../../utils/logger';
 import type { Conversation } from '../../../types/models';
+import type { ErrorCallback } from '../../../types/callbacks';
 import { AsrServiceErrorCallback, IAsrProvider, TextChunk, TextRecognitionCallback } from './IAsrProvider';
 
 /**
@@ -24,7 +25,7 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   protected onRecognitionStoppedCallback?: () => void;
 
   /** Callback for fatal errors */
-  protected onErrorCallback?: (error: string) => void;
+  protected onErrorCallback?: ErrorCallback;
 
   /** Callback for service errors */
   protected onServiceErrorCallback?: AsrServiceErrorCallback;
@@ -99,15 +100,15 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
 
   /**
    * Registers a callback for handling fatal recognition errors
-   * @param cb Callback function that receives the error description
+   * @param cb Callback function that receives the error
    */
-  setOnError(cb: (error: string) => void): void {
+  setOnError(cb: ErrorCallback): void {
     this.onErrorCallback = cb;
   }
 
   /**
    * Registers a callback for handling service errors
-   * @param cb Callback function that receives session ID and error message
+   * @param cb Callback function that receives conversation ID and error message
    */
   setOnServiceError(cb: AsrServiceErrorCallback): void {
     this.onServiceErrorCallback = cb;
@@ -163,12 +164,13 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   /**
    * Helper method to handle fatal errors
    * Called by subclasses when an unrecoverable error occurs
-   * @param error Error description
+   * @param error Error object or error message
    */
-  protected handleError(error: string): void {
-    logger.error(`ASR error for conversation ${this.currentConversation?.id}: ${error}`);
+  protected async handleError(error: Error | string): Promise<void> {
+    const errorObj = typeof error === 'string' ? new Error(error) : error;
+    logger.error(`ASR error for conversation ${this.currentConversation?.id}: ${errorObj.message}`);
     if (this.onErrorCallback) {
-      this.onErrorCallback(error);
+      await this.onErrorCallback(errorObj);
     }
   }
 
