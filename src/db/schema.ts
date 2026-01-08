@@ -214,8 +214,8 @@ export const providers = pgTable('providers', {
   id: text('id').primaryKey(),
   displayName: text('display_name').notNull(),
   description: text('description'),
-  type: text('type').notNull(), // asr, tts, llm, embeddings
-  providerName: text('provider_name').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex
+  providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings
+  apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex
   config: jsonb('config').notNull().$type<Record<string, any>>(),
   createdBy: text('created_by').references(() => admins.id),
   tags: jsonb('tags').$type<string[]>(),

@@ -93,7 +93,7 @@ export class ProviderController {
   @OpenAPI({
     tags: ['Providers'],
     summary: 'List providers',
-    description: 'Retrieves a paginated list of provider configurations with optional filtering by type, providerName, tags, etc.',
+    description: 'Retrieves a paginated list of provider configurations with optional filtering by providerType, apiType, tags, etc.',
     request: {
       query: listParamsSchema,
     },
