@@ -1,4 +1,3 @@
-import type { Conversation } from '../../../types/models';
 import type { ErrorCallback } from '../../../types/callbacks';
 
 /**
@@ -15,7 +14,7 @@ export type TextRecognitionCallback = (chunkId: string, text: string) => void;
  * @param conversationId The conversation where the error occurred
  * @param errorMessage Human-readable error description
  */
-export type AsrServiceErrorCallback = (conversationId: string, errorMessage: string) => Promise<void>;
+export type AsrServiceErrorCallback = (errorMessage: string) => Promise<void>;
 
 /**
  * Represents a chunk of recognized text from speech recognition
@@ -38,32 +37,28 @@ export type TextChunk = {
 export interface IAsrProvider {
   /**
    * Initializes the speech recognition session for the given context
-   * @param conversation The conversation data containing context and configuration for recognition
    * @returns Promise that resolves when initialization is complete
    */
-  init(conversation: Conversation): Promise<void>;
+  init(): Promise<void>;
 
   /**
    * Starts the speech recognition session for the given context
-   * @param conversation The conversation data containing context and configuration for recognition
    * @returns Promise that resolves when recognition session is successfully started
    */
-  start(conversation: Conversation): Promise<void>;
+  start(): Promise<void>;
 
   /**
    * Stops the speech recognition session for the given context
-   * @param conversation The conversation data for which to stop recognition
    * @returns Promise that resolves when recognition session is successfully stopped
    */
-  stop(conversation: Conversation): Promise<void>;
+  stop(): Promise<void>;
 
   /**
    * Sends audio data to the speech recognition service for processing
-   * @param conversation The conversation context for the audio data
    * @param audio Binary audio data buffer to be processed
    * @returns Promise that resolves when audio data is successfully sent
    */
-  sendAudio(conversation: Conversation, audio: Buffer): Promise<void>;
+  sendAudio(audio: Buffer): Promise<void>;
 
   /**
    * Registers a callback for partial speech recognition results
@@ -98,13 +93,13 @@ export interface IAsrProvider {
   /**
    * Registers a callback for handling service errors that should be sent to the client
    * This allows providers to communicate service-level errors through the WebSocket
-   * @param cb Callback function that receives conversation ID and error message
+   * @param cb Callback function that receives error message
    */
   setOnServiceError(cb: AsrServiceErrorCallback): void;
 
   /**
    * Retrieves all text chunks that have been recognized since the last start() call
-   * Useful for getting the complete conversation history or for batch processing
+   * Useful for getting the complete recognition history or for batch processing
    * @returns Array of all recognized text chunks with their metadata
    */
   getAllTextChunks(): TextChunk[];

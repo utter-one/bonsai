@@ -1,4 +1,3 @@
-import type { Conversation } from '../../../types/models';
 import type { SimpleCallback, ErrorCallback } from '../../../types/callbacks';
 
 /**
@@ -34,10 +33,9 @@ export type GeneratedAudioChunk = {
 /**
  * Callback function that is invoked when a TTS service error occurs
  * This allows the error to be sent to the client through WebSocket
- * @param conversationId The conversation where the error occurred
  * @param errorMessage Human-readable error description
  */
-export type TtsServiceErrorCallback = (conversationId: string, errorMessage: string) => Promise<void>;
+export type TtsServiceErrorCallback = (errorMessage: string) => Promise<void>;
 
 /**
  * Represents markers used to identify sections of text that should not be spoken
@@ -59,29 +57,24 @@ export interface ITtsProvider {
   /**
    * Initializes and starts the speech generation session for the given context
    * Prepares the TTS provider to receive text input and generate audio output
-   * @param conversation The conversation data containing context and configuration for speech generation
-   * @param voiceId Optional voice ID to override the default voice from conversation configuration
-   * @param speed Optional speech speed to override the default speed (0.7 - 1.2, default 1.0)
    * @returns Promise that resolves when the generation session is successfully started
    */
-  start(conversation: Conversation, voiceId?: string | null, speed?: number | null): Promise<void>;
+  start(): Promise<void>;
 
   /**
    * Stops and finalizes the speech generation session for the given context
    * Ensures all pending audio generation is completed and resources are cleaned up
-   * @param conversation The conversation data for which to stop speech generation
    * @returns Promise that resolves when the generation session is successfully ended
    */
-  end(conversation: Conversation): Promise<void>;
+  end(): Promise<void>;
 
   /**
    * Sends text to the speech generation service for real-time speech synthesis
    * The text will be converted to audio and delivered via the registered callbacks
-   * @param conversation The conversation context for the text-to-speech conversion
    * @param text The text content to be converted to speech
    * @returns Promise that resolves when text has been successfully submitted for generation
    */
-  sendText(conversation: Conversation, text: string): Promise<void>;
+  sendText(text: string): Promise<void>;
 
   /**
    * Registers a callback for when speech generation begins

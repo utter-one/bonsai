@@ -2,7 +2,6 @@ import * as azureSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { CancellationReason, PhraseListGrammar } from 'microsoft-cognitiveservices-speech-sdk';
 import { AsrProviderBase } from './AsrProviderBase';
 import { logger } from '../../../utils/logger';
-import type { Conversation } from '../../../types/models';
 
 /**
  * Configuration for Azure Speech Recognition service
@@ -53,8 +52,8 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    * Initializes the Azure speech recognition session
    * @param conversation The conversation data containing context and configuration
    */
-  async init(conversation: Conversation): Promise<void> {
-    await super.init(conversation);
+  async init(): Promise<void> {
+    await super.init();
 
     this.bufferArray = [];
     this.recognising = false;
@@ -62,13 +61,13 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     // Check if the required configuration is present
     if (!this.config.subscriptionKey || !this.config.region) {
       const errorMessage = 'Missing required Azure Speech configuration (subscription key or region)';
-      logger.error(`[ASR] ${errorMessage} for conversation ${conversation.id}`);
+      logger.error(`[ASR] ${errorMessage}`);
       await this.handleServiceError(errorMessage);
       throw new Error('Missing required configuration');
     }
 
     // Create a push stream for audio input
-    logger.info(`[ASR] Creating Azure speech recognition instance for conversation ${conversation.id}`);
+    logger.info(`[ASR] Creating Azure speech recognition instance`);
     this.audioStream = azureSDK.AudioInputStream.createPushStream();
     this.audioConfig = azureSDK.AudioConfig.fromStreamInput(this.audioStream);
 
@@ -79,7 +78,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     this.azureSpeechConfig.speechRecognitionLanguage = this.config.language || 'en-US';
 
     this.speechRecognizer = new azureSDK.SpeechRecognizer(this.azureSpeechConfig, this.audioConfig);
-    logger.info(`[ASR] Created Azure speech recognition instance for conversation ${conversation.id}`);
+    logger.info(`[ASR] Created Azure speech recognition instance`);
 
     // Add phrases to the phrase list if they are provided
     if (this.config.dictionaryPhrases && this.config.dictionaryPhrases.length) {
@@ -90,9 +89,8 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
 
   /**
    * Starts the Azure speech recognition session
-   * @param conversation The conversation data containing context and configuration
    */
-  async start(conversation: Conversation): Promise<void> {
+  async start(): Promise<void> {
     if (!this.speechRecognizer) {
       throw new Error('Azure Speech recognizer not initialized. Call init() first.');
     }
@@ -102,7 +100,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     // Set up event handlers
     this.speechRecognizer.sessionStopped = () => {
       this.recognising = false;
-      logger.info(`[ASR] Session stopped event for conversation ${conversation.id}`);
+      logger.info(`[ASR] Session stopped event`);
       if (this.speechRecognizer) {
         this.speechRecognizer.stopContinuousRecognitionAsync();
       }
@@ -111,9 +109,9 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
 
     this.speechRecognizer.canceled = async (_, err) => {
       this.recognising = false;
-      logger.info(`[ASR] Canceled event for conversation ${conversation.id}`);
+      logger.info(`[ASR] Canceled event`);
       if (err.reason === CancellationReason.Error) {
-        logger.error(`[ASR] Error: event cancelled for conversation ${conversation.id} - ${err.errorDetails}`);
+        logger.error(`[ASR] Error: event cancelled - ${err.errorDetails}`);
         const errorMessage = `Azure Speech recognition error: ${err.errorDetails}`;
         await this.handleServiceError(errorMessage);
       }
@@ -124,7 +122,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     };
 
     this.speechRecognizer.sessionStarted = () => {
-      logger.info(`[ASR] Session started event for conversation ${conversation.id}`);
+      logger.info(`[ASR] Session started event`);
     };
 
     this.speechRecognizer.recognizing = (_, e) => {
@@ -141,12 +139,12 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     await new Promise<void>((resolve, reject) => {
       this.speechRecognizer!.startContinuousRecognitionAsync(
         () => {
-          logger.info(`[ASR] Started recognition for conversation ${conversation.id}`);
+          logger.info(`[ASR] Started recognition`);
           if (this.audioStream) {
             for (const buffer of this.bufferArray) {
               const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
               this.audioStream.write(arrayBuffer);
-              logger.info(`[ASR] Pre-buffered audio chunk sent for conversation ${conversation.id}`);
+              logger.info(`[ASR] Pre-buffered audio chunk sent`);
             }
           }
           // Clear the buffer array
@@ -157,7 +155,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
         async (err: string) => {
           this.recognising = false;
           const errorMessage = `Failed to start Azure Speech recognition: ${err}`;
-          logger.error(`[ASR] Error starting recognition for conversation ${conversation.id} - ${err}`);
+          logger.error(`[ASR] Error starting recognition - ${err}`);
           await this.handleServiceError(errorMessage);
           await this.handleError(new Error(err));
           reject(new Error(errorMessage));
@@ -168,11 +166,10 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
 
   /**
    * Stops the Azure speech recognition session
-   * @param conversation The conversation data for which to stop recognition
    */
-  async stop(conversation: Conversation): Promise<void> {
+  async stop(): Promise<void> {
     if (!this.speechRecognizer) {
-      logger.warn(`[ASR] No Azure speech recognition instance to stop for conversation ${conversation.id}`);
+      logger.warn(`[ASR] No Azure speech recognition instance to stop`);
       return;
     }
 
@@ -180,13 +177,13 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
       this.speechRecognizer!.stopContinuousRecognitionAsync(
         () => {
           this.recognising = false;
-          logger.info(`[ASR] Stopped recognition for conversation ${conversation.id}`);
+          logger.info(`[ASR] Stopped recognition`);
           resolve();
         },
         async (err: string) => {
           this.recognising = false;
           const errorMessage = `Failed to stop Azure Speech recognition: ${err}`;
-          logger.error(`[ASR] Error stopping recognition for conversation ${conversation.id} - ${err}`);
+          logger.error(`[ASR] Error stopping recognition - ${err}`);
           await this.handleServiceError(errorMessage);
           await this.handleError(new Error(err));
           reject(new Error(errorMessage));
@@ -200,20 +197,20 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    * @param conversation The conversation context for the audio data
    * @param audio Binary audio data buffer to be processed
    */
-  async sendAudio(conversation: Conversation, audio: Buffer): Promise<void> {
+  async sendAudio(audio: Buffer): Promise<void> {
     if (this.recognising) {
       // If the recognizer is started, write the buffer to the audio stream
       if (this.audioStream) {
         const arrayBuffer = audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength) as ArrayBuffer;
         this.audioStream.write(arrayBuffer);
-        logger.info(`[ASR] Sent audio chunk for conversation ${conversation.id}`);
+        logger.info(`[ASR] Sent audio chunk`);
       } else {
-        logger.warn(`[ASR] No audio stream available for conversation ${conversation.id}`);
+        logger.warn(`[ASR] No audio stream available`);
       }
     } else {
       // If the recognizer is not started, store the buffer in the array
       this.bufferArray.push(audio);
-      logger.info(`[ASR] Buffered audio chunk for conversation ${conversation.id}`);
+      logger.info(`[ASR] Buffered audio chunk`);
     }
   }
 

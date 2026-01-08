@@ -60,20 +60,16 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
 
   /**
    * Initializes and starts the speech generation session
-   * @param conversation The conversation data containing context and configuration
-   * @param voiceId Optional voice ID to override the default voice
-   * @param speed Optional speech speed to override the default speed
    */
-  async start(conversation: Conversation, voiceId?: string | null, speed?: number | null): Promise<void> {
-    this.currentConversation = conversation;
+  async start(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.audioChunks = [];
     this.audioDurationMs = 0;
 
     // Merge conversation config with provider config
-    const effectiveVoiceId = voiceId ?? this.config.voiceId;
-    const effectiveSpeed = speed ?? this.config.speed ?? 1.0;
+    const effectiveVoiceId = this.config.voiceId;
+    const effectiveSpeed = this.config.speed ?? 1.0;
     const effectiveModel = this.config.model ?? 'eleven_flash_v2_5';
 
     if (!effectiveVoiceId) {
@@ -97,7 +93,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       this.sentenceSplitter = null;
     }
 
-    logger.info(`[ElevenLabs] Starting speech generation for conversation ${conversation.id} with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.config.stability}, similarityBoost: ${this.config.similarityBoost}`);
+    logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.config.stability}, similarityBoost: ${this.config.similarityBoost}`);
 
     const useGlobalPreview = this.config.useGlobalPreview ?? true;
     const baseUrl = useGlobalPreview ? 'wss://api-global-preview.elevenlabs.io' : 'wss://api.elevenlabs.io';
@@ -129,11 +125,10 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
 
   /**
    * Stops and finalizes the speech generation session
-   * @param conversation The conversation data for which to stop generation
    */
-  async end(conversation: Conversation): Promise<void> {
+  async end(): Promise<void> {
     if (!this.socket) {
-      logger.warn(`[ElevenLabs] No speech generation instance to end for conversation ${conversation.id}`);
+      logger.warn(`[ElevenLabs] No speech generation instance to end`);
       return;
     }
 
@@ -142,7 +137,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       await this.sentenceSplitter.finalize();
     }
 
-    logger.info(`[ElevenLabs] Ending speech generation for conversation ${conversation.id}`);
+    logger.info(`[ElevenLabs] Ending speech generation`);
 
     // Send end-of-stream message
     const eosMessage = { text: '' };
@@ -153,16 +148,15 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
 
   /**
    * Sends text to the speech generation service
-   * @param conversation The conversation context for the text-to-speech conversion
    * @param text The text content to be converted to speech
    */
-  async sendText(conversation: Conversation, text: string): Promise<void> {
+  async sendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
-      logger.info(`[ElevenLabs] Adding text to sentence splitter for conversation ${conversation.id}: "${text}"`);
+      logger.info(`[ElevenLabs] Adding text to sentence splitter: "${text}"`);
       // Add text to sentence splitter - it will automatically call sendTextToSocket for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
-      logger.info(`[ElevenLabs] Sending text directly for conversation ${conversation.id}: "${text}"`);
+      logger.info(`[ElevenLabs] Sending text directly: "${text}"`);
       // Send text directly without sentence splitting
       await this.sendTextToSocket(text);
     }
@@ -327,7 +321,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       text = text.replace(/!/g, '.');
     }
 
-    logger.info(`[ElevenLabs] Sending sentence for conversation ${this.currentConversation?.id}: "${text}"`);
+    logger.info(`[ElevenLabs] Sending sentence: "${text}"`);
 
     const textMessage = {
       text: text,
