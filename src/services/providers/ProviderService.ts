@@ -1,17 +1,17 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, and, desc, SQL } from 'drizzle-orm';
-import { db } from '../db/index';
-import { providers } from '../db/schema';
-import type { CreateProviderRequest, UpdateProviderRequest, ProviderResponse, ProviderListResponse } from '../api/provider';
-import type { ListParams } from '../api/common';
-import { providerResponseSchema, providerListResponseSchema } from '../api/provider';
-import { AuditService } from './AuditService';
-import { OptimisticLockError, NotFoundError } from '../errors';
-import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
-import { logger } from '../utils/logger';
-import { BaseService } from './BaseService';
-import type { RequestContext } from '../types/request-context';
-import { PERMISSIONS } from '../permissions';
+import { db } from '../../db/index';
+import { providers } from '../../db/schema';
+import type { CreateProviderRequest, UpdateProviderRequest, ProviderResponse, ProviderListResponse } from '../../api/provider';
+import type { ListParams } from '../../api/common';
+import { providerResponseSchema, providerListResponseSchema } from '../../api/provider';
+import { AuditService } from '../AuditService';
+import { OptimisticLockError, NotFoundError } from '../../errors';
+import { buildFilterCondition, buildOrderBy } from '../../utils/queryBuilder';
+import { logger } from '../../utils/logger';
+import { BaseService } from '../BaseService';
+import type { RequestContext } from '../../types/request-context';
+import { PERMISSIONS } from '../../permissions';
 
 /**
  * Service for managing provider configurations with full CRUD operations and audit logging

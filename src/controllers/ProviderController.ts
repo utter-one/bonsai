@@ -6,7 +6,7 @@ import { OpenAPI } from '../decorators/openapi';
 import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
-import { ProviderService } from '../services/ProviderService';
+import { ProviderService } from '../services/providers/ProviderService';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from '../api/provider';
 import type { CreateProviderRequest, UpdateProviderRequest, DeleteProviderRequest } from '../api/provider';
 import { listParamsSchema } from '../api/common';
