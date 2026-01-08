@@ -8,12 +8,6 @@ import { GeneratedAudioChunk, ITtsProvider, SpeechGenerationCallback, TtsService
  * @template TConfig The type of provider-specific configuration
  */
 export abstract class TtsProviderBase<TConfig = Record<string, any>> implements ITtsProvider {
-  /** Current voice ID being used */
-  protected currentVoiceId: string | null = null;
-
-  /** Current speech speed being used */
-  protected currentSpeed: number = 1.0;
-
   /** Counter for generating sequential ordinals for audio chunks */
   protected chunkOrdinal: number = 0;
 
@@ -191,8 +185,6 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
    */
   async cleanup(): Promise<void> {
     logger.info(`Cleaning up TTS provider resources`);
-    this.currentVoiceId = null;
-    this.currentSpeed = 1.0;
     this.chunkOrdinal = 0;
     this.onGenerationStartedCallback = undefined;
     this.onGenerationEndedCallback = undefined;

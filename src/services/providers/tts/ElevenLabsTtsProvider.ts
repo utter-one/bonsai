@@ -76,9 +76,6 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       throw new Error('Voice ID must be provided either in config or start() parameters');
     }
 
-    this.currentVoiceId = effectiveVoiceId;
-    this.currentSpeed = effectiveSpeed;
-
     // Initialize sentence splitter with callback to send complete sentences (if enabled)
     const useSentenceSplitter = this.config.useSentenceSplitter ?? true;
     if (useSentenceSplitter) {
