@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerativeModel, Content, Part, HarmCategory, HarmBlockThreshold, SafetySetting } from '@google/generative-ai';
+import { GoogleGenAI, Content, Part, HarmCategory, HarmBlockThreshold, SafetySetting } from '@google/genai';
 import { LlmProviderBase } from './LlmProviderBase';
 import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
@@ -9,7 +9,7 @@ import { logger } from '../../../utils/logger';
 export interface GeminiLlmProviderConfig extends LlmProviderConfig {
   /** Google API key */
   apiKey: string;
-  /** Model name (e.g., gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash) */
+  /** Model name (e.g., gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash) */
   model: string;
   /** Default max tokens */
   defaultMaxTokens?: number;
@@ -21,17 +21,17 @@ export interface GeminiLlmProviderConfig extends LlmProviderConfig {
   defaultTopK?: number;
   /** Request timeout in milliseconds */
   timeout?: number;
-  /** Safety settings */
+  /** Safety settings configuration */
   safetySettings?: SafetySetting[];
 }
 
 /**
  * Google Gemini LLM provider implementation
  * Supports both streaming and non-streaming generation with multi-modal messages
+ * Uses the new @google/genai SDK for Gemini 2.5+ models
  */
 export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> {
-  private client?: GoogleGenerativeAI;
-  private model?: GenerativeModel;
+  private client?: GoogleGenAI;
 
   /**
    * Initialize the Gemini provider
@@ -39,11 +39,7 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
   async init(config: GeminiLlmProviderConfig): Promise<void> {
     await super.init(config);
 
-    this.client = new GoogleGenerativeAI(config.apiKey);
-    this.model = this.client.getGenerativeModel({
-      model: config.model,
-      safetySettings: config.safetySettings,
-    });
+    this.client = new GoogleGenAI({ apiKey: config.apiKey });
 
     logger.info(`Google Gemini LLM provider initialized with model: ${config.model}`);
   }
@@ -55,8 +51,8 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     this.ensureInitialized();
     this.validateMessages(messages);
 
-    if (!this.model) {
-      throw new Error('Gemini model not initialized');
+    if (!this.client) {
+      throw new Error('Gemini client not initialized');
     }
 
     const mergedOptions = this.applyDefaultOptions(options);
@@ -65,41 +61,36 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     try {
       logger.info(`Generating Gemini completion with model: ${this.config!.model}`);
 
-      // Create model instance with system instruction if provided
-      const modelInstance = systemInstruction ? this.client!.getGenerativeModel({
+      const result = await this.client.models.generateContent({
         model: this.config!.model,
-        systemInstruction,
-        safetySettings: this.config!.safetySettings,
-      }) : this.model;
-
-      const result = await modelInstance.generateContent({
         contents,
-        generationConfig: {
+        config: {
+          systemInstruction,
           maxOutputTokens: mergedOptions.maxTokens,
           temperature: mergedOptions.temperature,
           topP: mergedOptions.topP,
           topK: (this.config as any).defaultTopK,
           stopSequences: mergedOptions.stopSequences,
+          safetySettings: this.config!.safetySettings,
         },
       });
 
-      const response = result.response;
-      const text = response.text();
-
+      const text = result.text || '';
+      
       const llmResult: LlmGenerationResult = {
         id: `gemini-${Date.now()}`,
         content: text,
         role: 'assistant',
-        finishReason: this.mapFinishReason(response.candidates?.[0]?.finishReason),
-        usage: response.usageMetadata ? {
-          promptTokens: response.usageMetadata.promptTokenCount || 0,
-          completionTokens: response.usageMetadata.candidatesTokenCount || 0,
-          totalTokens: response.usageMetadata.totalTokenCount || 0,
+        finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
+        usage: result.usageMetadata ? {
+          promptTokens: result.usageMetadata.promptTokenCount || 0,
+          completionTokens: result.usageMetadata.candidatesTokenCount || 0,
+          totalTokens: result.usageMetadata.totalTokenCount || 0,
         } : undefined,
         metadata: {
           model: this.config!.model,
-          finishReason: response.candidates?.[0]?.finishReason,
-          safetyRatings: response.candidates?.[0]?.safetyRatings,
+          finishReason: result.candidates?.[0]?.finishReason,
+          safetyRatings: result.candidates?.[0]?.safetyRatings,
         },
       };
 
@@ -120,8 +111,8 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     this.ensureInitialized();
     this.validateMessages(messages);
 
-    if (!this.model) {
-      throw new Error('Gemini model not initialized');
+    if (!this.client) {
+      throw new Error('Gemini client not initialized');
     }
 
     const mergedOptions = this.applyDefaultOptions(options);
@@ -130,21 +121,17 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     try {
       logger.info(`Starting Gemini streaming completion with model: ${this.config!.model}`);
 
-      // Create model instance with system instruction if provided
-      const modelInstance = systemInstruction ? this.client!.getGenerativeModel({
+      const stream = await this.client.models.generateContentStream({
         model: this.config!.model,
-        systemInstruction,
-        safetySettings: this.config!.safetySettings,
-      }) : this.model;
-
-      const result = await modelInstance.generateContentStream({
         contents,
-        generationConfig: {
+        config: {
+          systemInstruction,
           maxOutputTokens: mergedOptions.maxTokens,
           temperature: mergedOptions.temperature,
           topP: mergedOptions.topP,
           topK: (this.config as any).defaultTopK,
           stopSequences: mergedOptions.stopSequences,
+          safetySettings: this.config!.safetySettings,
         },
       });
 
@@ -153,12 +140,14 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       let promptTokens = 0;
       let completionTokens = 0;
       let totalTokens = 0;
+      let generationId: string | undefined;
 
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
+      for await (const chunk of stream) {
+        const chunkText = chunk.text || '';
         if (chunkText) {
           fullContent += chunkText;
-          await this.notifyChunk(chunkText, `gemini-${Date.now()}`, 'assistant', null);
+          generationId = generationId || `gemini-${Date.now()}`;
+          await this.notifyChunk(chunkText, generationId, 'assistant', null);
         }
 
         // Track finish reason and usage
@@ -175,7 +164,7 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
 
       // Notify completion
       const llmResult: LlmGenerationResult = {
-        id: `gemini-${Date.now()}`,
+        id: generationId || `gemini-${Date.now()}`,
         content: fullContent,
         role: 'assistant',
         finishReason: this.mapFinishReason(finalFinishReason),

@@ -19,7 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@asteasolutions/zod-to-openapi": "^8.2.0",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.35.0",
     "@types/express": "^5.0.6",
     "@types/swagger-ui-express": "^4.1.8",
     "bcrypt": "^6.0.0",
