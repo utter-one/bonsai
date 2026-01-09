@@ -1,0 +1,290 @@
+import { GoogleGenerativeAI, GenerativeModel, Content, Part, HarmCategory, HarmBlockThreshold, SafetySetting } from '@google/generative-ai';
+import { LlmProviderBase } from './LlmProviderBase';
+import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, TextContent } from './ILlmProvider';
+import { logger } from '../../../utils/logger';
+
+/**
+ * Google Gemini-specific configuration
+ */
+export interface GeminiLlmProviderConfig extends LlmProviderConfig {
+  /** Google API key */
+  apiKey: string;
+  /** Model name (e.g., gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash) */
+  model: string;
+  /** Default max tokens */
+  defaultMaxTokens?: number;
+  /** Default temperature */
+  defaultTemperature?: number;
+  /** Default top-p */
+  defaultTopP?: number;
+  /** Default top-k */
+  defaultTopK?: number;
+  /** Request timeout in milliseconds */
+  timeout?: number;
+  /** Safety settings */
+  safetySettings?: SafetySetting[];
+}
+
+/**
+ * Google Gemini LLM provider implementation
+ * Supports both streaming and non-streaming generation with multi-modal messages
+ */
+export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> {
+  private client?: GoogleGenerativeAI;
+  private model?: GenerativeModel;
+
+  /**
+   * Initialize the Gemini provider
+   */
+  async init(config: GeminiLlmProviderConfig): Promise<void> {
+    await super.init(config);
+
+    this.client = new GoogleGenerativeAI(config.apiKey);
+    this.model = this.client.getGenerativeModel({
+      model: config.model,
+      safetySettings: config.safetySettings,
+    });
+
+    logger.info(`Google Gemini LLM provider initialized with model: ${config.model}`);
+  }
+
+  /**
+   * Generate a non-streaming response
+   */
+  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    this.ensureInitialized();
+    this.validateMessages(messages);
+
+    if (!this.model) {
+      throw new Error('Gemini model not initialized');
+    }
+
+    const mergedOptions = this.applyDefaultOptions(options);
+    const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
+
+    try {
+      logger.info(`Generating Gemini completion with model: ${this.config!.model}`);
+
+      // Create model instance with system instruction if provided
+      const modelInstance = systemInstruction ? this.client!.getGenerativeModel({
+        model: this.config!.model,
+        systemInstruction,
+        safetySettings: this.config!.safetySettings,
+      }) : this.model;
+
+      const result = await modelInstance.generateContent({
+        contents,
+        generationConfig: {
+          maxOutputTokens: mergedOptions.maxTokens,
+          temperature: mergedOptions.temperature,
+          topP: mergedOptions.topP,
+          topK: (this.config as any).defaultTopK,
+          stopSequences: mergedOptions.stopSequences,
+        },
+      });
+
+      const response = result.response;
+      const text = response.text();
+
+      const llmResult: LlmGenerationResult = {
+        id: `gemini-${Date.now()}`,
+        content: text,
+        role: 'assistant',
+        finishReason: this.mapFinishReason(response.candidates?.[0]?.finishReason),
+        usage: response.usageMetadata ? {
+          promptTokens: response.usageMetadata.promptTokenCount || 0,
+          completionTokens: response.usageMetadata.candidatesTokenCount || 0,
+          totalTokens: response.usageMetadata.totalTokenCount || 0,
+        } : undefined,
+        metadata: {
+          model: this.config!.model,
+          finishReason: response.candidates?.[0]?.finishReason,
+          safetyRatings: response.candidates?.[0]?.safetyRatings,
+        },
+      };
+
+      await this.notifyComplete(llmResult);
+      return llmResult;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Gemini generation error: ${errorMessage}`);
+      await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a streaming response
+   */
+  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+    this.ensureInitialized();
+    this.validateMessages(messages);
+
+    if (!this.model) {
+      throw new Error('Gemini model not initialized');
+    }
+
+    const mergedOptions = this.applyDefaultOptions(options);
+    const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
+
+    try {
+      logger.info(`Starting Gemini streaming completion with model: ${this.config!.model}`);
+
+      // Create model instance with system instruction if provided
+      const modelInstance = systemInstruction ? this.client!.getGenerativeModel({
+        model: this.config!.model,
+        systemInstruction,
+        safetySettings: this.config!.safetySettings,
+      }) : this.model;
+
+      const result = await modelInstance.generateContentStream({
+        contents,
+        generationConfig: {
+          maxOutputTokens: mergedOptions.maxTokens,
+          temperature: mergedOptions.temperature,
+          topP: mergedOptions.topP,
+          topK: (this.config as any).defaultTopK,
+          stopSequences: mergedOptions.stopSequences,
+        },
+      });
+
+      let fullContent = '';
+      let finalFinishReason: string | undefined;
+      let promptTokens = 0;
+      let completionTokens = 0;
+      let totalTokens = 0;
+
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          fullContent += chunkText;
+          await this.notifyChunk(chunkText, `gemini-${Date.now()}`, 'assistant', null);
+        }
+
+        // Track finish reason and usage
+        if (chunk.candidates?.[0]?.finishReason) {
+          finalFinishReason = chunk.candidates[0].finishReason;
+        }
+
+        if (chunk.usageMetadata) {
+          promptTokens = chunk.usageMetadata.promptTokenCount || promptTokens;
+          completionTokens = chunk.usageMetadata.candidatesTokenCount || completionTokens;
+          totalTokens = chunk.usageMetadata.totalTokenCount || totalTokens;
+        }
+      }
+
+      // Notify completion
+      const llmResult: LlmGenerationResult = {
+        id: `gemini-${Date.now()}`,
+        content: fullContent,
+        role: 'assistant',
+        finishReason: this.mapFinishReason(finalFinishReason),
+        usage: {
+          promptTokens,
+          completionTokens,
+          totalTokens,
+        },
+        metadata: {
+          model: this.config!.model,
+          finishReason: finalFinishReason,
+        },
+      };
+
+      await this.notifyComplete(llmResult);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Gemini streaming error: ${errorMessage}`);
+      await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
+      throw error;
+    }
+  }
+
+  /**
+   * Convert our message format to Gemini's format
+   * Gemini uses "user" and "model" roles, and system instructions are separate
+   */
+  private convertToGeminiMessages(messages: LlmMessage[]): { systemInstruction?: string; contents: Content[] } {
+    let systemInstruction: string | undefined;
+    const contents: Content[] = [];
+
+    for (const msg of messages) {
+      // Extract system message separately
+      if (msg.role === 'system') {
+        const systemContent = typeof msg.content === 'string' ? msg.content : this.extractTextContent([msg]);
+        systemInstruction = systemInstruction ? `${systemInstruction}\n\n${systemContent}` : systemContent;
+        continue;
+      }
+
+      // Convert role (Gemini uses "user" and "model" instead of "assistant")
+      const role = msg.role === 'assistant' ? 'model' : 'user';
+
+      // Convert content
+      if (typeof msg.content === 'string') {
+        contents.push({
+          role,
+          parts: [{ text: msg.content }],
+        });
+      } else {
+        // Multi-modal content
+        const parts: Part[] = [];
+
+        for (const content of msg.content) {
+          if (content.type === 'text') {
+            parts.push({
+              text: (content as TextContent).text,
+            });
+          } else if (content.type === 'image') {
+            const imageContent = content as ImageContent;
+            if (imageContent.source.type === 'url' && imageContent.source.url) {
+              // Gemini supports image URLs via fileData
+              // Note: This requires the URL to be accessible
+              parts.push({
+                fileData: {
+                  mimeType: imageContent.source.mimeType || 'image/jpeg',
+                  fileUri: imageContent.source.url,
+                },
+              });
+            } else if (imageContent.source.type === 'base64' && imageContent.source.data) {
+              parts.push({
+                inlineData: {
+                  mimeType: imageContent.source.mimeType || 'image/jpeg',
+                  data: imageContent.source.data,
+                },
+              });
+            }
+          } else if (content.type === 'json') {
+            // Convert JSON to text
+            parts.push({
+              text: JSON.stringify((content as any).data),
+            });
+          }
+        }
+
+        contents.push({
+          role,
+          parts,
+        });
+      }
+    }
+
+    return { systemInstruction, contents };
+  }
+
+  /**
+   * Map Gemini's finish reason to our format
+   */
+  private mapFinishReason(reason?: string): 'stop' | 'length' | 'tool_calls' | 'content_filter' {
+    switch (reason) {
+      case 'STOP':
+        return 'stop';
+      case 'MAX_TOKENS':
+        return 'length';
+      case 'SAFETY':
+        return 'content_filter';
+      case 'RECITATION':
+        return 'content_filter';
+      default:
+        return 'stop';
+    }
+  }
+}

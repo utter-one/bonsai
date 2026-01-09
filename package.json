@@ -17,7 +17,9 @@
   "author": "utter.one",
   "license": "Apache-2.0",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@asteasolutions/zod-to-openapi": "^8.2.0",
+    "@google/generative-ai": "^0.24.1",
     "@types/express": "^5.0.6",
     "@types/swagger-ui-express": "^4.1.8",
     "bcrypt": "^6.0.0",
@@ -31,6 +33,7 @@
     "handlebars": "^4.7.8",
     "jsonwebtoken": "^9.0.3",
     "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
+    "openai": "^6.15.0",
     "pg": "^8.16.3",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.3",

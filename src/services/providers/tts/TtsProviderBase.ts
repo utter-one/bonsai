@@ -38,7 +38,13 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
   }
 
   /**
-   * Initializes and starts the speech generation session
+   * Initializes the speech generation session
+   * Subclasses must implement this to perform provider-specific initialization
+   */
+  abstract init(): Promise<void>;
+
+  /**
+   * Starts the speech generation session
    * Subclasses must implement this method to start provider-specific generation
    */
   abstract start(): Promise<void>;

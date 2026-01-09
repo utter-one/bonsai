@@ -58,8 +58,11 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /** Total duration of audio generated so far in milliseconds */
   private audioDurationMs: number = 0;
 
+  async init(): Promise<void> {
+  }
+
   /**
-   * Initializes and starts the speech generation session
+   * Starts the speech generation session
    */
   async start(): Promise<void> {
     this.resetOrdinal();

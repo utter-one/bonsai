@@ -55,7 +55,12 @@ export type NoSpeechMarker = {
  */
 export interface ITtsProvider {
   /**
-   * Initializes and starts the speech generation session for the given context
+   * Initializes the speech generation session for the given context
+   */
+  init(): Promise<void>;
+
+  /**
+   * Starts the speech generation session for the given context
    * Prepares the TTS provider to receive text input and generate audio output
    * @returns Promise that resolves when the generation session is successfully started
    */
