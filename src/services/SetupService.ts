@@ -44,7 +44,6 @@ export class SetupService {
    * This endpoint can only be used when no admin accounts exist
    * @param input - Initial admin creation data (id, displayName, password, optional metadata)
    * @returns Admin details and authentication tokens for immediate login
-   * @throws {SystemAlreadySetupError} When at least one admin account already exists
    */
   async createInitialAdmin(input: InitialAdminSetupRequest): Promise<InitialAdminSetupResponse> {
     logger.info({ adminId: input.id, displayName: input.displayName }, 'Creating initial admin account');
