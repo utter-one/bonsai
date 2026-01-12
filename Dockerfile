@@ -17,12 +17,6 @@ RUN npm ci --only=production
 COPY src/ ./src/
 COPY tsconfig.json ./
 
-# Install TypeScript globally for runtime compilation
-RUN npm install -g typescript ts-node
-
-# Build the application
-RUN npm run build
-
 # Expose the application port
 EXPOSE 3000
 
