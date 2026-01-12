@@ -6,6 +6,7 @@ import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminR
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './api/user';
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './api/persona';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './api/auth';
+import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './api/setup';
 import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './api/knowledge';
 import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './api/issue';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './api/conversation';
@@ -23,6 +24,7 @@ import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
 import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
+import { SetupController } from './controllers/SetupController';
 import { KnowledgeController } from './controllers/KnowledgeController';
 import { IssueController } from './controllers/IssueController';
 import { ConversationController } from './controllers/ConversationController';
@@ -130,6 +132,9 @@ export function getOpenAPISpec(): any {
   registry.register('RefreshTokenRequest', refreshTokenSchema);
   registry.register('LoginResponse', loginResponseSchema);
   registry.register('RefreshTokenResponse', refreshTokenResponseSchema);
+  registry.register('InitialAdminSetupRequest', initialAdminSetupSchema);
+  registry.register('SetupStatusResponse', setupStatusResponseSchema);
+  registry.register('InitialAdminSetupResponse', initialAdminSetupResponseSchema);
   registry.register('CreateKnowledgeSectionRequest', createKnowledgeSectionSchema);
   registry.register('UpdateKnowledgeSectionRequest', updateKnowledgeSectionSchema);
   registry.register('KnowledgeSectionResponse', knowledgeSectionResponseSchema);
@@ -193,7 +198,7 @@ export function getOpenAPISpec(): any {
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AuthController, AdminController, UserController, 
+  const controllers = [AuthController, SetupController, AdminController, UserController, 
     ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
     PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController, AuditController];
 
