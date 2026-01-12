@@ -17,6 +17,7 @@ import {
   environments,
   auditLogs,
   conversationAssets,
+  providers,
 } from '../db/schema';
 
 // Inferred select models from Drizzle schema
@@ -37,3 +38,4 @@ export type Issue = InferSelectModel<typeof issues>;
 export type Environment = InferSelectModel<typeof environments>;
 export type AuditLog = InferSelectModel<typeof auditLogs>;
 export type ConversationAsset = InferSelectModel<typeof conversationAssets>;
+export type Provider = InferSelectModel<typeof providers>;

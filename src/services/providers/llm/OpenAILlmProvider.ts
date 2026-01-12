@@ -1,0 +1,266 @@
+import OpenAI from 'openai';
+import { LlmProviderBase } from './LlmProviderBase';
+import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, TextContent } from './ILlmProvider';
+import { logger } from '../../../utils/logger';
+
+/**
+ * OpenAI-specific configuration
+ */
+export interface OpenAILlmProviderConfig extends LlmProviderConfig {
+  /** OpenAI API key */
+  apiKey: string;
+  /** Optional organization ID */
+  organizationId?: string;
+  /** Optional base URL for OpenAI-compatible APIs */
+  baseUrl?: string;
+  /** Model name (e.g., gpt-4, gpt-3.5-turbo) */
+  model: string;
+  /** Default max tokens */
+  defaultMaxTokens?: number;
+  /** Default temperature */
+  defaultTemperature?: number;
+  /** Default top-p */
+  defaultTopP?: number;
+  /** Request timeout in milliseconds */
+  timeout?: number;
+}
+
+/**
+ * OpenAI LLM provider implementation using the new Responses API
+ * Supports both streaming and non-streaming generation with multi-modal messages
+ */
+export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> {
+  private client?: OpenAI;
+
+  /**
+   * Convert message content to Response API input format
+   */
+  private convertContentToInput(content: string | (TextContent | ImageContent | { type: 'json'; data: Record<string, any> })[]) {
+    if (typeof content === 'string') {
+      return content;
+    }
+
+    // Multi-modal content array
+    return content.map((item) => {
+      if (item.type === 'text') {
+        return {
+          type: 'input_text' as const,
+          text: (item as TextContent).text,
+        };
+      }
+      if (item.type === 'image') {
+        const imageContent = item as ImageContent;
+        if (imageContent.source.type === 'url' && imageContent.source.url) {
+          return {
+            type: 'input_image' as const,
+            image_url: imageContent.source.url,
+          };
+        } else if (imageContent.source.type === 'base64' && imageContent.source.data) {
+          const mimeType = imageContent.source.mimeType || 'image/jpeg';
+          const dataUrl = `data:${mimeType};base64,${imageContent.source.data}`;
+          return {
+            type: 'input_image' as const,
+            image_url: dataUrl,
+          };
+        }
+        throw new Error('Invalid image content: missing url or data');
+      }
+      if (item.type === 'json') {
+        return {
+          type: 'input_text' as const,
+          text: JSON.stringify((item as any).data),
+        };
+      }
+      throw new Error(`Unsupported content type: ${(item as any).type}`);
+    });
+  }
+
+  /**
+   * Convert our message format to simple text input (for now)
+   * TODO: Support multi-modal input array format
+   */
+  private convertMessagesToInput(messages: LlmMessage[]): string {
+    return messages
+      .filter((msg) => msg.role !== 'system')
+      .map((msg) => {
+        const role = msg.role === 'user' ? 'User' : 'Assistant';
+        if (typeof msg.content === 'string') {
+          return `${role}: ${msg.content}`;
+        }
+        // Extract text from multi-modal content
+        const text = msg.content.filter((c) => c.type === 'text').map((c) => (c as TextContent).text).join(' ');
+        return `${role}: ${text}`;
+      })
+      .join('\n\n');
+  }
+
+  /**
+   * Initialize the OpenAI provider
+   */
+  async init(config: OpenAILlmProviderConfig): Promise<void> {
+    await super.init(config);
+
+    this.client = new OpenAI({
+      apiKey: config.apiKey,
+      organization: config.organizationId,
+      baseURL: config.baseUrl,
+      timeout: config.timeout,
+    });
+
+    logger.info(`OpenAI LLM provider initialized with model: ${config.model}`);
+  }
+
+  /**
+   * Generate a non-streaming response using the Responses API
+   */
+  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    this.ensureInitialized();
+    this.validateMessages(messages);
+
+    if (!this.client) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const mergedOptions = this.applyDefaultOptions(options);
+    const input = this.convertMessagesToInput(messages);
+    const systemMessage = messages.find((m) => m.role === 'system');
+
+    try {
+      logger.info(`Generating OpenAI response with model: ${this.config!.model}`);
+
+      const response = await this.client.responses.create({
+        model: this.config!.model,
+        input,
+        instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
+        max_output_tokens: mergedOptions.maxTokens,
+        temperature: mergedOptions.temperature,
+        top_p: mergedOptions.topP,
+        stream: false,
+        metadata: mergedOptions.metadata,
+      });
+
+      if (response.status === 'failed') {
+        throw new Error(response.error?.message || 'Response generation failed');
+      }
+
+      // Extract text from output items
+      let content = '';
+      for (const item of response.output || []) {
+        if (item.type === 'message' && item.role === 'assistant') {
+          for (const contentItem of item.content || []) {
+            if (contentItem.type === 'output_text') {
+              content += contentItem.text;
+            }
+          }
+        }
+      }
+
+      const result: LlmGenerationResult = {
+        id: response.id,
+        content,
+        role: 'assistant',
+        finishReason: response.status === 'completed' ? 'stop' : 'length',
+        usage: response.usage ? {
+          promptTokens: response.usage.input_tokens,
+          completionTokens: response.usage.output_tokens,
+          totalTokens: response.usage.total_tokens,
+        } : undefined,
+        metadata: {
+          model: response.model,
+          status: response.status,
+        },
+      };
+
+      await this.notifyComplete(result);
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`OpenAI generation error: ${errorMessage}`);
+      await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a streaming response using the Responses API
+   */
+  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+    this.ensureInitialized();
+    this.validateMessages(messages);
+
+    if (!this.client) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const mergedOptions = this.applyDefaultOptions(options);
+    const input = this.convertMessagesToInput(messages);
+    const systemMessage = messages.find((m) => m.role === 'system');
+
+    try {
+      logger.info(`Starting OpenAI streaming response with model: ${this.config!.model}`);
+
+      const stream = await this.client.responses.create({
+        model: this.config!.model,
+        input,
+        instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
+        max_output_tokens: mergedOptions.maxTokens,
+        temperature: mergedOptions.temperature,
+        top_p: mergedOptions.topP,
+        stream: true,
+        metadata: mergedOptions.metadata,
+      });
+
+      let fullContent = '';
+      let responseId = '';
+      let finalStatus = 'in_progress';
+      let finalUsage: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | undefined;
+
+      for await (const event of stream) {
+        if (event.type === 'response.created') {
+          responseId = event.response?.id || '';
+        } else if (event.type === 'response.output_text.delta') {
+          fullContent += event.delta;
+          await this.notifyChunk(event.delta, responseId, 'assistant', null);
+        } else if (event.type === 'response.completed') {
+          const response = event.response;
+          responseId = response?.id || responseId;
+          finalStatus = response?.status || finalStatus;
+
+          if (response?.usage) {
+            finalUsage = {
+              promptTokens: response.usage.input_tokens,
+              completionTokens: response.usage.output_tokens,
+              totalTokens: response.usage.total_tokens,
+            };
+          }
+        }
+      }
+
+      // Notify completion
+      const result: LlmGenerationResult = {
+        id: responseId,
+        content: fullContent,
+        role: 'assistant',
+        finishReason: finalStatus === 'completed' ? 'stop' : finalStatus === 'incomplete' ? 'length' : 'stop',
+        usage: finalUsage ? {
+          promptTokens: finalUsage.promptTokens || 0,
+          completionTokens: finalUsage.completionTokens || 0,
+          totalTokens: finalUsage.totalTokens || 0,
+        } : undefined,
+        metadata: {
+          model: this.config!.model,
+          status: finalStatus,
+        },
+      };
+
+      await this.notifyComplete(result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`OpenAI streaming error: ${errorMessage}`);
+      await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
+      throw error;
+    }
+  }
+
+
+}

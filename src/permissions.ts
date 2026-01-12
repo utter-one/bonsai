@@ -65,6 +65,11 @@ export const PERMISSIONS = {
   ISSUE_WRITE: 'issue:write',
   ISSUE_DELETE: 'issue:delete',
 
+  // Provider permissions
+  PROVIDER_READ: 'provider:read',
+  PROVIDER_WRITE: 'provider:write',
+  PROVIDER_DELETE: 'provider:delete',
+
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',
@@ -102,6 +107,8 @@ export const ROLES = {
       PERMISSIONS.GLOBAL_ACTION_WRITE,
       PERMISSIONS.KNOWLEDGE_READ,
       PERMISSIONS.KNOWLEDGE_WRITE,
+      PERMISSIONS.PROVIDER_READ,
+      PERMISSIONS.PROVIDER_WRITE,
       PERMISSIONS.AUDIT_READ,
     ],
   },
@@ -131,6 +138,7 @@ export const ROLES = {
       PERMISSIONS.GLOBAL_ACTION_READ,
       PERMISSIONS.KNOWLEDGE_READ,
       PERMISSIONS.ISSUE_READ,
+      PERMISSIONS.PROVIDER_READ,
       PERMISSIONS.SYSTEM_CONFIG,
       PERMISSIONS.AUDIT_READ,
     ],
@@ -149,6 +157,7 @@ export const ROLES = {
       PERMISSIONS.GLOBAL_ACTION_READ,
       PERMISSIONS.KNOWLEDGE_READ,
       PERMISSIONS.ISSUE_READ,
+      PERMISSIONS.PROVIDER_READ,
       PERMISSIONS.AUDIT_READ,
     ],
   },
