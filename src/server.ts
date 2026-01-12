@@ -17,6 +17,7 @@ import { ToolController } from './controllers/ToolController';
 import { GlobalActionController } from './controllers/GlobalActionController';
 import { EnvironmentController } from './controllers/EnvironmentController';
 import { AuditController } from './controllers/AuditController';
+import { HealthController } from './controllers/HealthController';
 import { errorHandler } from './middleware/errorHandler';
 import { optionalAuthMiddleware } from './middleware/auth';
 import { requestContextMiddleware } from './middleware/requestContext';
@@ -60,7 +61,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
+    controllers: [AdminController, UserController, PersonaController, AuthController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController, HealthController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
