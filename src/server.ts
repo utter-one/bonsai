@@ -7,7 +7,6 @@ import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
 import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
-import { SetupController } from './controllers/SetupController';
 import { KnowledgeController } from './controllers/KnowledgeController';
 import { IssueController } from './controllers/IssueController';
 import { ConversationController } from './controllers/ConversationController';
@@ -24,6 +23,8 @@ import { requestContextMiddleware } from './middleware/requestContext';
 import { ValidationMiddleware } from './middleware/validation';
 import { PermissionInterceptor } from './middleware/authorization';
 import { getOpenAPISpec } from './swagger';
+import { SetupService } from './services/SetupService';
+import { initialAdminSetupSchema } from './api/setup';
 import logger from './utils/logger';
 
 /**
@@ -40,6 +41,28 @@ export function createApp(): express.Application {
       status: 'healthy',
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // Setup endpoints - public routes that bypass authentication
+  const setupService = container.resolve(SetupService);
+  
+  app.get('/api/setup/status', async (req, res, next) => {
+    try {
+      const status = await setupService.getSetupStatus();
+      res.status(200).json(status);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/setup/initial-admin', async (req, res, next) => {
+    try {
+      const validated = initialAdminSetupSchema.parse(req.body);
+      const result = await setupService.createInitialAdmin(validated);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.use((req, res, next) => {
@@ -69,7 +92,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, SetupController, AdminController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
+    controllers: [AuthController, AdminController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
