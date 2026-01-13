@@ -4,6 +4,8 @@ export { OpenAILlmProvider } from './OpenAILlmProvider';
 export { OpenAILegacyLlmProvider } from './OpenAILegacyLlmProvider';
 export { AnthropicLlmProvider } from './AnthropicLlmProvider';
 export { GeminiLlmProvider } from './GeminiLlmProvider';
+export { LlmProviderFactory } from './LlmProviderFactory';
+export type { LlmProviderApiType } from './LlmProviderFactory';
 
 export type {
   MessageRole,
