@@ -67,7 +67,7 @@ export class ConversationRunner {
       if (!classifier) {
         throw new NotFoundError(`Classifier with ID ${classifierId} not found`);
       }
-      const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, classifier.llmProvider) });
+      const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, classifier.llmProviderId) });
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
       this.stageData.classifiers.push({ classifier, llmProvider });
     }
@@ -79,7 +79,7 @@ export class ConversationRunner {
       if (!transformer) {
         throw new NotFoundError(`Transformer with ID ${transformerId} not found`);
       }
-      const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, transformer.llmProvider) });
+      const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, transformer.llmProviderId) });
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
       this.stageData.transformers.push({ transformer, llmProvider });
     }

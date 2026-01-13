@@ -26,21 +26,14 @@ export const variablesSchema = z.record(z.string(), z.unknown()).describe('Varia
 export const actionsSchema = z.record(z.string(), z.unknown()).describe('Action definitions for this stage');
 
 /**
- * Schema for LLM provider configuration
- * Provides settings for the language model provider
- */
-export const llmProviderConfigSchema = z.record(z.string(), z.unknown()).optional().describe('LLM provider-specific configuration settings');
-
-/**
  * Schema for creating a new stage
  * Required fields: id, prompt, personaId
- * Optional fields: llmProvider, llmProviderConfig, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, classifierIds, transformerIds, metadata
+ * Optional fields: llmProviderId, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, classifierIds, transformerIds, metadata
  */
 export const createStageSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the stage'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
-  llmProvider: z.string().nullable().optional().describe('LLM provider identifier (e.g., "openai", "anthropic")'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider-specific configuration'),
+  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this stage'),
   personaId: z.string().min(1).describe('ID of the persona associated with this stage'),
   enterBehavior: enterBehaviorSchema.optional().describe('Behavior configuration when entering this stage'),
   useKnowledge: z.boolean().optional().default(false).describe('Whether to use knowledge base in this stage'),
@@ -60,8 +53,7 @@ export const createStageSchema = z.object({
  */
 export const updateStageBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated system prompt'),
-  llmProvider: z.string().nullable().optional().describe('Updated LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('Updated LLM provider configuration'),
+  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
   personaId: z.string().min(1).optional().describe('Updated persona ID'),
   enterBehavior: enterBehaviorSchema.optional().describe('Updated enter behavior configuration'),
   useKnowledge: z.boolean().optional().describe('Updated knowledge usage flag'),
@@ -91,8 +83,7 @@ export const deleteStageBodySchema = z.object({
 export const stageResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the stage'),
   prompt: z.string().describe('System prompt defining the stage behavior'),
-  llmProvider: z.string().nullable().describe('LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider configuration'),
+  llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   personaId: z.string().describe('ID of the associated persona'),
   enterBehavior: enterBehaviorSchema.describe('Stage entry behavior configuration'),
   useKnowledge: z.boolean().describe('Whether knowledge base is enabled'),

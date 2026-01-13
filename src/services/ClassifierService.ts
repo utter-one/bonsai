@@ -34,11 +34,11 @@ export class ClassifierService extends BaseService {
     logger.info({ classifierId: input.id, name: input.name, adminId: context?.adminId }, 'Creating classifier');
 
     try {
-      const classifier = await db.insert(classifiers).values({ id: input.id, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProvider: input.llmProvider ?? null, llmProviderConfig: input.llmProviderConfig ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const classifier = await db.insert(classifiers).values({ id: input.id, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdClassifier = classifier[0];
 
-      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProvider: createdClassifier.llmProvider, llmProviderConfig: createdClassifier.llmProviderConfig, metadata: createdClassifier.metadata }, context?.adminId);
+      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, metadata: createdClassifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: createdClassifier.id }, 'Classifier created successfully');
 
@@ -89,7 +89,7 @@ export class ClassifierService extends BaseService {
       const columnMap = {
         id: classifiers.id,
         name: classifiers.name,
-        llmProvider: classifiers.llmProvider,
+        llmProviderId: classifiers.llmProviderId,
         version: classifiers.version,
         createdAt: classifiers.createdAt,
         updatedAt: classifiers.updatedAt,
@@ -169,8 +169,7 @@ export class ClassifierService extends BaseService {
       if (input.name !== undefined) updateData.name = input.name;
       if (input.description !== undefined) updateData.description = input.description;
       if (input.prompt !== undefined) updateData.prompt = input.prompt;
-      if (input.llmProvider !== undefined) updateData.llmProvider = input.llmProvider;
-      if (input.llmProviderConfig !== undefined) updateData.llmProviderConfig = input.llmProviderConfig;
+      if (input.llmProviderId !== undefined) updateData.llmProviderId = input.llmProviderId;
       if (input.metadata !== undefined) updateData.metadata = input.metadata;
 
       const updatedClassifier = await db.update(classifiers).set(updateData).where(and(eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
@@ -181,7 +180,7 @@ export class ClassifierService extends BaseService {
 
       const classifier = updatedClassifier[0];
 
-      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProvider: existingClassifier.llmProvider, llmProviderConfig: existingClassifier.llmProviderConfig, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProvider: classifier.llmProvider, llmProviderConfig: classifier.llmProviderConfig, metadata: classifier.metadata }, context?.adminId);
+      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, metadata: classifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: classifier.id, newVersion: classifier.version }, 'Classifier updated successfully');
 
@@ -221,7 +220,7 @@ export class ClassifierService extends BaseService {
         throw new OptimisticLockError(`Failed to delete classifier due to version conflict`);
       }
 
-      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProvider: existingClassifier.llmProvider, llmProviderConfig: existingClassifier.llmProviderConfig, metadata: existingClassifier.metadata }, context?.adminId);
+      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, metadata: existingClassifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: id }, 'Classifier deleted successfully');
     } catch (error) {

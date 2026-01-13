@@ -8,15 +8,9 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
- * Schema for LLM provider configuration
- * Provides settings for the language model provider
- */
-export const llmProviderConfigSchema = z.record(z.string(), z.unknown()).optional().describe('LLM provider-specific configuration settings');
-
-/**
  * Schema for creating a new context transformer
  * Required fields: id, name, prompt
- * Optional fields: description, contextFields, llmProvider, llmProviderConfig, metadata
+ * Optional fields: description, contextFields, llmProviderId, metadata
  */
 export const createContextTransformerSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the context transformer'),
@@ -24,8 +18,7 @@ export const createContextTransformerSchema = z.object({
   description: z.string().nullable().optional().describe('Detailed description of the transformer\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the transformation logic and instructions'),
   contextFields: z.array(z.string()).optional().describe('List of context field names to be transformed'),
-  llmProvider: z.string().nullable().optional().describe('LLM provider identifier (e.g., "openai", "anthropic")'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider-specific configuration'),
+  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this transformer'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional transformer-specific metadata'),
 });
 
@@ -38,8 +31,7 @@ export const updateContextTransformerBodySchema = z.object({
   description: z.string().nullable().optional().describe('Updated description'),
   prompt: z.string().min(1).optional().describe('Updated transformation prompt'),
   contextFields: z.array(z.string()).optional().describe('Updated context field names'),
-  llmProvider: z.string().nullable().optional().describe('Updated LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('Updated LLM provider configuration'),
+  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -62,8 +54,7 @@ export const contextTransformerResponseSchema = z.object({
   description: z.string().nullable().describe('Detailed description of the transformer'),
   prompt: z.string().describe('Prompt defining the transformation logic'),
   contextFields: z.array(z.string()).nullable().describe('Context field names to be transformed'),
-  llmProvider: z.string().nullable().describe('LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider configuration'),
+  llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the transformer was created'),

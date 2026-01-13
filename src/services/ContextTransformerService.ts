@@ -34,11 +34,11 @@ export class ContextTransformerService extends BaseService {
     logger.info({ transformerId: input.id, name: input.name, adminId: context?.adminId }, 'Creating context transformer');
 
     try {
-      const transformer = await db.insert(contextTransformers).values({ id: input.id, name: input.name, description: input.description ?? null, prompt: input.prompt, contextFields: input.contextFields ?? null, llmProvider: input.llmProvider ?? null, llmProviderConfig: input.llmProviderConfig ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const transformer = await db.insert(contextTransformers).values({ id: input.id, name: input.name, description: input.description ?? null, prompt: input.prompt, contextFields: input.contextFields ?? null, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTransformer = transformer[0];
 
-      await this.auditService.logCreate('context_transformer', createdTransformer.id, { id: createdTransformer.id, name: createdTransformer.name, description: createdTransformer.description, prompt: createdTransformer.prompt, contextFields: createdTransformer.contextFields, llmProvider: createdTransformer.llmProvider, llmProviderConfig: createdTransformer.llmProviderConfig, metadata: createdTransformer.metadata }, context?.adminId);
+      await this.auditService.logCreate('context_transformer', createdTransformer.id, { id: createdTransformer.id, name: createdTransformer.name, description: createdTransformer.description, prompt: createdTransformer.prompt, contextFields: createdTransformer.contextFields, llmProviderId: createdTransformer.llmProviderId, metadata: createdTransformer.metadata }, context?.adminId);
 
       logger.info({ transformerId: createdTransformer.id }, 'Context transformer created successfully');
 
@@ -89,7 +89,7 @@ export class ContextTransformerService extends BaseService {
       const columnMap = {
         id: contextTransformers.id,
         name: contextTransformers.name,
-        llmProvider: contextTransformers.llmProvider,
+        llmProviderId: contextTransformers.llmProviderId,
         version: contextTransformers.version,
         createdAt: contextTransformers.createdAt,
         updatedAt: contextTransformers.updatedAt,
@@ -170,8 +170,7 @@ export class ContextTransformerService extends BaseService {
       if (input.description !== undefined) updateData.description = input.description;
       if (input.prompt !== undefined) updateData.prompt = input.prompt;
       if (input.contextFields !== undefined) updateData.contextFields = input.contextFields;
-      if (input.llmProvider !== undefined) updateData.llmProvider = input.llmProvider;
-      if (input.llmProviderConfig !== undefined) updateData.llmProviderConfig = input.llmProviderConfig;
+      if (input.llmProviderId !== undefined) updateData.llmProviderId = input.llmProviderId;
       if (input.metadata !== undefined) updateData.metadata = input.metadata;
 
       const updatedTransformer = await db.update(contextTransformers).set(updateData).where(and(eq(contextTransformers.id, id), eq(contextTransformers.version, expectedVersion))).returning();
@@ -182,7 +181,7 @@ export class ContextTransformerService extends BaseService {
 
       const transformer = updatedTransformer[0];
 
-      await this.auditService.logUpdate('context_transformer', transformer.id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProvider: existingTransformer.llmProvider, llmProviderConfig: existingTransformer.llmProviderConfig, metadata: existingTransformer.metadata }, { id: transformer.id, name: transformer.name, description: transformer.description, prompt: transformer.prompt, contextFields: transformer.contextFields, llmProvider: transformer.llmProvider, llmProviderConfig: transformer.llmProviderConfig, metadata: transformer.metadata }, context?.adminId);
+      await this.auditService.logUpdate('context_transformer', transformer.id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProviderId: existingTransformer.llmProviderId, metadata: existingTransformer.metadata }, { id: transformer.id, name: transformer.name, description: transformer.description, prompt: transformer.prompt, contextFields: transformer.contextFields, llmProviderId: transformer.llmProviderId, metadata: transformer.metadata }, context?.adminId);
 
       logger.info({ transformerId: transformer.id, newVersion: transformer.version }, 'Context transformer updated successfully');
 
@@ -222,7 +221,7 @@ export class ContextTransformerService extends BaseService {
         throw new OptimisticLockError(`Failed to delete context transformer due to version conflict`);
       }
 
-      await this.auditService.logDelete('context_transformer', id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProvider: existingTransformer.llmProvider, llmProviderConfig: existingTransformer.llmProviderConfig, metadata: existingTransformer.metadata }, context?.adminId);
+      await this.auditService.logDelete('context_transformer', id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProviderId: existingTransformer.llmProviderId, metadata: existingTransformer.metadata }, context?.adminId);
 
       logger.info({ transformerId: id }, 'Context transformer deleted successfully');
     } catch (error) {
