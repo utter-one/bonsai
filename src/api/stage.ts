@@ -33,11 +33,11 @@ export const llmProviderConfigSchema = z.record(z.string(), z.unknown()).optiona
 
 /**
  * Schema for creating a new stage
- * Required fields: stageId, prompt, personaId
+ * Required fields: id, prompt, personaId
  * Optional fields: llmProvider, llmProviderConfig, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, classifierIds, transformerIds, metadata
  */
 export const createStageSchema = z.object({
-  stageId: z.string().min(1).describe('Unique identifier for the stage'),
+  id: z.string().min(1).describe('Unique identifier for the stage'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
   llmProvider: z.string().nullable().optional().describe('LLM provider identifier (e.g., "openai", "anthropic")'),
   llmProviderConfig: llmProviderConfigSchema.describe('LLM provider-specific configuration'),
@@ -89,7 +89,7 @@ export const deleteStageBodySchema = z.object({
  * Includes all fields from the database schema
  */
 export const stageResponseSchema = z.object({
-  stageId: z.string().describe('Unique identifier for the stage'),
+  id: z.string().describe('Unique identifier for the stage'),
   prompt: z.string().describe('System prompt defining the stage behavior'),
   llmProvider: z.string().nullable().describe('LLM provider identifier'),
   llmProviderConfig: llmProviderConfigSchema.describe('LLM provider configuration'),

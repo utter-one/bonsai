@@ -80,7 +80,7 @@ const conversationEventIdParamSchema = z.object({
 });
 
 const stageIdParamSchema = z.object({
-  stageId: z.string().openapi({ description: 'Stage ID', example: 'stage-123' }),
+  id: z.string().openapi({ description: 'Stage ID', example: 'stage-123' }),
 });
 
 const classifierIdParamSchema = z.object({
@@ -214,7 +214,7 @@ export function getOpenAPISpec(): any {
     '/api/issues/:id': issueIdParamSchema,
     '/api/conversations/:id': conversationIdParamSchema,
     '/api/conversations/:id/events/:eventId': conversationEventIdParamSchema,
-    '/api/stages/:stageId': stageIdParamSchema,
+    '/api/stages/:id': stageIdParamSchema,
     '/api/classifiers/:id': classifierIdParamSchema,
     '/api/context-transformers/:id': contextTransformerIdParamSchema,
     '/api/tools/:id': toolIdParamSchema,
@@ -240,7 +240,7 @@ export function getOpenAPISpec(): any {
       const fullPath = `${basePath}${actionPath}`.replace(/\/\//g, '/');
 
       // Determine if this route has params
-      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId') || fullPath.includes(':eventId') || fullPath.includes(':stageId');
+      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId') || fullPath.includes(':eventId');
       const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '').replace(/\/items$/, '').replace(/\/events$/, '');
       const paramSchema = hasParams && !fullPath.includes('/audit-logs') && !fullPath.endsWith('/items') && !fullPath.endsWith('/events') ? paramSchemaMap[paramKey] : undefined;
 

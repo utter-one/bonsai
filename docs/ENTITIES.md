@@ -185,7 +185,7 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 
 | Field Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
-| `stageId` | String | Primary Key | Unique identifier for the stage |
+| `id` | String | Primary Key | Unique identifier for the stage |
 | `prompt` | Text | Not Null | System prompt template for this stage (supports Handlebars templating) |
 | `llmProvider` | String | Nullable | LLM provider override for conversation completion |
 | `llmProviderConfig` | JSON Object | Nullable | LLM configuration override (without credentials) |
@@ -211,7 +211,7 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 - Referenced by Conversation (`stageId`)
 
 ### Indexes
-- Primary key on `stageId`
+- Primary key on `id`
 - Foreign key index on `personaId`
 
 ### Variables Structure

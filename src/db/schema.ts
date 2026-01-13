@@ -111,7 +111,7 @@ export const tools = pgTable('tools', {
 
 // Stage table
 export const stages = pgTable('stages', {
-  stageId: text('stage_id').primaryKey(),
+  id: text('id').primaryKey(),
   prompt: text('prompt').notNull(),
   llmProvider: text('llm_provider'),
   llmProviderConfig: jsonb('llm_provider_config').$type<Record<string, any>>(),

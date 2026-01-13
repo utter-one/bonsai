@@ -60,7 +60,7 @@ export class StageController {
   }
 
   /**
-   * GET /api/stages/:stageId
+   * GET /api/stages/:id
    * Get a stage by ID
    */
   @RequirePermissions([PERMISSIONS.STAGE_READ])
@@ -80,9 +80,9 @@ export class StageController {
       404: { description: 'Stage not found' },
     },
   })
-  @Get('/:stageId')
-  async getStageById(@Param('stageId') stageId: string) {
-    const stage = await this.stageService.getStageById(stageId);
+  @Get('/:id')
+  async getStageById(@Param('id') id: string) {
+    const stage = await this.stageService.getStageById(id);
     return stage;
   }
 
@@ -116,7 +116,7 @@ export class StageController {
   }
 
   /**
-   * PUT /api/stages/:stageId
+   * PUT /api/stages/:id
    * Update a stage
    */
   @RequirePermissions([PERMISSIONS.STAGE_WRITE])
@@ -147,15 +147,15 @@ export class StageController {
       409: { description: 'Version conflict - entity was modified' },
     },
   })
-  @Put('/:stageId')
-  async updateStage(@Param('stageId') stageId: string, @Validated(updateStageBodySchema) @Body() body: UpdateStageRequest, @Req() req: Request) {
+  @Put('/:id')
+  async updateStage(@Param('id') id: string, @Validated(updateStageBodySchema) @Body() body: UpdateStageRequest, @Req() req: Request) {
     const { version, ...updateData } = body;
-    const stage = await this.stageService.updateStage(stageId, updateData, version, req.context);
+    const stage = await this.stageService.updateStage(id, updateData, version, req.context);
     return stage;
   }
 
   /**
-   * DELETE /api/stages/:stageId
+   * DELETE /api/stages/:id
    * Delete a stage
    */
   @RequirePermissions([PERMISSIONS.STAGE_DELETE])
@@ -179,14 +179,14 @@ export class StageController {
       409: { description: 'Version conflict - entity was modified' },
     },
   })
-  @Delete('/:stageId')
+  @Delete('/:id')
   @HttpCode(204)
-  async deleteStage(@Param('stageId') stageId: string, @Validated(deleteStageBodySchema) @Body() body: DeleteStageRequest, @Req() req: Request) {
-    await this.stageService.deleteStage(stageId, body.version, req.context);
+  async deleteStage(@Param('id') id: string, @Validated(deleteStageBodySchema) @Body() body: DeleteStageRequest, @Req() req: Request) {
+    await this.stageService.deleteStage(id, body.version, req.context);
   }
 
   /**
-   * GET /api/stages/:stageId/audit-logs
+   * GET /api/stages/:id/audit-logs
    * Get audit logs for a stage
    */
   @RequirePermissions([PERMISSIONS.AUDIT_READ])
@@ -201,8 +201,8 @@ export class StageController {
       404: { description: 'Stage not found' },
     },
   })
-  @Get('/:stageId/audit-logs')
-  async getStageAuditLogs(@Param('stageId') stageId: string) {
-    return await this.stageService.getStageAuditLogs(stageId);
+  @Get('/:id/audit-logs')
+  async getStageAuditLogs(@Param('id') id: string) {
+    return await this.stageService.getStageAuditLogs(id);
   }
 }
