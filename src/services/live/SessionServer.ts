@@ -6,6 +6,10 @@ import { logger } from '../../utils/logger';
 import type { AuthRequest, AuthResponse } from '../../contracts/websocket/auth';
 import type { StartConversationRequest, StartConversationResponse, ResumeConversationRequest, ResumeConversationResponse, EndConversationRequest, EndConversationResponse } from '../../contracts/websocket/session';
 import type { BaseInputMessage, BaseOutputMessage } from '../../contracts/websocket/common';
+import { ConversationService } from '../ConversationService';
+import { InvalidOperationError, NotFoundError } from '../../errors';
+import { conversations, db } from '../../db';
+import { eq } from 'drizzle-orm';
 
 type InputMessage = AuthRequest | StartConversationRequest | ResumeConversationRequest | EndConversationRequest;
 
@@ -81,8 +85,9 @@ export class SessionServer {
         }
       }
     } catch (error) {
-      logger.error({ error: error instanceof Error ? error.message : String(error) }, 'Failed to handle WebSocket message');
-      this.sendError(ws, 'Invalid message format');
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ error: message }, 'Failed to handle WebSocket message');
+      this.sendError(ws, message);
     }
   }
 
@@ -121,13 +126,59 @@ export class SessionServer {
    * @param ws - The WebSocket connection.
    * @param message - The start conversation request message.
    */
-  private handleStartConversation(ws: WebSocket, message: StartConversationRequest): void {
+  private async handleStartConversation(ws: WebSocket, message: StartConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, personaId: message.personaId, requestId: message.requestId }, 'Start conversation request received');
+    const metadata = this.sessionManager.getWebSocketMetadata(ws);
+    if (!metadata) {
+      throw new NotFoundError('Session not found');
+    }
+    if (metadata.conversationId) {
+      throw new InvalidOperationError('A conversation is already active in this session');
+    }
 
-    // TODO: Implement conversation creation logic using ConversationService
-    // For now, return a placeholder response
-    const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: false, error: 'Not implemented', requestId: message.requestId };
-    this.send(ws, response);
+    try {
+      const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      await db.insert(conversations).values({
+        id: conversationId,
+        userId: message.userId,
+        clientId: metadata.sessionId,
+        stageId: message.stageId,
+        state: {
+          variables: {},
+          currentActions: [],
+        },
+        status: 'ongoing',
+        metadata: {
+          sessionId: message.sessionId,
+          createdVia: 'websocket',
+        },
+      });
+
+      this.sessionManager.attachConversationToSession(message.sessionId, conversationId);
+
+      logger.info({ sessionId: message.sessionId, conversationId }, 'Conversation created and attached to session');
+
+      const response: StartConversationResponse = { 
+        type: 'start_conversation', 
+        sessionId: message.sessionId, 
+        success: true, 
+        conversationId, 
+        requestId: message.requestId 
+      };
+      this.send(ws, response);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation';
+      logger.error({ error: errorMessage, sessionId: message.sessionId }, 'Failed to create conversation');
+      const response: StartConversationResponse = { 
+        type: 'start_conversation', 
+        sessionId: message.sessionId, 
+        success: false, 
+        error: errorMessage, 
+        requestId: message.requestId 
+      };
+      this.send(ws, response);
+    }
   }
 
   /**
@@ -137,10 +188,31 @@ export class SessionServer {
    */
   private handleResumeConversation(ws: WebSocket, message: ResumeConversationRequest): void {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Resume conversation request received');
+    const metadata = this.sessionManager.getWebSocketMetadata(ws);
+    if (!metadata) {
+      throw new NotFoundError('Session not found');
+    }
 
-    // TODO: Implement conversation resumption logic using ConversationService
-    // For now, return a placeholder response
-    const response: ResumeConversationResponse = { type: 'resume_conversation', sessionId: message.sessionId, success: false, error: 'Not implemented', requestId: message.requestId };
+    if (metadata.conversationId) {
+      throw new InvalidOperationError('A conversation is already active in this session');
+    }
+
+    const conversation = db.query.conversations.findFirst({
+      where: eq(conversations.id, message.conversationId)
+    });
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    this.sessionManager.attachConversationToSession(message.sessionId, message.conversationId);
+
+    // Return success response
+    const response: ResumeConversationResponse = { 
+      type: 'resume_conversation', 
+      sessionId: message.sessionId, 
+      success: true, 
+      requestId: message.requestId 
+    };
     this.send(ws, response);
   }
 
