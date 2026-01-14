@@ -4,7 +4,7 @@ import { NotFoundError } from "../../errors";
 import { StageService } from "../StageService";
 import { ClassifierService } from "../ClassifierService";
 import { ContextTransformerService } from "../ContextTransformerService";
-import { Classifier, ContextTransformer, Conversation } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, Stage } from "../../types/models";
 import { db } from "../../db";
 import { ILlmProvider, LlmProviderFactory } from "../providers/llm";
 
@@ -20,48 +20,54 @@ type TransformerData = {
 
 type StageData = {
   id: string;
+  stage: Stage;
   classifiers: ClassifierData[];
   transformers: TransformerData[];
 }
 
+type ConversationState = 'awaiting_user_input' // Runner is waiting for user input (text or voice)
+  | 'receiving_user_voice' // Runner is receiving voice input from user (ASR in progress)
+  | 'processing_user_input' // Runner is processing user input (classification/transformation)
+  | 'generating_response' // Runner is generating a response  
+  | 'finished'; // Runner has finished
 export class ConversationRunner {
   private conversation: Conversation;
   private stageData: StageData;
+  private state: ConversationState = 'awaiting_user_input';
 
-  constructor(@inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory) {}
+  constructor(@inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory) { }
 
   async prepareConversation(conversationId: string): Promise<void> {
-    // load conversation data
+    // Load conversation data
     this.conversation = await db.query.conversations.findFirst({ where: (conversations, { eq }) => eq(conversations.id, conversationId) });
     if (!this.conversation) {
       throw new NotFoundError(`Conversation with ID ${conversationId} not found`);
     }
 
-    // check if conversation is active
+    // Check if conversation is active
     if (this.conversation.status !== 'active') {
       throw new Error(`Conversation with ID ${conversationId} is not active`);
     }
 
     this.stageData = await this.loadStageData(this.conversation.stageId);
-
+    this.state = this.stageData.stage.enterBehavior === 'await_user_input' ? 'awaiting_user_input' : 'generating_response';
   }
 
   private async loadStageData(stageId: string): Promise<StageData> {
+    // Load current stage data
+    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, stageId) });
+    if (!stage) {
+      throw new NotFoundError(`Stage with ID ${stageId} not found`);
+    }
+
     const stageData: StageData = {
       id: stageId,
+      stage: stage,
       classifiers: [],
       transformers: [],
     };
 
-    // load current stage data
-    this.stageData = {} as StageData;
-    this.stageData.id = this.conversation.stageId;
-    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, this.stageData.id) });
-    if (!stage) {
-      throw new NotFoundError(`Stage with ID ${this.stageData.id} not found`);
-    }
-
-    // load classifiers for the stage
+    // Load classifiers for the stage
     for (const classifierId of stage.classifierIds) {
       const classifier = await db.query.classifiers.findFirst({ where: (classifiers, { eq }) => eq(classifiers.id, classifierId) });
       if (!classifier) {
@@ -69,11 +75,10 @@ export class ConversationRunner {
       }
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, classifier.llmProviderId) });
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
-      this.stageData.classifiers.push({ classifier, llmProvider });
+      stageData.classifiers.push({ classifier, llmProvider });
     }
 
-    // load transformers for the stage
-    this.stageData.transformers = [];
+    // Load transformers for the stage
     for (const transformerId of stage.transformerIds) {
       const transformer = await db.query.contextTransformers.findFirst({ where: (contextTransformers, { eq }) => eq(contextTransformers.id, transformerId) });
       if (!transformer) {
@@ -81,11 +86,29 @@ export class ConversationRunner {
       }
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, transformer.llmProviderId) });
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
-      this.stageData.transformers.push({ transformer, llmProvider });
+      stageData.transformers.push({ transformer, llmProvider });
     }
 
     return stageData;
   }
 
-  async runConversation(conversationId: string): Promise<void> { }
+  async receiveUserTextInput(userInput: string) {
+    throw new Error("Method not implemented.");
+  }
+
+  async startUserVoiceInput() {
+    throw new Error("Method not implemented.");
+  }
+
+  async receiveUserVoiceData(voiceData: Buffer) {
+    throw new Error("Method not implemented.");
+  }
+
+  async stopUserVoiceInput() {
+    throw new Error("Method not implemented.");
+  }
+
+  async receiveCommand(command: string, data: any) {
+    throw new Error("Method not implemented.");
+  }
 }

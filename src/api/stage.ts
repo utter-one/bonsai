@@ -11,7 +11,7 @@ export { listParamsSchema, type ListParams };
  * Schema for enter behavior configuration
  * Defines what happens when a conversation enters this stage
  */
-export const enterBehaviorSchema = z.record(z.string(), z.unknown()).describe('Configuration for stage entry behavior');
+export const enterBehaviorSchema = z.enum(['generate_response', 'await_user_input']).describe('What should happen when entering the stage');
 
 /**
  * Schema for variable definitions
@@ -35,7 +35,7 @@ export const createStageSchema = z.object({
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this stage'),
   personaId: z.string().min(1).describe('ID of the persona associated with this stage'),
-  enterBehavior: enterBehaviorSchema.optional().describe('Behavior configuration when entering this stage'),
+  enterBehavior: enterBehaviorSchema.optional().default('generate_response').describe('What should happen when entering the stage'),
   useKnowledge: z.boolean().optional().default(false).describe('Whether to use knowledge base in this stage'),
   knowledgeSections: z.array(z.string()).optional().default([]).describe('List of knowledge section IDs to include'),
   useGlobalActions: z.boolean().optional().default(true).describe('Whether to enable global actions in this stage'),
@@ -55,7 +55,7 @@ export const updateStageBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated system prompt'),
   llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
   personaId: z.string().min(1).optional().describe('Updated persona ID'),
-  enterBehavior: enterBehaviorSchema.optional().describe('Updated enter behavior configuration'),
+  enterBehavior: enterBehaviorSchema.optional().describe('Updated behavior when entering this stage'),
   useKnowledge: z.boolean().optional().describe('Updated knowledge usage flag'),
   knowledgeSections: z.array(z.string()).optional().describe('Updated knowledge section IDs'),
   useGlobalActions: z.boolean().optional().describe('Updated global actions flag'),
@@ -85,7 +85,7 @@ export const stageResponseSchema = z.object({
   prompt: z.string().describe('System prompt defining the stage behavior'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   personaId: z.string().describe('ID of the associated persona'),
-  enterBehavior: enterBehaviorSchema.describe('Stage entry behavior configuration'),
+  enterBehavior: enterBehaviorSchema.describe('What happens when entering the stage'),
   useKnowledge: z.boolean().describe('Whether knowledge base is enabled'),
   knowledgeSections: z.array(z.string()).describe('Knowledge section IDs included in this stage'),
   useGlobalActions: z.boolean().describe('Whether global actions are enabled'),

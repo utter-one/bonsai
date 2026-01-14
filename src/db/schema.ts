@@ -112,7 +112,7 @@ export const stages = pgTable('stages', {
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
   personaId: text('persona_id').notNull().references(() => personas.id),
-  enterBehavior: jsonb('enter_behavior').notNull().default({}).$type<Record<string, any>>(),
+  enterBehavior: text('enter_behavior').notNull().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),
   knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
   useGlobalActions: boolean('use_global_actions').notNull().default(true),

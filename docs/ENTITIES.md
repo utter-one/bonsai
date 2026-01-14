@@ -189,7 +189,7 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 | `prompt` | Text | Not Null | System prompt template for this stage (supports Handlebars templating) |
 | `llmProviderId` | String | Nullable | ID of the LLM provider to use for this stage |
 | `personaId` | String | Foreign Key (Persona), Not Null | Reference to the persona used in this stage |
-| `enterBehavior` | JSON Object | Not Null, Default: `{}` | What should happen when entering the stage |
+| `enterBehavior` | String | Not Null, Default: `generate_response` | What should happen when entering the stage (`generate_response` or `await_user_input`) |
 | `useKnowledge` | Boolean | Not Null, Default: `false` | Whether to use knowledge base in this stage |
 | `knowledgeSections` | JSON Array | Not Null, Default: `[]` | Array of knowledge section IDs to use |
 | `useGlobalActions` | Boolean | Not Null, Default: `true` | Whether global actions are active in this stage |
