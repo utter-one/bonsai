@@ -16,7 +16,6 @@ type InputMessage = AuthRequest | StartConversationRequest | ResumeConversationR
 @singleton()
 export class SessionServer {
   private wss: WebSocketServer | null = null;
-  private authenticatedClients: WeakSet<WebSocket> = new WeakSet();
 
   constructor(@inject(SessionManager) private sessionManager: SessionManager) {}
 
@@ -61,7 +60,7 @@ export class SessionServer {
       if (message.type === 'auth') {
         this.handleAuth(ws, message as AuthRequest);
       } else {
-        if (!this.authenticatedClients.has(ws)) {
+        if (!this.sessionManager.getWebSocketMetadata(ws) || !this.sessionManager.getWebSocketMetadata(ws)?.sessionId) {
           this.sendError(ws, 'Authentication required', message.requestId);
           return;
         }
@@ -111,8 +110,6 @@ export class SessionServer {
     }
 
     const sessionId = this.sessionManager.createSession(ws);
-    this.authenticatedClients.add(ws);
-
     logger.info({ sessionId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
 
     const response: AuthResponse = { type: 'auth', success: true, sessionId, requestId: message.requestId };

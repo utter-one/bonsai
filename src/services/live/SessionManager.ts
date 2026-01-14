@@ -1,5 +1,6 @@
-import { singleton } from "tsyringe";
-import ws from 'ws'
+import { singleton, container } from "tsyringe";
+import { ConversationRunner } from "./ConversationRunner";
+import { meta } from "zod/v4/core";
 
 /** Metadata associated with each WebSocket connection. */
 export type WebSocketMetadata =
@@ -8,6 +9,8 @@ export type WebSocketMetadata =
   sessionId: string,
   /** ID of the conversation currently active in this session, empty string if none. */
   conversationId: string
+  /** Conversation runner instance for managing the conversation. */
+  runner: ConversationRunner;
 };
 
 /**
@@ -28,9 +31,27 @@ export class SessionManager {
    */
   createSession(ws: WebSocket) {
     const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
-    this.socketMap.set(ws, { sessionId, conversationId: '' });
+    this.socketMap.set(ws, { sessionId, conversationId: null, runner: null });
     this.sessionMap.set(sessionId, ws);
     return sessionId;
+  }
+
+  /**
+   * Retrieves the WebSocket connection associated with a given session ID.
+   * @param sessionId - The session ID to look up.
+   * @returns The WebSocket connection if found, otherwise undefined.
+   */
+  getSessionWebSocket(sessionId: string): WebSocket | undefined {
+    return this.sessionMap.get(sessionId);
+  }
+
+  /**
+   * Retrieves the metadata associated with a given WebSocket connection.
+   * @param ws - The WebSocket connection to look up.
+   * @returns The WebSocket metadata if found, otherwise undefined.
+   */
+  getWebSocketMetadata(ws: WebSocket): WebSocketMetadata | undefined {
+    return this.socketMap.get(ws);
   }
 
   /**
@@ -48,6 +69,8 @@ export class SessionManager {
     const metadata = this.socketMap.get(socket);
     if (metadata) {
       metadata.conversationId = conversationId;
+      metadata.runner = container.resolve(ConversationRunner);
+      metadata.runner.prepareConversation(conversationId);
       this.socketMap.set(socket, metadata);
     }
   }
@@ -65,7 +88,8 @@ export class SessionManager {
 
     const metadata = this.socketMap.get(socket);
     if (metadata) {
-      metadata.conversationId = '';
+      metadata.conversationId = null;
+      metadata.runner = null;
       this.socketMap.set(socket, metadata);
     }
   }

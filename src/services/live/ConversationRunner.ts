@@ -30,6 +30,7 @@ type ConversationState = 'awaiting_user_input' // Runner is waiting for user inp
   | 'processing_user_input' // Runner is processing user input (classification/transformation)
   | 'generating_response' // Runner is generating a response  
   | 'finished'; // Runner has finished
+  
 export class ConversationRunner {
   private conversation: Conversation;
   private stageData: StageData;
