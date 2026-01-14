@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import express from 'express';
+import { createServer } from 'http';
 import { useExpressServer, useContainer } from 'routing-controllers';
 import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
@@ -24,6 +25,7 @@ import { ValidationMiddleware } from './middleware/validation';
 import { PermissionInterceptor } from './middleware/authorization';
 import { getOpenAPISpec } from './swagger';
 import { SetupService } from './services/SetupService';
+import { SessionServer } from './services/live/SessionServer';
 import { initialAdminSetupSchema } from './contracts/rest/setup';
 import logger from './utils/logger';
 
@@ -104,12 +106,17 @@ export function createApp(): express.Application {
 }
 
 /**
- * Starts the HTTP server
+ * Starts the HTTP server and initializes WebSocket host
  */
 export function startServer(port: number = 3000): void {
   const app = createApp();
+  const server = createServer(app);
 
-  app.listen(port, () => {
+  // Initialize WebSocket host
+  const wsHost = container.resolve(SessionServer);
+  wsHost.initialize(server);
+
+  server.listen(port, () => {
     logger.info({ port }, 'HTTP server started');
   });
 }

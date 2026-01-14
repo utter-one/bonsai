@@ -13,6 +13,7 @@ export type AuthRequest = z.infer<typeof authRequestSchema>;
 export const authResponseSchema = baseOutputMessageSchema.extend({
   type: z.literal('auth').describe('Message type for authentication response'),
   success: z.boolean().describe('Whether authentication was successful'),
+  sessionId: z.string().optional().describe('Unique identifier for the automatically created session'),
   error: z.string().optional().describe('Error message if authentication failed'),
 });
 
