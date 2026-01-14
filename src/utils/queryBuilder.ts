@@ -1,5 +1,5 @@
 import { eq, and, gte, lte, gt, lt, ne, like, inArray, notInArray, between, SQL, asc, desc } from 'drizzle-orm';
-import type { ListFilter, ListFilterOperation } from '../api/common';
+import type { ListFilter, ListFilterOperation } from '../contracts/rest/common';
 import type { Logger } from 'pino';
 
 /**

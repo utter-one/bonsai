@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { UserService } from '../services/UserService';
-import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from '../api/user';
-import type { CreateUserRequest, UpdateUserRequest } from '../api/user';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from '../contracts/rest/user';
+import type { CreateUserRequest, UpdateUserRequest } from '../contracts/rest/user';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for user management with decorator-based routing

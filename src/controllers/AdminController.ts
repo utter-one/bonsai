@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { AdminService } from '../services/AdminService';
-import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from '../api/admin';
-import type { CreateAdminRequest, UpdateAdminRequest, DeleteAdminRequest } from '../api/admin';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from '../contracts/rest/admin';
+import type { CreateAdminRequest, UpdateAdminRequest, DeleteAdminRequest } from '../contracts/rest/admin';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for admin user management with decorator-based routing

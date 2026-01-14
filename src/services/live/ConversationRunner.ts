@@ -93,22 +93,44 @@ export class ConversationRunner {
   }
 
   async receiveUserTextInput(userInput: string) {
+    if (this.state !== 'awaiting_user_input') {
+      throw new Error(`Cannot receive user input in current state: ${this.state}`);
+    }
+
+    this.state = 'processing_user_input';
+
     throw new Error("Method not implemented.");
   }
 
   async startUserVoiceInput() {
+    if (this.state !== 'awaiting_user_input') {
+      throw new Error(`Cannot start receiving user voice input in current state: ${this.state}`);
+    }
+
+    this.state = 'receiving_user_voice';
+
     throw new Error("Method not implemented.");
   }
 
   async receiveUserVoiceData(voiceData: Buffer) {
+    if (this.state !== 'receiving_user_voice') {
+      throw new Error(`Cannot receive user voice data in current state: ${this.state}`);
+    }
+    
     throw new Error("Method not implemented.");
   }
 
   async stopUserVoiceInput() {
+    if (this.state !== 'receiving_user_voice') {
+      throw new Error(`Cannot stop receiving user voice input in current state: ${this.state}`);
+    }
+
+    this.state = 'processing_user_input';
+
     throw new Error("Method not implemented.");
   }
 
-  async receiveCommand(command: string, data: any) {
+  async receiveCommand(command: string, data: any) {    
     throw new Error("Method not implemented.");
   }
 }

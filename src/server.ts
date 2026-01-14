@@ -24,7 +24,7 @@ import { ValidationMiddleware } from './middleware/validation';
 import { PermissionInterceptor } from './middleware/authorization';
 import { getOpenAPISpec } from './swagger';
 import { SetupService } from './services/SetupService';
-import { initialAdminSetupSchema } from './api/setup';
+import { initialAdminSetupSchema } from './contracts/rest/setup';
 import logger from './utils/logger';
 
 /**

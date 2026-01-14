@@ -7,9 +7,9 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { AuditService } from '../services/AuditService';
-import { auditLogResponseSchema, auditLogListResponseSchema } from '../api/audit';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { auditLogResponseSchema, auditLogListResponseSchema } from '../contracts/rest/audit';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for audit log management with decorator-based routing

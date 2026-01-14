@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { StageService } from '../services/StageService';
-import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from '../api/stage';
-import type { CreateStageRequest, UpdateStageRequest, DeleteStageRequest } from '../api/stage';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from '../contracts/rest/stage';
+import type { CreateStageRequest, UpdateStageRequest, DeleteStageRequest } from '../contracts/rest/stage';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for stage management with decorator-based routing

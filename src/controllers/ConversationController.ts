@@ -7,9 +7,9 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { ConversationService } from '../services/ConversationService';
-import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../api/conversation';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../contracts/rest/conversation';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for conversation management with decorator-based routing

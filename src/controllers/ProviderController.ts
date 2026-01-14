@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { ProviderService } from '../services/providers/ProviderService';
-import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from '../api/provider';
-import type { CreateProviderRequest, UpdateProviderRequest, DeleteProviderRequest } from '../api/provider';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from '../contracts/rest/provider';
+import type { CreateProviderRequest, UpdateProviderRequest, DeleteProviderRequest } from '../contracts/rest/provider';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for provider configuration management with decorator-based routing
