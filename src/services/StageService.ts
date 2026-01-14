@@ -94,17 +94,17 @@ export class StageService extends BaseService {
    */
   async createStage(input: CreateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
-    logger.info({ id: input.id, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
+    logger.info({ id: input.id, projectId: input.projectId, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
 
     try {
       // Validate referenced entities exist
       await this.validateReferencedEntities(input.personaId, input.classifierIds, input.transformerIds, input.knowledgeSections, input.globalActions);
 
-      const stage = await db.insert(stages).values({ id: input.id, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const stage = await db.insert(stages).values({ id: input.id, projectId: input.projectId, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdStage = stage[0];
 
-      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeSections: createdStage.knowledgeSections, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variables: createdStage.variables, actions: createdStage.actions, classifierIds: createdStage.classifierIds, transformerIds: createdStage.transformerIds, metadata: createdStage.metadata }, context?.adminId);
+      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeSections: createdStage.knowledgeSections, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variables: createdStage.variables, actions: createdStage.actions, classifierIds: createdStage.classifierIds, transformerIds: createdStage.transformerIds, metadata: createdStage.metadata }, context?.adminId);
 
       logger.info({ id: createdStage.id }, 'Stage created successfully');
 

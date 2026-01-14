@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from './contracts/rest/admin';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './contracts/rest/user';
+import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema } from './contracts/rest/project';
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './contracts/rest/persona';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './contracts/rest/auth';
 import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './contracts/rest/setup';
@@ -22,6 +23,7 @@ import { listParamsSchema } from './contracts/rest/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
+import { ProjectController } from './controllers/ProjectController';
 import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
 import { SetupController } from './controllers/SetupController';
@@ -47,6 +49,10 @@ const adminIdParamSchema = z.object({
 
 const userIdParamSchema = z.object({
   id: z.string().openapi({ description: 'User ID', example: 'user-123' }),
+});
+
+const projectIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Project ID', example: 'proj-123' }),
 });
 
 const personaIdParamSchema = z.object({
@@ -123,6 +129,10 @@ export function getOpenAPISpec(): any {
   registry.register('UpdateUserRequest', updateUserBodySchema);
   registry.register('UserResponse', userResponseSchema);
   registry.register('UserListResponse', userListResponseSchema);
+  registry.register('CreateProjectRequest', createProjectSchema);
+  registry.register('UpdateProjectRequest', updateProjectSchema);
+  registry.register('ProjectResponse', projectResponseSchema);
+  registry.register('ProjectListResponse', projectListResponseSchema);
   registry.register('CreatePersonaRequest', createPersonaSchema);
   registry.register('UpdatePersonaRequest', updatePersonaBodySchema);
   registry.register('DeletePersonaRequest', deletePersonaBodySchema);
@@ -198,7 +208,7 @@ export function getOpenAPISpec(): any {
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AuthController, SetupController, AdminController, UserController, 
+  const controllers = [AuthController, SetupController, AdminController, UserController, ProjectController,
     ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
     PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController, AuditController];
 
@@ -206,6 +216,7 @@ export function getOpenAPISpec(): any {
   const paramSchemaMap: Record<string, any> = {
     '/api/admins/:id': adminIdParamSchema,
     '/api/users/:id': userIdParamSchema,
+    '/api/projects/:id': projectIdParamSchema,
     '/api/personas/:id': personaIdParamSchema,
     '/api/knowledge/sections/:id': knowledgeSectionIdParamSchema,
     '/api/knowledge/categories/:id': knowledgeCategoryIdParamSchema,

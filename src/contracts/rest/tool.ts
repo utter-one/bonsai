@@ -14,6 +14,7 @@ export { listParamsSchema, type ListParams };
  */
 export const createToolSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the tool'),
+  projectId: z.string().min(1).describe('ID of the project this tool belongs to'),
   name: z.string().min(1).describe('Display name of the tool'),
   description: z.string().nullable().optional().describe('Detailed description of the tool\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Handlebars template for tool invocation'),
@@ -52,6 +53,7 @@ export const deleteToolBodySchema = z.object({
  */
 export const toolResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the tool'),
+  projectId: z.string().describe('ID of the project this tool belongs to'),
   name: z.string().describe('Display name of the tool'),
   description: z.string().nullable().describe('Detailed description of the tool'),
   prompt: z.string().describe('Handlebars template for tool invocation'),

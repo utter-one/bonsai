@@ -24,6 +24,7 @@ export const voiceConfigSchema = z.object({
  */
 export const createPersonaSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the persona'),
+  projectId: z.string().min(1).describe('ID of the project this persona belongs to'),
   name: z.string().min(1).describe('Display name of the persona'),
   prompt: z.string().min(1).describe('Detailed prompt defining the persona\'s characteristics and behavior'),
   voiceConfig: voiceConfigSchema.describe('Optional voice configuration settings for TTS'),
@@ -57,6 +58,7 @@ export const deletePersonaBodySchema = z.object({
  */
 export const personaResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the persona'),
+  projectId: z.string().describe('ID of the project this persona belongs to'),
   name: z.string().describe('Display name of the persona'),
   prompt: z.string().describe('Prompt defining the persona\'s characteristics and behavior'),
   voiceConfig: voiceConfigSchema.describe('Voice configuration settings'),

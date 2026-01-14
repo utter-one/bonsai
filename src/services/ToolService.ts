@@ -31,14 +31,14 @@ export class ToolService extends BaseService {
    */
   async createTool(input: CreateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
-    logger.info({ toolId: input.id, name: input.name, adminId: context?.adminId }, 'Creating tool');
+    logger.info({ toolId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating tool');
 
     try {
-      const tool = await db.insert(tools).values({ id: input.id, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, inputType: input.inputType, outputType: input.outputType, metadata: input.metadata ?? null, version: 1 }).returning();
+      const tool = await db.insert(tools).values({ id: input.id, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, inputType: input.inputType, outputType: input.outputType, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTool = tool[0];
 
-      await this.auditService.logCreate('tool', createdTool.id, { id: createdTool.id, name: createdTool.name, description: createdTool.description, prompt: createdTool.prompt, llmProviderId: createdTool.llmProviderId, inputType: createdTool.inputType, outputType: createdTool.outputType, metadata: createdTool.metadata }, context?.adminId);
+      await this.auditService.logCreate('tool', createdTool.id, { id: createdTool.id, projectId: createdTool.projectId, name: createdTool.name, description: createdTool.description, prompt: createdTool.prompt, llmProviderId: createdTool.llmProviderId, inputType: createdTool.inputType, outputType: createdTool.outputType, metadata: createdTool.metadata }, context?.adminId);
 
       logger.info({ toolId: createdTool.id }, 'Tool created successfully');
 

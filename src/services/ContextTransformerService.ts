@@ -31,14 +31,14 @@ export class ContextTransformerService extends BaseService {
    */
   async createContextTransformer(input: CreateContextTransformerRequest, context: RequestContext): Promise<ContextTransformerResponse> {
     this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_WRITE);
-    logger.info({ transformerId: input.id, name: input.name, adminId: context?.adminId }, 'Creating context transformer');
+    logger.info({ transformerId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating context transformer');
 
     try {
-      const transformer = await db.insert(contextTransformers).values({ id: input.id, name: input.name, description: input.description ?? null, prompt: input.prompt, contextFields: input.contextFields ?? null, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const transformer = await db.insert(contextTransformers).values({ id: input.id, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, contextFields: input.contextFields ?? null, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTransformer = transformer[0];
 
-      await this.auditService.logCreate('context_transformer', createdTransformer.id, { id: createdTransformer.id, name: createdTransformer.name, description: createdTransformer.description, prompt: createdTransformer.prompt, contextFields: createdTransformer.contextFields, llmProviderId: createdTransformer.llmProviderId, metadata: createdTransformer.metadata }, context?.adminId);
+      await this.auditService.logCreate('context_transformer', createdTransformer.id, { id: createdTransformer.id, projectId: createdTransformer.projectId, name: createdTransformer.name, description: createdTransformer.description, prompt: createdTransformer.prompt, contextFields: createdTransformer.contextFields, llmProviderId: createdTransformer.llmProviderId, metadata: createdTransformer.metadata }, context?.adminId);
 
       logger.info({ transformerId: createdTransformer.id }, 'Context transformer created successfully');
 

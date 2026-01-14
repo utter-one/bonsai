@@ -31,14 +31,14 @@ export class ClassifierService extends BaseService {
    */
   async createClassifier(input: CreateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
-    logger.info({ classifierId: input.id, name: input.name, adminId: context?.adminId }, 'Creating classifier');
+    logger.info({ classifierId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating classifier');
 
     try {
-      const classifier = await db.insert(classifiers).values({ id: input.id, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const classifier = await db.insert(classifiers).values({ id: input.id, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdClassifier = classifier[0];
 
-      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, metadata: createdClassifier.metadata }, context?.adminId);
+      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, projectId: createdClassifier.projectId, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, metadata: createdClassifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: createdClassifier.id }, 'Classifier created successfully');
 

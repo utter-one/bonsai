@@ -198,14 +198,14 @@ export class KnowledgeService extends BaseService {
    */
   async createKnowledgeCategory(input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
-    logger.info({ categoryId: input.id, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
+    logger.info({ categoryId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
 
     try {
-      const category = await db.insert(knowledgeCategories).values({ id: input.id, name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections ?? [], order: input.order ?? 0, version: 1 }).returning();
+      const category = await db.insert(knowledgeCategories).values({ id: input.id, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections ?? [], order: input.order ?? 0, version: 1 }).returning();
 
       const createdCategory = category[0];
 
-      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeSections: createdCategory.knowledgeSections, order: createdCategory.order }, context?.adminId);
+      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, projectId: createdCategory.projectId, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeSections: createdCategory.knowledgeSections, order: createdCategory.order }, context?.adminId);
 
       logger.info({ categoryId: createdCategory.id }, 'Knowledge category created successfully');
 

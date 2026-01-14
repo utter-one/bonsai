@@ -13,6 +13,7 @@ export { listParamsSchema, type ListParams };
  * Optional fields: beat, sessionId, eventIndex, userId, comments
  */
 export const createIssueSchema = z.object({
+  projectId: z.string().min(1).describe('ID of the project this issue belongs to'),
   environment: z.string().min(1).describe('Environment where issue occurred (e.g., production, staging, development)'),
   buildVersion: z.string().min(1).describe('Application build version where the issue was encountered'),
   beat: z.string().optional().describe('Beat/sprint identifier for tracking purposes'),
@@ -53,6 +54,7 @@ export const updateIssueBodySchema = z.object({
  */
 export const issueResponseSchema = z.object({
   id: z.number().int().describe('Unique auto-incrementing identifier for the issue'),
+  projectId: z.string().describe('ID of the project this issue belongs to'),
   environment: z.string().describe('Environment where issue occurred'),
   buildVersion: z.string().describe('Application build version'),
   beat: z.string().nullable().describe('Beat/sprint identifier'),

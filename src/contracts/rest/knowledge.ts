@@ -72,6 +72,7 @@ export type KnowledgeSectionListResponse = z.infer<typeof knowledgeSectionListRe
  */
 export const createKnowledgeCategorySchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the knowledge category'),
+  projectId: z.string().min(1).describe('ID of the project this knowledge category belongs to'),
   name: z.string().min(1).describe('Name of the knowledge category'),
   promptTrigger: z.string().min(1).describe('Trigger phrase that activates this category in conversations'),
   knowledgeSections: z.array(z.string()).optional().describe('Array of knowledge section IDs this category belongs to'),
@@ -119,6 +120,7 @@ export const knowledgeItemInCategorySchema = z.object({
  */
 export const knowledgeCategoryResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the knowledge category'),
+  projectId: z.string().describe('ID of the project this knowledge category belongs to'),
   name: z.string().describe('Name of the knowledge category'),
   promptTrigger: z.string().describe('Trigger phrase that activates this category'),
   knowledgeSections: z.array(z.string()).describe('Array of knowledge section IDs'),

@@ -15,6 +15,11 @@ export const PERMISSIONS = {
   USER_WRITE: 'user:write',
   USER_DELETE: 'user:delete',
 
+  // Project permissions
+  PROJECT_READ: 'project:read',
+  PROJECT_WRITE: 'project:write',
+  PROJECT_DELETE: 'project:delete',
+
   // Persona permissions
   PERSONA_READ: 'persona:read',
   PERSONA_WRITE: 'persona:write',
@@ -91,6 +96,8 @@ export const ROLES = {
     permissions: [
       PERMISSIONS.USER_READ,
       PERMISSIONS.USER_WRITE,
+      PERMISSIONS.PROJECT_READ,
+      PERMISSIONS.PROJECT_WRITE,
       PERMISSIONS.PERSONA_READ,
       PERMISSIONS.PERSONA_WRITE,
       PERMISSIONS.CONVERSATION_READ,
@@ -118,6 +125,7 @@ export const ROLES = {
     permissions: [
       PERMISSIONS.USER_READ,
       PERMISSIONS.USER_WRITE,
+      PERMISSIONS.PROJECT_READ,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.ISSUE_READ,
       PERMISSIONS.ISSUE_WRITE,
@@ -129,6 +137,7 @@ export const ROLES = {
     description: 'Technical access for development and debugging',
     permissions: [
       PERMISSIONS.USER_READ,
+      PERMISSIONS.PROJECT_READ,
       PERMISSIONS.PERSONA_READ,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.STAGE_READ,
@@ -148,6 +157,7 @@ export const ROLES = {
     description: 'Read-only access to most entities',
     permissions: [
       PERMISSIONS.USER_READ,
+      PERMISSIONS.PROJECT_READ,
       PERMISSIONS.PERSONA_READ,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.STAGE_READ,

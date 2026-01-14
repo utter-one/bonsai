@@ -30,14 +30,14 @@ export class IssueService extends BaseService {
    */
   async createIssue(input: CreateIssueRequest, context: RequestContext): Promise<IssueResponse> {
     this.requirePermission(context, PERMISSIONS.ISSUE_WRITE);
-    logger.info({ environment: input.environment, severity: input.severity, adminId: context?.adminId }, 'Creating issue');
+    logger.info({ projectId: input.projectId, environment: input.environment, severity: input.severity, adminId: context?.adminId }, 'Creating issue');
 
     try {
-      const issue = await db.insert(issues).values({ environment: input.environment, buildVersion: input.buildVersion, beat: input.beat, sessionId: input.sessionId, eventIndex: input.eventIndex, userId: input.userId, severity: input.severity, category: input.category, bugDescription: input.bugDescription, expectedBehaviour: input.expectedBehaviour, comments: input.comments ?? '', status: input.status }).returning();
+      const issue = await db.insert(issues).values({ projectId: input.projectId, environment: input.environment, buildVersion: input.buildVersion, beat: input.beat, sessionId: input.sessionId, eventIndex: input.eventIndex, userId: input.userId, severity: input.severity, category: input.category, bugDescription: input.bugDescription, expectedBehaviour: input.expectedBehaviour, comments: input.comments ?? '', status: input.status }).returning();
 
       const createdIssue = issue[0];
 
-      await this.auditService.logCreate('issue', String(createdIssue.id), { id: createdIssue.id, environment: createdIssue.environment, buildVersion: createdIssue.buildVersion, severity: createdIssue.severity, category: createdIssue.category, status: createdIssue.status }, context?.adminId);
+      await this.auditService.logCreate('issue', String(createdIssue.id), { id: createdIssue.id, projectId: createdIssue.projectId, environment: createdIssue.environment, buildVersion: createdIssue.buildVersion, severity: createdIssue.severity, category: createdIssue.category, status: createdIssue.status }, context?.adminId);
 
       logger.info({ issueId: createdIssue.id }, 'Issue created successfully');
 

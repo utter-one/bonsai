@@ -14,6 +14,7 @@ export { listParamsSchema, type ListParams };
  */
 export const createGlobalActionSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the global action'),
+  projectId: z.string().min(1).describe('ID of the project this global action belongs to'),
   name: z.string().min(1).describe('Display name of the global action'),
   condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
   promptTrigger: z.string().min(1).describe('Description of when this action should be triggered'),
@@ -52,6 +53,7 @@ export const deleteGlobalActionBodySchema = z.object({
  */
 export const globalActionResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the global action'),
+  projectId: z.string().describe('ID of the project this global action belongs to'),
   name: z.string().describe('Display name of the global action'),
   condition: z.string().nullable().describe('Condition expression for action activation'),
   promptTrigger: z.string().describe('Description of when this action should be triggered'),

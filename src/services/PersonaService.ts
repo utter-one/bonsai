@@ -30,14 +30,14 @@ export class PersonaService extends BaseService {
    */
   async createPersona(input: CreatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
     this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
-    logger.info({ personaId: input.id, name: input.name, adminId: context?.adminId }, 'Creating persona');
+    logger.info({ personaId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
-      const persona = await db.insert(personas).values({ id: input.id, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
+      const persona = await db.insert(personas).values({ id: input.id, projectId: input.projectId, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
 
       const createdPersona = persona[0];
 
-      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, name: createdPersona.name, prompt: createdPersona.prompt, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, context?.adminId);
+      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, projectId: createdPersona.projectId, name: createdPersona.name, prompt: createdPersona.prompt, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: createdPersona.id }, 'Persona created successfully');
 

@@ -14,6 +14,7 @@ export { listParamsSchema, type ListParams };
  */
 export const createClassifierSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the classifier'),
+  projectId: z.string().min(1).describe('ID of the project this classifier belongs to'),
   name: z.string().min(1).describe('Display name of the classifier'),
   description: z.string().nullable().optional().describe('Detailed description of the classifier\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the classification logic and instructions'),
@@ -48,6 +49,7 @@ export const deleteClassifierBodySchema = z.object({
  */
 export const classifierResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the classifier'),
+  projectId: z.string().describe('ID of the project this classifier belongs to'),
   name: z.string().describe('Display name of the classifier'),
   description: z.string().nullable().describe('Detailed description of the classifier'),
   prompt: z.string().describe('Prompt defining the classification logic'),

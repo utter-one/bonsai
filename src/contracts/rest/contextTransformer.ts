@@ -14,6 +14,7 @@ export { listParamsSchema, type ListParams };
  */
 export const createContextTransformerSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the context transformer'),
+  projectId: z.string().min(1).describe('ID of the project this context transformer belongs to'),
   name: z.string().min(1).describe('Display name of the context transformer'),
   description: z.string().nullable().optional().describe('Detailed description of the transformer\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the transformation logic and instructions'),
@@ -50,6 +51,7 @@ export const deleteContextTransformerBodySchema = z.object({
  */
 export const contextTransformerResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the context transformer'),
+  projectId: z.string().describe('ID of the project this context transformer belongs to'),
   name: z.string().describe('Display name of the context transformer'),
   description: z.string().nullable().describe('Detailed description of the transformer'),
   prompt: z.string().describe('Prompt defining the transformation logic'),

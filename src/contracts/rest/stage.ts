@@ -32,6 +32,7 @@ export const actionsSchema = z.record(z.string(), z.unknown()).describe('Action 
  */
 export const createStageSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the stage'),
+  projectId: z.string().min(1).describe('ID of the project this stage belongs to'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this stage'),
   personaId: z.string().min(1).describe('ID of the persona associated with this stage'),
@@ -82,6 +83,7 @@ export const deleteStageBodySchema = z.object({
  */
 export const stageResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the stage'),
+  projectId: z.string().describe('ID of the project this stage belongs to'),
   prompt: z.string().describe('System prompt defining the stage behavior'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   personaId: z.string().describe('ID of the associated persona'),
