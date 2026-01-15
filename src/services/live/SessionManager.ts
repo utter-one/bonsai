@@ -70,7 +70,7 @@ export class SessionManager {
     if (metadata) {
       metadata.conversationId = conversationId;
       metadata.runner = container.resolve(ConversationRunner);
-      metadata.runner.prepareConversation(conversationId);
+      metadata.runner.prepareConversation(conversationId, sessionId);
       this.socketMap.set(socket, metadata);
     }
   }

@@ -7,6 +7,9 @@ import { IAsrProvider, AsrProviderFactory } from "../providers/asr";
 import { ITtsProvider, TtsProviderFactory } from "../providers/tts";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
+import { PersonaService } from "../PersonaService";
+import { SessionManager } from "./SessionManager";
+import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../contracts/websocket/aiResponse";
 
 type ClassifierData = {
   classifier: Classifier;
@@ -43,15 +46,24 @@ export class ConversationRunner {
   private stageData: StageData;
   private state: ConversationState = 'awaiting_user_input';
   private failureReason?: string;
+  private sessionId: string;
 
   constructor(
+    @inject(SessionManager) private sessionManager: SessionManager,
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
     @inject(AsrProviderFactory) private asrProviderFactory: AsrProviderFactory,
     @inject(TtsProviderFactory) private ttsProviderFactory: TtsProviderFactory,
-    @inject(ConversationService) private conversationService: ConversationService
+    @inject(ConversationService) private conversationService: ConversationService,
+    @inject(PersonaService) private personaService: PersonaService
   ) { }
 
-  async prepareConversation(conversationId: string): Promise<void> {
+  private getWebSocket(): WebSocket | undefined {
+    return this.sessionManager.getSessionWebSocket(this.sessionId);
+  }
+
+  async prepareConversation(conversationId: string, sessionId: string): Promise<void> {
+    this.sessionId = sessionId;
+
     // Load conversation data
     this.conversation = await db.query.conversations.findFirst({ where: (conversations, { eq }) => eq(conversations.id, conversationId) });
     if (!this.conversation) {
@@ -115,6 +127,14 @@ export class ConversationRunner {
       stageData.transformers.push({ transformer, llmProvider });
     }
 
+    // TODO: Initialize TTS provider if configured
+    const persona = await this.personaService.getPersonaById(this.stageData.stage.personaId);
+    if (!persona) {
+      throw new NotFoundError(`Persona with ID ${this.stageData.stage.personaId} not found`);
+    }
+
+    // TODO: Initialize ASR provider if configured
+
     return stageData;
   }
 
@@ -158,15 +178,39 @@ export class ConversationRunner {
         await ttsProvider.init();
 
         let firstTtsChunkGenerated = false;
+        let voiceOutputId: string = null;
 
         ttsProvider.setOnGenerationStarted(async () => {
           logger.info({ conversationId }, `TTS generation started for conversation ${conversationId}`);
           firstTtsChunkGenerated = false;
+          voiceOutputId = `voice_${Math.random().toString(36).substr(2, 9)}`;
+
+          // Send AI response start notification to client through WebSocket
+          const ws = this.getWebSocket();
+          const message = { 
+            type: 'start_ai_voice_output',
+            conversationId,
+            voiceOutputId,
+            sessionId: this.sessionId,
+            requestId: null
+          } as StartAiVoiceOutputMessage;
+          ws.send(JSON.stringify(message));
         });
 
         ttsProvider.setOnGenerationEnded(async () => {
           logger.info({ conversationId }, `TTS generation ended for conversation ${conversationId}`);
           firstTtsChunkGenerated = false;
+
+          // Send AI response end notification to client through WebSocket
+          const ws = this.getWebSocket();
+          const message = { 
+            type: 'end_ai_voice_output',
+            conversationId,
+            voiceOutputId,
+            sessionId: this.sessionId,
+            requestId: null
+          } as EndAiVoiceOutputMessage;
+          ws.send(JSON.stringify(message));
         });
 
         ttsProvider.setOnSpeechGenerating(async (chunk) => {
@@ -175,7 +219,20 @@ export class ConversationRunner {
             firstTtsChunkGenerated = true;
           }
 
-          // TODO: Send TTS audio chunk to client through WebSocket
+          // Send TTS audio chunk to client through WebSocket
+          const ws = this.getWebSocket();
+          const message = { 
+            type: 'send_ai_voice_chunk',
+            conversationId,
+            voiceOutputId,
+            audioData: chunk.audio.toString('base64'),
+            chunkId: chunk.chunkId,
+            ordinal: chunk.ordinal,
+            isFinal: chunk.isFinal,
+            sessionId: this.sessionId,
+            requestId: null
+          } as SendAiVoiceChunkMessage;
+          ws.send(JSON.stringify(message));
           logger.debug({ conversationId, chunkId: chunk.chunkId, ordinal: chunk.ordinal, isFinal: chunk.isFinal }, `TTS chunk generated for conversation ${conversationId}`);
 
           if (chunk.isFinal) {
