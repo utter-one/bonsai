@@ -3,6 +3,10 @@ import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, Stage } from "../../types/models";
 import { db } from "../../db";
 import { ILlmProvider, LlmProviderFactory } from "../providers/llm";
+import { IAsrProvider, AsrProviderFactory } from "../providers/asr";
+import { ITtsProvider, TtsProviderFactory } from "../providers/tts";
+import { ConversationService } from "../ConversationService";
+import { logger } from "../../utils/logger";
 
 type ClassifierData = {
   classifier: Classifier;
@@ -17,15 +21,19 @@ type TransformerData = {
 type StageData = {
   id: string;
   stage: Stage;
+  completionLlmProvider?: ILlmProvider;
   classifiers: ClassifierData[];
   transformers: TransformerData[];
+  asrProvider?: IAsrProvider;
+  ttsProvider?: ITtsProvider;
 }
 
 type ConversationState = 'awaiting_user_input' // Runner is waiting for user input (text or voice)
   | 'receiving_user_voice' // Runner is receiving voice input from user (ASR in progress)
   | 'processing_user_input' // Runner is processing user input (classification/transformation)
   | 'generating_response' // Runner is generating a response  
-  | 'finished'; // Runner has finished
+  | 'finished' // Runner has finished
+  | 'failed'; // Runner has failed due to an error
 
 /** 
  * Manages the lifecycle and state of a conversation. Runners are hosted by the SessionManager.
@@ -34,8 +42,14 @@ export class ConversationRunner {
   private conversation: Conversation;
   private stageData: StageData;
   private state: ConversationState = 'awaiting_user_input';
+  private failureReason?: string;
 
-  constructor(@inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory) { }
+  constructor(
+    @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
+    @inject(AsrProviderFactory) private asrProviderFactory: AsrProviderFactory,
+    @inject(TtsProviderFactory) private ttsProviderFactory: TtsProviderFactory,
+    @inject(ConversationService) private conversationService: ConversationService
+  ) { }
 
   async prepareConversation(conversationId: string): Promise<void> {
     // Load conversation data
@@ -64,9 +78,20 @@ export class ConversationRunner {
     const stageData: StageData = {
       id: stageId,
       stage: stage,
+      completionLlmProvider: undefined,
       classifiers: [],
       transformers: [],
+      asrProvider: undefined,
+      ttsProvider: undefined,
     };
+
+    // Load completion LLM provider for the stage
+    if (stage.llmProviderId) {
+      const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, stage.llmProviderId) });
+      if (llmProviderEntity) {
+        stageData.completionLlmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
+      }
+    }
 
     // Load classifiers for the stage
     for (const classifierId of stage.classifierIds) {
@@ -94,8 +119,125 @@ export class ConversationRunner {
   }
 
   private async wireUpProviders() {
-    // TODO: wire up ASR, TTS, and other providers as needed
+    const conversationId = this.conversation.id;
+    const { asrProvider, ttsProvider, completionLlmProvider } = this.stageData;
 
+    // Initialize and wire up ASR provider
+    if (asrProvider) {
+      try {
+        await asrProvider.init();
+
+        asrProvider.setOnRecognitionStopped(async () => {
+          logger.info({ conversationId }, `ASR recognition stopped for conversation ${conversationId}`);
+          // Get all recognized text chunks and combine them
+          const allTextChunks = asrProvider.getAllTextChunks();
+          const fullText = allTextChunks.map(chunk => chunk.text).join(' ').trim();
+
+          if (fullText) {
+            logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
+            // TODO: Process the recognized text
+          } else {
+            logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
+          }
+        });
+
+        asrProvider.setOnError(async (error: Error) => {
+          logger.error({ conversationId, error: error.message }, `ASR error for conversation ${conversationId}: ${error.message}`);
+          // TODO: Send error to client through WebSocket
+        });
+
+        logger.info({ conversationId }, `ASR provider initialized for conversation ${conversationId}`);
+      } catch (error) {
+        logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to initialize ASR provider for conversation ${conversationId}`);
+      }
+    }
+
+    // Initialize and wire up TTS provider
+    if (ttsProvider) {
+      try {
+        await ttsProvider.init();
+
+        let firstTtsChunkGenerated = false;
+
+        ttsProvider.setOnGenerationStarted(async () => {
+          logger.info({ conversationId }, `TTS generation started for conversation ${conversationId}`);
+          firstTtsChunkGenerated = false;
+        });
+
+        ttsProvider.setOnGenerationEnded(async () => {
+          logger.info({ conversationId }, `TTS generation ended for conversation ${conversationId}`);
+          firstTtsChunkGenerated = false;
+        });
+
+        ttsProvider.setOnSpeechGenerating(async (chunk) => {
+          if (!firstTtsChunkGenerated) {
+            logger.info({ conversationId, chunkId: chunk.chunkId }, `First TTS chunk generated for conversation ${conversationId}`);
+            firstTtsChunkGenerated = true;
+          }
+
+          // TODO: Send TTS audio chunk to client through WebSocket
+          logger.debug({ conversationId, chunkId: chunk.chunkId, ordinal: chunk.ordinal, isFinal: chunk.isFinal }, `TTS chunk generated for conversation ${conversationId}`);
+
+          if (chunk.isFinal) {
+            logger.info({ conversationId }, `TTS generation completed for conversation ${conversationId}`);
+            firstTtsChunkGenerated = false;
+          }
+        });
+
+        ttsProvider.setOnError(async (error: Error) => {
+          logger.error({ conversationId, error: error.message }, `TTS error for conversation ${conversationId}: ${error.message}`);
+          // TODO: Send error to client through WebSocket
+        });
+
+        logger.info({ conversationId }, `TTS provider initialized for conversation ${conversationId}`);
+      } catch (error) {
+        logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to initialize TTS provider for conversation ${conversationId}`);
+      }
+    }
+
+    // Initialize and wire up completion LLM provider
+    if (completionLlmProvider) {
+      try {
+        completionLlmProvider.setOnError(async (error: Error) => {
+          logger.error({ conversationId, error: error.message }, `LLM completion error for conversation ${conversationId}: ${error.message}`);
+          // TODO: Send error to client through WebSocket
+        });
+
+        logger.info({ conversationId, stageId: this.stageData.id }, `Completion LLM provider wired up for conversation ${conversationId}`);
+      } catch (error) {
+        logger.error({ conversationId, stageId: this.stageData.id, error: error instanceof Error ? error.message : String(error) }, `Failed to wire up completion LLM provider for conversation ${conversationId}`);
+      }
+    } else {
+      logger.warn({ conversationId, stageId: this.stageData.id }, `No completion LLM provider available for conversation ${conversationId}`);
+    }
+
+    // Wire up classification LLM providers
+    for (const classifierData of this.stageData.classifiers) {
+      try {
+        classifierData.llmProvider.setOnError(async (error: Error) => {
+          logger.error({ conversationId, classifierId: classifierData.classifier.id, error: error.message }, `LLM classification error for conversation ${conversationId}: ${error.message}`);
+          // TODO: Send error to client through WebSocket
+        });
+
+        logger.info({ conversationId, classifierId: classifierData.classifier.id }, `Classification LLM provider wired up for classifier ${classifierData.classifier.name}`);
+      } catch (error) {
+        logger.error({ conversationId, classifierId: classifierData.classifier.id, error: error instanceof Error ? error.message : String(error) }, `Failed to wire up classification LLM provider for classifier ${classifierData.classifier.id}`);
+      }
+    }
+
+    // Wire up transformer LLM providers
+    for (const transformerData of this.stageData.transformers) {
+      try {
+        transformerData.llmProvider.setOnError(async (error: Error) => {
+          logger.error({ conversationId, transformerId: transformerData.transformer.id, error: error.message }, `LLM transformer error for conversation ${conversationId}: ${error.message}`);
+          // TODO: Send error to client through WebSocket
+        });
+
+        logger.info({ conversationId, transformerId: transformerData.transformer.id }, `Transformer LLM provider wired up for transformer ${transformerData.transformer.name}`);
+      } catch (error) {
+        logger.error({ conversationId, transformerId: transformerData.transformer.id, error: error instanceof Error ? error.message : String(error) }, `Failed to wire up transformer LLM provider for transformer ${transformerData.transformer.id}`);
+      }
+    }
   }
 
   async startConversation() {
@@ -121,17 +263,44 @@ export class ConversationRunner {
       throw new Error(`Cannot start receiving user voice input in current state: ${this.state}`);
     }
 
-    this.state = 'receiving_user_voice';
+    if (!this.stageData.asrProvider) {
+      const errorMessage = `ASR provider not available for conversation ${this.conversation.id}`;
+      await this.markAsFailed(errorMessage);
+      throw new Error(errorMessage);
+    }
 
-    throw new Error("Method not implemented.");
+    try {
+      await this.stageData.asrProvider.start();
+      this.state = 'receiving_user_voice';
+      logger.info({ conversationId: this.conversation.id }, `Started voice input for conversation ${this.conversation.id}`);
+    } catch (error) {
+      const errorMessage = `Failed to start voice input: ${error instanceof Error ? error.message : String(error)}`;
+      await this.markAsFailed(errorMessage);
+      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to start voice input for conversation ${this.conversation.id}`);
+      throw error;
+    }
   }
 
   async receiveUserVoiceData(voiceData: Buffer) {
     if (this.state !== 'receiving_user_voice') {
       throw new Error(`Cannot receive user voice data in current state: ${this.state}`);
     }
-    
-    throw new Error("Method not implemented.");
+
+    if (!this.stageData.asrProvider) {
+      const errorMessage = `ASR provider not available for conversation ${this.conversation.id}`;
+      await this.markAsFailed(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    try {
+      await this.stageData.asrProvider.sendAudio(voiceData);
+      logger.debug({ conversationId: this.conversation.id, bufferSize: voiceData.length }, `Sent ${voiceData.length} bytes of audio data for conversation ${this.conversation.id}`);
+    } catch (error) {
+      const errorMessage = `Failed to process voice data: ${error instanceof Error ? error.message : String(error)}`;
+      await this.markAsFailed(errorMessage);
+      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to send audio data for conversation ${this.conversation.id}`);
+      throw error;
+    }
   }
 
   async stopUserVoiceInput() {
@@ -139,12 +308,56 @@ export class ConversationRunner {
       throw new Error(`Cannot stop receiving user voice input in current state: ${this.state}`);
     }
 
-    this.state = 'processing_user_input';
+    if (!this.stageData.asrProvider) {
+      const errorMessage = `ASR provider not available for conversation ${this.conversation.id}`;
+      await this.markAsFailed(errorMessage);
+      throw new Error(errorMessage);
+    }
 
-    throw new Error("Method not implemented.");
+    try {
+      await this.stageData.asrProvider.stop();
+      this.state = 'processing_user_input';
+      logger.info({ conversationId: this.conversation.id }, `Stopped voice input for conversation ${this.conversation.id}`);
+    } catch (error) {
+      const errorMessage = `Failed to stop voice input: ${error instanceof Error ? error.message : String(error)}`;
+      await this.markAsFailed(errorMessage);
+      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to stop voice input for conversation ${this.conversation.id}`);
+      throw error;
+    }
   }
 
   async receiveCommand(command: string, data: any) {    
     throw new Error("Method not implemented.");
+  }
+
+  /**
+   * Marks the conversation as failed and stores the failure reason
+   * @param reason Human-readable description of why the conversation failed
+   */
+  private async markAsFailed(reason: string): Promise<void> {
+    this.state = 'failed';
+    this.failureReason = reason;
+    logger.error({ conversationId: this.conversation.id, reason }, `Conversation ${this.conversation.id} marked as failed: ${reason}`);
+
+    // Update conversation status via ConversationService
+    try {
+      await this.conversationService.failConversation(this.conversation.id, reason);
+    } catch (error) {
+      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to update conversation status in database via ConversationService`);
+    }
+  }
+
+  /**
+   * Gets the current state of the conversation
+   */
+  getState(): ConversationState {
+    return this.state;
+  }
+
+  /**
+   * Gets the failure reason if the conversation has failed
+   */
+  getFailureReason(): string | undefined {
+    return this.failureReason;
   }
 }

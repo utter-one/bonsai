@@ -31,13 +31,6 @@ export type GeneratedAudioChunk = {
 };
 
 /**
- * Callback function that is invoked when a TTS service error occurs
- * This allows the error to be sent to the client through WebSocket
- * @param errorMessage Human-readable error description
- */
-export type TtsServiceErrorCallback = (errorMessage: string) => Promise<void>;
-
-/**
  * Represents markers used to identify sections of text that should not be spoken
  * Useful for excluding stage directions, metadata, or other non-speech content
  */
@@ -109,11 +102,4 @@ export interface ITtsProvider {
    * @param cb Callback function that receives and processes each generated audio chunk
    */
   setOnSpeechGenerating(cb: SpeechGenerationCallback): void;
-
-  /**
-   * Registers a callback for handling service errors that should be sent to the client
-   * This allows providers to communicate service-level errors through the WebSocket
-   * @param cb Callback function that receives conversation ID and error message
-   */
-  setOnServiceError(cb: TtsServiceErrorCallback): void;
 }

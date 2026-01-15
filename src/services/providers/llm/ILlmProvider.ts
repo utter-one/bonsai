@@ -1,13 +1,6 @@
 import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
 
 /**
- * Callback function that is invoked when an LLM service error occurs
- * This allows the error to be sent to the client through WebSocket
- * @param errorMessage Human-readable error description
- */
-export type LlmServiceErrorCallback = (errorMessage: string) => Promise<void>;
-
-/**
  * Represents the role of a message in a conversation
  */
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -187,12 +180,6 @@ export interface ILlmProvider<TConfig extends LlmProviderConfig = LlmProviderCon
    * @param callback Function to call on fatal error
    */
   setOnError(callback: ErrorCallback): void;
-
-  /**
-   * Set callback for service errors (recoverable)
-   * @param callback Function to call on service error
-   */
-  setOnServiceError(callback: LlmServiceErrorCallback): void;
 
   /**
    * Get the current configuration

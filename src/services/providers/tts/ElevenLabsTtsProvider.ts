@@ -275,8 +275,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   private async handleWebSocketError(error: Error): Promise<void> {
     const errorMessage = `ElevenLabs TTS connection error: ${error.message || 'WebSocket connection failed'}`;
     logger.error(`[ElevenLabs] Error: ${errorMessage}`);
-    await this.handleServiceError(errorMessage);
-    await this.handleError(error);
+    await this.handleError(new Error(errorMessage));
   }
 
   /**
@@ -330,8 +329,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       if (error) {
         const errorMessage = `Failed to send text to ElevenLabs TTS: ${error.message}`;
         logger.error(`[ElevenLabs] Error sending sentence: ${errorMessage}`);
-        await this.handleServiceError(errorMessage);
-        await this.handleError(error);
+        await this.handleError(new Error(errorMessage));
       }
     });
   }

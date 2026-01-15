@@ -21,7 +21,6 @@ export type {
   LlmGenerationOptions,
   LlmChunkCallback,
   LlmCompleteCallback,
-  LlmServiceErrorCallback,
   LlmProviderConfig,
 } from './ILlmProvider';
 

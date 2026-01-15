@@ -172,6 +172,36 @@ export class ConversationService extends BaseService {
   }
 
   /**
+   * Marks a conversation as failed with a reason
+   * @param id - The unique identifier of the conversation
+   * @param reason - Human-readable description of why the conversation failed
+   */
+  async failConversation(id: string, reason: string): Promise<void> {
+    logger.info({ conversationId: id, reason }, `Marking conversation as failed: ${reason}`);
+
+    try {
+      const existingConversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+
+      if (!existingConversation) {
+        throw new NotFoundError(`Conversation with id ${id} not found`);
+      }
+
+      await db.update(conversations)
+        .set({ 
+          status: 'failed',
+          statusReason: reason,
+          updatedAt: new Date()
+        })
+        .where(eq(conversations.id, id));
+
+      logger.info({ conversationId: id }, 'Conversation marked as failed successfully');
+    } catch (error) {
+      logger.error({ error, conversationId: id, reason }, 'Failed to mark conversation as failed');
+      throw error;
+    }
+  }
+
+  /**
    * Deletes a conversation and all its associated events (via cascade)
    * @param id - The unique identifier of the conversation to delete
    * @param context - Request context for auditing and authorization

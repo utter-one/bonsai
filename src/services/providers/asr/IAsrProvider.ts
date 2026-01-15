@@ -9,14 +9,6 @@ import type { ErrorCallback } from '../../../types/callbacks';
 export type TextRecognitionCallback = (chunkId: string, text: string) => void;
 
 /**
- * Callback function that is invoked when an ASR service error occurs
- * This allows the error to be sent to the client through WebSocket
- * @param conversationId The conversation where the error occurred
- * @param errorMessage Human-readable error description
- */
-export type AsrServiceErrorCallback = (errorMessage: string) => Promise<void>;
-
-/**
  * Represents a chunk of recognized text from speech recognition
  */
 export type TextChunk = {
@@ -89,13 +81,6 @@ export interface IAsrProvider {
    * @param cb Callback function that receives the error
    */
   setOnError(cb: ErrorCallback): void;
-
-  /**
-   * Registers a callback for handling service errors that should be sent to the client
-   * This allows providers to communicate service-level errors through the WebSocket
-   * @param cb Callback function that receives error message
-   */
-  setOnServiceError(cb: AsrServiceErrorCallback): void;
 
   /**
    * Retrieves all text chunks that have been recognized since the last start() call

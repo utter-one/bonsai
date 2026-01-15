@@ -62,7 +62,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     if (!this.config.subscriptionKey || !this.config.region) {
       const errorMessage = 'Missing required Azure Speech configuration (subscription key or region)';
       logger.error(`[ASR] ${errorMessage}`);
-      await this.handleServiceError(errorMessage);
+      await this.handleError(new Error(errorMessage));
       throw new Error('Missing required configuration');
     }
 
@@ -113,12 +113,11 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
       if (err.reason === CancellationReason.Error) {
         logger.error(`[ASR] Error: event cancelled - ${err.errorDetails}`);
         const errorMessage = `Azure Speech recognition error: ${err.errorDetails}`;
-        await this.handleServiceError(errorMessage);
+        await this.handleError(new Error(errorMessage));
       }
       if (this.speechRecognizer) {
         this.speechRecognizer.stopContinuousRecognitionAsync();
       }
-      await this.handleError(new Error(err.errorDetails));
     };
 
     this.speechRecognizer.sessionStarted = () => {
@@ -156,8 +155,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
           this.recognising = false;
           const errorMessage = `Failed to start Azure Speech recognition: ${err}`;
           logger.error(`[ASR] Error starting recognition - ${err}`);
-          await this.handleServiceError(errorMessage);
-          await this.handleError(new Error(err));
+          await this.handleError(new Error(errorMessage));
           reject(new Error(errorMessage));
         }
       );
@@ -184,8 +182,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
           this.recognising = false;
           const errorMessage = `Failed to stop Azure Speech recognition: ${err}`;
           logger.error(`[ASR] Error stopping recognition - ${err}`);
-          await this.handleServiceError(errorMessage);
-          await this.handleError(new Error(err));
+          await this.handleError(new Error(errorMessage));
           reject(new Error(errorMessage));
         }
       );

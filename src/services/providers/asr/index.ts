@@ -4,7 +4,7 @@
  */
 
 // Core interfaces and types
-export type { IAsrProvider, TextRecognitionCallback, AsrServiceErrorCallback, TextChunk } from './IAsrProvider';
+export type { IAsrProvider, TextRecognitionCallback, TextChunk } from './IAsrProvider';
 
 // Base class
 export { AsrProviderBase } from './AsrProviderBase';

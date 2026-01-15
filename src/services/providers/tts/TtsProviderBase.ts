@@ -1,6 +1,6 @@
 import { logger } from '../../../utils/logger';
 import type { SimpleCallback, ErrorCallback } from '../../../types/callbacks';
-import { GeneratedAudioChunk, ITtsProvider, SpeechGenerationCallback, TtsServiceErrorCallback } from './ITtsProvider';
+import { GeneratedAudioChunk, ITtsProvider, SpeechGenerationCallback } from './ITtsProvider';
 
 /**
  * Abstract base class for TTS provider implementations
@@ -22,9 +22,6 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
 
   /** Callback for generated audio chunks */
   protected onSpeechGeneratingCallback?: SpeechGenerationCallback;
-
-  /** Callback for service errors */
-  protected onServiceErrorCallback?: TtsServiceErrorCallback;
 
   /** Provider-specific configuration */
   protected config: TConfig;
@@ -95,14 +92,6 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
   }
 
   /**
-   * Registers a callback for handling service errors
-   * @param cb Callback function that receives conversation ID and error message
-   */
-  setOnServiceError(cb: TtsServiceErrorCallback): void {
-    this.onServiceErrorCallback = cb;
-  }
-
-  /**
    * Helper method to handle generation started events
    * Called by subclasses when speech generation begins
    */
@@ -150,18 +139,6 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
   }
 
   /**
-   * Helper method to handle service errors that should be sent to the client
-   * Called by subclasses when a service-level error occurs
-   * @param errorMessage Human-readable error description
-   */
-  protected async handleServiceError(errorMessage: string): Promise<void> {
-    logger.error(`TTS service error: ${errorMessage}`);
-    if (this.onServiceErrorCallback) {
-      await this.onServiceErrorCallback(errorMessage);
-    }
-  }
-
-  /**
    * Generates a unique chunk ID for audio generation
    * @returns A unique identifier string
    */
@@ -196,6 +173,5 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
     this.onGenerationEndedCallback = undefined;
     this.onErrorCallback = undefined;
     this.onSpeechGeneratingCallback = undefined;
-    this.onServiceErrorCallback = undefined;
   }
 }
