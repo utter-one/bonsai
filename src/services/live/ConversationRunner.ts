@@ -1,9 +1,5 @@
 import { inject } from "tsyringe";
-import { ConversationService } from "../ConversationService";
 import { NotFoundError } from "../../errors";
-import { StageService } from "../StageService";
-import { ClassifierService } from "../ClassifierService";
-import { ContextTransformerService } from "../ContextTransformerService";
 import { Classifier, ContextTransformer, Conversation, Stage } from "../../types/models";
 import { db } from "../../db";
 import { ILlmProvider, LlmProviderFactory } from "../providers/llm";
@@ -30,7 +26,10 @@ type ConversationState = 'awaiting_user_input' // Runner is waiting for user inp
   | 'processing_user_input' // Runner is processing user input (classification/transformation)
   | 'generating_response' // Runner is generating a response  
   | 'finished'; // Runner has finished
-  
+
+/** 
+ * Manages the lifecycle and state of a conversation. Runners are hosted by the SessionManager.
+ */
 export class ConversationRunner {
   private conversation: Conversation;
   private stageData: StageData;
@@ -50,11 +49,12 @@ export class ConversationRunner {
       throw new Error(`Conversation with ID ${conversationId} is not active`);
     }
 
-    this.stageData = await this.loadStageData(this.conversation.stageId);
+    this.stageData = await this.buildStageData(this.conversation.stageId);
     this.state = this.stageData.stage.enterBehavior === 'await_user_input' ? 'awaiting_user_input' : 'generating_response';
+    await this.wireUpProviders();
   }
 
-  private async loadStageData(stageId: string): Promise<StageData> {
+  private async buildStageData(stageId: string): Promise<StageData> {
     // Load current stage data
     const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, stageId) });
     if (!stage) {
@@ -91,6 +91,19 @@ export class ConversationRunner {
     }
 
     return stageData;
+  }
+
+  private async wireUpProviders() {
+    // TODO: wire up ASR, TTS, and other providers as needed
+
+  }
+
+  async startConversation() {
+    throw new Error("Method not implemented.");
+  }
+
+  async resumeConversation() {
+    throw new Error("Method not implemented.");
   }
 
   async receiveUserTextInput(userInput: string) {

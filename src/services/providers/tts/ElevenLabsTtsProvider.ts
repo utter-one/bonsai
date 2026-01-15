@@ -1,7 +1,5 @@
-import WebSocket, { ErrorEvent, MessageEvent, CloseEvent } from 'ws';
-import { randomUUID } from 'crypto';
+import WebSocket, {  } from 'ws';
 import { logger } from '../../../utils/logger';
-import type { Conversation } from '../../../types/models';
 import { TtsProviderBase } from './TtsProviderBase';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';

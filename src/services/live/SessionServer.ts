@@ -5,13 +5,14 @@ import { SessionManager } from './SessionManager';
 import { logger } from '../../utils/logger';
 import type { AuthRequest, AuthResponse } from '../../contracts/websocket/auth';
 import type { StartConversationRequest, StartConversationResponse, ResumeConversationRequest, ResumeConversationResponse, EndConversationRequest, EndConversationResponse } from '../../contracts/websocket/session';
+import type { StartUserVoiceInputRequest, StartUserVoiceInputResponse, SendUserVoiceChunkRequest, SendUserVoiceChunkResponse, EndUserVoiceInputRequest, EndUserVoiceInputResponse, SendUserTextInputRequest, SendUserTextInputResponse } from '../../contracts/websocket/userInput';
 import type { BaseInputMessage, BaseOutputMessage } from '../../contracts/websocket/common';
 import { ConversationService } from '../ConversationService';
 import { InvalidOperationError, NotFoundError } from '../../errors';
 import { conversations, db } from '../../db';
 import { eq } from 'drizzle-orm';
 
-type InputMessage = AuthRequest | StartConversationRequest | ResumeConversationRequest | EndConversationRequest;
+type InputMessage = AuthRequest | StartConversationRequest | ResumeConversationRequest | EndConversationRequest | StartUserVoiceInputRequest | SendUserVoiceChunkRequest | EndUserVoiceInputRequest | SendUserTextInputRequest;
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -21,7 +22,8 @@ type InputMessage = AuthRequest | StartConversationRequest | ResumeConversationR
 export class SessionServer {
   private wss: WebSocketServer | null = null;
 
-  constructor(@inject(SessionManager) private sessionManager: SessionManager) {}
+  constructor(@inject(SessionManager) private sessionManager: SessionManager,
+    @inject(ConversationService) private conversationService: ConversationService) { }
 
   /**
    * Initializes the WebSocket server and attaches it to an HTTP server.
@@ -78,6 +80,18 @@ export class SessionServer {
             break;
           case 'end_conversation':
             this.handleEndConversation(ws, message as EndConversationRequest);
+            break;
+          case 'start_user_voice_input':
+            this.handleStartUserVoiceInput(ws, message as StartUserVoiceInputRequest);
+            break;
+          case 'send_user_voice_chunk':
+            this.handleSendUserVoiceChunk(ws, message as SendUserVoiceChunkRequest);
+            break;
+          case 'end_user_voice_input':
+            this.handleEndUserVoiceInput(ws, message as EndUserVoiceInputRequest);
+            break;
+          case 'send_user_text_input':
+            this.handleSendUserTextInput(ws, message as SendUserTextInputRequest);
             break;
           default:
             logger.warn({ messageType: (message as BaseInputMessage).type }, 'Unknown message type received');
@@ -137,45 +151,38 @@ export class SessionServer {
     }
 
     try {
-      const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      await db.insert(conversations).values({
-        id: conversationId,
+      const conversation = await this.conversationService.createConversation({
         userId: message.userId,
-        clientId: metadata.sessionId,
         stageId: message.stageId,
-        state: {
-          variables: {},
-          currentActions: [],
-        },
-        status: 'ongoing',
-        metadata: {
-          sessionId: message.sessionId,
-          createdVia: 'websocket',
-        },
+        clientId: metadata.sessionId,
       });
+      const conversationId = conversation.id;
 
       this.sessionManager.attachConversationToSession(message.sessionId, conversationId);
 
       logger.info({ sessionId: message.sessionId, conversationId }, 'Conversation created and attached to session');
 
-      const response: StartConversationResponse = { 
-        type: 'start_conversation', 
-        sessionId: message.sessionId, 
-        success: true, 
-        conversationId, 
-        requestId: message.requestId 
+      const response: StartConversationResponse = {
+        type: 'start_conversation',
+        sessionId: message.sessionId,
+        success: true,
+        conversationId,
+        requestId: message.requestId
       };
       this.send(ws, response);
+
+      // Start the conversation
+      const sessionMetadata = this.sessionManager.getWebSocketMetadata(ws);
+      await sessionMetadata.runner.startConversation();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation';
       logger.error({ error: errorMessage, sessionId: message.sessionId }, 'Failed to create conversation');
-      const response: StartConversationResponse = { 
-        type: 'start_conversation', 
-        sessionId: message.sessionId, 
-        success: false, 
-        error: errorMessage, 
-        requestId: message.requestId 
+      const response: StartConversationResponse = {
+        type: 'start_conversation',
+        sessionId: message.sessionId,
+        success: false,
+        error: errorMessage,
+        requestId: message.requestId
       };
       this.send(ws, response);
     }
@@ -186,7 +193,7 @@ export class SessionServer {
    * @param ws - The WebSocket connection.
    * @param message - The resume conversation request message.
    */
-  private handleResumeConversation(ws: WebSocket, message: ResumeConversationRequest): void {
+  private async handleResumeConversation(ws: WebSocket, message: ResumeConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Resume conversation request received');
     const metadata = this.sessionManager.getWebSocketMetadata(ws);
     if (!metadata) {
@@ -197,9 +204,7 @@ export class SessionServer {
       throw new InvalidOperationError('A conversation is already active in this session');
     }
 
-    const conversation = db.query.conversations.findFirst({
-      where: eq(conversations.id, message.conversationId)
-    });
+    const conversation = await this.conversationService.getConversationById(message.conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }
@@ -207,13 +212,17 @@ export class SessionServer {
     this.sessionManager.attachConversationToSession(message.sessionId, message.conversationId);
 
     // Return success response
-    const response: ResumeConversationResponse = { 
-      type: 'resume_conversation', 
-      sessionId: message.sessionId, 
-      success: true, 
-      requestId: message.requestId 
+    const response: ResumeConversationResponse = {
+      type: 'resume_conversation',
+      sessionId: message.sessionId,
+      success: true,
+      requestId: message.requestId
     };
     this.send(ws, response);
+
+    // Resume the conversation
+    const sessionMetadata = this.sessionManager.getWebSocketMetadata(ws);
+    await sessionMetadata.runner.resumeConversation();
   }
 
   /**
@@ -234,6 +243,149 @@ export class SessionServer {
     } catch (error) {
       logger.error({ error: error instanceof Error ? error.message : String(error), sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end conversation');
       const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: false, error: error instanceof Error ? error.message : 'Failed to end conversation', requestId: message.requestId };
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handles start user voice input requests.
+   * @param ws - The WebSocket connection.
+   * @param message - The start user voice input request message.
+   */
+  private async handleStartUserVoiceInput(ws: WebSocket, message: StartUserVoiceInputRequest): Promise<void> {
+    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Start user voice input request received');
+
+    try {
+      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      if (!metadata) {
+        throw new NotFoundError('Session not found');
+      }
+
+      if (!metadata.conversationId) {
+        throw new InvalidOperationError('No active conversation in this session');
+      }
+
+      if (metadata.conversationId !== message.conversationId) {
+        throw new InvalidOperationError('Conversation ID mismatch');
+      }
+
+      await metadata.runner.startUserVoiceInput();
+
+      const response: StartUserVoiceInputResponse = { type: 'start_user_voice_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      this.send(ws, response);
+
+      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input started successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start user voice input';
+      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to start user voice input');
+      const response: StartUserVoiceInputResponse = { type: 'start_user_voice_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handles send user voice chunk requests.
+   * @param ws - The WebSocket connection.
+   * @param message - The send user voice chunk request message.
+   */
+  private async handleSendUserVoiceChunk(ws: WebSocket, message: SendUserVoiceChunkRequest): Promise<void> {
+    logger.debug({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user voice chunk request received');
+
+    try {
+      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      if (!metadata) {
+        throw new NotFoundError('Session not found');
+      }
+
+      if (!metadata.conversationId) {
+        throw new InvalidOperationError('No active conversation in this session');
+      }
+
+      if (metadata.conversationId !== message.conversationId) {
+        throw new InvalidOperationError('Conversation ID mismatch');
+      }
+
+      const audioBuffer = Buffer.from(message.audioData, 'base64');
+      await metadata.runner.receiveUserVoiceData(audioBuffer);
+
+      const response: SendUserVoiceChunkResponse = { type: 'send_user_voice_chunk', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      this.send(ws, response);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process voice chunk';
+      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process voice chunk');
+      const response: SendUserVoiceChunkResponse = { type: 'send_user_voice_chunk', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handles end user voice input requests.
+   * @param ws - The WebSocket connection.
+   * @param message - The end user voice input request message.
+   */
+  private async handleEndUserVoiceInput(ws: WebSocket, message: EndUserVoiceInputRequest): Promise<void> {
+    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End user voice input request received');
+
+    try {
+      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      if (!metadata) {
+        throw new NotFoundError('Session not found');
+      }
+
+      if (!metadata.conversationId) {
+        throw new InvalidOperationError('No active conversation in this session');
+      }
+
+      if (metadata.conversationId !== message.conversationId) {
+        throw new InvalidOperationError('Conversation ID mismatch');
+      }
+
+      await metadata.runner.stopUserVoiceInput();
+
+      const response: EndUserVoiceInputResponse = { type: 'end_user_voice_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      this.send(ws, response);
+
+      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input ended successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to end user voice input';
+      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end user voice input');
+      const response: EndUserVoiceInputResponse = { type: 'end_user_voice_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
+      this.send(ws, response);
+    }
+  }
+
+  /**
+   * Handles send user text input requests.
+   * @param ws - The WebSocket connection.
+   * @param message - The send user text input request message.
+   */
+  private async handleSendUserTextInput(ws: WebSocket, message: SendUserTextInputRequest): Promise<void> {
+    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user text input request received');
+
+    try {
+      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      if (!metadata) {
+        throw new NotFoundError('Session not found');
+      }
+
+      if (!metadata.conversationId) {
+        throw new InvalidOperationError('No active conversation in this session');
+      }
+
+      if (metadata.conversationId !== message.conversationId) {
+        throw new InvalidOperationError('Conversation ID mismatch');
+      }
+
+      await metadata.runner.receiveUserTextInput(message.text);
+
+      const response: SendUserTextInputResponse = { type: 'send_user_text_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      this.send(ws, response);
+
+      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User text input received successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process text input';
+      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process text input');
+      const response: SendUserTextInputResponse = { type: 'send_user_text_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
       this.send(ws, response);
     }
   }

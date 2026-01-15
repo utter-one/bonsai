@@ -12,15 +12,70 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
 import { PERMISSIONS } from '../permissions';
+import { randomUUID } from 'crypto';
 
 /**
- * Service for managing conversations with read and delete operations
- * Create operation is intentionally not exposed as it is reserved for other modules
+ * Input for creating a conversation (internal use only)
+ */
+export type CreateConversationInput = {
+  id?: string;
+  userId: string;
+  clientId: string;
+  stageId: string;
+  state?: {
+    variables: Record<string, Record<string, any>>;
+    currentActions: string[];
+  };
+  status?: string;
+  statusReason?: string | null;
+  metadata?: Record<string, any> | null;
+};
+
+/**
+ * Service for managing conversations with create, read and delete operations
  */
 @injectable()
 export class ConversationService extends BaseService {
   constructor(@inject(AuditService) private readonly auditService: AuditService) {
     super();
+  }
+
+  /**
+   * Creates a new conversation (internal use only, not exposed via REST API)
+   * @param input - Conversation creation data
+   * @param context - Optional request context for auditing
+   * @returns The created conversation
+   */
+  async createConversation(input: CreateConversationInput, context?: RequestContext): Promise<ConversationResponse> {
+    const conversationId = input.id ?? randomUUID();
+    logger.info({ conversationId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, adminId: context?.adminId }, 'Creating conversation');
+
+    try {
+      const conversationData = {
+        id: conversationId,
+        userId: input.userId,
+        clientId: input.clientId,
+        stageId: input.stageId,
+        state: input.state ?? { variables: {}, currentActions: [] },
+        status: input.status ?? 'ongoing',
+        statusReason: input.statusReason ?? null,
+        metadata: input.metadata ?? null,
+      };
+
+      const result = await db.insert(conversations).values(conversationData).returning();
+      const createdConversation = result[0];
+
+      if (context?.adminId) {
+        await this.auditService.logCreate('conversation', createdConversation.id, { id: createdConversation.id, userId: createdConversation.userId, clientId: createdConversation.clientId, stageId: createdConversation.stageId, status: createdConversation.status }, context.adminId);
+      }
+
+      logger.info({ conversationId: createdConversation.id }, 'Conversation created successfully');
+
+      return conversationResponseSchema.parse(createdConversation);
+    } catch (error) {
+      logger.error({ error, conversationId, userId: input.userId }, 'Failed to create conversation');
+      throw error;
+    }
   }
 
   /**
