@@ -20,10 +20,24 @@ export const enterBehaviorSchema = z.enum(['generate_response', 'await_user_inpu
 export const variablesSchema = z.record(z.string(), z.unknown()).describe('Variable definitions for this stage');
 
 /**
- * Schema for action definitions
- * Defines actions available in this conversation stage
+ * Schema for a single stage action
+ * Defines an action available within a conversation stage (similar structure to global actions)
  */
-export const actionsSchema = z.record(z.string(), z.unknown()).describe('Action definitions for this stage');
+export const stageActionSchema = z.object({
+  name: z.string().min(1).describe('Display name of the action'),
+  condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
+  promptTrigger: z.string().min(1).describe('Description of when this action should be triggered'),
+  operations: z.array(z.string()).describe('Array of operations to execute (e.g., "ai_response", "modify_variables", "go_to_stage")'),
+  template: z.string().nullable().optional().describe('Optional message template for the action'),
+  examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
+});
+
+/**
+ * Schema for action definitions
+ * Defines a map of actions available in this conversation stage
+ */
+export const actionsSchema = z.record(z.string(), stageActionSchema).describe('Action definitions for this stage (map of action ID to action definition)');
 
 /**
  * Schema for creating a new stage
@@ -127,3 +141,6 @@ export type StageResponse = z.infer<typeof stageResponseSchema>;
 
 /** Response for paginated list of stages with metadata */
 export type StageListResponse = z.infer<typeof stageListResponseSchema>;
+
+/** Definition of a single action within a stage */
+export type StageAction = z.infer<typeof stageActionSchema>;

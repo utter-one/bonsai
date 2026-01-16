@@ -66,7 +66,7 @@ export class SessionServer {
       if (message.type === 'auth') {
         this.handleAuth(ws, message as AuthRequest);
       } else {
-        if (!this.sessionManager.getWebSocketMetadata(ws) || !this.sessionManager.getWebSocketMetadata(ws)?.sessionId) {
+        if (!this.sessionManager.getSessionForWebSocket(ws) || !this.sessionManager.getSessionForWebSocket(ws)?.id) {
           this.sendError(ws, 'Authentication required', message.requestId);
           return;
         }
@@ -142,7 +142,7 @@ export class SessionServer {
    */
   private async handleStartConversation(ws: WebSocket, message: StartConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, personaId: message.personaId, requestId: message.requestId }, 'Start conversation request received');
-    const metadata = this.sessionManager.getWebSocketMetadata(ws);
+    const metadata = this.sessionManager.getSessionForWebSocket(ws);
     if (!metadata) {
       throw new NotFoundError('Session not found');
     }
@@ -154,7 +154,7 @@ export class SessionServer {
       const conversation = await this.conversationService.createConversation({
         userId: message.userId,
         stageId: message.stageId,
-        clientId: metadata.sessionId,
+        clientId: metadata.id,
       });
       const conversationId = conversation.id;
 
@@ -172,7 +172,7 @@ export class SessionServer {
       this.send(ws, response);
 
       // Start the conversation
-      const sessionMetadata = this.sessionManager.getWebSocketMetadata(ws);
+      const sessionMetadata = this.sessionManager.getSessionForWebSocket(ws);
       await sessionMetadata.runner.startConversation();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation';
@@ -195,7 +195,7 @@ export class SessionServer {
    */
   private async handleResumeConversation(ws: WebSocket, message: ResumeConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Resume conversation request received');
-    const metadata = this.sessionManager.getWebSocketMetadata(ws);
+    const metadata = this.sessionManager.getSessionForWebSocket(ws);
     if (!metadata) {
       throw new NotFoundError('Session not found');
     }
@@ -221,7 +221,7 @@ export class SessionServer {
     this.send(ws, response);
 
     // Resume the conversation
-    const sessionMetadata = this.sessionManager.getWebSocketMetadata(ws);
+    const sessionMetadata = this.sessionManager.getSessionForWebSocket(ws);
     await sessionMetadata.runner.resumeConversation();
   }
 
@@ -256,7 +256,7 @@ export class SessionServer {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Start user voice input request received');
 
     try {
-      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      const metadata = this.sessionManager.getSessionForWebSocket(ws);
       if (!metadata) {
         throw new NotFoundError('Session not found');
       }
@@ -292,7 +292,7 @@ export class SessionServer {
     logger.debug({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user voice chunk request received');
 
     try {
-      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      const metadata = this.sessionManager.getSessionForWebSocket(ws);
       if (!metadata) {
         throw new NotFoundError('Session not found');
       }
@@ -327,7 +327,7 @@ export class SessionServer {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End user voice input request received');
 
     try {
-      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      const metadata = this.sessionManager.getSessionForWebSocket(ws);
       if (!metadata) {
         throw new NotFoundError('Session not found');
       }
@@ -363,7 +363,7 @@ export class SessionServer {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user text input request received');
 
     try {
-      const metadata = this.sessionManager.getWebSocketMetadata(ws);
+      const metadata = this.sessionManager.getSessionForWebSocket(ws);
       if (!metadata) {
         throw new NotFoundError('Session not found');
       }

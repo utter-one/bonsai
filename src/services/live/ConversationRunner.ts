@@ -2,36 +2,40 @@ import { inject } from "tsyringe";
 import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, Stage } from "../../types/models";
 import { db } from "../../db";
-import { ILlmProvider, LlmProviderFactory } from "../providers/llm";
-import { IAsrProvider, AsrProviderFactory } from "../providers/asr";
-import { ITtsProvider, TtsProviderFactory } from "../providers/tts";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
-import { SessionManager } from "./SessionManager";
+import { Session, SessionManager } from "./SessionManager";
 import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../contracts/websocket/aiResponse";
+import { ILlmProvider } from "../providers/llm/ILlmProvider";
+import { IAsrProvider } from "../providers/asr/IAsrProvider";
+import { ITtsProvider } from "../providers/tts/ITtsProvider";
+import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
+import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
+import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
+import { UserInputProcessor } from "./UserInputProcessor";
 
-type ClassifierData = {
+export type ClassifierRuntimeData = {
   classifier: Classifier;
   llmProvider: ILlmProvider;
 }
 
-type TransformerData = {
+export type TransformerRuntimeData = {
   transformer: ContextTransformer;
   llmProvider: ILlmProvider;
 }
 
-type StageData = {
+export type StageRuntimeData = {
   id: string;
   stage: Stage;
   completionLlmProvider?: ILlmProvider;
-  classifiers: ClassifierData[];
-  transformers: TransformerData[];
+  classifiers: ClassifierRuntimeData[];
+  transformers: TransformerRuntimeData[];
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
 }
 
-type ConversationState = 'awaiting_user_input' // Runner is waiting for user input (text or voice)
+export type ConversationState = 'awaiting_user_input' // Runner is waiting for user input (text or voice)
   | 'receiving_user_voice' // Runner is receiving voice input from user (ASR in progress)
   | 'processing_user_input' // Runner is processing user input (classification/transformation)
   | 'generating_response' // Runner is generating a response  
@@ -43,10 +47,10 @@ type ConversationState = 'awaiting_user_input' // Runner is waiting for user inp
  */
 export class ConversationRunner {
   private conversation: Conversation;
-  private stageData: StageData;
+  private stageData: StageRuntimeData;
   private state: ConversationState = 'awaiting_user_input';
   private failureReason?: string;
-  private sessionId: string;
+  private session: Session;
 
   constructor(
     @inject(SessionManager) private sessionManager: SessionManager,
@@ -54,15 +58,20 @@ export class ConversationRunner {
     @inject(AsrProviderFactory) private asrProviderFactory: AsrProviderFactory,
     @inject(TtsProviderFactory) private ttsProviderFactory: TtsProviderFactory,
     @inject(ConversationService) private conversationService: ConversationService,
-    @inject(PersonaService) private personaService: PersonaService
+    @inject(PersonaService) private personaService: PersonaService,
+    @inject(UserInputProcessor) private userInputProcessor: UserInputProcessor,
   ) { }
 
   private getWebSocket(): WebSocket | undefined {
-    return this.sessionManager.getSessionWebSocket(this.sessionId);
+    return this.sessionManager.getWebSocketForSession(this.session.id);
   }
 
-  async prepareConversation(conversationId: string, sessionId: string): Promise<void> {
-    this.sessionId = sessionId;
+  public getRuntimeData(): StageRuntimeData {
+    return this.stageData;
+  }
+
+  async prepareConversation(conversationId: string, session: Session): Promise<void> {
+    this.session = session;
 
     // Load conversation data
     this.conversation = await db.query.conversations.findFirst({ where: (conversations, { eq }) => eq(conversations.id, conversationId) });
@@ -80,14 +89,14 @@ export class ConversationRunner {
     await this.wireUpProviders();
   }
 
-  private async buildStageData(stageId: string): Promise<StageData> {
+  private async buildStageData(stageId: string): Promise<StageRuntimeData> {
     // Load current stage data
     const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, stageId) });
     if (!stage) {
       throw new NotFoundError(`Stage with ID ${stageId} not found`);
     }
 
-    const stageData: StageData = {
+    const stageData: StageRuntimeData = {
       id: stageId,
       stage: stage,
       completionLlmProvider: undefined,
@@ -155,7 +164,7 @@ export class ConversationRunner {
 
           if (fullText) {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
-            // TODO: Process the recognized text
+            await this.userInputProcessor.processTextInput(this.session, fullText);
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
           }
@@ -191,7 +200,7 @@ export class ConversationRunner {
             type: 'start_ai_voice_output',
             conversationId,
             voiceOutputId,
-            sessionId: this.sessionId,
+            sessionId: this.session.id,
             requestId: null
           } as StartAiVoiceOutputMessage;
           ws.send(JSON.stringify(message));
@@ -207,7 +216,7 @@ export class ConversationRunner {
             type: 'end_ai_voice_output',
             conversationId,
             voiceOutputId,
-            sessionId: this.sessionId,
+            sessionId: this.session.id,
             requestId: null
           } as EndAiVoiceOutputMessage;
           ws.send(JSON.stringify(message));
@@ -229,7 +238,7 @@ export class ConversationRunner {
             chunkId: chunk.chunkId,
             ordinal: chunk.ordinal,
             isFinal: chunk.isFinal,
-            sessionId: this.sessionId,
+            sessionId: this.session.id,
             requestId: null
           } as SendAiVoiceChunkMessage;
           ws.send(JSON.stringify(message));

@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { StageAction } from '../contracts/rest/stage';
 
 // User table
 export const users = pgTable('users', {
@@ -134,7 +135,7 @@ export const stages = pgTable('stages', {
   useGlobalActions: boolean('use_global_actions').notNull().default(true),
   globalActions: jsonb('global_actions').notNull().default([]).$type<string[]>(),
   variables: jsonb('variables').notNull().default({}).$type<Record<string, any>>(),
-  actions: jsonb('actions').notNull().default({}).$type<Record<string, any>>(),
+  actions: jsonb('actions').notNull().default({}).$type<Record<string, StageAction>>(),
   classifierIds: jsonb('classifier_ids').notNull().default([]).$type<string[]>(),
   transformerIds: jsonb('transformer_ids').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),

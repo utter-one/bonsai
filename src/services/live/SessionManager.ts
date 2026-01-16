@@ -2,15 +2,17 @@ import { singleton, container } from "tsyringe";
 import { ConversationRunner } from "./ConversationRunner";
 import { meta } from "zod/v4/core";
 
-/** Metadata associated with each WebSocket connection. */
-export type WebSocketMetadata =
+/** Session data associated with each WebSocket connection. */
+export type Session =
 { 
   /** Unique identifier for the session. */
-  sessionId: string,
+  id: string,
   /** ID of the conversation currently active in this session, empty string if none. */
   conversationId: string
   /** Conversation runner instance for managing the conversation. */
   runner: ConversationRunner;
+  /** WebSocket connection associated with this session. */
+  ws: WebSocket;
 };
 
 /**
@@ -20,7 +22,7 @@ export type WebSocketMetadata =
 @singleton()
 export class SessionManager {
   /** Maps WebSocket connections to their metadata (sessionId and conversationId). */
-  private socketMap: Map<WebSocket, WebSocketMetadata> = new Map();
+  private socketMap: Map<WebSocket, Session> = new Map();
   /** Maps session IDs to their WebSocket connections for quick lookup. */
   private sessionMap: Map<string, WebSocket> = new Map();
 
@@ -31,7 +33,7 @@ export class SessionManager {
    */
   createSession(ws: WebSocket) {
     const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
-    this.socketMap.set(ws, { sessionId, conversationId: null, runner: null });
+    this.socketMap.set(ws, { id: sessionId, conversationId: null, runner: null, ws });
     this.sessionMap.set(sessionId, ws);
     return sessionId;
   }
@@ -41,16 +43,16 @@ export class SessionManager {
    * @param sessionId - The session ID to look up.
    * @returns The WebSocket connection if found, otherwise undefined.
    */
-  getSessionWebSocket(sessionId: string): WebSocket | undefined {
+  getWebSocketForSession(sessionId: string): WebSocket | undefined {
     return this.sessionMap.get(sessionId);
   }
 
   /**
-   * Retrieves the metadata associated with a given WebSocket connection.
+   * Retrieves the session data associated with a given WebSocket connection.
    * @param ws - The WebSocket connection to look up.
-   * @returns The WebSocket metadata if found, otherwise undefined.
+   * @returns The session data if found, otherwise undefined.
    */
-  getWebSocketMetadata(ws: WebSocket): WebSocketMetadata | undefined {
+  getSessionForWebSocket(ws: WebSocket): Session | undefined {
     return this.socketMap.get(ws);
   }
 
@@ -66,12 +68,12 @@ export class SessionManager {
       throw new Error('Session not found');
     }
 
-    const metadata = this.socketMap.get(socket);
-    if (metadata) {
-      metadata.conversationId = conversationId;
-      metadata.runner = container.resolve(ConversationRunner);
-      metadata.runner.prepareConversation(conversationId, sessionId);
-      this.socketMap.set(socket, metadata);
+    const session = this.socketMap.get(socket);
+    if (session) {
+      session.conversationId = conversationId;
+      session.runner = container.resolve(ConversationRunner);
+      session.runner.prepareConversation(conversationId, session);
+      this.socketMap.set(socket, session);
     }
   }
 
