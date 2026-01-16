@@ -1,9 +1,11 @@
-import { singleton } from "tsyringe";
+import { inject, singleton } from "tsyringe";
 import { z } from "zod";
 import { Session } from "./SessionManager";
 import { StageAction } from "../../contracts/rest/stage";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
+import { LlmContext, LlmContextBuilder } from "./LlmContextBuilder";
+import { LlmPromptBuilder } from "./LlmPromptBuilder";
 
 const actionClassificationResultSchema = z.object({
   actionName: z.string(),
@@ -23,6 +25,9 @@ type ClassificationResult = z.infer<typeof classificationResultSchema>;
  */
 @singleton()
 export class UserInputProcessor {
+  constructor(@inject(LlmContextBuilder) private llmContextBuilder: LlmContextBuilder,
+    @inject(LlmPromptBuilder) private llmPromptBuilder: LlmPromptBuilder) {}
+
   /** Processes text input from the user within a session.
    * @param session - The session in which the input was received.
    * @param text - The text input from the user.
@@ -30,14 +35,15 @@ export class UserInputProcessor {
    */
   async processTextInput(session: Session, text: string): Promise<ActionClassificationResult[]> {
     // How to process:
-    // 1. Get all classifiers for the current stage.
-    // 2. For each classifier, run the text through it to determine actions. Do this in parallel.
-    // 3. Collect and return all detected actions from classifiers.
+    // - Get all classifiers for the current stage.
+    // - For each classifier, run the text through it to determine actions. Do this in parallel.
+    // - Collect and return all detected actions from classifiers.
 
     try {
+      const context = await this.llmContextBuilder.buildContextForSession(session);
       const classifiers = session.runner.getRuntimeData().classifiers;
       const actionPromises = classifiers.map(async (classifier) => {
-        return this.classifyTextInput(session, classifier, text);
+        return this.classifyTextInput(session, classifier, context, text);
       });
 
       const actionsArrays = await Promise.all(actionPromises);
@@ -48,7 +54,7 @@ export class UserInputProcessor {
     } 
   }
 
-  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, text: string): Promise<ClassificationResult> {
+  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: LlmContext, text: string): Promise<ClassificationResult> {
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
       const llmProvider = classifierData.llmProvider;
@@ -57,7 +63,7 @@ export class UserInputProcessor {
       const messages = [
         {
           role: 'system' as const,
-          content: classifier.prompt
+          content: await this.llmPromptBuilder.buildPrompt(classifier.prompt, context)
         },
         {
           role: 'user' as const,

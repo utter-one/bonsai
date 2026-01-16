@@ -1,6 +1,6 @@
 import { inject } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, Stage } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, Project, Stage } from "../../types/models";
 import { db } from "../../db";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
@@ -27,6 +27,8 @@ export type TransformerRuntimeData = {
 
 export type StageRuntimeData = {
   id: string;
+  conversation: Conversation;
+  project: Project;
   stage: Stage;
   completionLlmProvider?: ILlmProvider;
   classifiers: ClassifierRuntimeData[];
@@ -46,7 +48,6 @@ export type ConversationState = 'awaiting_user_input' // Runner is waiting for u
  * Manages the lifecycle and state of a conversation. Runners are hosted by the SessionManager.
  */
 export class ConversationRunner {
-  private conversation: Conversation;
   private stageData: StageRuntimeData;
   private state: ConversationState = 'awaiting_user_input';
   private failureReason?: string;
@@ -74,31 +75,35 @@ export class ConversationRunner {
     this.session = session;
 
     // Load conversation data
-    this.conversation = await db.query.conversations.findFirst({ where: (conversations, { eq }) => eq(conversations.id, conversationId) });
-    if (!this.conversation) {
+    const conversation = await db.query.conversations.findFirst({ where: (conversations, { eq }) => eq(conversations.id, conversationId) });
+    if (!conversation) {
       throw new NotFoundError(`Conversation with ID ${conversationId} not found`);
     }
 
     // Check if conversation is active
-    if (this.conversation.status !== 'active') {
+    if (conversation.status !== 'active') {
       throw new Error(`Conversation with ID ${conversationId} is not active`);
     }
 
-    this.stageData = await this.buildStageData(this.conversation.stageId);
+    this.stageData = await this.buildStageData(conversation);
     this.state = this.stageData.stage.enterBehavior === 'await_user_input' ? 'awaiting_user_input' : 'generating_response';
     await this.wireUpProviders();
   }
 
-  private async buildStageData(stageId: string): Promise<StageRuntimeData> {
+  private async buildStageData(conversation: Conversation): Promise<StageRuntimeData> {
     // Load current stage data
-    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, stageId) });
+    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, conversation.stageId) });
     if (!stage) {
-      throw new NotFoundError(`Stage with ID ${stageId} not found`);
+      throw new NotFoundError(`Stage with ID ${conversation.stageId} not found`);
     }
 
+    const project = await db.query.projects.findFirst({ where: (projects, { eq }) => eq(projects.id, stage.projectId) });
+
     const stageData: StageRuntimeData = {
-      id: stageId,
+      id: stage.id,
       stage: stage,
+      project: project,
+      conversation: conversation,
       completionLlmProvider: undefined,
       classifiers: [],
       transformers: [],
@@ -148,7 +153,7 @@ export class ConversationRunner {
   }
 
   private async wireUpProviders() {
-    const conversationId = this.conversation.id;
+    const conversationId = this.stageData.conversation.id;
     const { asrProvider, ttsProvider, completionLlmProvider } = this.stageData;
 
     // Initialize and wire up ASR provider
@@ -319,9 +324,7 @@ export class ConversationRunner {
       throw new Error(`Cannot receive user input in current state: ${this.state}`);
     }
 
-    this.state = 'processing_user_input';
-
-    throw new Error("Method not implemented.");
+    await this.processUserInput(userInput);
   }
 
   async startUserVoiceInput() {
@@ -330,7 +333,7 @@ export class ConversationRunner {
     }
 
     if (!this.stageData.asrProvider) {
-      const errorMessage = `ASR provider not available for conversation ${this.conversation.id}`;
+      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}`;
       await this.markAsFailed(errorMessage);
       throw new Error(errorMessage);
     }
@@ -338,11 +341,11 @@ export class ConversationRunner {
     try {
       await this.stageData.asrProvider.start();
       this.state = 'receiving_user_voice';
-      logger.info({ conversationId: this.conversation.id }, `Started voice input for conversation ${this.conversation.id}`);
+      logger.info({ conversationId: this.stageData.conversation.id }, `Started voice input for conversation ${this.stageData.conversation.id}`);
     } catch (error) {
       const errorMessage = `Failed to start voice input: ${error instanceof Error ? error.message : String(error)}`;
       await this.markAsFailed(errorMessage);
-      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to start voice input for conversation ${this.conversation.id}`);
+      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to start voice input for conversation ${this.stageData.conversation.id}`);
       throw error;
     }
   }
@@ -353,18 +356,18 @@ export class ConversationRunner {
     }
 
     if (!this.stageData.asrProvider) {
-      const errorMessage = `ASR provider not available for conversation ${this.conversation.id}`;
+      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}`;
       await this.markAsFailed(errorMessage);
       throw new Error(errorMessage);
     }
 
     try {
       await this.stageData.asrProvider.sendAudio(voiceData);
-      logger.debug({ conversationId: this.conversation.id, bufferSize: voiceData.length }, `Sent ${voiceData.length} bytes of audio data for conversation ${this.conversation.id}`);
+      logger.debug({ conversationId: this.stageData.conversation.id, bufferSize: voiceData.length }, `Sent ${voiceData.length} bytes of audio data for conversation ${this.stageData.conversation.id}`);
     } catch (error) {
       const errorMessage = `Failed to process voice data: ${error instanceof Error ? error.message : String(error)}`;
       await this.markAsFailed(errorMessage);
-      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to send audio data for conversation ${this.conversation.id}`);
+      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to send audio data for conversation ${this.stageData.conversation.id}`);
       throw error;
     }
   }
@@ -375,7 +378,7 @@ export class ConversationRunner {
     }
 
     if (!this.stageData.asrProvider) {
-      const errorMessage = `ASR provider not available for conversation ${this.conversation.id}`;
+      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}`;
       await this.markAsFailed(errorMessage);
       throw new Error(errorMessage);
     }
@@ -383,11 +386,11 @@ export class ConversationRunner {
     try {
       await this.stageData.asrProvider.stop();
       this.state = 'processing_user_input';
-      logger.info({ conversationId: this.conversation.id }, `Stopped voice input for conversation ${this.conversation.id}`);
+      logger.info({ conversationId: this.stageData.conversation.id }, `Stopped voice input for conversation ${this.stageData.conversation.id}`);
     } catch (error) {
       const errorMessage = `Failed to stop voice input: ${error instanceof Error ? error.message : String(error)}`;
       await this.markAsFailed(errorMessage);
-      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to stop voice input for conversation ${this.conversation.id}`);
+      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to stop voice input for conversation ${this.stageData.conversation.id}`);
       throw error;
     }
   }
@@ -403,13 +406,28 @@ export class ConversationRunner {
   private async markAsFailed(reason: string): Promise<void> {
     this.state = 'failed';
     this.failureReason = reason;
-    logger.error({ conversationId: this.conversation.id, reason }, `Conversation ${this.conversation.id} marked as failed: ${reason}`);
+    logger.error({ conversationId: this.stageData.conversation.id, reason }, `Conversation ${this.stageData.conversation.id} marked as failed: ${reason}`);
 
     // Update conversation status via ConversationService
     try {
-      await this.conversationService.failConversation(this.conversation.id, reason);
+      await this.conversationService.failConversation(this.stageData.conversation.id, reason);
     } catch (error) {
-      logger.error({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to update conversation status in database via ConversationService`);
+      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to update conversation status in database via ConversationService`);
+    }
+  }
+
+  private async processUserInput(userInput: string) {
+    this.state = 'processing_user_input';
+    const actions = await this.userInputProcessor.processTextInput(this.session, userInput);
+
+    let shouldGenerateResponse = false;
+    // TODO: process actions (not implemented yet)
+
+    if (shouldGenerateResponse) {
+      this.state = 'generating_response';
+      // TODO: implement response generation
+    } else {
+      this.state = 'awaiting_user_input';
     }
   }
 
