@@ -72,7 +72,7 @@ export class SessionManager {
     if (session) {
       session.conversationId = conversationId;
       session.runner = container.resolve(ConversationRunner);
-      session.runner.prepareConversation(conversationId, session);
+      session.runner.prepareConversation(conversationId, session, this.socketMap.get(socket).ws);
       this.socketMap.set(socket, session);
     }
   }

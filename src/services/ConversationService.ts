@@ -13,6 +13,7 @@ import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
 import { PERMISSIONS } from '../permissions';
 import { randomUUID } from 'crypto';
+import { ConversationState } from './live/ConversationRunner';
 
 /**
  * Input for creating a conversation (internal use only)
@@ -23,12 +24,9 @@ export type CreateConversationInput = {
   userId: string;
   clientId: string;
   stageId: string;
-  state?: {
-    variables: Record<string, Record<string, any>>;
-    currentActions: string[];
-  };
-  status?: string;
-  statusReason?: string | null;
+  stageVars?: Record<string, Record<string, any>>;
+  status: ConversationState;
+  statusDetails?: string | null;
   metadata?: Record<string, any> | null;
 };
 
@@ -58,9 +56,9 @@ export class ConversationService extends BaseService {
         userId: input.userId,
         clientId: input.clientId,
         stageId: input.stageId,
-        state: input.state ?? { variables: {}, currentActions: [] },
-        status: input.status ?? 'ongoing',
-        statusReason: input.statusReason ?? null,
+        stageVars: {},
+        status: input.status ?? 'initialized',
+        statusDetails: input.statusDetails ?? null,
         metadata: input.metadata ?? null,
       };
 
@@ -80,8 +78,44 @@ export class ConversationService extends BaseService {
     }
   }
 
-  async saveConversationState() {
+  /**
+   * Saves the current state of a conversation (internal use only)
+   */
+  async saveConversationState(conversationId: string,
+    status: ConversationState,
+    statusDetails?: string | null,
+    stageVars?: Record<string, Record<string, any>>
+   ) {
+    logger.debug({ conversationId }, 'Saving conversation state');
 
+    try {
+      const updateData: Partial<{
+        status: ConversationState;
+        statusDetails: string | null;
+        stageVars: Record<string, Record<string, any>>;
+        updatedAt: Date;
+      }> = {
+        status,
+        updatedAt: new Date(),
+      };
+
+      if (statusDetails !== undefined) {
+        updateData.statusDetails = statusDetails;
+      }
+
+      if (stageVars !== undefined) {
+        updateData.stageVars = stageVars;
+      }
+
+      await db.update(conversations)
+        .set(updateData)
+        .where(eq(conversations.id, conversationId));
+
+      logger.debug({ conversationId }, 'Conversation state saved successfully');
+    } catch (error) {
+      logger.error({ error, conversationId }, 'Failed to save conversation state');
+      throw error;
+    }
   }
 
   /**
@@ -128,7 +162,7 @@ export class ConversationService extends BaseService {
         clientId: conversations.clientId,
         stageId: conversations.stageId,
         status: conversations.status,
-        statusReason: conversations.statusReason,
+        statusReason: conversations.statusDetails,
         createdAt: conversations.createdAt,
         updatedAt: conversations.updatedAt,
       };
@@ -196,7 +230,7 @@ export class ConversationService extends BaseService {
       await db.update(conversations)
         .set({ 
           status: 'failed',
-          statusReason: reason,
+          statusDetails: reason,
           updatedAt: new Date()
         })
         .where(eq(conversations.id, id));

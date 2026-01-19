@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { StageAction } from '../contracts/rest/stage';
+import { ConversationState } from '../services/live/ConversationRunner';
 
 // User table
 export const users = pgTable('users', {
@@ -17,12 +18,9 @@ export const conversations = pgTable('conversations', {
   userId: text('user_id').notNull().references(() => users.id),
   clientId: text('client_id').notNull(),
   stageId: text('stage_id').notNull(),
-  state: jsonb('state').notNull().$type<{
-    variables: Record<string, Record<string, any>>;
-    currentActions: string[];
-  }>(),
-  status: text('status').notNull().default('ongoing'),
-  statusReason: text('status_reason'),
+  stageVars: jsonb('stage_vars').$type<Record<string, Record<string, any>>>(),
+  status: text('status').notNull().$type<ConversationState>().default('initialized'),
+  statusDetails: text('status_reason').default(null),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

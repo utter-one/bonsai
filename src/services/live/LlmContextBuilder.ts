@@ -6,7 +6,7 @@ import { singleton } from "tsyringe";
 export type LlmContext = {
   projectId: string;
   stageId: string;
-  variables: Record<string, any>;
+  vars: Record<string, any>;
   history: Array<{
     role: 'user' | 'assistant' | 'system';
     content: string;
@@ -24,7 +24,7 @@ export class LlmContextBuilder {
     const context = {
       projectId: session.runner.getRuntimeData().project.id,
       stageId: session.runner.getRuntimeData().stage.id,
-      variables: {},
+      vars: {},
       history: [],
       command: null,
     };
