@@ -8,6 +8,7 @@ import type { StartConversationRequest, StartConversationResponse, ResumeConvers
 import type { StartUserVoiceInputRequest, StartUserVoiceInputResponse, SendUserVoiceChunkRequest, SendUserVoiceChunkResponse, EndUserVoiceInputRequest, EndUserVoiceInputResponse, SendUserTextInputRequest, SendUserTextInputResponse } from '../../contracts/websocket/userInput';
 import type { BaseInputMessage, BaseOutputMessage } from '../../contracts/websocket/common';
 import { ConversationService } from '../ConversationService';
+import { StageService } from '../StageService';
 import { InvalidOperationError, NotFoundError } from '../../errors';
 import { conversations, db } from '../../db';
 import { eq } from 'drizzle-orm';
@@ -23,7 +24,8 @@ export class SessionServer {
   private wss: WebSocketServer | null = null;
 
   constructor(@inject(SessionManager) private sessionManager: SessionManager,
-    @inject(ConversationService) private conversationService: ConversationService) { }
+    @inject(ConversationService) private conversationService: ConversationService,
+    @inject(StageService) private stageService: StageService) { }
 
   /**
    * Initializes the WebSocket server and attaches it to an HTTP server.
@@ -151,7 +153,11 @@ export class SessionServer {
     }
 
     try {
+      // Get stage to extract projectId
+      const stage = await this.stageService.getStageById(message.stageId);
+      
       const conversation = await this.conversationService.createConversation({
+        projectId: stage.projectId,
         userId: message.userId,
         stageId: message.stageId,
         clientId: metadata.id,

@@ -13,6 +13,7 @@ export const users = pgTable('users', {
 // Conversation table
 export const conversations = pgTable('conversations', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   userId: text('user_id').notNull().references(() => users.id),
   clientId: text('client_id').notNull(),
   stageId: text('stage_id').notNull(),
@@ -272,6 +273,10 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [conversations.projectId],
+    references: [projects.id],
+  }),
   user: one(users, {
     fields: [conversations.userId],
     references: [users.id],
@@ -288,6 +293,7 @@ export const conversationEventsRelations = relations(conversationEvents, ({ one 
 }));
 
 export const projectsRelations = relations(projects, ({ many }) => ({
+  conversations: many(conversations),
   personas: many(personas),
   stages: many(stages),
   classifiers: many(classifiers),

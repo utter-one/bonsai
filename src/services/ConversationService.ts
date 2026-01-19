@@ -19,6 +19,7 @@ import { randomUUID } from 'crypto';
  */
 export type CreateConversationInput = {
   id?: string;
+  projectId: string;
   userId: string;
   clientId: string;
   stageId: string;
@@ -48,11 +49,12 @@ export class ConversationService extends BaseService {
    */
   async createConversation(input: CreateConversationInput, context?: RequestContext): Promise<ConversationResponse> {
     const conversationId = input.id ?? randomUUID();
-    logger.info({ conversationId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, adminId: context?.adminId }, 'Creating conversation');
+    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, adminId: context?.adminId }, 'Creating conversation');
 
     try {
       const conversationData = {
         id: conversationId,
+        projectId: input.projectId,
         userId: input.userId,
         clientId: input.clientId,
         stageId: input.stageId,
@@ -66,16 +68,20 @@ export class ConversationService extends BaseService {
       const createdConversation = result[0];
 
       if (context?.adminId) {
-        await this.auditService.logCreate('conversation', createdConversation.id, { id: createdConversation.id, userId: createdConversation.userId, clientId: createdConversation.clientId, stageId: createdConversation.stageId, status: createdConversation.status }, context.adminId);
+        await this.auditService.logCreate('conversation', createdConversation.id, { id: createdConversation.id, projectId: createdConversation.projectId, userId: createdConversation.userId, clientId: createdConversation.clientId, stageId: createdConversation.stageId, status: createdConversation.status }, context.adminId);
       }
 
       logger.info({ conversationId: createdConversation.id }, 'Conversation created successfully');
 
       return conversationResponseSchema.parse(createdConversation);
     } catch (error) {
-      logger.error({ error, conversationId, userId: input.userId }, 'Failed to create conversation');
+      logger.error({ error, conversationId, projectId: input.projectId, userId: input.userId }, 'Failed to create conversation');
       throw error;
     }
+  }
+
+  async saveConversationState() {
+
   }
 
   /**
@@ -117,6 +123,7 @@ export class ConversationService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: conversations.id,
+        projectId: conversations.projectId,
         userId: conversations.userId,
         clientId: conversations.clientId,
         stageId: conversations.stageId,
@@ -223,7 +230,7 @@ export class ConversationService extends BaseService {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.adminId);
+      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, projectId: existingConversation.projectId, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.adminId);
 
       logger.info({ conversationId: id }, 'Conversation deleted successfully');
     } catch (error) {

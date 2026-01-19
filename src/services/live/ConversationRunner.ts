@@ -169,7 +169,7 @@ export class ConversationRunner {
 
           if (fullText) {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
-            await this.userInputProcessor.processTextInput(this.session, fullText);
+            await this.processUserInput(fullText);
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
           }
@@ -416,6 +416,10 @@ export class ConversationRunner {
     }
   }
 
+  /**
+   * Processes user input (text or voice) and advances the conversation state
+   * @param userInput The user input text to process
+   */
   private async processUserInput(userInput: string) {
     this.state = 'processing_user_input';
     const actions = await this.userInputProcessor.processTextInput(this.session, userInput);
