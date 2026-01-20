@@ -5,7 +5,7 @@ import { db } from "../../db";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
-import { Connection, ConnectionManager } from "./ConnectionManager";
+import { Connection, ConnectionManager } from "../../websocket/ConnectionManager";
 import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../contracts/websocket/aiResponse";
 import { ILlmProvider } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";

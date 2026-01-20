@@ -1,0 +1,49 @@
+import { inject, injectable } from 'tsyringe';
+import type { MessageHandler, MessageHandlerContext } from './types';
+import type { ResumeConversationRequest, ResumeConversationResponse } from '../../contracts/websocket/session';
+import { ConnectionManager } from '../ConnectionManager';
+import { ConversationService } from '../../services/ConversationService';
+import { NotFoundError, InvalidOperationError } from '../../errors';
+import { logger } from '../../utils/logger';
+import { MessageHandlerFor } from './registry';
+
+/**
+ * Handles resume conversation requests.
+ */
+@MessageHandlerFor('resume_conversation')
+@injectable()
+export class ResumeConversationHandler implements MessageHandler<ResumeConversationRequest> {
+  readonly messageType!: string;
+  readonly requiresAuth!: boolean;
+
+  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, @inject(ConversationService) private conversationService: ConversationService) {}
+
+  /**
+   * Handles resume conversation requests.
+   */
+  async handle(context: MessageHandlerContext, message: ResumeConversationRequest): Promise<void> {
+    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Resume conversation request received');
+    
+    if (!context.connection) {
+      throw new NotFoundError('Session not found');
+    }
+
+    if (context.connection.conversationId) {
+      throw new InvalidOperationError('A conversation is already active in this session');
+    }
+
+    const conversation = await this.conversationService.getConversationById(message.conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    this.connectionManager.attachConversationToSession(message.sessionId, message.conversationId);
+
+    // Return success response
+    const response: ResumeConversationResponse = { type: 'resume_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };
+    context.send(context.connection.ws, response);
+
+    // Resume the conversation
+    await context.connection.runner.resumeConversation();
+  }
+}

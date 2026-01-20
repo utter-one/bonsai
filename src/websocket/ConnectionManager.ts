@@ -1,5 +1,5 @@
 import { singleton, container } from "tsyringe";
-import { ConversationRunner } from "./ConversationRunner";
+import { ConversationRunner } from "../services/live/ConversationRunner";
 import { meta } from "zod/v4/core";
 
 /** Session data associated with each WebSocket connection. */

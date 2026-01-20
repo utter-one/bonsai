@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { conversationEvents, db } from "../../db";
-import { Connection } from "./ConnectionManager";
+import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
 
 export type LlmContext = {

@@ -25,7 +25,7 @@ import { ValidationMiddleware } from './middleware/validation';
 import { PermissionInterceptor } from './middleware/authorization';
 import { getOpenAPISpec } from './swagger';
 import { SetupService } from './services/SetupService';
-import { ConversationServer } from './services/live/ConversationServer';
+import { ConversationServer } from './websocket/ConversationServer';
 import { initialAdminSetupSchema } from './contracts/rest/setup';
 import logger from './utils/logger';
 
