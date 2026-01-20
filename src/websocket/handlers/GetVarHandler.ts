@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { GetVarRequest, GetVarResponse } from '../../contracts/websocket/command';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles get variable requests.
  */
-@MessageHandlerFor('get_var')
+@WebSocketMessageHandler('get_var')
 @injectable()
-export class GetVarHandler implements MessageHandler<GetVarRequest> {
+export class GetVarHandler implements WebSocketHandler<GetVarRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles get variable requests.
    */
-  async handle(context: MessageHandlerContext, message: GetVarRequest): Promise<void> {
+  async handle(context: WebSocketHandlerContext, message: GetVarRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, requestId: message.requestId }, 'Get variable request received');
 
     try {

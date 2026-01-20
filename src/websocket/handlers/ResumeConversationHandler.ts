@@ -1,18 +1,18 @@
 import { inject, injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { ResumeConversationRequest, ResumeConversationResponse } from '../../contracts/websocket/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles resume conversation requests.
  */
-@MessageHandlerFor('resume_conversation')
+@WebSocketMessageHandler('resume_conversation')
 @injectable()
-export class ResumeConversationHandler implements MessageHandler<ResumeConversationRequest> {
+export class ResumeConversationHandler implements WebSocketHandler<ResumeConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -21,7 +21,7 @@ export class ResumeConversationHandler implements MessageHandler<ResumeConversat
   /**
    * Handles resume conversation requests.
    */
-  async handle(context: MessageHandlerContext, message: ResumeConversationRequest): Promise<void> {
+  async handle(context: WebSocketHandlerContext, message: ResumeConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Resume conversation request received');
     
     if (!context.connection) {

@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { RunActionRequest, RunActionResponse } from '../../contracts/websocket/command';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles run action requests.
  */
-@MessageHandlerFor('run_action')
+@WebSocketMessageHandler('run_action')
 @injectable()
-export class RunActionHandler implements MessageHandler<RunActionRequest> {
+export class RunActionHandler implements WebSocketHandler<RunActionRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles run action requests.
    */
-  async handle(context: MessageHandlerContext, message: RunActionRequest): Promise<void> {
+  async handle(context: WebSocketHandlerContext, message: RunActionRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName, requestId: message.requestId }, 'Run action request received');
 
     try {

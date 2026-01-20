@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { EndUserVoiceInputRequest, EndUserVoiceInputResponse } from '../../contracts/websocket/userInput';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles end user voice input requests.
  */
-@MessageHandlerFor('end_user_voice_input')
+@WebSocketMessageHandler('end_user_voice_input')
 @injectable()
-export class EndUserVoiceInputHandler implements MessageHandler<EndUserVoiceInputRequest> {
+export class EndUserVoiceInputHandler implements WebSocketHandler<EndUserVoiceInputRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles end user voice input requests.
    */
-  async handle(context: MessageHandlerContext, message: EndUserVoiceInputRequest): Promise<void> {
+  async handle(context: WebSocketHandlerContext, message: EndUserVoiceInputRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End user voice input request received');
 
     try {

@@ -1,16 +1,16 @@
 import { inject, injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { EndConversationRequest, EndConversationResponse } from '../../contracts/websocket/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles end conversation requests.
  */
-@MessageHandlerFor('end_conversation')
+@WebSocketMessageHandler('end_conversation')
 @injectable()
-export class EndConversationHandler implements MessageHandler<EndConversationRequest> {
+export class EndConversationHandler implements WebSocketHandler<EndConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -19,7 +19,7 @@ export class EndConversationHandler implements MessageHandler<EndConversationReq
   /**
    * Handles end conversation requests.
    */
-  handle(context: MessageHandlerContext, message: EndConversationRequest): void {
+  handle(context: WebSocketHandlerContext, message: EndConversationRequest): void {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End conversation request received');
 
     try {

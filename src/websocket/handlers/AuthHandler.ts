@@ -1,17 +1,17 @@
 import { inject, injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { AuthRequest, AuthResponse } from '../../contracts/websocket/auth';
 import { ConnectionManager } from '../ConnectionManager';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles WebSocket authentication requests.
  * Validates API key and creates a session on successful authentication.
  */
-@MessageHandlerFor('auth', false)
+@WebSocketMessageHandler('auth', false)
 @injectable()
-export class AuthHandler implements MessageHandler<AuthRequest> {
+export class AuthHandler implements WebSocketHandler<AuthRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -21,7 +21,7 @@ export class AuthHandler implements MessageHandler<AuthRequest> {
    * Handles authentication requests.
    * Validates API key and creates a session on successful authentication.
    */
-  handle(context: MessageHandlerContext, message: AuthRequest): void {
+  handle(context: WebSocketHandlerContext, message: AuthRequest): void {
     const expectedApiKey = process.env.WEBSOCKET_API_KEY || process.env.API_KEY;
 
     if (!expectedApiKey) {

@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { SendUserTextInputRequest, SendUserTextInputResponse } from '../../contracts/websocket/userInput';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles send user text input requests.
  */
-@MessageHandlerFor('send_user_text_input')
+@WebSocketMessageHandler('send_user_text_input')
 @injectable()
-export class SendUserTextInputHandler implements MessageHandler<SendUserTextInputRequest> {
+export class SendUserTextInputHandler implements WebSocketHandler<SendUserTextInputRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles send user text input requests.
    */
-  async handle(context: MessageHandlerContext, message: SendUserTextInputRequest): Promise<void> {
+  async handle(context: WebSocketHandlerContext, message: SendUserTextInputRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user text input request received');
 
     try {

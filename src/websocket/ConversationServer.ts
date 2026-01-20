@@ -4,9 +4,11 @@ import type { Server } from 'http';
 import { ConnectionManager } from './ConnectionManager';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from '../contracts/websocket/common';
-import { MessageHandlerContext, MessageHandlerRegistry } from './handlers';
+import { WebSocketHandlerRegistry } from './WebSocketHandlerRegistry';
+
 // Import handlers module to trigger decorator registration
 import './handlers';
+import { WebSocketHandlerContext } from './WebSocketHandler';
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -26,13 +28,14 @@ export class ConversationServer {
    * Handlers are automatically discovered via the @MessageHandlerFor decorator.
    */
   private registerHandlers(): void {
-    const handlerClasses = MessageHandlerRegistry.getAll();
+    const handlerClasses = WebSocketHandlerRegistry.getAll();
 
     for (const messageType of handlerClasses.keys()) {
-      const handler = handlerClasses.get(messageType)();
+      const registryItem = handlerClasses.get(messageType);
+      const handler = registryItem.handlerFactory();
       if (handler) {
         this.handlers.set(messageType, handler);
-        logger.debug({ messageType: messageType, requiresAuth: messageType !== 'auth' }, 'Registered message handler');
+        logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth }, 'Registered message handler');
       }
     }
 
@@ -92,7 +95,7 @@ export class ConversationServer {
         return;
       }
 
-      const context: MessageHandlerContext = { ws, connection, send: this.send.bind(this), sendError: this.sendError.bind(this) };
+      const context: WebSocketHandlerContext = { ws, connection, send: this.send.bind(this), sendError: this.sendError.bind(this) };
 
       await handler.handle(context, message);
     } catch (error) {

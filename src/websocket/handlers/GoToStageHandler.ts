@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { GoToStageRequest, GoToStageResponse } from '../../contracts/websocket/command';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles go to stage requests.
  */
-@MessageHandlerFor('go_to_stage')
+@WebSocketMessageHandler('go_to_stage')
 @injectable()
-export class GoToStageHandler implements MessageHandler<GoToStageRequest> {
+export class GoToStageHandler implements WebSocketHandler<GoToStageRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles go to stage requests.
    */
-  async handle(context: MessageHandlerContext, message: GoToStageRequest): Promise<void> {
+  async handle(context: WebSocketHandlerContext, message: GoToStageRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, requestId: message.requestId }, 'Go to stage request received');
 
     try {

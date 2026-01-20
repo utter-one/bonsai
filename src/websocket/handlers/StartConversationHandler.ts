@@ -1,28 +1,30 @@
 import { inject, injectable } from 'tsyringe';
-import type { MessageHandler, MessageHandlerContext } from './types';
+import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
 import type { StartConversationRequest, StartConversationResponse } from '../../contracts/websocket/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { StageService } from '../../services/StageService';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { MessageHandlerFor } from './registry';
+import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
 /**
  * Handles start conversation requests.
  */
-@MessageHandlerFor('start_conversation')
+@WebSocketMessageHandler('start_conversation')
 @injectable()
-export class StartConversationHandler implements MessageHandler<StartConversationRequest> {
+export class StartConversationHandler implements WebSocketHandler<StartConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
-  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, @inject(ConversationService) private conversationService: ConversationService, @inject(StageService) private stageService: StageService) {}
+  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, 
+    @inject(ConversationService) private conversationService: ConversationService, 
+    @inject(StageService) private stageService: StageService) {}
 
   /**
    * Handles start conversation requests.
    */
-  async handle(context: MessageHandlerContext, message: StartConversationRequest): Promise<void> {
+  async handle(context: WebSocketHandlerContext, message: StartConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, personaId: message.personaId, requestId: message.requestId }, 'Start conversation request received');
     
     if (!context.connection) {

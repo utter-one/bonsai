@@ -1,24 +1,28 @@
 import { container } from 'tsyringe';
-import logger from '../../utils/logger';
-import type { MessageHandler } from './types';
+import logger from '../utils/logger';
+import type { WebSocketHandler } from './WebSocketHandler';
+
+type RegistryItem = {
+  handlerFactory: () => WebSocketHandler;
+  requiresAuth: boolean;
+}
 
 /**
- * Global registry for message handlers.
- * Handlers are automatically registered via the @MessageHandlerFor decorator.
+ * Global registry for WebSocket message handlers.
+ * Handlers are automatically registered via the @WebSocketMessageHandler decorator.
  */
-export class MessageHandlerRegistry {
-  private static handlers: Map<string, () => MessageHandler> = new Map();
-
+export class WebSocketHandlerRegistry {
+  private static handlers: Map<string, RegistryItem> = new Map();
   /**
    * Registers a handler class for a specific message type.
    * @param messageType - The message type this handler processes.
    * @param handlerFactory - The handler class factory function.
    */
-  static register(messageType: string, handlerFactory: () => MessageHandler): void {
+  static register(messageType: string, handlerFactory: () => WebSocketHandler, requiresAuth: boolean): void {
     if (this.handlers.has(messageType)) {
       throw new Error(`Handler for message type "${messageType}" is already registered`);
     }
-    this.handlers.set(messageType, handlerFactory);
+    this.handlers.set(messageType, { handlerFactory, requiresAuth });
   }
 
   /**
@@ -56,11 +60,11 @@ export class MessageHandlerRegistry {
  * }
  * ```
  */
-export function MessageHandlerFor(messageType: string, requiresAuth: boolean = true) {
-  return function <T extends new (...args: any[]) => MessageHandler>(constructor: T): T {
+export function WebSocketMessageHandler(messageType: string, requiresAuth: boolean = true) {
+  return function <T extends new (...args: any[]) => WebSocketHandler>(constructor: T): T {
     logger.info({ messageType, requiresAuth }, `Registering message handler for type "${messageType}"`);
     // Register the handler class
-    MessageHandlerRegistry.register(messageType, () => container.resolve(constructor));
+    WebSocketHandlerRegistry.register(messageType, () => container.resolve(constructor), requiresAuth);
 
     return constructor;  
   };
