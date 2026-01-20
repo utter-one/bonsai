@@ -8,7 +8,7 @@ import { WebSocketHandlerRegistry } from './WebSocketHandlerRegistry';
 
 // Import handlers module to trigger decorator registration
 import './handlers';
-import { WebSocketHandlerContext } from './WebSocketHandler';
+import { WebSocketHandler, WebSocketHandlerContext } from './WebSocketHandler';
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -17,7 +17,7 @@ import { WebSocketHandlerContext } from './WebSocketHandler';
 @singleton()
 export class ConversationServer {
   private wss: WebSocketServer | null = null;
-  private handlers = new Map<string, any>();
+  private handlers = new Map<string, { instance: WebSocketHandler; requiresAuth: boolean }>();
 
   constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager) {
     this.registerHandlers();
@@ -34,7 +34,7 @@ export class ConversationServer {
       const registryItem = handlerClasses.get(messageType);
       const handler = registryItem.handlerFactory();
       if (handler) {
-        this.handlers.set(messageType, handler);
+        this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth });
         logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth }, 'Registered message handler');
       }
     }
@@ -97,7 +97,7 @@ export class ConversationServer {
 
       const context: WebSocketHandlerContext = { ws, connection, send: this.send.bind(this), sendError: this.sendError.bind(this) };
 
-      await handler.handle(context, message);
+      await handler.instance.handle(context, message);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error({ error: message }, 'Failed to handle WebSocket message');
