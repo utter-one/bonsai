@@ -2,10 +2,10 @@ import type { Action, InterceptorInterface } from 'routing-controllers';
 import { Interceptor } from 'routing-controllers';
 import type { Request } from 'express';
 import { getRequiredPermissions, isPublicRoute } from '../decorators/auth';
-import { hasAllPermissions } from '../permissions';
-import type { Permission } from '../permissions';
-import { UnauthorizedError, ForbiddenError } from '../errors';
-import { logger } from '../utils/logger';
+import { hasAllPermissions } from '../../permissions';
+import type { Permission } from '../../permissions';
+import { UnauthorizedError, ForbiddenError } from '../../errors';
+import { logger } from '../../utils/logger';
 
 /**
  * Interceptor that checks @RequirePermissions decorator before executing controller actions

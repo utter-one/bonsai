@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
-import type { EndConversationRequest, EndConversationResponse } from '../../contracts/websocket/session';
+import type { EndConversationRequest, EndConversationResponse } from '../contracts/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';

@@ -4,13 +4,13 @@ import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { RequirePermissions } from '../decorators/auth';
-import { PERMISSIONS } from '../permissions';
+import { PERMISSIONS } from '../../permissions';
 import type { Request } from 'express';
-import { ProviderService } from '../services/providers/ProviderService';
-import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from '../contracts/rest/provider';
-import type { CreateProviderRequest, UpdateProviderRequest, DeleteProviderRequest } from '../contracts/rest/provider';
-import { listParamsSchema } from '../contracts/rest/common';
-import type { ListParams } from '../contracts/rest/common';
+import { ProviderService } from '../../services/providers/ProviderService';
+import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from '../contracts/provider';
+import type { CreateProviderRequest, UpdateProviderRequest, DeleteProviderRequest } from '../contracts/provider';
+import { listParamsSchema } from '../contracts/common';
+import type { ListParams } from '../contracts/common';
 
 /**
  * Controller for provider configuration management with decorator-based routing

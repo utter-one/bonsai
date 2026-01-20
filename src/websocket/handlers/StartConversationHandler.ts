@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
-import type { StartConversationRequest, StartConversationResponse } from '../../contracts/websocket/session';
+import type { StartConversationRequest, StartConversationResponse } from '../contracts/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { StageService } from '../../services/StageService';

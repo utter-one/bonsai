@@ -4,13 +4,13 @@ import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { RequirePermissions } from '../decorators/auth';
-import { PERMISSIONS } from '../permissions';
+import { PERMISSIONS } from '../../permissions';
 import type { Request } from 'express';
-import { ContextTransformerService } from '../services/ContextTransformerService';
-import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from '../contracts/rest/contextTransformer';
-import type { CreateContextTransformerRequest, UpdateContextTransformerRequest, DeleteContextTransformerRequest } from '../contracts/rest/contextTransformer';
-import { listParamsSchema } from '../contracts/rest/common';
-import type { ListParams } from '../contracts/rest/common';
+import { ContextTransformerService } from '../../services/ContextTransformerService';
+import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from '../contracts/contextTransformer';
+import type { CreateContextTransformerRequest, UpdateContextTransformerRequest, DeleteContextTransformerRequest } from '../contracts/contextTransformer';
+import { listParamsSchema } from '../contracts/common';
+import type { ListParams } from '../contracts/common';
 
 /**
  * Controller for context transformer management with decorator-based routing

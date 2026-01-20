@@ -4,13 +4,13 @@ import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { RequirePermissions } from '../decorators/auth';
-import { PERMISSIONS } from '../permissions';
+import { PERMISSIONS } from '../../permissions';
 import type { Request } from 'express';
-import { StageService } from '../services/StageService';
-import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from '../contracts/rest/stage';
-import type { CreateStageRequest, UpdateStageRequest, DeleteStageRequest } from '../contracts/rest/stage';
-import { listParamsSchema } from '../contracts/rest/common';
-import type { ListParams } from '../contracts/rest/common';
+import { StageService } from '../../services/StageService';
+import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from '../contracts/stage';
+import type { CreateStageRequest, UpdateStageRequest, DeleteStageRequest } from '../contracts/stage';
+import { listParamsSchema } from '../contracts/common';
+import type { ListParams } from '../contracts/common';
 
 /**
  * Controller for stage management with decorator-based routing

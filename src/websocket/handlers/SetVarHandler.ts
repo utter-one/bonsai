@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
 import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
-import type { SetVarRequest, SetVarResponse } from '../../contracts/websocket/command';
+import type { SetVarRequest, SetVarResponse } from '../contracts/command';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';

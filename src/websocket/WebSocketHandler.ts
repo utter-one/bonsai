@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
 import type { Connection } from './ConnectionManager';
-import type { BaseInputMessage } from '../contracts/websocket/common';
+import type { BaseInputMessage } from './contracts/common';
 
 /**
  * Context provided to message handlers.

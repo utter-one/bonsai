@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
 import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
-import type { StartUserVoiceInputRequest, StartUserVoiceInputResponse } from '../../contracts/websocket/userInput';
+import type { StartUserVoiceInputRequest, StartUserVoiceInputResponse } from '../contracts/userInput';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';

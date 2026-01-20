@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
-import type { AuthRequest, AuthResponse } from '../../contracts/websocket/auth';
+import type { AuthRequest, AuthResponse } from '../contracts/auth';
 import { ConnectionManager } from '../ConnectionManager';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';

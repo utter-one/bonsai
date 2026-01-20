@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { UnauthorizedError } from '../errors';
-import { logger } from '../utils/logger';
+import { UnauthorizedError } from '../../errors';
+import { logger } from '../../utils/logger';
 
 /** JWT payload structure */
 export type JWTPayload = {

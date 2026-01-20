@@ -4,9 +4,9 @@ import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { PublicRoute } from '../decorators/auth';
-import { SetupService } from '../services/SetupService';
-import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from '../contracts/rest/setup';
-import type { InitialAdminSetupRequest } from '../contracts/rest/setup';
+import { SetupService } from '../../services/SetupService';
+import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from '../contracts/setup';
+import type { InitialAdminSetupRequest } from '../contracts/setup';
 
 /**
  * Controller for system setup and initialization
