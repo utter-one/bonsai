@@ -28,10 +28,10 @@ export class ConversationServer {
    * Handlers are automatically discovered via the @MessageHandlerFor decorator.
    */
   private registerHandlers(): void {
-    const handlerClasses = WebSocketHandlerRegistry.getAll();
+    const registryItems = WebSocketHandlerRegistry.getAll();
 
-    for (const messageType of handlerClasses.keys()) {
-      const registryItem = handlerClasses.get(messageType);
+    for (const messageType of registryItems.keys()) {
+      const registryItem = registryItems.get(messageType);
       const handler = registryItem.handlerFactory();
       if (handler) {
         this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth });
@@ -111,9 +111,7 @@ export class ConversationServer {
    * @param ws - The WebSocket connection that was disconnected.
    */
   private handleDisconnect(ws: WebSocket): void {
-    // Find and end the session associated with this WebSocket
-    // Note: We need to iterate through the session manager's internal state
-    // This is a limitation of the current SessionManager API
+    // TODO: Find and suspend the session associated with this WebSocket if not already finished or failed.
     logger.info('WebSocket connection closed');
   }
 
