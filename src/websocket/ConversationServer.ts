@@ -7,8 +7,8 @@ import type { BaseInputMessage, BaseOutputMessage } from '../contracts/websocket
 import { WebSocketHandlerRegistry } from './WebSocketHandlerRegistry';
 
 // Import handlers module to trigger decorator registration
-import './handlers';
 import { WebSocketHandler, WebSocketHandlerContext } from './WebSocketHandler';
+import "./handlers";
 
 /**
  * WebSocket server that manages client connections and message routing.
