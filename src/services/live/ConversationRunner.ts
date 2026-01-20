@@ -194,7 +194,7 @@ export class ConversationRunner {
     // Initialize and wire up TTS provider
     if (ttsProvider) {
       try {
-        await ttsProvider.init();
+        await ttsProvider.init(this.stageData.voiceConfig);
 
         let firstTtsChunkGenerated = false;
         let voiceOutputId: string = null;

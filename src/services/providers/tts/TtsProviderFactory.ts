@@ -60,20 +60,9 @@ export class TtsProviderFactory {
     // Build ElevenLabs provider configuration
     const elevenLabsConfig: ElevenLabsTtsProviderConfig = {
       apiKey: config.apiKey,
-      model: config.model,
-      voiceId: config.voiceId,
-      noSpeechMarkers: config.noSpeechMarkers,
-      removeExclamationMarks: config.removeExclamationMarks,
-      stability: config.stability,
-      similarityBoost: config.similarityBoost,
-      style: config.style,
-      useSpeakerBoost: config.useSpeakerBoost,
-      speed: config.speed,
-      useGlobalPreview: config.useGlobalPreview,
-      inactivityTimeout: config.inactivityTimeout,
     };
 
-    logger.info(`Creating ElevenLabs TTS provider for provider ${provider.id} with model ${elevenLabsConfig.model ?? 'eleven_flash_v2_5'}`);
+    logger.info(`Creating ElevenLabs TTS provider for provider ${provider.id}`);
     return new ElevenLabsTtsProvider(elevenLabsConfig);
   }
 
