@@ -1,7 +1,7 @@
 import { inject, singleton } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
-import { SessionManager } from './SessionManager';
+import { Connection, ConnectionManager } from './ConnectionManager';
 import { logger } from '../../utils/logger';
 import type { AuthRequest, AuthResponse } from '../../contracts/websocket/auth';
 import type { StartConversationRequest, StartConversationResponse, ResumeConversationRequest, ResumeConversationResponse, EndConversationRequest, EndConversationResponse } from '../../contracts/websocket/session';
@@ -11,8 +11,6 @@ import type { BaseInputMessage, BaseOutputMessage } from '../../contracts/websoc
 import { ConversationService } from '../ConversationService';
 import { StageService } from '../StageService';
 import { InvalidOperationError, NotFoundError } from '../../errors';
-import { conversations, db } from '../../db';
-import { eq } from 'drizzle-orm';
 
 type InputMessage = AuthRequest | StartConversationRequest | ResumeConversationRequest | EndConversationRequest | StartUserVoiceInputRequest | SendUserVoiceChunkRequest | EndUserVoiceInputRequest | SendUserTextInputRequest | GoToStageRequest | SetVarRequest | GetVarRequest | GetAllVarsRequest | RunActionRequest;
 
@@ -21,10 +19,10 @@ type InputMessage = AuthRequest | StartConversationRequest | ResumeConversationR
  * Handles authentication, session management, and conversation lifecycle.
  */
 @singleton()
-export class SessionServer {
+export class ConversationServer {
   private wss: WebSocketServer | null = null;
 
-  constructor(@inject(SessionManager) private sessionManager: SessionManager,
+  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(ConversationService) private conversationService: ConversationService,
     @inject(StageService) private stageService: StageService) { }
 
@@ -69,47 +67,48 @@ export class SessionServer {
       if (message.type === 'auth') {
         this.handleAuth(ws, message as AuthRequest);
       } else {
-        if (!this.sessionManager.getSessionForWebSocket(ws) || !this.sessionManager.getSessionForWebSocket(ws)?.id) {
+        const connection = this.connectionManager.getConnectionForWebSocket(ws);
+        if (!connection || !connection.id) {
           this.sendError(ws, 'Authentication required', message.requestId);
           return;
         }
 
         switch (message.type) {
           case 'start_conversation':
-            this.handleStartConversation(ws, message as StartConversationRequest);
+            this.handleStartConversation(connection, message as StartConversationRequest);
             break;
           case 'resume_conversation':
-            this.handleResumeConversation(ws, message as ResumeConversationRequest);
+            this.handleResumeConversation(connection, message as ResumeConversationRequest);
             break;
           case 'end_conversation':
-            this.handleEndConversation(ws, message as EndConversationRequest);
+            this.handleEndConversation(connection, message as EndConversationRequest);
             break;
           case 'start_user_voice_input':
-            this.handleStartUserVoiceInput(ws, message as StartUserVoiceInputRequest);
+            this.handleStartUserVoiceInput(connection, message as StartUserVoiceInputRequest);
             break;
           case 'send_user_voice_chunk':
-            this.handleSendUserVoiceChunk(ws, message as SendUserVoiceChunkRequest);
+            this.handleSendUserVoiceChunk(connection, message as SendUserVoiceChunkRequest);
             break;
           case 'end_user_voice_input':
-            this.handleEndUserVoiceInput(ws, message as EndUserVoiceInputRequest);
+            this.handleEndUserVoiceInput(connection, message as EndUserVoiceInputRequest);
             break;
           case 'send_user_text_input':
-            this.handleSendUserTextInput(ws, message as SendUserTextInputRequest);
+            this.handleSendUserTextInput(connection, message as SendUserTextInputRequest);
             break;
           case 'go_to_stage':
-            this.handleGoToStage(ws, message as GoToStageRequest);
+            this.handleGoToStage(connection, message as GoToStageRequest);
             break;
           case 'set_var':
-            this.handleSetVar(ws, message as SetVarRequest);
+            this.handleSetVar(connection, message as SetVarRequest);
             break;
           case 'get_var':
-            this.handleGetVar(ws, message as GetVarRequest);
+            this.handleGetVar(connection, message as GetVarRequest);
             break;
           case 'get_all_vars':
-            this.handleGetAllVars(ws, message as GetAllVarsRequest);
+            this.handleGetAllVars(connection, message as GetAllVarsRequest);
             break;
           case 'run_action':
-            this.handleRunAction(ws, message as RunActionRequest);
+            this.handleRunAction(connection, message as RunActionRequest);
             break;
           default:
             logger.warn({ messageType: (message as BaseInputMessage).type }, 'Unknown message type received');
@@ -146,7 +145,7 @@ export class SessionServer {
       return;
     }
 
-    const sessionId = this.sessionManager.createSession(ws);
+    const sessionId = this.connectionManager.createSession(ws);
     logger.info({ sessionId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
 
     const response: AuthResponse = { type: 'auth', success: true, sessionId, requestId: message.requestId };
@@ -155,16 +154,15 @@ export class SessionServer {
 
   /**
    * Handles start conversation requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The start conversation request message.
    */
-  private async handleStartConversation(ws: WebSocket, message: StartConversationRequest): Promise<void> {
+  private async handleStartConversation(connection: Connection, message: StartConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, personaId: message.personaId, requestId: message.requestId }, 'Start conversation request received');
-    const metadata = this.sessionManager.getSessionForWebSocket(ws);
-    if (!metadata) {
+    if (!connection) {
       throw new NotFoundError('Session not found');
     }
-    if (metadata.conversationId) {
+    if (connection.conversationId) {
       throw new InvalidOperationError('A conversation is already active in this session');
     }
 
@@ -176,12 +174,12 @@ export class SessionServer {
         projectId: stage.projectId,
         userId: message.userId,
         stageId: message.stageId,
-        clientId: metadata.id,
+        clientId: connection.id,
         status: 'initialized'
       });
       const conversationId = conversation.id;
 
-      this.sessionManager.attachConversationToSession(message.sessionId, conversationId);
+      this.connectionManager.attachConversationToSession(message.sessionId, conversationId);
 
       logger.info({ sessionId: message.sessionId, conversationId }, 'Conversation created and attached to session');
 
@@ -192,11 +190,10 @@ export class SessionServer {
         conversationId,
         requestId: message.requestId
       };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       // Start the conversation
-      const sessionMetadata = this.sessionManager.getSessionForWebSocket(ws);
-      await sessionMetadata.runner.startConversation();
+      await connection.runner.startConversation();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation';
       logger.error({ error: errorMessage, sessionId: message.sessionId }, 'Failed to create conversation');
@@ -207,23 +204,22 @@ export class SessionServer {
         error: errorMessage,
         requestId: message.requestId
       };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles resume conversation requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The resume conversation request message.
    */
-  private async handleResumeConversation(ws: WebSocket, message: ResumeConversationRequest): Promise<void> {
+  private async handleResumeConversation(connection: Connection, message: ResumeConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Resume conversation request received');
-    const metadata = this.sessionManager.getSessionForWebSocket(ws);
-    if (!metadata) {
+    if (!connection) {
       throw new NotFoundError('Session not found');
     }
 
-    if (metadata.conversationId) {
+    if (connection.conversationId) {
       throw new InvalidOperationError('A conversation is already active in this session');
     }
 
@@ -232,7 +228,7 @@ export class SessionServer {
       throw new NotFoundError('Conversation not found');
     }
 
-    this.sessionManager.attachConversationToSession(message.sessionId, message.conversationId);
+    this.connectionManager.attachConversationToSession(message.sessionId, message.conversationId);
 
     // Return success response
     const response: ResumeConversationResponse = {
@@ -241,355 +237,345 @@ export class SessionServer {
       success: true,
       requestId: message.requestId
     };
-    this.send(ws, response);
+    this.send(connection.ws, response);
 
     // Resume the conversation
-    const sessionMetadata = this.sessionManager.getSessionForWebSocket(ws);
-    await sessionMetadata.runner.resumeConversation();
+    await connection.runner.resumeConversation();
   }
 
   /**
    * Handles end conversation requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The end conversation request message.
    */
-  private handleEndConversation(ws: WebSocket, message: EndConversationRequest): void {
+  private handleEndConversation(connection: Connection, message: EndConversationRequest): void {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End conversation request received');
 
     try {
-      this.sessionManager.detachConversationInSession(message.sessionId);
+      this.connectionManager.detachConversationInSession(message.sessionId);
 
       const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'Conversation ended successfully');
     } catch (error) {
       logger.error({ error: error instanceof Error ? error.message : String(error), sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end conversation');
       const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: false, error: error instanceof Error ? error.message : 'Failed to end conversation', requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles start user voice input requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The start user voice input request message.
    */
-  private async handleStartUserVoiceInput(ws: WebSocket, message: StartUserVoiceInputRequest): Promise<void> {
+  private async handleStartUserVoiceInput(connection: Connection, message: StartUserVoiceInputRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Start user voice input request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await metadata.runner.startUserVoiceInput();
+      await connection.runner.startUserVoiceInput();
 
       const response: StartUserVoiceInputResponse = { type: 'start_user_voice_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input started successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start user voice input';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to start user voice input');
       const response: StartUserVoiceInputResponse = { type: 'start_user_voice_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles send user voice chunk requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The send user voice chunk request message.
    */
-  private async handleSendUserVoiceChunk(ws: WebSocket, message: SendUserVoiceChunkRequest): Promise<void> {
+  private async handleSendUserVoiceChunk(connection: Connection, message: SendUserVoiceChunkRequest): Promise<void> {
     logger.debug({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user voice chunk request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
       const audioBuffer = Buffer.from(message.audioData, 'base64');
-      await metadata.runner.receiveUserVoiceData(audioBuffer);
+      await connection.runner.receiveUserVoiceData(audioBuffer);
 
       const response: SendUserVoiceChunkResponse = { type: 'send_user_voice_chunk', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process voice chunk';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process voice chunk');
       const response: SendUserVoiceChunkResponse = { type: 'send_user_voice_chunk', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles end user voice input requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The end user voice input request message.
    */
-  private async handleEndUserVoiceInput(ws: WebSocket, message: EndUserVoiceInputRequest): Promise<void> {
+  private async handleEndUserVoiceInput(connection: Connection, message: EndUserVoiceInputRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End user voice input request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await metadata.runner.stopUserVoiceInput();
+      await connection.runner.stopUserVoiceInput();
 
       const response: EndUserVoiceInputResponse = { type: 'end_user_voice_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input ended successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to end user voice input';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end user voice input');
       const response: EndUserVoiceInputResponse = { type: 'end_user_voice_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles send user text input requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The send user text input request message.
    */
-  private async handleSendUserTextInput(ws: WebSocket, message: SendUserTextInputRequest): Promise<void> {
+  private async handleSendUserTextInput(connection: Connection, message: SendUserTextInputRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user text input request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await metadata.runner.receiveUserTextInput(message.text);
+      await connection.runner.receiveUserTextInput(message.text);
 
       const response: SendUserTextInputResponse = { type: 'send_user_text_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User text input received successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process text input';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process text input');
       const response: SendUserTextInputResponse = { type: 'send_user_text_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles go to stage requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The go to stage request message.
    */
-  private async handleGoToStage(ws: WebSocket, message: GoToStageRequest): Promise<void> {
+  private async handleGoToStage(connection: Connection, message: GoToStageRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, requestId: message.requestId }, 'Go to stage request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await metadata.runner.goToStage(message.stageId);
+      await connection.runner.goToStage(message.stageId);
 
       const response: GoToStageResponse = { type: 'go_to_stage', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Go to stage completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to navigate to stage';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to go to stage');
       const response: GoToStageResponse = { type: 'go_to_stage', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles set variable requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The set variable request message.
    */
-  private async handleSetVar(ws: WebSocket, message: SetVarRequest): Promise<void> {
+  private async handleSetVar(connection: Connection, message: SetVarRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, requestId: message.requestId }, 'Set variable request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await metadata.runner.setVariable(message.stageId, message.variableName, message.variableValue);
+      await connection.runner.setVariable(message.stageId, message.variableName, message.variableValue);
 
       const response: SetVarResponse = { type: 'set_var', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Set variable completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to set variable';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to set variable');
       const response: SetVarResponse = { type: 'set_var', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles get variable requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The get variable request message.
    */
-  private async handleGetVar(ws: WebSocket, message: GetVarRequest): Promise<void> {
+  private async handleGetVar(connection: Connection, message: GetVarRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, requestId: message.requestId }, 'Get variable request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      const variableValue = await metadata.runner.getVariable(message.stageId, message.variableName);
+      const variableValue = await connection.runner.getVariable(message.stageId, message.variableName);
 
       const response: GetVarResponse = { type: 'get_var', sessionId: message.sessionId, success: true, variableName: message.variableName, variableValue, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Get variable completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get variable';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to get variable');
       const response: GetVarResponse = { type: 'get_var', sessionId: message.sessionId, success: false, variableName: message.variableName, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles get all variables requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The get all variables request message.
    */
-  private async handleGetAllVars(ws: WebSocket, message: GetAllVarsRequest): Promise<void> {
+  private async handleGetAllVars(connection: Connection, message: GetAllVarsRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, requestId: message.requestId }, 'Get all variables request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      const variables = await metadata.runner.getAllVariables(message.stageId);
+      const variables = await connection.runner.getAllVariables(message.stageId);
 
       const response: GetAllVarsResponse = { type: 'get_all_vars', sessionId: message.sessionId, success: true, variables, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Get all variables completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get all variables';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to get all variables');
       const response: GetAllVarsResponse = { type: 'get_all_vars', sessionId: message.sessionId, success: false, variables: {}, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 
   /**
    * Handles run action requests.
-   * @param ws - The WebSocket connection.
+   * @param connection - The connection metadata.
    * @param message - The run action request message.
    */
-  private async handleRunAction(ws: WebSocket, message: RunActionRequest): Promise<void> {
+  private async handleRunAction(connection: Connection, message: RunActionRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName, requestId: message.requestId }, 'Run action request received');
 
     try {
-      const metadata = this.sessionManager.getSessionForWebSocket(ws);
-      if (!metadata) {
+      if (!connection) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!metadata.conversationId) {
+      if (!connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (metadata.conversationId !== message.conversationId) {
+      if (connection.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      const result = await metadata.runner.runAction(message.actionName, message.parameters);
+      const result = await connection.runner.runAction(message.actionName, message.parameters);
 
       const response: RunActionResponse = { type: 'run_action', sessionId: message.sessionId, success: true, result, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to run action';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName }, 'Failed to run action');
       const response: RunActionResponse = { type: 'run_action', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      this.send(ws, response);
+      this.send(connection.ws, response);
     }
   }
 

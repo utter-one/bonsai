@@ -3,7 +3,7 @@ import { ConversationRunner } from "./ConversationRunner";
 import { meta } from "zod/v4/core";
 
 /** Session data associated with each WebSocket connection. */
-export type Session =
+export type Connection =
 { 
   /** Unique identifier for the session. */
   id: string,
@@ -20,11 +20,11 @@ export type Session =
  * Maintains bidirectional mappings between WebSocket connections, session IDs, and conversation IDs.
  */
 @singleton()
-export class SessionManager {
+export class ConnectionManager {
   /** Maps WebSocket connections to their metadata (sessionId and conversationId). */
-  private socketMap: Map<WebSocket, Session> = new Map();
+  private socketMap: Map<WebSocket, Connection> = new Map();
   /** Maps session IDs to their WebSocket connections for quick lookup. */
-  private sessionMap: Map<string, WebSocket> = new Map();
+  private connectionMap: Map<string, WebSocket> = new Map();
 
   /**
    * Creates a new session for a WebSocket connection.
@@ -34,7 +34,7 @@ export class SessionManager {
   createSession(ws: WebSocket) {
     const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
     this.socketMap.set(ws, { id: sessionId, conversationId: null, runner: null, ws });
-    this.sessionMap.set(sessionId, ws);
+    this.connectionMap.set(sessionId, ws);
     return sessionId;
   }
 
@@ -44,7 +44,7 @@ export class SessionManager {
    * @returns The WebSocket connection if found, otherwise undefined.
    */
   getWebSocketForSession(sessionId: string): WebSocket | undefined {
-    return this.sessionMap.get(sessionId);
+    return this.connectionMap.get(sessionId);
   }
 
   /**
@@ -52,7 +52,7 @@ export class SessionManager {
    * @param ws - The WebSocket connection to look up.
    * @returns The session data if found, otherwise undefined.
    */
-  getSessionForWebSocket(ws: WebSocket): Session | undefined {
+  getConnectionForWebSocket(ws: WebSocket): Connection | undefined {
     return this.socketMap.get(ws);
   }
 
@@ -63,7 +63,7 @@ export class SessionManager {
    * @throws Error if the session is not found.
    */
   attachConversationToSession(sessionId: string, conversationId: string) {
-    const socket = this.sessionMap.get(sessionId);
+    const socket = this.connectionMap.get(sessionId);
     if (!socket) {
       throw new Error('Session not found');
     }
@@ -83,16 +83,16 @@ export class SessionManager {
    * @throws Error if the session is not found.
    */
   detachConversationInSession(sessionId: string) {
-    const socket = this.sessionMap.get(sessionId);
+    const socket = this.connectionMap.get(sessionId);
     if (!socket) {
       throw new Error('Session not found');
     }
 
-    const metadata = this.socketMap.get(socket);
-    if (metadata) {
-      metadata.conversationId = null;
-      metadata.runner = null;
-      this.socketMap.set(socket, metadata);
+    const session = this.socketMap.get(socket);
+    if (session) {
+      session.conversationId = null;
+      session.runner = null;
+      this.socketMap.set(socket, session);
     }
   }
 
@@ -101,10 +101,10 @@ export class SessionManager {
    * @param sessionId - The session ID to end.
    */
   endSession(sessionId: string) {
-    const socket = this.sessionMap.get(sessionId);
+    const socket = this.connectionMap.get(sessionId);
     if (socket) {
       this.socketMap.delete(socket);
-      this.sessionMap.delete(sessionId);
+      this.connectionMap.delete(sessionId);
     }
   }
 }

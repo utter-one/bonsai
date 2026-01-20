@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { conversationEvents, db } from "../../db";
-import { Session } from "./SessionManager";
+import { Connection } from "./ConnectionManager";
 import { singleton } from "tsyringe";
 
 export type LlmContext = {
@@ -20,7 +20,7 @@ export type LlmContext = {
  */
 @singleton()
 export class LlmContextBuilder {
-  async buildContextForSession(session: Session): Promise<LlmContext> {
+  async buildContextForSession(session: Connection): Promise<LlmContext> {
     const context = {
       projectId: session.runner.getRuntimeData().project.id,
       stageId: session.runner.getRuntimeData().stage.id,

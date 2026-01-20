@@ -25,7 +25,7 @@ import { ValidationMiddleware } from './middleware/validation';
 import { PermissionInterceptor } from './middleware/authorization';
 import { getOpenAPISpec } from './swagger';
 import { SetupService } from './services/SetupService';
-import { SessionServer } from './services/live/SessionServer';
+import { ConversationServer } from './services/live/ConversationServer';
 import { initialAdminSetupSchema } from './contracts/rest/setup';
 import logger from './utils/logger';
 
@@ -113,7 +113,7 @@ export function startServer(port: number = 3000): void {
   const server = createServer(app);
 
   // Initialize WebSocket host
-  const wsHost = container.resolve(SessionServer);
+  const wsHost = container.resolve(ConversationServer);
   wsHost.initialize(server);
 
   server.listen(port, () => {

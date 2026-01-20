@@ -1,6 +1,6 @@
 import { inject, singleton } from "tsyringe";
 import { z } from "zod";
-import { Session } from "./SessionManager";
+import { Connection } from "./ConnectionManager";
 import { StageAction } from "../../contracts/rest/stage";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
@@ -33,7 +33,7 @@ export class UserInputProcessor {
    * @param text - The text input from the user.
    * @returns A promise that resolves to an array of stage actions resulting from processing the input.
    */
-  async processTextInput(session: Session, text: string): Promise<ActionClassificationResult[]> {
+  async processTextInput(session: Connection, text: string): Promise<ActionClassificationResult[]> {
     // How to process:
     // - Get all classifiers for the current stage.
     // - For each classifier, run the text through it to determine actions. Do this in parallel.
@@ -54,7 +54,7 @@ export class UserInputProcessor {
     } 
   }
 
-  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: LlmContext, text: string): Promise<ClassificationResult> {
+  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: LlmContext, text: string): Promise<ClassificationResult> {
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
       const llmProvider = classifierData.llmProvider;

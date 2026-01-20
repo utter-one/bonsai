@@ -5,7 +5,7 @@ import { db } from "../../db";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
-import { Session, SessionManager } from "./SessionManager";
+import { Connection, ConnectionManager } from "./ConnectionManager";
 import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../contracts/websocket/aiResponse";
 import { ILlmProvider } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
@@ -51,7 +51,7 @@ export type ConversationState =
  */
 export class ConversationRunner {
   private stageData: StageRuntimeData;
-  private session: Session;
+  private session: Connection;
   private conversation: Conversation;
   private ws: WebSocket;
 
@@ -68,7 +68,7 @@ export class ConversationRunner {
     return this.stageData;
   }
 
-  async prepareConversation(conversationId: string, session: Session, ws: WebSocket): Promise<void> {
+  async prepareConversation(conversationId: string, session: Connection, ws: WebSocket): Promise<void> {
     this.session = session;
     this.ws = ws;
 
