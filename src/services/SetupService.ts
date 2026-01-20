@@ -1,11 +1,10 @@
 import { injectable, inject } from 'tsyringe';
 import { db } from '../db/index';
 import { admins } from '../db/schema';
-import type { InitialAdminSetupRequest, InitialAdminSetupResponse, SetupStatusResponse } from '../contracts/rest/setup';
+import type { InitialAdminSetupRequest, InitialAdminSetupResponse, SetupStatusResponse } from '../http/contracts/setup';
 import { AuthService } from './AuthService';
 import { InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
-import { ROLES } from '../permissions';
 
 /**
  * Service for system setup and initialization

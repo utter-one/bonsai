@@ -6,7 +6,7 @@ import type { AuditLog } from '../types/models';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
-import type { ListParams } from '../contracts/rest/common';
+import type { ListParams } from '../http/contracts/common';
 
 export interface AuditLogInput {
   userId?: string;

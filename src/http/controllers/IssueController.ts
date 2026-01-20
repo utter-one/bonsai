@@ -4,13 +4,13 @@ import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { RequirePermissions } from '../decorators/auth';
-import { PERMISSIONS } from '../permissions';
+import { PERMISSIONS } from '../../permissions';
 import type { Request } from 'express';
-import { IssueService } from '../services/IssueService';
-import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from '../contracts/rest/issue';
-import type { CreateIssueRequest, UpdateIssueRequest } from '../contracts/rest/issue';
-import { listParamsSchema } from '../contracts/rest/common';
-import type { ListParams } from '../contracts/rest/common';
+import { IssueService } from '../../services/IssueService';
+import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from '../contracts/issue';
+import type { CreateIssueRequest, UpdateIssueRequest } from '../contracts/issue';
+import { listParamsSchema } from '../contracts/common';
+import type { ListParams } from '../contracts/common';
 
 /**
  * Controller for issue management with decorator-based routing

@@ -5,13 +5,13 @@ import { z } from 'zod';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { RequirePermissions } from '../decorators/auth';
-import { PERMISSIONS } from '../permissions';
+import { PERMISSIONS } from '../../permissions';
 import type { Request } from 'express';
-import { KnowledgeService } from '../services/KnowledgeService';
-import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../contracts/rest/knowledge';
-import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, DeleteKnowledgeCategoryRequest, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, DeleteKnowledgeItemRequest } from '../contracts/rest/knowledge';
-import { listParamsSchema } from '../contracts/rest/common';
-import type { ListParams } from '../contracts/rest/common';
+import { KnowledgeService } from '../../services/KnowledgeService';
+import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../contracts/knowledge';
+import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, DeleteKnowledgeCategoryRequest, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, DeleteKnowledgeItemRequest } from '../contracts/knowledge';
+import { listParamsSchema } from '../contracts/common';
+import type { ListParams } from '../contracts/common';
 
 /**
  * Controller for knowledge base management including sections, categories, and items

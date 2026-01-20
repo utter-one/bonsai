@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
 import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
-import type { ResumeConversationRequest, ResumeConversationResponse } from '../../contracts/websocket/session';
+import type { ResumeConversationRequest, ResumeConversationResponse } from '../contracts/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { NotFoundError, InvalidOperationError } from '../../errors';

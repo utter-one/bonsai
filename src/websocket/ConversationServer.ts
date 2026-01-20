@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import { ConnectionManager } from './ConnectionManager';
 import { logger } from '../utils/logger';
-import type { BaseInputMessage, BaseOutputMessage } from '../contracts/websocket/common';
+import type { BaseInputMessage, BaseOutputMessage } from './contracts/common'
 import { WebSocketHandlerRegistry } from './WebSocketHandlerRegistry';
 
 // Import handlers module to trigger decorator registration

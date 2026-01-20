@@ -4,9 +4,9 @@ import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
 import { PublicRoute } from '../decorators/auth';
-import { AuthService } from '../services/AuthService';
-import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from '../contracts/rest/auth';
-import type { LoginRequest, RefreshTokenRequest } from '../contracts/rest/auth';
+import { AuthService } from '../../services/AuthService';
+import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from '../contracts/auth';
+import type { LoginRequest, RefreshTokenRequest } from '../contracts/auth';
 
 /**
  * Controller for authentication endpoints

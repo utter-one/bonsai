@@ -1,7 +1,7 @@
 import { inject, singleton } from "tsyringe";
 import { z } from "zod";
 import { Connection } from "../../websocket/ConnectionManager";
-import { StageAction } from "../../contracts/rest/stage";
+import { StageAction } from "../../http/contracts/stage";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
 import { LlmContext, LlmContextBuilder } from "./LlmContextBuilder";

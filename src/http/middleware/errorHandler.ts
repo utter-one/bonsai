@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { OptimisticLockError, NotFoundError, InvalidOperationError, AccessDeniedError, UnauthorizedError, ForbiddenError } from '../errors';
-import logger from '../utils/logger';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, AccessDeniedError, UnauthorizedError, ForbiddenError } from '../../errors';
+import logger from '../../utils/logger';
 
 /**
  * Global error handling middleware

@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index';
 import { admins } from '../db/schema';
-import type { JWTPayload } from '../middleware/auth';
+import type { JWTPayload } from '../http/middleware/auth';
 import { UnauthorizedError, InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
 
