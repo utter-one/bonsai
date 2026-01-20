@@ -10,6 +10,7 @@ data/
 # Environment variables
 .env
 .env.local
+*TODO.md*
 
 # Logs
 *.log

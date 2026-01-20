@@ -14,6 +14,7 @@ import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { UserInputProcessor } from "./UserInputProcessor";
+import { VoiceConfig } from "../../http/contracts/persona";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -35,6 +36,7 @@ export type StageRuntimeData = {
   transformers: TransformerRuntimeData[];
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
+  voiceConfig?: VoiceConfig;
 }
 
 export type ConversationState =
@@ -138,10 +140,16 @@ export class ConversationRunner {
       stageData.transformers.push({ transformer, llmProvider });
     }
 
-    // TODO: Initialize TTS provider if configured
+    // Initialize TTS provider if configured
     const persona = await this.personaService.getPersonaById(this.stageData.stage.personaId);
     if (!persona) {
       throw new NotFoundError(`Persona with ID ${this.stageData.stage.personaId} not found`);
+    }
+    const voiceConfig = persona.voiceConfig;
+    const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, voiceConfig.voiceProviderId) });
+    if (voiceProviderEntity) {
+      stageData.ttsProvider = this.ttsProviderFactory.createProvider(voiceProviderEntity);
+      stageData.voiceConfig = voiceConfig;
     }
 
     // TODO: Initialize ASR provider if configured

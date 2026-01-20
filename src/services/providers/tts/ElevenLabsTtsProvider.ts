@@ -3,6 +3,7 @@ import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
+import { VoiceConfig } from '../../../http/contracts/persona';
 
 /**
  * Configuration for ElevenLabs TTS provider
@@ -10,6 +11,9 @@ import { SentenceSplitter } from './SentenceSplitter';
 export type ElevenLabsTtsProviderConfig = {
   /** API key for authenticating with ElevenLabs */
   apiKey: string;
+};
+
+export type ElevenLabsTtsVoiceSettings = {
   /** Model ID to use for speech synthesis (e.g., 'eleven_flash_v2_5') */
   model?: string;
   /** Default voice ID to use if not specified in start() */
@@ -56,7 +60,11 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /** Total duration of audio generated so far in milliseconds */
   private audioDurationMs: number = 0;
 
-  async init(): Promise<void> {
+  /** Voice configuration used for this TTS session */
+  private voiceSettings: ElevenLabsTtsVoiceSettings = null;
+
+  async init(voiceConfig: VoiceConfig): Promise<void> {
+    this.voiceSettings = voiceConfig.settings as ElevenLabsTtsVoiceSettings;
   }
 
   /**
@@ -69,16 +77,16 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     this.audioDurationMs = 0;
 
     // Merge conversation config with provider config
-    const effectiveVoiceId = this.config.voiceId;
-    const effectiveSpeed = this.config.speed ?? 1.0;
-    const effectiveModel = this.config.model ?? 'eleven_flash_v2_5';
+    const effectiveVoiceId = this.voiceSettings.voiceId;
+    const effectiveSpeed = this.voiceSettings.speed ?? 1.0;
+    const effectiveModel = this.voiceSettings.model ?? 'eleven_flash_v2_5';
 
     if (!effectiveVoiceId) {
       throw new Error('Voice ID must be provided either in config or start() parameters');
     }
 
     // Initialize sentence splitter with callback to send complete sentences (if enabled)
-    const useSentenceSplitter = this.config.useSentenceSplitter ?? true;
+    const useSentenceSplitter = this.voiceSettings.useSentenceSplitter ?? true;
     if (useSentenceSplitter) {
       this.sentenceSplitter = new SentenceSplitter(async (sentence: string) => {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
@@ -91,11 +99,11 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       this.sentenceSplitter = null;
     }
 
-    logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.config.stability}, similarityBoost: ${this.config.similarityBoost}`);
+    logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.voiceSettings.stability}, similarityBoost: ${this.voiceSettings.similarityBoost}`);
 
-    const useGlobalPreview = this.config.useGlobalPreview ?? true;
+    const useGlobalPreview = this.voiceSettings.useGlobalPreview ?? true;
     const baseUrl = useGlobalPreview ? 'wss://api-global-preview.elevenlabs.io' : 'wss://api.elevenlabs.io';
-    const inactivityTimeout = this.config.inactivityTimeout ?? 180;
+    const inactivityTimeout = this.voiceSettings.inactivityTimeout ?? 180;
     const wsUrl = `${baseUrl}/v1/text-to-speech/${effectiveVoiceId}/stream-input?model_id=${effectiveModel}&output_format=pcm_16000&inactivity_timeout=${inactivityTimeout}`;
 
     return new Promise<void>((resolve, reject) => {
@@ -170,20 +178,20 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     // Build voice_settings object, only including defined values
     const voiceSettings: Record<string, any> = {};
 
-    if (this.config.stability !== null && this.config.stability !== undefined) {
-      voiceSettings.stability = this.config.stability;
+    if (this.voiceSettings.stability !== null && this.voiceSettings.stability !== undefined) {
+      voiceSettings.stability = this.voiceSettings.stability;
     }
-    if (this.config.similarityBoost !== null && this.config.similarityBoost !== undefined) {
-      voiceSettings.similarity_boost = this.config.similarityBoost;
+    if (this.voiceSettings.similarityBoost !== null && this.voiceSettings.similarityBoost !== undefined) {
+      voiceSettings.similarity_boost = this.voiceSettings.similarityBoost;
     }
     if (speed !== null && speed !== undefined) {
       voiceSettings.speed = speed;
     }
-    if (this.config.style !== null && this.config.style !== undefined) {
-      voiceSettings.style = this.config.style;
+    if (this.voiceSettings.style !== null && this.voiceSettings.style !== undefined) {
+      voiceSettings.style = this.voiceSettings.style;
     }
-    if (this.config.useSpeakerBoost !== null && this.config.useSpeakerBoost !== undefined) {
-      voiceSettings.use_speaker_boost = this.config.useSpeakerBoost;
+    if (this.voiceSettings.useSpeakerBoost !== null && this.voiceSettings.useSpeakerBoost !== undefined) {
+      voiceSettings.use_speaker_boost = this.voiceSettings.useSpeakerBoost;
     }
 
     const bosMessage: Record<string, any> = {
@@ -298,9 +306,9 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     }
 
     // Apply no-speech marker filtering
-    if (this.config.noSpeechMarkers && this.config.noSpeechMarkers.length > 0) {
+    if (this.voiceSettings.noSpeechMarkers && this.voiceSettings.noSpeechMarkers.length > 0) {
       const startsInFilter = !!this.inNoSpeechSection;
-      const { indexes, currentMarker } = this.getFilterIndexes(text, this.config.noSpeechMarkers, this.inNoSpeechSection);
+      const { indexes, currentMarker } = this.getFilterIndexes(text, this.voiceSettings.noSpeechMarkers, this.inNoSpeechSection);
       this.inNoSpeechSection = currentMarker;
 
       if (currentMarker !== undefined || indexes.length !== 0) {
@@ -314,7 +322,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     }
 
     // Apply text transformations
-    if (this.config.removeExclamationMarks) {
+    if (this.voiceSettings.removeExclamationMarks) {
       text = text.replace(/!/g, '.');
     }
 

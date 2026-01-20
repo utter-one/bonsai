@@ -17,6 +17,8 @@ export const voiceConfigSchema = z.object({
   settings: z.record(z.string(), z.unknown()).optional().describe('Voice-specific settings including model, speed, stability, etc.'),
 }).optional().describe('Voice configuration for TTS');
 
+export type VoiceConfig = z.infer<typeof voiceConfigSchema>;
+
 /**
  * Schema for creating a new persona
  * Required fields: id, name, prompt
@@ -61,6 +63,7 @@ export const personaResponseSchema = z.object({
   projectId: z.string().describe('ID of the project this persona belongs to'),
   name: z.string().describe('Display name of the persona'),
   prompt: z.string().describe('Prompt defining the persona\'s characteristics and behavior'),
+  voiceProviderId: z.string().describe('ID of the voice provider used for TTS, if any'),
   voiceConfig: voiceConfigSchema.describe('Voice configuration settings'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional persona-specific metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
