@@ -1,3 +1,4 @@
+import { VoiceConfig } from '../../../http/contracts/persona';
 import type { SimpleCallback, ErrorCallback } from '../../../types/callbacks';
 
 /**
@@ -48,9 +49,12 @@ export type NoSpeechMarker = {
  */
 export interface ITtsProvider {
   /**
-   * Initializes the speech generation session for the given context
+   * Initializes the speech generation session for the given voice configuration
+   * Prepares the TTS provider with the specified voice settings
+   * @param voiceConfig Configuration settings for the TTS voice synthesis
+   * @returns Promise that resolves when initialization is complete
    */
-  init(): Promise<void>;
+  init(voiceConfig: VoiceConfig): Promise<void>;
 
   /**
    * Starts the speech generation session for the given context
