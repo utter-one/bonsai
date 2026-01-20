@@ -18,10 +18,11 @@ export const conversationStateSchema = z.object({
 
 /**
  * Schema for conversation response
- * Includes: id, userId, clientId, stageId, state, status, statusReason, metadata, createdAt, updatedAt
+ * Includes: id, projectId, userId, clientId, stageId, state, status, statusReason, metadata, createdAt, updatedAt
  */
 export const conversationResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the conversation'),
+  projectId: z.string().describe('Identifier of the project this conversation belongs to'),
   userId: z.string().describe('Identifier of the user associated with this conversation'),
   clientId: z.string().describe('Client identifier for the conversation'),
   stageId: z.string().describe('Current stage identifier for the conversation'),

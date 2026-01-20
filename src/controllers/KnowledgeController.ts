@@ -8,10 +8,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { KnowledgeService } from '../services/KnowledgeService';
-import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../api/knowledge';
-import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, DeleteKnowledgeCategoryRequest, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, DeleteKnowledgeItemRequest } from '../api/knowledge';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../contracts/rest/knowledge';
+import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, DeleteKnowledgeCategoryRequest, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, DeleteKnowledgeItemRequest } from '../contracts/rest/knowledge';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for knowledge base management including sections, categories, and items

@@ -2,9 +2,9 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { conversations, conversationEvents } from '../db/schema';
-import type { ConversationResponse, ConversationListResponse, ConversationEventResponse, ConversationEventListResponse } from '../api/conversation';
-import type { ListParams } from '../api/common';
-import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../api/conversation';
+import type { ConversationResponse, ConversationListResponse, ConversationEventResponse, ConversationEventListResponse } from '../contracts/rest/conversation';
+import type { ListParams } from '../contracts/rest/common';
+import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../contracts/rest/conversation';
 import { AuditService } from './AuditService';
 import { NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
@@ -12,15 +12,110 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from '../types/request-context';
 import { PERMISSIONS } from '../permissions';
+import { randomUUID } from 'crypto';
+import { ConversationState } from './live/ConversationRunner';
 
 /**
- * Service for managing conversations with read and delete operations
- * Create operation is intentionally not exposed as it is reserved for other modules
+ * Input for creating a conversation (internal use only)
+ */
+export type CreateConversationInput = {
+  id?: string;
+  projectId: string;
+  userId: string;
+  clientId: string;
+  stageId: string;
+  stageVars?: Record<string, Record<string, any>>;
+  status: ConversationState;
+  statusDetails?: string | null;
+  metadata?: Record<string, any> | null;
+};
+
+/**
+ * Service for managing conversations with create, read and delete operations
  */
 @injectable()
 export class ConversationService extends BaseService {
   constructor(@inject(AuditService) private readonly auditService: AuditService) {
     super();
+  }
+
+  /**
+   * Creates a new conversation (internal use only, not exposed via REST API)
+   * @param input - Conversation creation data
+   * @param context - Optional request context for auditing
+   * @returns The created conversation
+   */
+  async createConversation(input: CreateConversationInput, context?: RequestContext): Promise<ConversationResponse> {
+    const conversationId = input.id ?? randomUUID();
+    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, adminId: context?.adminId }, 'Creating conversation');
+
+    try {
+      const conversationData = {
+        id: conversationId,
+        projectId: input.projectId,
+        userId: input.userId,
+        clientId: input.clientId,
+        stageId: input.stageId,
+        stageVars: {},
+        status: input.status ?? 'initialized',
+        statusDetails: input.statusDetails ?? null,
+        metadata: input.metadata ?? null,
+      };
+
+      const result = await db.insert(conversations).values(conversationData).returning();
+      const createdConversation = result[0];
+
+      if (context?.adminId) {
+        await this.auditService.logCreate('conversation', createdConversation.id, { id: createdConversation.id, projectId: createdConversation.projectId, userId: createdConversation.userId, clientId: createdConversation.clientId, stageId: createdConversation.stageId, status: createdConversation.status }, context.adminId);
+      }
+
+      logger.info({ conversationId: createdConversation.id }, 'Conversation created successfully');
+
+      return conversationResponseSchema.parse(createdConversation);
+    } catch (error) {
+      logger.error({ error, conversationId, projectId: input.projectId, userId: input.userId }, 'Failed to create conversation');
+      throw error;
+    }
+  }
+
+  /**
+   * Saves the current state of a conversation (internal use only)
+   */
+  async saveConversationState(conversationId: string,
+    status: ConversationState,
+    statusDetails?: string | null,
+    stageVars?: Record<string, Record<string, any>>
+   ) {
+    logger.debug({ conversationId }, 'Saving conversation state');
+
+    try {
+      const updateData: Partial<{
+        status: ConversationState;
+        statusDetails: string | null;
+        stageVars: Record<string, Record<string, any>>;
+        updatedAt: Date;
+      }> = {
+        status,
+        updatedAt: new Date(),
+      };
+
+      if (statusDetails !== undefined) {
+        updateData.statusDetails = statusDetails;
+      }
+
+      if (stageVars !== undefined) {
+        updateData.stageVars = stageVars;
+      }
+
+      await db.update(conversations)
+        .set(updateData)
+        .where(eq(conversations.id, conversationId));
+
+      logger.debug({ conversationId }, 'Conversation state saved successfully');
+    } catch (error) {
+      logger.error({ error, conversationId }, 'Failed to save conversation state');
+      throw error;
+    }
   }
 
   /**
@@ -62,11 +157,12 @@ export class ConversationService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: conversations.id,
+        projectId: conversations.projectId,
         userId: conversations.userId,
         clientId: conversations.clientId,
         stageId: conversations.stageId,
         status: conversations.status,
-        statusReason: conversations.statusReason,
+        statusReason: conversations.statusDetails,
         createdAt: conversations.createdAt,
         updatedAt: conversations.updatedAt,
       };
@@ -117,6 +213,36 @@ export class ConversationService extends BaseService {
   }
 
   /**
+   * Marks a conversation as failed with a reason
+   * @param id - The unique identifier of the conversation
+   * @param reason - Human-readable description of why the conversation failed
+   */
+  async failConversation(id: string, reason: string): Promise<void> {
+    logger.info({ conversationId: id, reason }, `Marking conversation as failed: ${reason}`);
+
+    try {
+      const existingConversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+
+      if (!existingConversation) {
+        throw new NotFoundError(`Conversation with id ${id} not found`);
+      }
+
+      await db.update(conversations)
+        .set({ 
+          status: 'failed',
+          statusDetails: reason,
+          updatedAt: new Date()
+        })
+        .where(eq(conversations.id, id));
+
+      logger.info({ conversationId: id }, 'Conversation marked as failed successfully');
+    } catch (error) {
+      logger.error({ error, conversationId: id, reason }, 'Failed to mark conversation as failed');
+      throw error;
+    }
+  }
+
+  /**
    * Deletes a conversation and all its associated events (via cascade)
    * @param id - The unique identifier of the conversation to delete
    * @param context - Request context for auditing and authorization
@@ -138,7 +264,7 @@ export class ConversationService extends BaseService {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.adminId);
+      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, projectId: existingConversation.projectId, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.adminId);
 
       logger.info({ conversationId: id }, 'Conversation deleted successfully');
     } catch (error) {

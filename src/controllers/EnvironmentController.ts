@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { EnvironmentService } from '../services/EnvironmentService';
-import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from '../api/environment';
-import type { CreateEnvironmentRequest, UpdateEnvironmentRequest, DeleteEnvironmentRequest } from '../api/environment';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from '../contracts/rest/environment';
+import type { CreateEnvironmentRequest, UpdateEnvironmentRequest, DeleteEnvironmentRequest } from '../contracts/rest/environment';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for environment management with decorator-based routing

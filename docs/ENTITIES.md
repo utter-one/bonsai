@@ -185,12 +185,11 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 
 | Field Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
-| `stageId` | String | Primary Key | Unique identifier for the stage |
+| `id` | String | Primary Key | Unique identifier for the stage |
 | `prompt` | Text | Not Null | System prompt template for this stage (supports Handlebars templating) |
-| `llmProvider` | String | Nullable | LLM provider override for conversation completion |
-| `llmProviderConfig` | JSON Object | Nullable | LLM configuration override (without credentials) |
+| `llmProviderId` | String | Nullable | ID of the LLM provider to use for this stage |
 | `personaId` | String | Foreign Key (Persona), Not Null | Reference to the persona used in this stage |
-| `enterBehavior` | JSON Object | Not Null, Default: `{}` | What should happen when entering the stage |
+| `enterBehavior` | String | Not Null, Default: `generate_response` | What should happen when entering the stage (`generate_response` or `await_user_input`) |
 | `useKnowledge` | Boolean | Not Null, Default: `false` | Whether to use knowledge base in this stage |
 | `knowledgeSections` | JSON Array | Not Null, Default: `[]` | Array of knowledge section IDs to use |
 | `useGlobalActions` | Boolean | Not Null, Default: `true` | Whether global actions are active in this stage |
@@ -211,7 +210,7 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 - Referenced by Conversation (`stageId`)
 
 ### Indexes
-- Primary key on `stageId`
+- Primary key on `id`
 - Foreign key index on `personaId`
 
 ### Variables Structure
@@ -234,8 +233,7 @@ Represents a reusable classifier for user input analysis that can be shared acro
 | `name` | String | Not Null | Display name of the classifier |
 | `description` | String | Nullable | Detailed description of the classifier's purpose |
 | `prompt` | Text | Not Null | Classification prompt template |
-| `llmProvider` | String | Nullable | LLM provider for this classifier |
-| `llmProviderConfig` | JSON Object | Nullable | LLM configuration (without credentials) |
+| `llmProviderId` | String | Nullable | ID of the LLM provider for this classifier |
 | `metadata` | JSON Object | Nullable | Additional classifier-specific data |
 | `version` | Integer | Not Null | Version number for optimistic locking |
 | `createdAt` | Timestamp | Auto-managed | Record creation timestamp |
@@ -262,8 +260,7 @@ Represents a reusable context transformer for data transformation that can be sh
 | `description` | String | Nullable | Detailed description of the transformer's purpose |
 | `prompt` | Text | Not Null | Transformation prompt template |
 | `contextFields` | JSON Array | Nullable | Context fields for transformation |
-| `llmProvider` | String | Nullable | LLM provider for this transformer |
-| `llmProviderConfig` | JSON Object | Nullable | LLM configuration (without credentials) |
+| `llmProviderId` | String | Nullable | ID of the LLM provider for this transformer |
 | `metadata` | JSON Object | Nullable | Additional transformer-specific data |
 | `version` | Integer | Not Null | Version number for optimistic locking |
 | `createdAt` | Timestamp | Auto-managed | Record creation timestamp |
@@ -289,8 +286,7 @@ Represents a reusable tool that can be invoked during conversation stages for LL
 | `name` | String | Not Null | Display name of the tool |
 | `description` | String | Nullable | Detailed description of the tool's purpose |
 | `prompt` | Text | Not Null | Handlebars template for tool invocation |
-| `llmProvider` | String | Nullable | LLM provider for tool execution |
-| `llmProviderConfig` | JSON Object | Nullable | LLM configuration (without credentials) |
+| `llmProviderId` | String | Nullable | ID of the LLM provider for tool execution |
 | `inputType` | String | Not Null | Expected input format ('text', 'json', 'image') |
 | `outputType` | String | Not Null | Expected output format ('text', 'json', 'image') |
 | `metadata` | JSON Object | Nullable | Additional tool-specific data |

@@ -2,9 +2,9 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/index';
 import { knowledgeSections, knowledgeCategories, knowledgeItems } from '../db/schema';
-import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, KnowledgeSectionResponse, KnowledgeSectionListResponse, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, KnowledgeCategoryResponse, KnowledgeCategoryListResponse, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, KnowledgeItemResponse, KnowledgeItemListResponse } from '../api/knowledge';
-import type { ListParams } from '../api/common';
-import { knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../api/knowledge';
+import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, KnowledgeSectionResponse, KnowledgeSectionListResponse, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, KnowledgeCategoryResponse, KnowledgeCategoryListResponse, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, KnowledgeItemResponse, KnowledgeItemListResponse } from '../contracts/rest/knowledge';
+import type { ListParams } from '../contracts/rest/common';
+import { knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../contracts/rest/knowledge';
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
@@ -198,14 +198,14 @@ export class KnowledgeService extends BaseService {
    */
   async createKnowledgeCategory(input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
-    logger.info({ categoryId: input.id, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
+    logger.info({ categoryId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
 
     try {
-      const category = await db.insert(knowledgeCategories).values({ id: input.id, name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections ?? [], order: input.order ?? 0, version: 1 }).returning();
+      const category = await db.insert(knowledgeCategories).values({ id: input.id, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections ?? [], order: input.order ?? 0, version: 1 }).returning();
 
       const createdCategory = category[0];
 
-      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeSections: createdCategory.knowledgeSections, order: createdCategory.order }, context?.adminId);
+      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, projectId: createdCategory.projectId, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeSections: createdCategory.knowledgeSections, order: createdCategory.order }, context?.adminId);
 
       logger.info({ categoryId: createdCategory.id }, 'Knowledge category created successfully');
 

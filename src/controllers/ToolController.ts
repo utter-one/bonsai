@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { ToolService } from '../services/ToolService';
-import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from '../api/tool';
-import type { CreateToolRequest, UpdateToolRequest, DeleteToolRequest } from '../api/tool';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from '../contracts/rest/tool';
+import type { CreateToolRequest, UpdateToolRequest, DeleteToolRequest } from '../contracts/rest/tool';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for tool management with decorator-based routing

@@ -1,6 +1,6 @@
 import { logger } from '../../../utils/logger';
 import type { ErrorCallback } from '../../../types/callbacks';
-import { AsrServiceErrorCallback, IAsrProvider, TextChunk, TextRecognitionCallback } from './IAsrProvider';
+import { IAsrProvider, TextChunk, TextRecognitionCallback } from './IAsrProvider';
 
 /**
  * Abstract base class for ASR provider implementations
@@ -22,9 +22,6 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
 
   /** Callback for fatal errors */
   protected onErrorCallback?: ErrorCallback;
-
-  /** Callback for service errors */
-  protected onServiceErrorCallback?: AsrServiceErrorCallback;
 
   /** Provider-specific configuration */
   protected config: TConfig;
@@ -98,14 +95,6 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   }
 
   /**
-   * Registers a callback for handling service errors
-   * @param cb Callback function that receives conversation ID and error message
-   */
-  setOnServiceError(cb: AsrServiceErrorCallback): void {
-    this.onServiceErrorCallback = cb;
-  }
-
-  /**
    * Retrieves all text chunks recognized since the last start() call
    * @returns Array of all recognized text chunks with their metadata
    */
@@ -166,18 +155,6 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   }
 
   /**
-   * Helper method to handle service errors that should be sent to the client
-   * Called by subclasses when a service-level error occurs
-   * @param errorMessage Human-readable error description
-   */
-  protected async handleServiceError(errorMessage: string): Promise<void> {
-    logger.error(`ASR service error: ${errorMessage}`);
-    if (this.onServiceErrorCallback) {
-      await this.onServiceErrorCallback(errorMessage);
-    }
-  }
-
-  /**
    * Generates a unique chunk ID for text recognition
    * @returns A unique identifier string
    */
@@ -196,6 +173,5 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
     this.onRecognizedCallback = undefined;
     this.onRecognitionStoppedCallback = undefined;
     this.onErrorCallback = undefined;
-    this.onServiceErrorCallback = undefined;
   }
 }

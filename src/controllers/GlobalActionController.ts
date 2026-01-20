@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { GlobalActionService } from '../services/GlobalActionService';
-import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from '../api/globalAction';
-import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, DeleteGlobalActionRequest } from '../api/globalAction';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from '../contracts/rest/globalAction';
+import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, DeleteGlobalActionRequest } from '../contracts/rest/globalAction';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for global action management with decorator-based routing

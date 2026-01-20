@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { ClassifierService } from '../services/ClassifierService';
-import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from '../api/classifier';
-import type { CreateClassifierRequest, UpdateClassifierRequest, DeleteClassifierRequest } from '../api/classifier';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from '../contracts/rest/classifier';
+import type { CreateClassifierRequest, UpdateClassifierRequest, DeleteClassifierRequest } from '../contracts/rest/classifier';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for classifier management with decorator-based routing

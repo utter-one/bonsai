@@ -11,7 +11,7 @@ export { listParamsSchema, type ListParams };
  * Schema for enter behavior configuration
  * Defines what happens when a conversation enters this stage
  */
-export const enterBehaviorSchema = z.record(z.string(), z.unknown()).describe('Configuration for stage entry behavior');
+export const enterBehaviorSchema = z.enum(['generate_response', 'await_user_input']).describe('What should happen when entering the stage');
 
 /**
  * Schema for variable definitions
@@ -20,29 +20,37 @@ export const enterBehaviorSchema = z.record(z.string(), z.unknown()).describe('C
 export const variablesSchema = z.record(z.string(), z.unknown()).describe('Variable definitions for this stage');
 
 /**
- * Schema for action definitions
- * Defines actions available in this conversation stage
+ * Schema for a single stage action
+ * Defines an action available within a conversation stage (similar structure to global actions)
  */
-export const actionsSchema = z.record(z.string(), z.unknown()).describe('Action definitions for this stage');
+export const stageActionSchema = z.object({
+  name: z.string().min(1).describe('Display name of the action'),
+  condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
+  promptTrigger: z.string().min(1).describe('Description of when this action should be triggered'),
+  operations: z.array(z.string()).describe('Array of operations to execute (e.g., "ai_response", "modify_variables", "go_to_stage")'),
+  template: z.string().nullable().optional().describe('Optional message template for the action'),
+  examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
+});
 
 /**
- * Schema for LLM provider configuration
- * Provides settings for the language model provider
+ * Schema for action definitions
+ * Defines a map of actions available in this conversation stage
  */
-export const llmProviderConfigSchema = z.record(z.string(), z.unknown()).optional().describe('LLM provider-specific configuration settings');
+export const actionsSchema = z.record(z.string(), stageActionSchema).describe('Action definitions for this stage (map of action ID to action definition)');
 
 /**
  * Schema for creating a new stage
- * Required fields: stageId, prompt, personaId
- * Optional fields: llmProvider, llmProviderConfig, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, classifierIds, transformerIds, metadata
+ * Required fields: id, prompt, personaId
+ * Optional fields: llmProviderId, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, classifierIds, transformerIds, metadata
  */
 export const createStageSchema = z.object({
-  stageId: z.string().min(1).describe('Unique identifier for the stage'),
+  id: z.string().min(1).describe('Unique identifier for the stage'),
+  projectId: z.string().min(1).describe('ID of the project this stage belongs to'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
-  llmProvider: z.string().nullable().optional().describe('LLM provider identifier (e.g., "openai", "anthropic")'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider-specific configuration'),
+  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this stage'),
   personaId: z.string().min(1).describe('ID of the persona associated with this stage'),
-  enterBehavior: enterBehaviorSchema.optional().describe('Behavior configuration when entering this stage'),
+  enterBehavior: enterBehaviorSchema.optional().default('generate_response').describe('What should happen when entering the stage'),
   useKnowledge: z.boolean().optional().default(false).describe('Whether to use knowledge base in this stage'),
   knowledgeSections: z.array(z.string()).optional().default([]).describe('List of knowledge section IDs to include'),
   useGlobalActions: z.boolean().optional().default(true).describe('Whether to enable global actions in this stage'),
@@ -60,10 +68,9 @@ export const createStageSchema = z.object({
  */
 export const updateStageBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated system prompt'),
-  llmProvider: z.string().nullable().optional().describe('Updated LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('Updated LLM provider configuration'),
+  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
   personaId: z.string().min(1).optional().describe('Updated persona ID'),
-  enterBehavior: enterBehaviorSchema.optional().describe('Updated enter behavior configuration'),
+  enterBehavior: enterBehaviorSchema.optional().describe('Updated behavior when entering this stage'),
   useKnowledge: z.boolean().optional().describe('Updated knowledge usage flag'),
   knowledgeSections: z.array(z.string()).optional().describe('Updated knowledge section IDs'),
   useGlobalActions: z.boolean().optional().describe('Updated global actions flag'),
@@ -89,12 +96,12 @@ export const deleteStageBodySchema = z.object({
  * Includes all fields from the database schema
  */
 export const stageResponseSchema = z.object({
-  stageId: z.string().describe('Unique identifier for the stage'),
+  id: z.string().describe('Unique identifier for the stage'),
+  projectId: z.string().describe('ID of the project this stage belongs to'),
   prompt: z.string().describe('System prompt defining the stage behavior'),
-  llmProvider: z.string().nullable().describe('LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider configuration'),
+  llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   personaId: z.string().describe('ID of the associated persona'),
-  enterBehavior: enterBehaviorSchema.describe('Stage entry behavior configuration'),
+  enterBehavior: enterBehaviorSchema.describe('What happens when entering the stage'),
   useKnowledge: z.boolean().describe('Whether knowledge base is enabled'),
   knowledgeSections: z.array(z.string()).describe('Knowledge section IDs included in this stage'),
   useGlobalActions: z.boolean().describe('Whether global actions are enabled'),
@@ -134,3 +141,6 @@ export type StageResponse = z.infer<typeof stageResponseSchema>;
 
 /** Response for paginated list of stages with metadata */
 export type StageListResponse = z.infer<typeof stageListResponseSchema>;
+
+/** Definition of a single action within a stage */
+export type StageAction = z.infer<typeof stageActionSchema>;

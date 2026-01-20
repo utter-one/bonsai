@@ -8,23 +8,17 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
- * Schema for LLM provider configuration
- * Provides settings for the language model provider
- */
-export const llmProviderConfigSchema = z.record(z.string(), z.unknown()).optional().describe('LLM provider-specific configuration settings');
-
-/**
  * Schema for creating a new classifier
  * Required fields: id, name, prompt
- * Optional fields: description, llmProvider, llmProviderConfig, metadata
+ * Optional fields: description, llmProviderId, metadata
  */
 export const createClassifierSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the classifier'),
+  projectId: z.string().min(1).describe('ID of the project this classifier belongs to'),
   name: z.string().min(1).describe('Display name of the classifier'),
   description: z.string().nullable().optional().describe('Detailed description of the classifier\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the classification logic and instructions'),
-  llmProvider: z.string().nullable().optional().describe('LLM provider identifier (e.g., "openai", "anthropic")'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider-specific configuration'),
+  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this classifier'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional classifier-specific metadata'),
 });
 
@@ -36,8 +30,7 @@ export const updateClassifierBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
   description: z.string().nullable().optional().describe('Updated description'),
   prompt: z.string().min(1).optional().describe('Updated classification prompt'),
-  llmProvider: z.string().nullable().optional().describe('Updated LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('Updated LLM provider configuration'),
+  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -56,11 +49,11 @@ export const deleteClassifierBodySchema = z.object({
  */
 export const classifierResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the classifier'),
+  projectId: z.string().describe('ID of the project this classifier belongs to'),
   name: z.string().describe('Display name of the classifier'),
   description: z.string().nullable().describe('Detailed description of the classifier'),
   prompt: z.string().describe('Prompt defining the classification logic'),
-  llmProvider: z.string().nullable().describe('LLM provider identifier'),
-  llmProviderConfig: llmProviderConfigSchema.describe('LLM provider configuration'),
+  llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the classifier was created'),

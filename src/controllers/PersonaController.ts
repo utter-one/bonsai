@@ -7,10 +7,10 @@ import { RequirePermissions } from '../decorators/auth';
 import { PERMISSIONS } from '../permissions';
 import type { Request } from 'express';
 import { PersonaService } from '../services/PersonaService';
-import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from '../api/persona';
-import type { CreatePersonaRequest, UpdatePersonaRequest, DeletePersonaRequest } from '../api/persona';
-import { listParamsSchema } from '../api/common';
-import type { ListParams } from '../api/common';
+import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from '../contracts/rest/persona';
+import type { CreatePersonaRequest, UpdatePersonaRequest, DeletePersonaRequest } from '../contracts/rest/persona';
+import { listParamsSchema } from '../contracts/rest/common';
+import type { ListParams } from '../contracts/rest/common';
 
 /**
  * Controller for persona management with decorator-based routing

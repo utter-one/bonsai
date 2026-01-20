@@ -1,5 +1,7 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { StageAction } from '../contracts/rest/stage';
+import { ConversationState } from '../services/live/ConversationRunner';
 
 // User table
 export const users = pgTable('users', {
@@ -12,15 +14,13 @@ export const users = pgTable('users', {
 // Conversation table
 export const conversations = pgTable('conversations', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   userId: text('user_id').notNull().references(() => users.id),
   clientId: text('client_id').notNull(),
   stageId: text('stage_id').notNull(),
-  state: jsonb('state').notNull().$type<{
-    variables: Record<string, Record<string, any>>;
-    currentActions: string[];
-  }>(),
-  status: text('status').notNull().default('ongoing'),
-  statusReason: text('status_reason'),
+  stageVars: jsonb('stage_vars').$type<Record<string, Record<string, any>>>(),
+  status: text('status').notNull().$type<ConversationState>().default('initialized'),
+  statusDetails: text('status_reason').default(null),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -48,9 +48,21 @@ export const admins = pgTable('admins', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Project table
+export const projects = pgTable('projects', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Persona table
 export const personas = pgTable('personas', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   prompt: text('prompt').notNull(),
   voiceConfig: jsonb('voice_config').$type<{
@@ -67,11 +79,11 @@ export const personas = pgTable('personas', {
 // Classifier table
 export const classifiers = pgTable('classifiers', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   description: text('description'),
   prompt: text('prompt').notNull(),
-  llmProvider: text('llm_provider'),
-  llmProviderConfig: jsonb('llm_provider_config').$type<Record<string, any>>(),
+  llmProviderId: text('llm_provider_id'),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -81,12 +93,12 @@ export const classifiers = pgTable('classifiers', {
 // ContextTransformer table
 export const contextTransformers = pgTable('context_transformers', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   description: text('description'),
   prompt: text('prompt').notNull(),
   contextFields: jsonb('context_fields').$type<string[]>(),
-  llmProvider: text('llm_provider'),
-  llmProviderConfig: jsonb('llm_provider_config').$type<Record<string, any>>(),
+  llmProviderId: text('llm_provider_id'),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -96,11 +108,11 @@ export const contextTransformers = pgTable('context_transformers', {
 // Tool table
 export const tools = pgTable('tools', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   description: text('description'),
   prompt: text('prompt').notNull(),
-  llmProvider: text('llm_provider'),
-  llmProviderConfig: jsonb('llm_provider_config').$type<Record<string, any>>(),
+  llmProviderId: text('llm_provider_id'),
   inputType: text('input_type').notNull(),
   outputType: text('output_type').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -111,18 +123,18 @@ export const tools = pgTable('tools', {
 
 // Stage table
 export const stages = pgTable('stages', {
-  stageId: text('stage_id').primaryKey(),
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   prompt: text('prompt').notNull(),
-  llmProvider: text('llm_provider'),
-  llmProviderConfig: jsonb('llm_provider_config').$type<Record<string, any>>(),
+  llmProviderId: text('llm_provider_id'),
   personaId: text('persona_id').notNull().references(() => personas.id),
-  enterBehavior: jsonb('enter_behavior').notNull().default({}).$type<Record<string, any>>(),
+  enterBehavior: text('enter_behavior').notNull().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),
   knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
   useGlobalActions: boolean('use_global_actions').notNull().default(true),
   globalActions: jsonb('global_actions').notNull().default([]).$type<string[]>(),
   variables: jsonb('variables').notNull().default({}).$type<Record<string, any>>(),
-  actions: jsonb('actions').notNull().default({}).$type<Record<string, any>>(),
+  actions: jsonb('actions').notNull().default({}).$type<Record<string, StageAction>>(),
   classifierIds: jsonb('classifier_ids').notNull().default([]).$type<string[]>(),
   transformerIds: jsonb('transformer_ids').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -142,6 +154,7 @@ export const knowledgeSections = pgTable('knowledge_sections', {
 // KnowledgeCategory table
 export const knowledgeCategories = pgTable('knowledge_categories', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   promptTrigger: text('prompt_trigger').notNull(),
   knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
@@ -166,6 +179,7 @@ export const knowledgeItems = pgTable('knowledge_items', {
 // GlobalAction table
 export const globalActions = pgTable('global_actions', {
   id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   condition: text('condition'),
   promptTrigger: text('prompt_trigger').notNull(),
@@ -181,6 +195,7 @@ export const globalActions = pgTable('global_actions', {
 // Issue table
 export const issues = pgTable('issues', {
   id: serial('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   environment: text('environment').notNull(),
   buildVersion: text('build_version').notNull(),
   beat: text('beat'),
@@ -256,6 +271,10 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [conversations.projectId],
+    references: [projects.id],
+  }),
   user: one(users, {
     fields: [conversations.userId],
     references: [users.id],
@@ -271,10 +290,69 @@ export const conversationEventsRelations = relations(conversationEvents, ({ one 
   }),
 }));
 
+export const projectsRelations = relations(projects, ({ many }) => ({
+  conversations: many(conversations),
+  personas: many(personas),
+  stages: many(stages),
+  classifiers: many(classifiers),
+  contextTransformers: many(contextTransformers),
+  tools: many(tools),
+  knowledgeCategories: many(knowledgeCategories),
+  globalActions: many(globalActions),
+  issues: many(issues),
+}));
+
+export const personasRelations = relations(personas, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [personas.projectId],
+    references: [projects.id],
+  }),
+  stages: many(stages),
+}));
+
 export const stagesRelations = relations(stages, ({ one }) => ({
+  project: one(projects, {
+    fields: [stages.projectId],
+    references: [projects.id],
+  }),
   persona: one(personas, {
     fields: [stages.personaId],
     references: [personas.id],
+  }),
+}));
+
+export const classifiersRelations = relations(classifiers, ({ one }) => ({
+  project: one(projects, {
+    fields: [classifiers.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const contextTransformersRelations = relations(contextTransformers, ({ one }) => ({
+  project: one(projects, {
+    fields: [contextTransformers.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const toolsRelations = relations(tools, ({ one }) => ({
+  project: one(projects, {
+    fields: [tools.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const globalActionsRelations = relations(globalActions, ({ one }) => ({
+  project: one(projects, {
+    fields: [globalActions.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const issuesRelations = relations(issues, ({ one }) => ({
+  project: one(projects, {
+    fields: [issues.projectId],
+    references: [projects.id],
   }),
 }));
 
@@ -285,7 +363,11 @@ export const knowledgeItemsRelations = relations(knowledgeItems, ({ one }) => ({
   }),
 }));
 
-export const knowledgeCategoriesRelations = relations(knowledgeCategories, ({ many }) => ({
+export const knowledgeCategoriesRelations = relations(knowledgeCategories, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [knowledgeCategories.projectId],
+    references: [projects.id],
+  }),
   items: many(knowledgeItems),
 }));
 

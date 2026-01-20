@@ -2,26 +2,28 @@ import 'reflect-metadata';
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from './api/admin';
-import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './api/user';
-import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './api/persona';
-import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './api/auth';
-import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './api/setup';
-import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './api/knowledge';
-import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './api/issue';
-import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './api/conversation';
-import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './api/stage';
-import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './api/classifier';
-import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './api/contextTransformer';
-import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './api/tool';
-import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from './api/globalAction';
-import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from './api/environment';
-import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './api/provider';
-import { auditLogResponseSchema, auditLogListResponseSchema } from './api/audit';
-import { listParamsSchema } from './api/common';
+import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from './contracts/rest/admin';
+import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './contracts/rest/user';
+import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema } from './contracts/rest/project';
+import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './contracts/rest/persona';
+import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './contracts/rest/auth';
+import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './contracts/rest/setup';
+import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './contracts/rest/knowledge';
+import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './contracts/rest/issue';
+import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './contracts/rest/conversation';
+import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './contracts/rest/stage';
+import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './contracts/rest/classifier';
+import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './contracts/rest/contextTransformer';
+import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './contracts/rest/tool';
+import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from './contracts/rest/globalAction';
+import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from './contracts/rest/environment';
+import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './contracts/rest/provider';
+import { auditLogResponseSchema, auditLogListResponseSchema } from './contracts/rest/audit';
+import { listParamsSchema } from './contracts/rest/common';
 import { getOpenAPIMetadata } from './decorators/openapi';
 import { AdminController } from './controllers/AdminController';
 import { UserController } from './controllers/UserController';
+import { ProjectController } from './controllers/ProjectController';
 import { PersonaController } from './controllers/PersonaController';
 import { AuthController } from './controllers/AuthController';
 import { SetupController } from './controllers/SetupController';
@@ -47,6 +49,10 @@ const adminIdParamSchema = z.object({
 
 const userIdParamSchema = z.object({
   id: z.string().openapi({ description: 'User ID', example: 'user-123' }),
+});
+
+const projectIdParamSchema = z.object({
+  id: z.string().openapi({ description: 'Project ID', example: 'proj-123' }),
 });
 
 const personaIdParamSchema = z.object({
@@ -80,7 +86,7 @@ const conversationEventIdParamSchema = z.object({
 });
 
 const stageIdParamSchema = z.object({
-  stageId: z.string().openapi({ description: 'Stage ID', example: 'stage-123' }),
+  id: z.string().openapi({ description: 'Stage ID', example: 'stage-123' }),
 });
 
 const classifierIdParamSchema = z.object({
@@ -123,6 +129,10 @@ export function getOpenAPISpec(): any {
   registry.register('UpdateUserRequest', updateUserBodySchema);
   registry.register('UserResponse', userResponseSchema);
   registry.register('UserListResponse', userListResponseSchema);
+  registry.register('CreateProjectRequest', createProjectSchema);
+  registry.register('UpdateProjectRequest', updateProjectSchema);
+  registry.register('ProjectResponse', projectResponseSchema);
+  registry.register('ProjectListResponse', projectListResponseSchema);
   registry.register('CreatePersonaRequest', createPersonaSchema);
   registry.register('UpdatePersonaRequest', updatePersonaBodySchema);
   registry.register('DeletePersonaRequest', deletePersonaBodySchema);
@@ -198,7 +208,7 @@ export function getOpenAPISpec(): any {
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AuthController, SetupController, AdminController, UserController, 
+  const controllers = [AuthController, SetupController, AdminController, UserController, ProjectController,
     ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
     PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController, AuditController];
 
@@ -206,6 +216,7 @@ export function getOpenAPISpec(): any {
   const paramSchemaMap: Record<string, any> = {
     '/api/admins/:id': adminIdParamSchema,
     '/api/users/:id': userIdParamSchema,
+    '/api/projects/:id': projectIdParamSchema,
     '/api/personas/:id': personaIdParamSchema,
     '/api/knowledge/sections/:id': knowledgeSectionIdParamSchema,
     '/api/knowledge/categories/:id': knowledgeCategoryIdParamSchema,
@@ -214,7 +225,7 @@ export function getOpenAPISpec(): any {
     '/api/issues/:id': issueIdParamSchema,
     '/api/conversations/:id': conversationIdParamSchema,
     '/api/conversations/:id/events/:eventId': conversationEventIdParamSchema,
-    '/api/stages/:stageId': stageIdParamSchema,
+    '/api/stages/:id': stageIdParamSchema,
     '/api/classifiers/:id': classifierIdParamSchema,
     '/api/context-transformers/:id': contextTransformerIdParamSchema,
     '/api/tools/:id': toolIdParamSchema,
@@ -240,7 +251,7 @@ export function getOpenAPISpec(): any {
       const fullPath = `${basePath}${actionPath}`.replace(/\/\//g, '/');
 
       // Determine if this route has params
-      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId') || fullPath.includes(':eventId') || fullPath.includes(':stageId');
+      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId') || fullPath.includes(':eventId');
       const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '').replace(/\/items$/, '').replace(/\/events$/, '');
       const paramSchema = hasParams && !fullPath.includes('/audit-logs') && !fullPath.endsWith('/items') && !fullPath.endsWith('/events') ? paramSchemaMap[paramKey] : undefined;
 

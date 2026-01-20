@@ -2,9 +2,9 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { globalActions } from '../db/schema';
-import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, GlobalActionResponse, GlobalActionListResponse } from '../api/globalAction';
-import type { ListParams } from '../api/common';
-import { globalActionResponseSchema, globalActionListResponseSchema } from '../api/globalAction';
+import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, GlobalActionResponse, GlobalActionListResponse } from '../contracts/rest/globalAction';
+import type { ListParams } from '../contracts/rest/common';
+import { globalActionResponseSchema, globalActionListResponseSchema } from '../contracts/rest/globalAction';
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
@@ -31,14 +31,14 @@ export class GlobalActionService extends BaseService {
    */
   async createGlobalAction(input: CreateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
-    logger.info({ globalActionId: input.id, name: input.name, adminId: context?.adminId }, 'Creating global action');
+    logger.info({ globalActionId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating global action');
 
     try {
-      const globalAction = await db.insert(globalActions).values({ id: input.id, name: input.name, condition: input.condition ?? null, promptTrigger: input.promptTrigger, operations: input.operations ?? [], template: input.template ?? null, examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const globalAction = await db.insert(globalActions).values({ id: input.id, projectId: input.projectId, name: input.name, condition: input.condition ?? null, promptTrigger: input.promptTrigger, operations: input.operations ?? [], template: input.template ?? null, examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdGlobalAction = globalAction[0];
 
-      await this.auditService.logCreate('global_action', createdGlobalAction.id, { id: createdGlobalAction.id, name: createdGlobalAction.name, condition: createdGlobalAction.condition, promptTrigger: createdGlobalAction.promptTrigger, operations: createdGlobalAction.operations, template: createdGlobalAction.template, examples: createdGlobalAction.examples, metadata: createdGlobalAction.metadata }, context?.adminId);
+      await this.auditService.logCreate('global_action', createdGlobalAction.id, { id: createdGlobalAction.id, projectId: createdGlobalAction.projectId, name: createdGlobalAction.name, condition: createdGlobalAction.condition, promptTrigger: createdGlobalAction.promptTrigger, operations: createdGlobalAction.operations, template: createdGlobalAction.template, examples: createdGlobalAction.examples, metadata: createdGlobalAction.metadata }, context?.adminId);
 
       logger.info({ globalActionId: createdGlobalAction.id }, 'Global action created successfully');
 

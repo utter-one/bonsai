@@ -2,9 +2,9 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { personas } from '../db/schema';
-import type { CreatePersonaRequest, UpdatePersonaRequest, PersonaResponse, PersonaListResponse } from '../api/persona';
-import type { ListParams } from '../api/common';
-import { personaResponseSchema, personaListResponseSchema } from '../api/persona';
+import type { CreatePersonaRequest, UpdatePersonaRequest, PersonaResponse, PersonaListResponse } from '../contracts/rest/persona';
+import type { ListParams } from '../contracts/rest/common';
+import { personaResponseSchema, personaListResponseSchema } from '../contracts/rest/persona';
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
@@ -30,14 +30,14 @@ export class PersonaService extends BaseService {
    */
   async createPersona(input: CreatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
     this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
-    logger.info({ personaId: input.id, name: input.name, adminId: context?.adminId }, 'Creating persona');
+    logger.info({ personaId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
-      const persona = await db.insert(personas).values({ id: input.id, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
+      const persona = await db.insert(personas).values({ id: input.id, projectId: input.projectId, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
 
       const createdPersona = persona[0];
 
-      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, name: createdPersona.name, prompt: createdPersona.prompt, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, context?.adminId);
+      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, projectId: createdPersona.projectId, name: createdPersona.name, prompt: createdPersona.prompt, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: createdPersona.id }, 'Persona created successfully');
 

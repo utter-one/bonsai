@@ -1,5 +1,5 @@
 import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
-import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, LlmServiceErrorCallback } from './ILlmProvider';
+import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
 /**
@@ -13,7 +13,6 @@ export abstract class LlmProviderBase<TConfig extends LlmProviderConfig = LlmPro
   protected onCompleteCallback?: LlmCompleteCallback;
   protected onReadyCallback?: SimpleCallback;
   protected onErrorCallback?: ErrorCallback;
-  protected onServiceErrorCallback?: LlmServiceErrorCallback;
 
   /**
    * Initialize the provider with configuration
@@ -64,13 +63,6 @@ export abstract class LlmProviderBase<TConfig extends LlmProviderConfig = LlmPro
    */
   setOnError(callback: ErrorCallback): void {
     this.onErrorCallback = callback;
-  }
-
-  /**
-   * Set callback for service errors (recoverable)
-   */
-  setOnServiceError(callback: LlmServiceErrorCallback): void {
-    this.onServiceErrorCallback = callback;
   }
 
   /**
@@ -139,20 +131,6 @@ export abstract class LlmProviderBase<TConfig extends LlmProviderConfig = LlmPro
         await this.onErrorCallback(error);
       } catch (callbackError) {
         logger.error(`Error in error callback: ${callbackError}`);
-      }
-    }
-  }
-
-  /**
-   * Notify about a service error (recoverable)
-   */
-  protected async notifyServiceError(errorMessage: string): Promise<void> {
-    logger.warn(`LLM provider service error: ${errorMessage}`);
-    if (this.onServiceErrorCallback) {
-      try {
-        await this.onServiceErrorCallback(errorMessage);
-      } catch (callbackError) {
-        logger.error(`Error in service error callback: ${callbackError}`);
       }
     }
   }
