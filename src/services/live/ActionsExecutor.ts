@@ -78,10 +78,11 @@ export class ActionsExecutor {
       case 'run_script':
         return 4;
       case 'end_conversation':
-      case 'abort_conversation':
         return 5;
-      case 'go_to_stage':
+      case 'abort_conversation':
         return 6;
+      case 'go_to_stage':
+        return 7;
       default:
         return 999; // Unknown operations execute last
     }
