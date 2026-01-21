@@ -4,13 +4,22 @@ import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
 
 export type ConversationContext = {
+  /** ID of the project the conversation belongs to */
   projectId: string;
+
+  /** ID of the current stage in the conversation */
   stageId: string;
+
+  /** Stage variables */
   vars: Record<string, any>;
+
+  /** Conversation history as an array of messages */
   history: Array<{
-    role: 'user' | 'assistant' | 'system';
+    role: 'user' | 'assistant';
     content: string;
   }>;
+
+  /** Current command being executed, if any */
   command: any;
 }
 
