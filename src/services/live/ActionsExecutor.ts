@@ -1,6 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
 import { ConversationRunner } from './ConversationRunner';
+import { StageScriptRunner } from './StageScriptRunner';
 import { ToolService } from '../ToolService';
 import type { AbortConversationOperation, CallToolOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
 import type { GlobalAction } from '../../types/models';
@@ -44,6 +45,7 @@ export type ActionExecutionContext = {
 @injectable()
 export class ActionsExecutor {
   constructor(
+    @inject(StageScriptRunner) private readonly scriptRunner: StageScriptRunner,
     @inject(ToolService) private readonly toolService: ToolService,
   ) {}
 
@@ -370,50 +372,17 @@ export class ActionsExecutor {
 
   /**
    * Executes run_script operation
-   * Runs JavaScript code in an isolated context with access to stage variables
+   * Delegates to StageScriptRunner for secure script execution in isolated VM
    */
   private async executeRunScript(
     operation: RunScriptOperation,
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
-    logger.info({ conversationId: context.conversationId, stageId: context.stageId, codeLength: operation.code.length }, `Running script`);
-
-    try {
-      // Get all current variables
-      const variables = await runner.getAllVariables(context.stageId);
-
-      // Create a sandbox context for script execution
-      const sandbox = {
-        variables,
-        setVariable: async (name: string, value: any) => {
-          await runner.setVariable(context.stageId, name, value);
-          variables[name] = value;
-        },
-        getVariable: async (name: string) => {
-          return await runner.getVariable(context.stageId, name);
-        },
-        console: {
-          log: (...args: any[]) => logger.info({ conversationId: context.conversationId, stageId: context.stageId }, ...args),
-          error: (...args: any[]) => logger.error({ conversationId: context.conversationId, stageId: context.stageId }, ...args),
-          warn: (...args: any[]) => logger.warn({ conversationId: context.conversationId, stageId: context.stageId }, ...args),
-        },
-      };
-
-      // Execute the script using Function constructor for isolation
-      const scriptFunction = new Function('sandbox', `
-        with (sandbox) {
-          ${operation.code}
-        }
-      `);
-
-      await scriptFunction(sandbox);
-
-      logger.info({ conversationId: context.conversationId, stageId: context.stageId }, `Script executed successfully`);
-    } catch (error) {
-      logger.error({ conversationId: context.conversationId, stageId: context.stageId, error: error instanceof Error ? error.message : String(error) }, `Failed to execute script`);
-      throw error;
-    }
+    await this.scriptRunner.executeScript(operation.code, runner, {
+      conversationId: context.conversationId,
+      stageId: context.stageId,
+    });
 
     return {
       shouldEndConversation: false,
