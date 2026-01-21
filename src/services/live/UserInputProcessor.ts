@@ -33,17 +33,16 @@ export class UserInputProcessor {
    * @param text - The text input from the user.
    * @returns A promise that resolves to an array of stage actions resulting from processing the input.
    */
-  async processTextInput(session: Connection, text: string): Promise<ActionClassificationResult[]> {
+  async processTextInput(session: Connection, context: ConversationContext): Promise<ActionClassificationResult[]> {
     // How to process:
     // - Get all classifiers for the current stage.
     // - For each classifier, run the text through it to determine actions. Do this in parallel.
     // - Collect and return all detected actions from classifiers.
 
     try {
-      const context = await this.llmContextBuilder.buildContextForSession(session);
       const classifiers = session.runner.getRuntimeData().classifiers;
       const actionPromises = classifiers.map(async (classifier) => {
-        return this.classifyTextInput(session, classifier, context, text);
+        return this.classifyTextInput(session, classifier, context);
       });
 
       const actionsArrays = await Promise.all(actionPromises);
@@ -54,11 +53,12 @@ export class UserInputProcessor {
     } 
   }
 
-  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext, text: string): Promise<ClassificationResult> {
+  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResult> {
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
       const llmProvider = classifierData.llmProvider;
       const classifier = classifierData.classifier;
+      const text = context.userInput || '';
 
       const messages = [
         {

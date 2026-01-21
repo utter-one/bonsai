@@ -2,8 +2,12 @@ import { and, asc, eq } from "drizzle-orm";
 import { conversationEvents, db } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
+import { Conversation } from "../../types/models";
 
 export type ConversationContext = {
+  /** ID of the conversation */
+  conversationId: string;
+
   /** ID of the project the conversation belongs to */
   projectId: string;
 
@@ -21,6 +25,12 @@ export type ConversationContext = {
 
   /** Current command being executed, if any */
   command: any;
+
+  /** User input that triggered processing (can be null if not triggered by user input) */
+  userInput?: string;
+
+  /** The original user input before any action processing/redaction/etc. */
+  originalUserInput?: string;
 }
 
 /**
@@ -29,19 +39,22 @@ export type ConversationContext = {
  */
 @singleton()
 export class ConversationContextBuilder {
-  async buildContextForSession(session: Connection): Promise<ConversationContext> {
+  async buildContextForSession(conversation: Conversation, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     const context = {
-      projectId: session.runner.getRuntimeData().project.id,
-      stageId: session.runner.getRuntimeData().stage.id,
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      stageId: conversation.stageId,
       vars: {},
       history: [],
       command: null,
+      userInput,
+      originalUserInput,
     };
 
     // Get history from database
     const messages = await db.query.conversationEvents.findMany({
       where: and(
-        eq(conversationEvents.conversationId, session.conversationId),
+        eq(conversationEvents.conversationId, conversation.id),
         eq(conversationEvents.eventType, 'message')
       ),
       orderBy: asc(conversationEvents.timestamp),

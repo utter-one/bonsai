@@ -1,10 +1,11 @@
 import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
 import { ConversationRunner } from './ConversationRunner';
-import { StageScriptRunner } from './StageScriptRunner';
+import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { ToolService } from '../ToolService';
 import type { AbortConversationOperation, CallToolOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
 import type { GlobalAction } from '../../types/models';
+import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 
 /**
  * Execution result for an action
@@ -28,15 +29,6 @@ type OperationWithSource = {
   actionIndex: number;
 };
 
-/**
- * Execution context for actions
- */
-export type ActionExecutionContext = {
-  conversationId: string;
-  stageId: string;
-  userInput: string;
-  modifiedUserInput?: string;
-};
 
 /**
  * Service responsible for executing operations defined in stage actions and global actions
@@ -45,8 +37,9 @@ export type ActionExecutionContext = {
 @injectable()
 export class ActionsExecutor {
   constructor(
-    @inject(StageScriptRunner) private readonly scriptRunner: StageScriptRunner,
+    @inject(IsolatedScriptExecutor) private readonly scriptRunner: IsolatedScriptExecutor,
     @inject(ToolService) private readonly toolService: ToolService,
+    @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
   ) {}
 
   /**
@@ -177,13 +170,12 @@ export class ActionsExecutor {
    * Gathers all operations from all actions, sorts by priority, resolves conflicts, and executes in order
    * @param actions - Array of actions to execute (can be stage actions or global actions)
    * @param runner - The conversation runner instance
-   * @param context - Execution context containing conversation and user input information
    * @returns Array of execution results for each action
    */
   async executeActions(
     actions: (StageAction | GlobalAction)[],
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext
   ): Promise<ActionExecutionResult[]> {
     logger.info({ conversationId: context.conversationId, actionCount: actions.length }, `Executing ${actions.length} action(s)`);
 
@@ -239,7 +231,6 @@ export class ActionsExecutor {
 
         // Update context with modified user input if applicable
         if (operationResult.modifiedUserInput) {
-          currentContext.modifiedUserInput = operationResult.modifiedUserInput;
           currentContext.userInput = operationResult.modifiedUserInput;
         }
 
@@ -279,7 +270,7 @@ export class ActionsExecutor {
   private async executeOperation(
     operation: Operation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{
     shouldEndConversation: boolean;
     shouldAbortConversation: boolean;
@@ -322,7 +313,7 @@ export class ActionsExecutor {
   private async executeEndConversation(
     operation: EndConversationOperation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{ shouldEndConversation: true; shouldAbortConversation: false; endReason?: string }> {
     logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Ending conversation gracefully`);
     return {
@@ -338,7 +329,7 @@ export class ActionsExecutor {
   private async executeAbortConversation(
     operation: AbortConversationOperation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: true; abortReason?: string }> {
     logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Aborting conversation immediately`);
     return {
@@ -354,7 +345,7 @@ export class ActionsExecutor {
   private async executeGoToStage(
     operation: GoToStageOperation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
     logger.info({ conversationId: context.conversationId, targetStageId: operation.stageId, currentStageId: context.stageId }, `Navigating to stage: ${operation.stageId}`);
 
@@ -378,12 +369,9 @@ export class ActionsExecutor {
   private async executeRunScript(
     operation: RunScriptOperation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
-    await this.scriptRunner.executeScript(operation.code, runner, {
-      conversationId: context.conversationId,
-      stageId: context.stageId,
-    });
+    await this.scriptRunner.executeScript(operation.code, runner, context);
 
     return {
       shouldEndConversation: false,
@@ -398,7 +386,7 @@ export class ActionsExecutor {
   private async executeModifyUserInput(
     operation: ModifyUserInputOperation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false; modifiedUserInput: string }> {
     logger.info({ conversationId: context.conversationId, originalInput: context.userInput, template: operation.template }, `Modifying user input`);
 
@@ -436,7 +424,7 @@ export class ActionsExecutor {
   private async executeModifyVariables(
     operation: ModifyVariablesOperation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
     logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: operation.modifications.length }, `Modifying variables`);
 
@@ -507,7 +495,7 @@ export class ActionsExecutor {
   private async executeCallTool(
     operation: CallToolOperation,
     runner: ConversationRunner,
-    context: ActionExecutionContext,
+    context: ConversationContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
     logger.info({ conversationId: context.conversationId, toolId: operation.toolId, parameterCount: Object.keys(operation.parameters).length }, `Calling tool: ${operation.toolId}`);
 

@@ -16,6 +16,7 @@ import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { UserInputProcessor } from "./UserInputProcessor";
 import { VoiceConfig } from "../../http/contracts/persona";
 import { ActionsExecutor } from "./ActionsExecutor";
+import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -63,6 +64,7 @@ export class ConversationRunner {
     @inject(AsrProviderFactory) private asrProviderFactory: AsrProviderFactory,
     @inject(TtsProviderFactory) private ttsProviderFactory: TtsProviderFactory,
     @inject(ConversationService) private conversationService: ConversationService,
+    @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
     @inject(PersonaService) private personaService: PersonaService,
     @inject(UserInputProcessor) private userInputProcessor: UserInputProcessor,
     @inject(ActionsExecutor) private actionsExecutor: ActionsExecutor,
@@ -176,7 +178,8 @@ export class ConversationRunner {
 
           if (fullText) {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
-            await this.processUserInput(fullText);
+            const context = await this.contextBuilder.buildContextForSession(this.stageData.conversation, fullText, fullText);
+            await this.processUserInput(context);
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
           }
@@ -332,7 +335,8 @@ export class ConversationRunner {
       throw new Error(`Cannot receive user input in current state: ${this.conversation.status}`);
     }
 
-    await this.processUserInput(userInput);
+    const context = await this.contextBuilder.buildContextForSession(this.stageData.conversation, userInput, userInput);
+    await this.processUserInput(context);
   }
 
   async startUserVoiceInput() {
@@ -574,9 +578,9 @@ export class ConversationRunner {
    * Processes user input (text or voice) and advances the conversation state
    * @param userInput The user input text to process
    */
-  private async processUserInput(userInput: string) {
+  private async processUserInput(context: ConversationContext) {
     await this.changeState('processing_user_input');
-    const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput);
+    const classificationResults = await this.userInputProcessor.processTextInput(this.session, context);
     const stageActions = this.stageData.stage.actions;
     const actions = classificationResults.map(r => {
       const stageAction = stageActions[r.actionName];
@@ -587,12 +591,7 @@ export class ConversationRunner {
       return stageAction;
     }).filter(a => a !== null) as StageAction[];
 
-    const actionResults = await this.actionsExecutor.executeActions(actions, this, {
-      userInput,
-      modifiedUserInput: userInput,
-      conversationId: this.conversation.id,
-      stageId: this.stageData.id,
-    })
+    const actionResults = await this.actionsExecutor.executeActions(actions, this, context)
 
     const shouldGenerateResponse = !actionResults.some(r => r.shouldAbortConversation);
     if (shouldGenerateResponse) {
