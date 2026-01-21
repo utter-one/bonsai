@@ -3,7 +3,7 @@ import { conversationEvents, db } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
 
-export type LlmContext = {
+export type ConversationContext = {
   projectId: string;
   stageId: string;
   vars: Record<string, any>;
@@ -19,8 +19,8 @@ export type LlmContext = {
  * The context is used by templating engine to create final prompts sent to LLMs.
  */
 @singleton()
-export class LlmContextBuilder {
-  async buildContextForSession(session: Connection): Promise<LlmContext> {
+export class ConversationContextBuilder {
+  async buildContextForSession(session: Connection): Promise<ConversationContext> {
     const context = {
       projectId: session.runner.getRuntimeData().project.id,
       stageId: session.runner.getRuntimeData().stage.id,

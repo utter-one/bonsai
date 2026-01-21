@@ -4,8 +4,8 @@ import { Connection } from "../../websocket/ConnectionManager";
 import { StageAction } from "../../http/contracts/stage";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
-import { LlmContext, LlmContextBuilder } from "./LlmContextBuilder";
-import { LlmPromptBuilder } from "./LlmPromptBuilder";
+import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
+import { TemplatingEngine } from "./TemplatingEngine";
 
 const actionClassificationResultSchema = z.object({
   actionName: z.string(),
@@ -25,8 +25,8 @@ type ClassificationResult = z.infer<typeof classificationResultSchema>;
  */
 @singleton()
 export class UserInputProcessor {
-  constructor(@inject(LlmContextBuilder) private llmContextBuilder: LlmContextBuilder,
-    @inject(LlmPromptBuilder) private llmPromptBuilder: LlmPromptBuilder) {}
+  constructor(@inject(ConversationContextBuilder) private llmContextBuilder: ConversationContextBuilder,
+    @inject(TemplatingEngine) private templatingEngine: TemplatingEngine) {}
 
   /** Processes text input from the user within a session.
    * @param session - The session in which the input was received.
@@ -54,7 +54,7 @@ export class UserInputProcessor {
     } 
   }
 
-  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: LlmContext, text: string): Promise<ClassificationResult> {
+  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext, text: string): Promise<ClassificationResult> {
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
       const llmProvider = classifierData.llmProvider;
@@ -63,7 +63,7 @@ export class UserInputProcessor {
       const messages = [
         {
           role: 'system' as const,
-          content: await this.llmPromptBuilder.buildPrompt(classifier.prompt, context)
+          content: await this.templatingEngine.render(classifier.prompt, context)
         },
         {
           role: 'user' as const,
