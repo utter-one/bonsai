@@ -2,8 +2,8 @@ import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
 import { ConversationRunner } from './ConversationRunner';
 import { ToolService } from '../ToolService';
-import type { Operation, StageAction } from '../../http/contracts/stage';
-import type { GlobalActionResponse } from '../../http/contracts/globalAction';
+import type { AbortConversationOperation, CallToolOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
+import type { GlobalAction } from '../../types/models';
 
 /**
  * Execution result for an action
@@ -48,12 +48,12 @@ export class ActionsExecutor {
   ) {}
 
   /**
-   * Helper method to extract action name from StageAction or GlobalActionResponse
+   * Helper method to extract action name from StageAction or GlobalAction
    */
-  private getActionName(action: StageAction | GlobalActionResponse): string {
+  private getActionName(action: StageAction | GlobalAction): string {
     if ('id' in action && 'version' in action) {
-      // It's a GlobalActionResponse
-      return (action as GlobalActionResponse).name;
+      // It's a GlobalAction
+      return (action as GlobalAction).name;
     }
     // It's a StageAction
     return (action as StageAction).name;
@@ -176,7 +176,7 @@ export class ActionsExecutor {
    * @returns Array of execution results for each action
    */
   async executeActions(
-    actions: (StageAction | GlobalActionResponse)[],
+    actions: (StageAction | GlobalAction)[],
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<ActionExecutionResult[]> {
@@ -312,7 +312,7 @@ export class ActionsExecutor {
    * Executes end_conversation operation
    */
   private async executeEndConversation(
-    operation: Extract<Operation, { type: 'end_conversation' }>,
+    operation: EndConversationOperation,
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<{ shouldEndConversation: true; shouldAbortConversation: false; endReason?: string }> {
@@ -328,7 +328,7 @@ export class ActionsExecutor {
    * Executes abort_conversation operation
    */
   private async executeAbortConversation(
-    operation: Extract<Operation, { type: 'abort_conversation' }>,
+    operation: AbortConversationOperation,
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: true; abortReason?: string }> {
@@ -344,7 +344,7 @@ export class ActionsExecutor {
    * Executes go_to_stage operation
    */
   private async executeGoToStage(
-    operation: Extract<Operation, { type: 'go_to_stage' }>,
+    operation: GoToStageOperation,
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
@@ -368,7 +368,7 @@ export class ActionsExecutor {
    * Runs JavaScript code in an isolated context with access to stage variables
    */
   private async executeRunScript(
-    operation: Extract<Operation, { type: 'run_script' }>,
+    operation: RunScriptOperation,
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
@@ -421,7 +421,7 @@ export class ActionsExecutor {
    * Renders a template and replaces the user input with it
    */
   private async executeModifyUserInput(
-    operation: Extract<Operation, { type: 'modify_user_input' }>,
+    operation: ModifyUserInputOperation,
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false; modifiedUserInput: string }> {
@@ -459,7 +459,7 @@ export class ActionsExecutor {
    * Calls a tool with the specified parameters and stores the result
    */
   private async executeCallTool(
-    operation: Extract<Operation, { type: 'call_tool' }>,
+    operation: CallToolOperation,
     runner: ConversationRunner,
     context: ActionExecutionContext,
   ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {

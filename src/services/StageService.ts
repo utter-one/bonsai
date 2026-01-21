@@ -10,7 +10,7 @@ import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
-import type { RequestContext } from '../types/request-context';
+import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 
 /**

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
+import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, CallToolOperation } from '../../types/models';
 
 extendZodWithOpenApi(z);
 
@@ -210,14 +211,5 @@ export type StageResponse = z.infer<typeof stageResponseSchema>;
 /** Response for paginated list of stages with metadata */
 export type StageListResponse = z.infer<typeof stageListResponseSchema>;
 
-/** Definition of a single action within a stage */
-export type StageAction = z.infer<typeof stageActionSchema>;
-
-/** Operation types */
-export type Operation = z.infer<typeof operationSchema>;
-export type EndConversationOperation = z.infer<typeof endConversationOperationSchema>;
-export type AbortConversationOperation = z.infer<typeof abortConversationOperationSchema>;
-export type GoToStageOperation = z.infer<typeof goToStageOperationSchema>;
-export type RunScriptOperation = z.infer<typeof runScriptOperationSchema>;
-export type ModifyUserInputOperation = z.infer<typeof modifyUserInputOperationSchema>;
-export type CallToolOperation = z.infer<typeof callToolOperationSchema>;
+// Re-export types from models.ts for convenience
+export type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, CallToolOperation };

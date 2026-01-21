@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import type { RequestContext } from '../../types/request-context';
+import type { RequestContext } from '../../services/RequestContext';
 
 // Extend Express Request type to include context and user
 declare global {
