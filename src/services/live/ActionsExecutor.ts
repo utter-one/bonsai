@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
 import { ConversationRunner } from './ConversationRunner';
 import { ToolService } from '../ToolService';
-import type { AbortConversationOperation, CallToolOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
+import type { AbortConversationOperation, CallToolOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
 import type { GlobalAction } from '../../types/models';
 
 /**
@@ -63,21 +63,23 @@ export class ActionsExecutor {
    * Gets the execution priority for an operation type
    * Lower numbers execute first
    * @param operation - The operation to get priority for
-   * @returns Priority number (1-5)
+   * @returns Priority number (1-6)
    */
   private getOperationPriority(operation: Operation): number {
     switch (operation.type) {
       case 'call_tool':
         return 1;
-      case 'modify_user_input':
+      case 'modify_variables':
         return 2;
-      case 'run_script':
+      case 'modify_user_input':
         return 3;
+      case 'run_script':
+        return 4;
       case 'end_conversation':
       case 'abort_conversation':
-        return 4;
-      case 'go_to_stage':
         return 5;
+      case 'go_to_stage':
+        return 6;
       default:
         return 999; // Unknown operations execute last
     }
@@ -298,6 +300,9 @@ export class ActionsExecutor {
       case 'modify_user_input':
         return await this.executeModifyUserInput(operation, runner, context);
 
+      case 'modify_variables':
+        return await this.executeModifyVariables(operation, runner, context);
+
       case 'call_tool':
         return await this.executeCallTool(operation, runner, context);
 
@@ -452,6 +457,77 @@ export class ActionsExecutor {
       logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user input`);
       throw error;
     }
+  }
+
+  /**
+   * Executes modify_variables operation
+   * Updates stage variables using specific operations (set, reset, add, remove)
+   */
+  private async executeModifyVariables(
+    operation: ModifyVariablesOperation,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+    logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: operation.modifications.length }, `Modifying variables`);
+
+    try {
+      for (const modification of operation.modifications) {
+        const { variableName, operation: op, value } = modification;
+
+        switch (op) {
+          case 'set': {
+            await runner.setVariable(context.stageId, variableName, value);
+            logger.debug({ conversationId: context.conversationId, variableName, value }, `Set variable: ${variableName}`);
+            break;
+          }
+
+          case 'reset': {
+            await runner.setVariable(context.stageId, variableName, undefined);
+            logger.debug({ conversationId: context.conversationId, variableName }, `Reset variable: ${variableName}`);
+            break;
+          }
+
+          case 'add': {
+            const currentValue = await runner.getVariable(context.stageId, variableName);
+            if (!Array.isArray(currentValue)) {
+              logger.warn({ conversationId: context.conversationId, variableName, currentValue }, `Variable ${variableName} is not an array, initializing as array`);
+              await runner.setVariable(context.stageId, variableName, [value]);
+            } else {
+              await runner.setVariable(context.stageId, variableName, [...currentValue, value]);
+            }
+            logger.debug({ conversationId: context.conversationId, variableName, value }, `Added to variable array: ${variableName}`);
+            break;
+          }
+
+          case 'remove': {
+            const currentValue = await runner.getVariable(context.stageId, variableName);
+            if (!Array.isArray(currentValue)) {
+              logger.warn({ conversationId: context.conversationId, variableName, currentValue }, `Variable ${variableName} is not an array, cannot remove value`);
+            } else {
+              const newValue = currentValue.filter(item => JSON.stringify(item) !== JSON.stringify(value));
+              await runner.setVariable(context.stageId, variableName, newValue);
+              logger.debug({ conversationId: context.conversationId, variableName, value, removedCount: currentValue.length - newValue.length }, `Removed from variable array: ${variableName}`);
+            }
+            break;
+          }
+
+          default: {
+            const exhaustiveCheck: never = op;
+            throw new Error(`Unknown variable operation: ${exhaustiveCheck}`);
+          }
+        }
+      }
+
+      logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: operation.modifications.length }, `Variables modified successfully`);
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, stageId: context.stageId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify variables`);
+      throw error;
+    }
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+    };
   }
 
   /**

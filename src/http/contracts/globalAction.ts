@@ -9,6 +9,8 @@ import {
   goToStageOperationSchema,
   runScriptOperationSchema,
   modifyUserInputOperationSchema,
+  modifyVariablesOperationSchema,
+  variableOperationSchema,
   callToolOperationSchema,
 } from './stage';
 import type {
@@ -18,6 +20,8 @@ import type {
   GoToStageOperation,
   RunScriptOperation,
   ModifyUserInputOperation,
+  ModifyVariablesOperation,
+  VariableOperation,
   CallToolOperation,
 } from './stage';
 
@@ -31,6 +35,8 @@ export {
   goToStageOperationSchema,
   runScriptOperationSchema,
   modifyUserInputOperationSchema,
+  modifyVariablesOperationSchema,
+  variableOperationSchema,
   callToolOperationSchema,
 };
 export type {
@@ -40,6 +46,8 @@ export type {
   GoToStageOperation,
   RunScriptOperation,
   ModifyUserInputOperation,
+  ModifyVariablesOperation,
+  VariableOperation,
   CallToolOperation,
 };
 

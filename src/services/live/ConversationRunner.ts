@@ -1,6 +1,6 @@
 import { inject } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, Project, Stage } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, Project, Stage, StageAction } from "../../types/models";
 import { db } from "../../db";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
@@ -15,6 +15,7 @@ import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { UserInputProcessor } from "./UserInputProcessor";
 import { VoiceConfig } from "../../http/contracts/persona";
+import { ActionsExecutor } from "./ActionsExecutor";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -64,6 +65,7 @@ export class ConversationRunner {
     @inject(ConversationService) private conversationService: ConversationService,
     @inject(PersonaService) private personaService: PersonaService,
     @inject(UserInputProcessor) private userInputProcessor: UserInputProcessor,
+    @inject(ActionsExecutor) private actionsExecutor: ActionsExecutor,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -574,17 +576,36 @@ export class ConversationRunner {
    */
   private async processUserInput(userInput: string) {
     await this.changeState('processing_user_input');
-    const actions = await this.userInputProcessor.processTextInput(this.session, userInput);
+    const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput);
+    const stageActions = this.stageData.stage.actions;
+    const actions = classificationResults.map(r => {
+      const stageAction = stageActions[r.actionName];
+      if (!stageAction) {
+        logger.warn({ conversationId: this.conversation.id, actionName: r.actionName }, `No matching action found for classification result ${r.actionName}`);
+        return null;
+      }
+      return stageAction;
+    }).filter(a => a !== null) as StageAction[];
 
-    let shouldGenerateResponse = false;
-    // TODO: process actions (not implemented yet)
+    const actionResults = await this.actionsExecutor.executeActions(actions, this, {
+      userInput,
+      modifiedUserInput: userInput,
+      conversationId: this.conversation.id,
+      stageId: this.stageData.id,
+    })
 
+    const shouldGenerateResponse = !actionResults.some(r => r.shouldAbortConversation);
     if (shouldGenerateResponse) {
       await this.changeState('generating_response');
-      // TODO: implement response generation
+      this.generateResonse();
     } else {
-      await this.changeState('awaiting_user_input');
+      // it means the conversation was aborted
+      await this.changeState('finished');
     }
+  }
+
+  private async generateResonse() {
+    throw new Error("Method not implemented.");
   }
 
   /**

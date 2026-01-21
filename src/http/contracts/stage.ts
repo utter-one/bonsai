@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
-import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, CallToolOperation } from '../../types/models';
+import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation } from '../../types/models';
 
 extendZodWithOpenApi(z);
 
@@ -54,6 +54,24 @@ export const modifyUserInputOperationSchema = z.object({
 });
 
 /**
+ * Schema for a single variable modification operation
+ */
+export const variableOperationSchema = z.object({
+  variableName: z.string().min(1).describe('Name of the variable to modify'),
+  operation: z.enum(['set', 'reset', 'add', 'remove']).describe('Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)'),
+  value: z.unknown().describe('Value for the operation (not used for reset operation)'),
+});
+
+/**
+ * Operation type: Modify Variables
+ * Updates stage variables using specific operations
+ */
+export const modifyVariablesOperationSchema = z.object({
+  type: z.literal('modify_variables').describe('Operation type'),
+  modifications: z.array(variableOperationSchema).min(1).describe('Array of variable modifications to apply'),
+});
+
+/**
  * Operation type: Call Tool
  * Calls a selected tool with parameters and puts the result in context
  */
@@ -73,6 +91,7 @@ export const operationSchema = z.discriminatedUnion('type', [
   goToStageOperationSchema,
   runScriptOperationSchema,
   modifyUserInputOperationSchema,
+  modifyVariablesOperationSchema,
   callToolOperationSchema,
 ]);
 
@@ -212,4 +231,4 @@ export type StageResponse = z.infer<typeof stageResponseSchema>;
 export type StageListResponse = z.infer<typeof stageListResponseSchema>;
 
 // Re-export types from models.ts for convenience
-export type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, CallToolOperation };
+export type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation };

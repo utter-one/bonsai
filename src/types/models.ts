@@ -74,6 +74,19 @@ export type ModifyUserInputOperation = {
   template: string;
 };
 
+/** Definition of a single variable modification operation */
+export type VariableOperation = {
+  variableName: string;
+  operation: 'set' | 'reset' | 'add' | 'remove'; // 'add' and 'remove' are for array variables
+  value: unknown;
+};
+
+/** Operation: Modify Variables - Updates stage variables using specific operations */
+export type ModifyVariablesOperation = {
+  type: 'modify_variables';
+  modifications: VariableOperation[];
+};
+
 /** Operation: Call Tool - Calls a selected tool with parameters and puts result in context */
 export type CallToolOperation = {
   type: 'call_tool';
@@ -88,6 +101,7 @@ export type Operation =
   | GoToStageOperation
   | RunScriptOperation
   | ModifyUserInputOperation
+  | ModifyVariablesOperation
   | CallToolOperation;
 
 /** Definition of a single action within a stage */
