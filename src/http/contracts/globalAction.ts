@@ -2,10 +2,46 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
+import {
+  operationSchema,
+  endConversationOperationSchema,
+  abortConversationOperationSchema,
+  goToStageOperationSchema,
+  runScriptOperationSchema,
+  modifyUserInputOperationSchema,
+  callToolOperationSchema,
+} from './stage';
+import type {
+  Operation,
+  EndConversationOperation,
+  AbortConversationOperation,
+  GoToStageOperation,
+  RunScriptOperation,
+  ModifyUserInputOperation,
+  CallToolOperation,
+} from './stage';
 
 extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
+export {
+  operationSchema,
+  endConversationOperationSchema,
+  abortConversationOperationSchema,
+  goToStageOperationSchema,
+  runScriptOperationSchema,
+  modifyUserInputOperationSchema,
+  callToolOperationSchema,
+};
+export type {
+  Operation,
+  EndConversationOperation,
+  AbortConversationOperation,
+  GoToStageOperation,
+  RunScriptOperation,
+  ModifyUserInputOperation,
+  CallToolOperation,
+};
 
 /**
  * Schema for creating a new global action
@@ -18,7 +54,7 @@ export const createGlobalActionSchema = z.object({
   name: z.string().min(1).describe('Display name of the global action'),
   condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
   promptTrigger: z.string().min(1).describe('Description of when this action should be triggered'),
-  operations: z.array(z.string()).optional().describe('Array of operations to execute (e.g., "ai_response", "modify_variables", "go_to_stage")'),
+  operations: z.array(operationSchema).optional().describe('Array of operations to execute when action is triggered'),
   template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional action-specific metadata'),
@@ -32,7 +68,7 @@ export const updateGlobalActionBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
   condition: z.string().nullable().optional().describe('Updated condition expression'),
   promptTrigger: z.string().min(1).optional().describe('Updated prompt trigger description'),
-  operations: z.array(z.string()).optional().describe('Updated operations array'),
+  operations: z.array(operationSchema).optional().describe('Updated operations array'),
   template: z.string().nullable().optional().describe('Updated message template'),
   examples: z.array(z.string()).optional().describe('Updated example phrases'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
@@ -57,7 +93,7 @@ export const globalActionResponseSchema = z.object({
   name: z.string().describe('Display name of the global action'),
   condition: z.string().nullable().describe('Condition expression for action activation'),
   promptTrigger: z.string().describe('Description of when this action should be triggered'),
-  operations: z.array(z.string()).describe('Array of operations to execute'),
+  operations: z.array(operationSchema).describe('Array of operations to execute'),
   template: z.string().nullable().describe('Message template for the action'),
   examples: z.array(z.string()).nullable().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),

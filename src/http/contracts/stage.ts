@@ -8,6 +8,74 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Operation type: End Conversation
+ * Gracefully ends conversation with an AI response
+ */
+export const endConversationOperationSchema = z.object({
+  type: z.literal('end_conversation').describe('Operation type'),
+  reason: z.string().optional().describe('Optional reason for ending the conversation'),
+});
+
+/**
+ * Operation type: Abort Conversation
+ * Immediately ends conversation without AI response
+ */
+export const abortConversationOperationSchema = z.object({
+  type: z.literal('abort_conversation').describe('Operation type'),
+  reason: z.string().optional().describe('Optional reason for aborting the conversation'),
+});
+
+/**
+ * Operation type: Go To Stage
+ * Switches the conversation to a different stage
+ */
+export const goToStageOperationSchema = z.object({
+  type: z.literal('go_to_stage').describe('Operation type'),
+  stageId: z.string().min(1).describe('ID of the stage to switch to'),
+});
+
+/**
+ * Operation type: Run Script
+ * Runs an isolated JavaScript code that can modify stage state and variables
+ */
+export const runScriptOperationSchema = z.object({
+  type: z.literal('run_script').describe('Operation type'),
+  code: z.string().min(1).describe('JavaScript code to execute in isolated context'),
+});
+
+/**
+ * Operation type: Modify User Input
+ * Changes the contents of user input using a template (can replace, redact, or inject whisper)
+ */
+export const modifyUserInputOperationSchema = z.object({
+  type: z.literal('modify_user_input').describe('Operation type'),
+  template: z.string().min(1).describe('Template to render and replace user input with'),
+});
+
+/**
+ * Operation type: Call Tool
+ * Calls a selected tool with parameters and puts the result in context
+ */
+export const callToolOperationSchema = z.object({
+  type: z.literal('call_tool').describe('Operation type'),
+  toolId: z.string().min(1).describe('ID of the tool to call'),
+  parameters: z.record(z.string(), z.unknown()).describe('Parameters to pass to the tool'),
+});
+
+/**
+ * Discriminated union of all operation types
+ * Defines the possible operations that can be executed in stage actions or global actions
+ */
+export const operationSchema = z.discriminatedUnion('type', [
+  endConversationOperationSchema,
+  abortConversationOperationSchema,
+  goToStageOperationSchema,
+  runScriptOperationSchema,
+  modifyUserInputOperationSchema,
+  callToolOperationSchema,
+]);
+
+/**
  * Schema for enter behavior configuration
  * Defines what happens when a conversation enters this stage
  */
@@ -27,7 +95,7 @@ export const stageActionSchema = z.object({
   name: z.string().min(1).describe('Display name of the action'),
   condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
   promptTrigger: z.string().min(1).describe('Description of when this action should be triggered'),
-  operations: z.array(z.string()).describe('Array of operations to execute (e.g., "ai_response", "modify_variables", "go_to_stage")'),
+  operations: z.array(operationSchema).describe('Array of operations to execute when action is triggered'),
   template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
@@ -144,3 +212,12 @@ export type StageListResponse = z.infer<typeof stageListResponseSchema>;
 
 /** Definition of a single action within a stage */
 export type StageAction = z.infer<typeof stageActionSchema>;
+
+/** Operation types */
+export type Operation = z.infer<typeof operationSchema>;
+export type EndConversationOperation = z.infer<typeof endConversationOperationSchema>;
+export type AbortConversationOperation = z.infer<typeof abortConversationOperationSchema>;
+export type GoToStageOperation = z.infer<typeof goToStageOperationSchema>;
+export type RunScriptOperation = z.infer<typeof runScriptOperationSchema>;
+export type ModifyUserInputOperation = z.infer<typeof modifyUserInputOperationSchema>;
+export type CallToolOperation = z.infer<typeof callToolOperationSchema>;

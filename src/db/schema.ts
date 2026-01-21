@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { StageAction } from '../http/contracts/stage';
+import { StageAction, Operation } from '../http/contracts/stage';
 import { ConversationState } from '../services/live/ConversationRunner';
 
 // User table
@@ -183,7 +183,7 @@ export const globalActions = pgTable('global_actions', {
   name: text('name').notNull(),
   condition: text('condition'),
   promptTrigger: text('prompt_trigger').notNull(),
-  operations: jsonb('operations').notNull().default([]).$type<string[]>(),
+  operations: jsonb('operations').notNull().default([]).$type<Operation[]>(),
   template: text('template'),
   examples: jsonb('examples').$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),

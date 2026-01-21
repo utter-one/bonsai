@@ -1,0 +1,492 @@
+import { injectable, inject } from 'tsyringe';
+import { logger } from '../../utils/logger';
+import { ConversationRunner } from './ConversationRunner';
+import { ToolService } from '../ToolService';
+import type { Operation, StageAction } from '../../http/contracts/stage';
+import type { GlobalActionResponse } from '../../http/contracts/globalAction';
+
+/**
+ * Execution result for an action
+ */
+export type ActionExecutionResult = {
+  actionName: string;
+  success: boolean;
+  shouldEndConversation: boolean;
+  shouldAbortConversation: boolean;
+  endReason?: string;
+  abortReason?: string;
+  error?: string;
+};
+
+/**
+ * Operation with its source action for tracking
+ */
+type OperationWithSource = {
+  operation: Operation;
+  actionName: string;
+  actionIndex: number;
+};
+
+/**
+ * Execution context for actions
+ */
+export type ActionExecutionContext = {
+  conversationId: string;
+  stageId: string;
+  userInput: string;
+  modifiedUserInput?: string;
+};
+
+/**
+ * Service responsible for executing operations defined in stage actions and global actions
+ * Handles all operation types: end_conversation, abort_conversation, go_to_stage, run_script, modify_user_input, call_tool
+ */
+@injectable()
+export class ActionsExecutor {
+  constructor(
+    @inject(ToolService) private readonly toolService: ToolService,
+  ) {}
+
+  /**
+   * Helper method to extract action name from StageAction or GlobalActionResponse
+   */
+  private getActionName(action: StageAction | GlobalActionResponse): string {
+    if ('id' in action && 'version' in action) {
+      // It's a GlobalActionResponse
+      return (action as GlobalActionResponse).name;
+    }
+    // It's a StageAction
+    return (action as StageAction).name;
+  }
+
+  /**
+   * Gets the execution priority for an operation type
+   * Lower numbers execute first
+   * @param operation - The operation to get priority for
+   * @returns Priority number (1-5)
+   */
+  private getOperationPriority(operation: Operation): number {
+    switch (operation.type) {
+      case 'call_tool':
+        return 1;
+      case 'modify_user_input':
+        return 2;
+      case 'run_script':
+        return 3;
+      case 'end_conversation':
+      case 'abort_conversation':
+        return 4;
+      case 'go_to_stage':
+        return 5;
+      default:
+        return 999; // Unknown operations execute last
+    }
+  }
+
+  /**
+   * Detects and resolves conflicts between operations
+   * @param operations - Array of operations to check for conflicts
+   * @returns Resolved operations with conflicts handled
+   */
+  private resolveOperationConflicts(operations: OperationWithSource[]): OperationWithSource[] {
+    const resolvedOperations: OperationWithSource[] = [];
+    const conflicts: string[] = [];
+
+    // Group operations by type for conflict detection
+    const goToStageOps = operations.filter(op => op.operation.type === 'go_to_stage');
+    const endConversationOps = operations.filter(op => op.operation.type === 'end_conversation');
+    const abortConversationOps = operations.filter(op => op.operation.type === 'abort_conversation');
+    const modifyUserInputOps = operations.filter(op => op.operation.type === 'modify_user_input');
+
+    // Conflict 1: Multiple go_to_stage operations with different stage IDs
+    if (goToStageOps.length > 1) {
+      const stageIds = goToStageOps.map(op => (op.operation as Extract<Operation, { type: 'go_to_stage' }>).stageId);
+      const uniqueStageIds = new Set(stageIds);
+      
+      if (uniqueStageIds.size > 1) {
+        // Multiple different stage IDs - keep only the first one
+        const firstOp = goToStageOps[0];
+        conflicts.push(`Multiple go_to_stage operations with different IDs detected (${Array.from(uniqueStageIds).join(', ')}). Using first: ${(firstOp.operation as Extract<Operation, { type: 'go_to_stage' }>).stageId} from action "${firstOp.actionName}"`);
+        
+        // Remove all but the first go_to_stage operation
+        const otherOps = operations.filter(op => op.operation.type !== 'go_to_stage');
+        resolvedOperations.push(...otherOps, firstOp);
+      } else {
+        // Same stage ID - keep only one instance
+        conflicts.push(`Multiple go_to_stage operations with same ID detected. Using first occurrence from action "${goToStageOps[0].actionName}"`);
+        const otherOps = operations.filter(op => op.operation.type !== 'go_to_stage');
+        resolvedOperations.push(...otherOps, goToStageOps[0]);
+      }
+    } else {
+      resolvedOperations.push(...operations);
+    }
+
+    // Conflict 2: Both abort_conversation and end_conversation present
+    if (abortConversationOps.length > 0 && endConversationOps.length > 0) {
+      // Abort takes precedence - remove all end_conversation operations
+      const firstAbort = abortConversationOps[0];
+      conflicts.push(`Both abort_conversation and end_conversation detected. Prioritizing abort_conversation from action "${firstAbort.actionName}" - conversation will abort immediately`);
+      
+      resolvedOperations.splice(0, resolvedOperations.length);
+      resolvedOperations.push(...operations.filter(op => op.operation.type !== 'end_conversation'));
+    }
+
+    // Conflict 3: Multiple abort_conversation operations
+    if (abortConversationOps.length > 1) {
+      const firstAbort = abortConversationOps[0];
+      conflicts.push(`Multiple abort_conversation operations detected. Using first from action "${firstAbort.actionName}"`);
+      
+      resolvedOperations.splice(0, resolvedOperations.length);
+      const otherOps = operations.filter(op => op.operation.type !== 'abort_conversation');
+      resolvedOperations.push(...otherOps, firstAbort);
+    }
+
+    // Conflict 4: Multiple end_conversation operations
+    if (endConversationOps.length > 1 && abortConversationOps.length === 0) {
+      const firstEnd = endConversationOps[0];
+      conflicts.push(`Multiple end_conversation operations detected. Using first from action "${firstEnd.actionName}"`);
+      
+      if (resolvedOperations.length === 0) {
+        resolvedOperations.push(...operations);
+      }
+      const otherOps = resolvedOperations.filter(op => op.operation.type !== 'end_conversation');
+      resolvedOperations.splice(0, resolvedOperations.length);
+      resolvedOperations.push(...otherOps, firstEnd);
+    }
+
+    // Conflict 5: Multiple modify_user_input operations - this is NOT a conflict, they chain
+    if (modifyUserInputOps.length > 1) {
+      logger.debug(`Multiple modify_user_input operations detected (${modifyUserInputOps.length}). These will chain - each modifying the result of the previous`);
+    }
+
+    // Log all conflicts detected
+    if (conflicts.length > 0) {
+      logger.warn({ conflicts }, `Resolved ${conflicts.length} operation conflict(s)`);
+    }
+
+    return resolvedOperations.length > 0 ? resolvedOperations : operations;
+  }
+
+  /**
+   * Executes all operations for a list of actions
+   * Gathers all operations from all actions, sorts by priority, resolves conflicts, and executes in order
+   * @param actions - Array of actions to execute (can be stage actions or global actions)
+   * @param runner - The conversation runner instance
+   * @param context - Execution context containing conversation and user input information
+   * @returns Array of execution results for each action
+   */
+  async executeActions(
+    actions: (StageAction | GlobalActionResponse)[],
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<ActionExecutionResult[]> {
+    logger.info({ conversationId: context.conversationId, actionCount: actions.length }, `Executing ${actions.length} action(s)`);
+
+    // Gather all operations from all actions with their source information
+    const allOperations: OperationWithSource[] = [];
+    for (let i = 0; i < actions.length; i++) {
+      const action = actions[i];
+      const actionName = this.getActionName(action);
+      
+      for (const operation of action.operations) {
+        allOperations.push({
+          operation,
+          actionName,
+          actionIndex: i,
+        });
+      }
+    }
+
+    logger.info({ conversationId: context.conversationId, totalOperations: allOperations.length }, `Gathered ${allOperations.length} operation(s) from ${actions.length} action(s)`);
+
+    // Sort all operations by priority (lower numbers execute first)
+    let sortedOperations = allOperations.sort(
+      (a, b) => this.getOperationPriority(a.operation) - this.getOperationPriority(b.operation)
+    );
+
+    // Resolve conflicts between operations
+    sortedOperations = this.resolveOperationConflicts(sortedOperations);
+
+    logger.debug({ conversationId: context.conversationId, operationOrder: sortedOperations.map(op => ({ type: op.operation.type, action: op.actionName })) }, `Executing operations in global priority order after conflict resolution`);
+
+    // Track results per action
+    const results: ActionExecutionResult[] = actions.map(action => ({
+      actionName: this.getActionName(action),
+      success: true,
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+    }));
+
+    let currentContext = { ...context };
+    let shouldStop = false;
+
+    // Execute all operations in priority order
+    for (const { operation, actionName, actionIndex } of sortedOperations) {
+      if (shouldStop) {
+        logger.debug({ conversationId: context.conversationId, operationType: operation.type, actionName }, `Skipping operation due to conversation termination`);
+        continue;
+      }
+
+      logger.debug({ conversationId: context.conversationId, actionName, operationType: operation.type }, `Executing operation: ${operation.type} from action: ${actionName}`);
+
+      try {
+        const operationResult = await this.executeOperation(operation, runner, currentContext);
+
+        // Update context with modified user input if applicable
+        if (operationResult.modifiedUserInput) {
+          currentContext.modifiedUserInput = operationResult.modifiedUserInput;
+          currentContext.userInput = operationResult.modifiedUserInput;
+        }
+
+        // Check if operation resulted in conversation termination
+        if (operationResult.shouldEndConversation) {
+          results[actionIndex].shouldEndConversation = true;
+          results[actionIndex].endReason = operationResult.endReason;
+          shouldStop = true;
+          logger.info({ conversationId: context.conversationId, actionName, endReason: operationResult.endReason }, `Conversation will end gracefully - skipping remaining operations`);
+        }
+
+        if (operationResult.shouldAbortConversation) {
+          results[actionIndex].shouldAbortConversation = true;
+          results[actionIndex].abortReason = operationResult.abortReason;
+          shouldStop = true;
+          logger.info({ conversationId: context.conversationId, actionName, abortReason: operationResult.abortReason }, `Conversation will abort immediately - skipping remaining operations`);
+        }
+      } catch (error) {
+        results[actionIndex].success = false;
+        results[actionIndex].error = error instanceof Error ? error.message : String(error);
+        logger.error({ conversationId: context.conversationId, actionName, operationType: operation.type, error: results[actionIndex].error }, `Failed to execute operation: ${operation.type}`);
+        // Continue executing other operations even if one fails
+      }
+    }
+
+    logger.info({ conversationId: context.conversationId, executedOperations: sortedOperations.length, actionCount: actions.length }, `Completed execution of operations from ${actions.length} action(s)`);
+    return results;
+  }
+
+  /**
+   * Executes a single operation based on its type
+   * @param operation - The operation to execute
+   * @param runner - The conversation runner instance
+   * @param context - Execution context
+   * @returns Result indicating if conversation should end/abort and any modified user input
+   */
+  private async executeOperation(
+    operation: Operation,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{
+    shouldEndConversation: boolean;
+    shouldAbortConversation: boolean;
+    endReason?: string;
+    abortReason?: string;
+    modifiedUserInput?: string;
+  }> {
+    switch (operation.type) {
+      case 'end_conversation':
+        return await this.executeEndConversation(operation, runner, context);
+
+      case 'abort_conversation':
+        return await this.executeAbortConversation(operation, runner, context);
+
+      case 'go_to_stage':
+        return await this.executeGoToStage(operation, runner, context);
+
+      case 'run_script':
+        return await this.executeRunScript(operation, runner, context);
+
+      case 'modify_user_input':
+        return await this.executeModifyUserInput(operation, runner, context);
+
+      case 'call_tool':
+        return await this.executeCallTool(operation, runner, context);
+
+      default:
+        // TypeScript should ensure this is unreachable
+        const exhaustiveCheck: never = operation;
+        throw new Error(`Unknown operation type: ${(exhaustiveCheck as any).type}`);
+    }
+  }
+
+  /**
+   * Executes end_conversation operation
+   */
+  private async executeEndConversation(
+    operation: Extract<Operation, { type: 'end_conversation' }>,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{ shouldEndConversation: true; shouldAbortConversation: false; endReason?: string }> {
+    logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Ending conversation gracefully`);
+    return {
+      shouldEndConversation: true,
+      shouldAbortConversation: false,
+      endReason: operation.reason,
+    };
+  }
+
+  /**
+   * Executes abort_conversation operation
+   */
+  private async executeAbortConversation(
+    operation: Extract<Operation, { type: 'abort_conversation' }>,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: true; abortReason?: string }> {
+    logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Aborting conversation immediately`);
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: true,
+      abortReason: operation.reason,
+    };
+  }
+
+  /**
+   * Executes go_to_stage operation
+   */
+  private async executeGoToStage(
+    operation: Extract<Operation, { type: 'go_to_stage' }>,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+    logger.info({ conversationId: context.conversationId, targetStageId: operation.stageId, currentStageId: context.stageId }, `Navigating to stage: ${operation.stageId}`);
+
+    await runner.goToStage(operation.stageId);
+
+    // Update context with new stage ID
+    context.stageId = operation.stageId;
+
+    logger.info({ conversationId: context.conversationId, newStageId: operation.stageId }, `Successfully navigated to stage: ${operation.stageId}`);
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+    };
+  }
+
+  /**
+   * Executes run_script operation
+   * Runs JavaScript code in an isolated context with access to stage variables
+   */
+  private async executeRunScript(
+    operation: Extract<Operation, { type: 'run_script' }>,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+    logger.info({ conversationId: context.conversationId, stageId: context.stageId, codeLength: operation.code.length }, `Running script`);
+
+    try {
+      // Get all current variables
+      const variables = await runner.getAllVariables(context.stageId);
+
+      // Create a sandbox context for script execution
+      const sandbox = {
+        variables,
+        setVariable: async (name: string, value: any) => {
+          await runner.setVariable(context.stageId, name, value);
+          variables[name] = value;
+        },
+        getVariable: async (name: string) => {
+          return await runner.getVariable(context.stageId, name);
+        },
+        console: {
+          log: (...args: any[]) => logger.info({ conversationId: context.conversationId, stageId: context.stageId }, ...args),
+          error: (...args: any[]) => logger.error({ conversationId: context.conversationId, stageId: context.stageId }, ...args),
+          warn: (...args: any[]) => logger.warn({ conversationId: context.conversationId, stageId: context.stageId }, ...args),
+        },
+      };
+
+      // Execute the script using Function constructor for isolation
+      const scriptFunction = new Function('sandbox', `
+        with (sandbox) {
+          ${operation.code}
+        }
+      `);
+
+      await scriptFunction(sandbox);
+
+      logger.info({ conversationId: context.conversationId, stageId: context.stageId }, `Script executed successfully`);
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, stageId: context.stageId, error: error instanceof Error ? error.message : String(error) }, `Failed to execute script`);
+      throw error;
+    }
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+    };
+  }
+
+  /**
+   * Executes modify_user_input operation
+   * Renders a template and replaces the user input with it
+   */
+  private async executeModifyUserInput(
+    operation: Extract<Operation, { type: 'modify_user_input' }>,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false; modifiedUserInput: string }> {
+    logger.info({ conversationId: context.conversationId, originalInput: context.userInput, template: operation.template }, `Modifying user input`);
+
+    try {
+      // Get all current variables for template rendering
+      const variables = await runner.getAllVariables(context.stageId);
+
+      // Simple template rendering: replace {{variable}} with actual values
+      let modifiedInput = operation.template;
+      for (const [key, value] of Object.entries(variables)) {
+        const placeholder = `{{${key}}}`;
+        modifiedInput = modifiedInput.replace(new RegExp(placeholder, 'g'), String(value));
+      }
+
+      // Also support {{userInput}} to include original input
+      modifiedInput = modifiedInput.replace(/\{\{userInput\}\}/g, context.userInput);
+
+      logger.info({ conversationId: context.conversationId, originalInput: context.userInput, modifiedInput }, `User input modified`);
+
+      return {
+        shouldEndConversation: false,
+        shouldAbortConversation: false,
+        modifiedUserInput: modifiedInput,
+      };
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user input`);
+      throw error;
+    }
+  }
+
+  /**
+   * Executes call_tool operation
+   * Calls a tool with the specified parameters and stores the result
+   */
+  private async executeCallTool(
+    operation: Extract<Operation, { type: 'call_tool' }>,
+    runner: ConversationRunner,
+    context: ActionExecutionContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+    logger.info({ conversationId: context.conversationId, toolId: operation.toolId, parameterCount: Object.keys(operation.parameters).length }, `Calling tool: ${operation.toolId}`);
+
+    try {
+      // Load the tool
+      const tool = await this.toolService.getToolById(operation.toolId);
+
+      // TODO: Implement actual tool execution logic
+      // This would involve:
+      // 1. Validating input parameters against tool.inputType
+      // 2. Executing the tool (likely calling an LLM with the tool's prompt)
+      // 3. Storing the result in context or variables
+      // 4. Validating output against tool.outputType
+
+      logger.warn({ conversationId: context.conversationId, toolId: operation.toolId }, `Tool execution not yet fully implemented`);
+
+      logger.info({ conversationId: context.conversationId, toolId: operation.toolId }, `Tool called successfully: ${tool.name}`);
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, toolId: operation.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
+      throw error;
+    }
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+    };
+  }
+}
