@@ -109,6 +109,16 @@ export type CallToolOperation = {
   parameters: Record<string, unknown>;
 };
 
+/** Operation: Call Webhook - Calls an HTTP(S) endpoint and stores result in context */
+export type CallWebhookOperation = {
+  type: 'call_webhook';
+  url: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: unknown;
+  resultKey: string;
+};
+
 /** Discriminated union of all operation types */
 export type Operation =
   | EndConversationOperation
@@ -117,7 +127,8 @@ export type Operation =
   | RunScriptOperation
   | ModifyUserInputOperation
   | ModifyVariablesOperation
-  | CallToolOperation;
+  | CallToolOperation
+  | CallWebhookOperation;
 
 /** Definition of a single action within a stage */
 export type StageAction = {

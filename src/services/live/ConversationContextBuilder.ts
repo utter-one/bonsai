@@ -34,6 +34,12 @@ export type ConversationContext = {
 
   /** The original user input before any action processing/redaction/etc. */
   originalUserInput?: string;
+
+  /** Results from webhooks and tools called during processing */
+  results: {
+    webhooks: Record<string, any>;
+    tools: Record<string, any>;
+  }
 }
 
 /**
@@ -52,6 +58,10 @@ export class ConversationContextBuilder {
       command: null,
       userInput,
       originalUserInput,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
     };
 
     // Get history from database

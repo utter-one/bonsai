@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
-import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation } from '../../types/models';
+import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation, CallWebhookOperation } from '../../types/models';
 
 extendZodWithOpenApi(z);
 
@@ -82,6 +82,19 @@ export const callToolOperationSchema = z.object({
 });
 
 /**
+ * Operation type: Call Webhook
+ * Calls an HTTP(S) endpoint and stores the result in conversation context
+ */
+export const callWebhookOperationSchema = z.object({
+  type: z.literal('call_webhook').describe('Operation type'),
+  url: z.string().url().describe('HTTP(S) URL to call'),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().default('GET').describe('HTTP method to use'),
+  headers: z.record(z.string(), z.string()).optional().describe('HTTP headers to send with the request'),
+  body: z.unknown().optional().describe('Request body for POST/PUT/PATCH requests'),
+  resultKey: z.string().min(1).describe('Key name to store the webhook result under in context.results.webhooks'),
+});
+
+/**
  * Discriminated union of all operation types
  * Defines the possible operations that can be executed in stage actions or global actions
  */
@@ -93,6 +106,7 @@ export const operationSchema = z.discriminatedUnion('type', [
   modifyUserInputOperationSchema,
   modifyVariablesOperationSchema,
   callToolOperationSchema,
+  callWebhookOperationSchema,
 ]);
 
 /**
@@ -231,4 +245,4 @@ export type StageResponse = z.infer<typeof stageResponseSchema>;
 export type StageListResponse = z.infer<typeof stageListResponseSchema>;
 
 // Re-export types from models.ts for convenience
-export type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation };
+export type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation, CallWebhookOperation };

@@ -4,7 +4,7 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
-import type { AbortConversationOperation, CallToolOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
+import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 
@@ -73,24 +73,26 @@ export class ActionsExecutor {
    * Gets the execution priority for an operation type
    * Lower numbers execute first
    * @param operation - The operation to get priority for
-   * @returns Priority number (1-6)
+   * @returns Priority number (1-7)
    */
   private getOperationPriority(operation: Operation): number {
     switch (operation.type) {
-      case 'call_tool':
+      case 'call_webhook':
         return 1;
-      case 'modify_variables':
+      case 'call_tool':
         return 2;
-      case 'modify_user_input':
+      case 'modify_variables':
         return 3;
-      case 'run_script':
+      case 'modify_user_input':
         return 4;
-      case 'end_conversation':
+      case 'run_script':
         return 5;
-      case 'abort_conversation':
+      case 'end_conversation':
         return 6;
-      case 'go_to_stage':
+      case 'abort_conversation':
         return 7;
+      case 'go_to_stage':
+        return 8;
       default:
         return 999; // Unknown operations execute last
     }
@@ -222,7 +224,7 @@ export class ActionsExecutor {
 
     logger.debug({ conversationId: context.conversationId, operationOrder: sortedOperations.map(op => ({ type: op.operation.type, action: op.actionName })) }, `Executing operations in global priority order after conflict resolution`);
 
-    // Track results per action
+    // Track results
     const outcome: ActionsExecutionOutcome = {
       success: true,
       shouldEndConversation: false,
@@ -321,6 +323,9 @@ export class ActionsExecutor {
 
       case 'call_tool':
         return await this.executeCallTool(operation, runner, context);
+
+      case 'call_webhook':
+        return await this.executeCallWebhook(operation, runner, context);
 
       default:
         // TypeScript should ensure this is unreachable
@@ -527,6 +532,90 @@ export class ActionsExecutor {
       logger.info({ conversationId: context.conversationId, toolId: operation.toolId }, `Tool called successfully: ${tool.name}`);
     } catch (error) {
       logger.error({ conversationId: context.conversationId, toolId: operation.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
+      throw error;
+    }
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+    };
+  }
+
+  /**
+   * Executes call_webhook operation
+   * Calls an HTTP(S) endpoint and stores the result in conversation context
+   */
+  private async executeCallWebhook(
+    operation: CallWebhookOperation,
+    runner: ConversationRunner,
+    context: ConversationContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+    logger.info({ conversationId: context.conversationId, url: operation.url, method: operation.method || 'GET', resultKey: operation.resultKey }, `Calling webhook: ${operation.url}`);
+
+    try {
+      // Render URL through templating engine
+      const renderedUrl = await this.templatingEngine.render(operation.url, context);
+
+      // Render headers through templating engine
+      const renderedHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (operation.headers) {
+        for (const [key, value] of Object.entries(operation.headers)) {
+          renderedHeaders[key] = await this.templatingEngine.render(value, context);
+        }
+      }
+
+      // Prepare fetch options
+      const fetchOptions: RequestInit = {
+        method: operation.method || 'GET',
+        headers: renderedHeaders,
+      };
+
+      // Add body for POST/PUT/PATCH requests
+      if (operation.body && ['POST', 'PUT', 'PATCH'].includes(operation.method || 'GET')) {
+        // Render body through templating engine
+        const bodyString = typeof operation.body === 'string' ? operation.body : JSON.stringify(operation.body);
+        const renderedBody = await this.templatingEngine.render(bodyString, context);
+        fetchOptions.body = renderedBody;
+      }
+
+      // Make the HTTP request
+      const response = await fetch(renderedUrl, fetchOptions);
+
+      // Parse response
+      let result: any;
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        result = await response.json();
+      } else {
+        result = await response.text();
+      }
+
+      // Store result in context
+      if (!context.results) {
+        context.results = { webhooks: {}, tools: {} };
+      }
+      if (!context.results.webhooks) {
+        context.results.webhooks = {};
+      }
+      
+      // Convert headers to plain object
+      const headersObj: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headersObj[key] = value;
+      });
+      
+      context.results.webhooks[operation.resultKey] = {
+        status: response.status,
+        statusText: response.statusText,
+        headers: headersObj,
+        data: result,
+      };
+
+      logger.info({ conversationId: context.conversationId, url: operation.url, status: response.status, resultKey: operation.resultKey }, `Webhook called successfully and result stored`);
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, url: operation.url, error: error instanceof Error ? error.message : String(error) }, `Failed to call webhook`);
       throw error;
     }
 
