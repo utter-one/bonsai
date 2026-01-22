@@ -16,7 +16,9 @@ export type AzureAsrProviderConfig = {
    * The subscription key to use for the speech recognition service.
    */
   subscriptionKey: string;
+};
 
+export type AzureAsrSettings = {
   /**
    * The language code for speech recognition (e.g., 'en-US')
    */
@@ -26,7 +28,7 @@ export type AzureAsrProviderConfig = {
    * The phrases to add to the speech recognition dictionary.
    */
   dictionaryPhrases?: string[];
-};
+}
 
 /**
  * Implementation of ASR provider using the Azure Speech SDK
@@ -44,7 +46,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    * Creates a new Azure ASR provider instance
    * @param config Azure Speech service configuration
    */
-  constructor(config: AzureAsrProviderConfig) {
+  constructor(config: AzureAsrProviderConfig, private settings: AzureAsrSettings) {
     super(config);
   }
 
@@ -75,15 +77,15 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
       this.config.subscriptionKey,
       this.config.region
     );
-    this.azureSpeechConfig.speechRecognitionLanguage = this.config.language || 'en-US';
+    this.azureSpeechConfig.speechRecognitionLanguage = this.settings.language || 'en-US';
 
     this.speechRecognizer = new azureSDK.SpeechRecognizer(this.azureSpeechConfig, this.audioConfig);
     logger.info(`[ASR] Created Azure speech recognition instance`);
 
     // Add phrases to the phrase list if they are provided
-    if (this.config.dictionaryPhrases && this.config.dictionaryPhrases.length) {
+    if (this.settings.dictionaryPhrases && this.settings.dictionaryPhrases.length) {
       const phraseList = PhraseListGrammar.fromRecognizer(this.speechRecognizer);
-      phraseList.addPhrases(this.config.dictionaryPhrases);
+      phraseList.addPhrases(this.settings.dictionaryPhrases);
     }
   }
 

@@ -34,11 +34,11 @@ export class ProjectService extends BaseService {
 
     try {
       const id = `proj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, metadata: input.metadata, version: 1 }).returning();
+      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, constants: input.constants, metadata: input.metadata, version: 1 }).returning();
 
       const createdProject = project[0];
 
-      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, metadata: createdProject.metadata }, context?.adminId);
+      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, constants: createdProject.constants, metadata: createdProject.metadata }, context?.adminId);
 
       logger.info({ projectId: createdProject.id }, 'Project created successfully');
 
@@ -135,14 +135,14 @@ export class ProjectService extends BaseService {
         throw new OptimisticLockError('Project');
       }
 
-      const updateData = { name: input.name, description: input.description, metadata: input.metadata, version: existingProject.version + 1, updatedAt: new Date() };
+      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, constants: input.constants, metadata: input.metadata, version: existingProject.version + 1, updatedAt: new Date() };
       const updatedProject = await db.update(projects).set(updateData).where(eq(projects.id, id)).returning();
 
       if (!updatedProject[0]) {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, metadata: existingProject.metadata }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, metadata: updatedProject[0].metadata }, context?.adminId);
+      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, constants: existingProject.constants, metadata: existingProject.metadata }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata }, context?.adminId);
 
       logger.info({ projectId: id }, 'Project updated successfully');
 
@@ -172,7 +172,7 @@ export class ProjectService extends BaseService {
 
       await db.delete(projects).where(eq(projects.id, id));
 
-      await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, metadata: existingProject.metadata }, context?.adminId);
+      await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, constants: existingProject.constants, metadata: existingProject.metadata }, context?.adminId);
 
       logger.info({ projectId: id }, 'Project deleted successfully');
     } catch (error) {

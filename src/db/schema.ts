@@ -142,6 +142,13 @@ export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
+  asrConfig: jsonb('asr_config').$type<{
+    asrProviderId?: string;
+    settings?: unknown;
+  }>(),
+  acceptVoice: boolean('accept_voice').notNull().default(true),
+  generateVoice: boolean('generate_voice').notNull().default(true),
+  constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

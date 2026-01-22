@@ -152,12 +152,20 @@ export class ConversationRunner {
     }
     const voiceConfig = persona.voiceConfig;
     const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, voiceConfig.voiceProviderId) });
-    if (voiceProviderEntity) {
+    if (project.generateVoice && voiceProviderEntity) {
       stageData.ttsProvider = this.ttsProviderFactory.createProvider(voiceProviderEntity);
       stageData.voiceConfig = voiceConfig;
     }
 
-    // TODO: Initialize ASR provider if configured
+    // Initialize ASR provider if configured
+    if (project.acceptVoice && project.asrConfig?.asrProviderId && project.asrConfig.settings) {
+      const asrProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, project.asrConfig.asrProviderId) });
+      if (asrProviderEntity) {
+        stageData.asrProvider = this.asrProviderFactory.createProvider(asrProviderEntity, project.asrConfig.settings);
+      } else {
+        throw new NotFoundError(`ASR Provider with ID ${project.asrConfig.asrProviderId} not found`);
+      }
+    }
 
     return stageData;
   }
