@@ -146,6 +146,8 @@ export const projects = pgTable('projects', {
     asrProviderId?: string;
     settings?: unknown;
   }>(),
+  acceptVoice: boolean('accept_voice').notNull().default(true),
+  generateVoice: boolean('generate_voice').notNull().default(true),
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
