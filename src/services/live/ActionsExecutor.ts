@@ -4,7 +4,7 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
-import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
+import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyUserProfileOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 
@@ -83,16 +83,18 @@ export class ActionsExecutor {
         return 2;
       case 'modify_variables':
         return 3;
-      case 'modify_user_input':
+      case 'modify_user_profile':
         return 4;
-      case 'run_script':
+      case 'modify_user_input':
         return 5;
-      case 'end_conversation':
+      case 'run_script':
         return 6;
-      case 'abort_conversation':
+      case 'end_conversation':
         return 7;
-      case 'go_to_stage':
+      case 'abort_conversation':
         return 8;
+      case 'go_to_stage':
+        return 9;
       default:
         return 999; // Unknown operations execute last
     }
@@ -321,6 +323,9 @@ export class ActionsExecutor {
       case 'modify_variables':
         return await this.executeModifyVariables(operation, runner, context);
 
+      case 'modify_user_profile':
+        return await this.executeModifyUserProfile(operation, runner, context);
+
       case 'call_tool':
         return await this.executeCallTool(operation, runner, context);
 
@@ -496,6 +501,85 @@ export class ActionsExecutor {
       logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: operation.modifications.length }, `Variables modified successfully`);
     } catch (error) {
       logger.error({ conversationId: context.conversationId, stageId: context.stageId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify variables`);
+      throw error;
+    }
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+    };
+  }
+
+  /**
+   * Executes modify_user_profile operation
+   * Updates user profile fields using specific operations (set, reset, add, remove)
+   */
+  private async executeModifyUserProfile(
+    operation: ModifyUserProfileOperation,
+    runner: ConversationRunner,
+    context: ConversationContext,
+  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+    logger.info({ conversationId: context.conversationId, modificationCount: operation.modifications.length }, `Modifying user profile`);
+
+    try {
+      for (const modification of operation.modifications) {
+        const { fieldName, value } = modification;
+
+        switch (modification.operation) {
+          case 'set': {
+            await runner.setUserProfileField(fieldName, value);
+            logger.debug({ conversationId: context.conversationId, fieldName, value }, `Set user profile field: ${fieldName}`);
+            break;
+          }
+
+          case 'reset': {
+            await runner.setUserProfileField(fieldName, undefined);
+            logger.debug({ conversationId: context.conversationId, fieldName }, `Reset user profile field: ${fieldName}`);
+            break;
+          }
+
+          case 'add': {
+            const currentValue = context.userProfile[fieldName];
+            if (!Array.isArray(currentValue)) {
+              logger.warn({ conversationId: context.conversationId, fieldName, currentValue }, `User profile field ${fieldName} is not an array, initializing as array`);
+              await runner.setUserProfileField(fieldName, [value]);
+            } else {
+              await runner.setUserProfileField(fieldName, [...currentValue, value]);
+            }
+            logger.debug({ conversationId: context.conversationId, fieldName, value }, `Added to user profile array field: ${fieldName}`);
+            break;
+          }
+
+          case 'remove': {
+            const currentValue = context.userProfile[fieldName];
+            if (!Array.isArray(currentValue)) {
+              logger.warn({ conversationId: context.conversationId, fieldName, currentValue }, `User profile field ${fieldName} is not an array, cannot remove value`);
+            } else {
+              const newValue = currentValue.filter(item => JSON.stringify(item) !== JSON.stringify(value));
+              await runner.setUserProfileField(fieldName, newValue);
+              logger.debug({ conversationId: context.conversationId, fieldName, value, removedCount: currentValue.length - newValue.length }, `Removed from user profile array field: ${fieldName}`);
+            }
+            break;
+          }
+
+          default: {
+            const exhaustiveCheck: never = modification.operation;
+            throw new Error(`Unknown user profile operation: ${exhaustiveCheck}`);
+          }
+        }
+
+        // Update the context with the new value
+        if (modification.operation === 'reset') {
+          delete context.userProfile[fieldName];
+        } else {
+          const updatedValue = await runner.getUserProfileField(fieldName);
+          context.userProfile[fieldName] = updatedValue;
+        }
+      }
+
+      logger.info({ conversationId: context.conversationId, modificationCount: operation.modifications.length }, `User profile modified successfully`);
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user profile`);
       throw error;
     }
 

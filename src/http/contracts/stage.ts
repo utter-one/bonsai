@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
-import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation, CallWebhookOperation } from '../../types/models';
+import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, ModifyUserProfileOperation, VariableOperation, UserProfileOperation, CallToolOperation, CallWebhookOperation } from '../../types/models';
 
 extendZodWithOpenApi(z);
 
@@ -63,12 +63,30 @@ export const variableOperationSchema = z.object({
 });
 
 /**
+ * Schema for a single user profile modification operation
+ */
+export const userProfileOperationSchema = z.object({
+  fieldName: z.string().min(1).describe('Name of the profile field to modify'),
+  operation: z.enum(['set', 'reset', 'add', 'remove']).describe('Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)'),
+  value: z.unknown().describe('Value for the operation (not used for reset operation)'),
+});
+
+/**
  * Operation type: Modify Variables
  * Updates stage variables using specific operations
  */
 export const modifyVariablesOperationSchema = z.object({
   type: z.literal('modify_variables').describe('Operation type'),
   modifications: z.array(variableOperationSchema).min(1).describe('Array of variable modifications to apply'),
+});
+
+/**
+ * Operation type: Modify User Profile
+ * Updates user profile fields using specific operations
+ */
+export const modifyUserProfileOperationSchema = z.object({
+  type: z.literal('modify_user_profile').describe('Operation type'),
+  modifications: z.array(userProfileOperationSchema).min(1).describe('Array of user profile field modifications to apply'),
 });
 
 /**
@@ -105,6 +123,7 @@ export const operationSchema = z.discriminatedUnion('type', [
   runScriptOperationSchema,
   modifyUserInputOperationSchema,
   modifyVariablesOperationSchema,
+  modifyUserProfileOperationSchema,
   callToolOperationSchema,
   callWebhookOperationSchema,
 ]);
@@ -245,4 +264,4 @@ export type StageResponse = z.infer<typeof stageResponseSchema>;
 export type StageListResponse = z.infer<typeof stageListResponseSchema>;
 
 // Re-export types from models.ts for convenience
-export type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, VariableOperation, CallToolOperation, CallWebhookOperation };
+export type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, ModifyUserProfileOperation, VariableOperation, UserProfileOperation, CallToolOperation, CallWebhookOperation };

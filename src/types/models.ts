@@ -96,10 +96,23 @@ export type VariableOperation = {
   value: unknown;
 };
 
+/** Definition of a single user profile modification operation */
+export type UserProfileOperation = {
+  fieldName: string;
+  operation: 'set' | 'reset' | 'add' | 'remove'; // 'add' and 'remove' are for array fields
+  value: unknown;
+};
+
 /** Operation: Modify Variables - Updates stage variables using specific operations */
 export type ModifyVariablesOperation = {
   type: 'modify_variables';
   modifications: VariableOperation[];
+};
+
+/** Operation: Modify User Profile - Updates user profile fields using specific operations */
+export type ModifyUserProfileOperation = {
+  type: 'modify_user_profile';
+  modifications: UserProfileOperation[];
 };
 
 /** Operation: Call Tool - Calls a selected tool with parameters and puts result in context */
@@ -127,6 +140,7 @@ export type Operation =
   | RunScriptOperation
   | ModifyUserInputOperation
   | ModifyVariablesOperation
+  | ModifyUserProfileOperation
   | CallToolOperation
   | CallWebhookOperation;
 

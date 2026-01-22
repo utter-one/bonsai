@@ -21,6 +21,7 @@ import { ConversationContext } from './ConversationContextBuilder';
  * - `history` - Array of conversation messages with role and content
  * - `explicitAction` - The explicitly called action by the frontend, if any
  * - `vars` - Read-only object containing all stage variables
+ * - `userProfile` - Read-only object containing user profile data
  * - `console.log()`, `console.error()`, `console.warn()` - Logging functions
  */
 @injectable()
@@ -61,6 +62,7 @@ export class IsolatedScriptExecutor {
       await jail.set('history', new ivm.ExternalCopy(context.history).copyInto());
       await jail.set('explicitAction', new ivm.ExternalCopy(context.explicitAction).copyInto());
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
+      await jail.set('userProfile', new ivm.ExternalCopy(context.userProfile).copyInto());
 
       // Inject console.log, console.error, console.warn
       await jail.set('console', new ivm.ExternalCopy({

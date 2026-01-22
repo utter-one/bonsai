@@ -575,6 +575,68 @@ export class ConversationRunner {
   }
 
   /**
+   * Set a user profile field value
+   * @param fieldName - Name of the profile field to set
+   * @param fieldValue - Value to set
+   */
+  async setUserProfileField(fieldName: string, fieldValue: any): Promise<void> {
+    logger.info({ conversationId: this.conversation.id, fieldName }, `Setting user profile field ${fieldName}`);
+
+    // Load current user from database
+    const { users } = await import('../../db/schema');
+    const { eq } = await import('drizzle-orm');
+    
+    const currentUser = await db.query.users.findFirst({
+      where: eq(users.id, this.conversation.userId),
+    });
+
+    if (!currentUser) {
+      throw new NotFoundError(`User with ID ${this.conversation.userId} not found`);
+    }
+
+    // Update profile field
+    const updatedProfile = { ...currentUser.profile };
+    if (fieldValue === undefined) {
+      delete updatedProfile[fieldName];
+    } else {
+      updatedProfile[fieldName] = fieldValue;
+    }
+
+    // Update user in database
+    await db.update(users)
+      .set({ profile: updatedProfile, updatedAt: new Date() })
+      .where(eq(users.id, this.conversation.userId));
+
+    logger.info({ conversationId: this.conversation.id, fieldName }, `Successfully set user profile field ${fieldName}`);
+  }
+
+  /**
+   * Get a user profile field value
+   * @param fieldName - Name of the profile field to retrieve
+   * @returns The field value or undefined if not found
+   */
+  async getUserProfileField(fieldName: string): Promise<any> {
+    logger.info({ conversationId: this.conversation.id, fieldName }, `Getting user profile field ${fieldName}`);
+
+    const { users } = await import('../../db/schema');
+    const { eq } = await import('drizzle-orm');
+    
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, this.conversation.userId),
+    });
+
+    if (!user) {
+      throw new NotFoundError(`User with ID ${this.conversation.userId} not found`);
+    }
+
+    const value = user.profile[fieldName];
+
+    logger.info({ conversationId: this.conversation.id, fieldName, hasValue: value !== undefined }, `Retrieved user profile field ${fieldName}`);
+
+    return value;
+  }
+
+  /**
    * Execute a global action
    * @param actionName - Name of the action to execute
    * @param parameters - Array of parameters to pass to the action
