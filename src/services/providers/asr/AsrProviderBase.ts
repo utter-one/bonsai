@@ -20,6 +20,9 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   /** Callback for recognition stopped event */
   protected onRecognitionStoppedCallback?: () => void;
 
+  /** Callback for recognition started event */
+  protected onRecognitionStartedCallback?: () => void;
+
   /** Callback for fatal errors */
   protected onErrorCallback?: ErrorCallback;
 
@@ -84,6 +87,14 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
    */
   setOnRecognitionStopped(cb: () => void): void {
     this.onRecognitionStoppedCallback = cb;
+  }
+
+  /**
+   * Registers a callback for when the speech recognition session is started
+   * @param cb Callback function that is invoked when recognition starts
+   */
+  setOnRecognitionStarted(cb: () => void): void {
+    this.onRecognitionStartedCallback = cb;
   }
 
   /**

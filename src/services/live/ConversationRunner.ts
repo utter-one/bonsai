@@ -179,15 +179,22 @@ export class ConversationRunner {
       try {
         await asrProvider.init();
 
+        let isRecognizing = false;
+        asrProvider.setOnRecognitionStarted(async () => {
+          isRecognizing = true;
+        });
+        
         asrProvider.setOnRecognitionStopped(async () => {
           logger.info({ conversationId }, `ASR recognition stopped for conversation ${conversationId}`);
+
+          isRecognizing = false;
           // Get all recognized text chunks and combine them
           const allTextChunks = asrProvider.getAllTextChunks();
           const fullText = allTextChunks.map(chunk => chunk.text).join(' ').trim();
 
           if (fullText) {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
-            const context = await this.contextBuilder.buildContextForSession(this.stageData.conversation, fullText, fullText);
+            const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, fullText, fullText);
             context.userInputSource = 'voice';
             await this.processUserInput(context);
           } else {
@@ -196,13 +203,17 @@ export class ConversationRunner {
         });
 
         asrProvider.setOnError(async (error: Error) => {
-          logger.error({ conversationId, error: error.message }, `ASR error for conversation ${conversationId}: ${error.message}`);
-          // TODO: Send error to client through WebSocket
+          logger.error({ conversationId, error: error.message, isRecognizing }, `ASR error for conversation ${conversationId}: ${error.message}`);
+          if (isRecognizing) {
+            isRecognizing = false;
+            await this.markAsFailed(`ASR error: ${error.message}`);
+          }
         });
 
         logger.info({ conversationId }, `ASR provider initialized for conversation ${conversationId}`);
       } catch (error) {
         logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to initialize ASR provider for conversation ${conversationId}`);
+        throw error;
       }
     }
 
@@ -212,10 +223,12 @@ export class ConversationRunner {
         await ttsProvider.init(this.stageData.voiceConfig);
 
         let firstTtsChunkGenerated = false;
+        let isGenerating = false;
         let voiceOutputId: string = null;
 
         ttsProvider.setOnGenerationStarted(async () => {
           logger.info({ conversationId }, `TTS generation started for conversation ${conversationId}`);
+          isGenerating = true;
           firstTtsChunkGenerated = false;
           voiceOutputId = `voice_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -233,6 +246,7 @@ export class ConversationRunner {
         ttsProvider.setOnGenerationEnded(async () => {
           logger.info({ conversationId }, `TTS generation ended for conversation ${conversationId}`);
           firstTtsChunkGenerated = false;
+          isGenerating = false;
 
           // Send AI response end notification to client through WebSocket
           const message = {
@@ -274,12 +288,16 @@ export class ConversationRunner {
 
         ttsProvider.setOnError(async (error: Error) => {
           logger.error({ conversationId, error: error.message }, `TTS error for conversation ${conversationId}: ${error.message}`);
-          // TODO: Send error to client through WebSocket
+          if (isGenerating) {
+            isGenerating = false;
+            await this.markAsFailed(`TTS error: ${error.message}`);
+          }
         });
 
         logger.info({ conversationId }, `TTS provider initialized for conversation ${conversationId}`);
       } catch (error) {
         logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to initialize TTS provider for conversation ${conversationId}`);
+        throw error;
       }
     }
 
@@ -288,7 +306,7 @@ export class ConversationRunner {
       try {
         completionLlmProvider.setOnError(async (error: Error) => {
           logger.error({ conversationId, error: error.message }, `LLM completion error for conversation ${conversationId}: ${error.message}`);
-          // TODO: Send error to client through WebSocket
+          await this.markAsFailed(`LLM completion error: ${error.message}`);
         });
 
         logger.info({ conversationId, stageId: this.stageData.id }, `Completion LLM provider wired up for conversation ${conversationId}`);
@@ -304,7 +322,7 @@ export class ConversationRunner {
       try {
         classifierData.llmProvider.setOnError(async (error: Error) => {
           logger.error({ conversationId, classifierId: classifierData.classifier.id, error: error.message }, `LLM classification error for conversation ${conversationId}: ${error.message}`);
-          // TODO: Send error to client through WebSocket
+          await this.markAsFailed(`LLM classification error: ${error.message}`);
         });
 
         logger.info({ conversationId, classifierId: classifierData.classifier.id }, `Classification LLM provider wired up for classifier ${classifierData.classifier.name}`);
@@ -318,7 +336,7 @@ export class ConversationRunner {
       try {
         transformerData.llmProvider.setOnError(async (error: Error) => {
           logger.error({ conversationId, transformerId: transformerData.transformer.id, error: error.message }, `LLM transformer error for conversation ${conversationId}: ${error.message}`);
-          // TODO: Send error to client through WebSocket
+          await this.markAsFailed(`LLM transformer error: ${error.message}`);
         });
 
         logger.info({ conversationId, transformerId: transformerData.transformer.id }, `Transformer LLM provider wired up for transformer ${transformerData.transformer.name}`);
@@ -360,7 +378,7 @@ export class ConversationRunner {
       throw new Error(`Cannot receive user input in current state: ${this.conversation.status}`);
     }
 
-    const context = await this.contextBuilder.buildContextForSession(this.stageData.conversation, userInput, userInput);
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, userInput, userInput);
     context.userInputSource = 'text';
     await this.processUserInput(context);
   }
@@ -562,7 +580,7 @@ export class ConversationRunner {
    * @param parameters - Array of parameters to pass to the action
    * @returns Result of the action execution
    */
-  async runAction(actionName: string, parameters: any[]): Promise<any> {
+  async runAction(actionName: string, parameters: Record<string, any>): Promise<any> {
     logger.info({ conversationId: this.conversation.id, actionName, parameterCount: parameters.length }, `Running action ${actionName}`);
 
     if (this.conversation.status !== 'awaiting_user_input') {
@@ -570,18 +588,31 @@ export class ConversationRunner {
     }
 
     // Load the action from the database
-    const action = await db.query.globalActions.findFirst({
+    const globalAction = await db.query.globalActions.findFirst({
       where: (globalActions, { and, eq }) => and(
         eq(globalActions.projectId, this.stageData.project.id),
         eq(globalActions.name, actionName)
       )
     });
 
-    if (!action) {
+    const stageAction = this.stageData.stage.actions[actionName];
+
+    if (!globalAction && !stageAction) {
       throw new NotFoundError(`Action ${actionName} not found in project ${this.stageData.project.id}`);
     }
 
-    // TODO: Implement actual action execution logic
+    if (stageAction) { // Prefer stage-specific action if available
+      // Execute stage action
+      logger.info({ conversationId: this.conversation.id, actionName }, `Executing stage action ${actionName}`);
+      const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, stageAction, parameters);
+      await this.actionsExecutor.executeActions([stageAction], this, context);
+    } else {
+      // Execute global action
+      logger.info({ conversationId: this.conversation.id, actionName }, `Executing global action ${actionName}`);
+      const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, globalAction, parameters);
+      await this.actionsExecutor.executeActions([globalAction], this, context);
+    }
+    
     // This would involve running the action's operations with the provided parameters
     logger.warn({ conversationId: this.conversation.id, actionName }, `Action execution not yet fully implemented`);
 
