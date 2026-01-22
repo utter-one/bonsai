@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { conversationEvents, db } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
-import { Conversation } from "../../types/models";
+import { Conversation, MessageEventData } from "../../types/models";
 
 export type ConversationContext = {
   /** ID of the conversation */
@@ -28,6 +28,9 @@ export type ConversationContext = {
 
   /** User input that triggered processing (can be null if not triggered by user input) */
   userInput?: string;
+
+  /** Source of the user input (e.g., 'text' or 'voice') */
+  userInputSource?: 'text' | 'voice';
 
   /** The original user input before any action processing/redaction/etc. */
   originalUserInput?: string;
@@ -60,10 +63,10 @@ export class ConversationContextBuilder {
       orderBy: asc(conversationEvents.timestamp),
     });
     context.history = messages.map(msg => {
-      const eventData = msg.eventData as { role: 'user' | 'assistant'; content: string };
+      const eventData = msg.eventData as MessageEventData;
       return {
         role: eventData.role,
-        content: eventData.content,
+        content: eventData.text,
       };
     });
 

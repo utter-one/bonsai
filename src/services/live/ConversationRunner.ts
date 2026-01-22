@@ -2,6 +2,7 @@ import { inject } from "tsyringe";
 import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, Project, Stage, StageAction } from "../../types/models";
 import { db } from "../../db";
+import { ConversationEventType, MessageEventData, ClassificationEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData } from "../../db/schema";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
@@ -179,6 +180,7 @@ export class ConversationRunner {
           if (fullText) {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
             const context = await this.contextBuilder.buildContextForSession(this.stageData.conversation, fullText, fullText);
+            context.userInputSource = 'voice';
             await this.processUserInput(context);
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
@@ -323,10 +325,25 @@ export class ConversationRunner {
       throw new Error(`Cannot start conversation in current state: ${this.conversation.status}`);
     }
 
+    const eventData: ConversationStartEventData = {
+      stageId: this.stageData.id,
+      initialVariables: this.conversation.stageVars?.[this.stageData.id] || {},
+    };
+    await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_start', eventData);
+    logger.info({ conversationId: this.conversation.id, stageId: this.stageData.id }, 'Conversation started');
+
     throw new Error("Method not implemented.");
   }
 
   async resumeConversation() {
+    const previousStatus = this.conversation.status;
+    const eventData: ConversationResumeEventData = {
+      previousStatus,
+      stageId: this.stageData.id,
+    };
+    await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_resume', eventData);
+    logger.info({ conversationId: this.conversation.id, previousStatus, stageId: this.stageData.id }, 'Conversation resumed');
+
     throw new Error("Method not implemented.");
   }
 
@@ -336,6 +353,7 @@ export class ConversationRunner {
     }
 
     const context = await this.contextBuilder.buildContextForSession(this.stageData.conversation, userInput, userInput);
+    context.userInputSource = 'text';
     await this.processUserInput(context);
   }
 
@@ -423,6 +441,8 @@ export class ConversationRunner {
       throw new Error(`Cannot navigate to stage in current state: ${this.conversation.status}`);
     }
 
+    const fromStageId = this.stageData.id;
+
     // Load new stage data
     const newStageData = await this.buildStageData({ ...this.conversation, stageId });
 
@@ -439,6 +459,12 @@ export class ConversationRunner {
 
     // Re-wire providers for the new stage
     await this.wireUpProviders();
+
+    const eventData: JumpToStageEventData = {
+      fromStageId,
+      toStageId: stageId,
+    };
+    await this.conversationService.saveConversationEvent(this.conversation.id, 'jump_to_stage', eventData);
 
     logger.info({ conversationId: this.conversation.id, stageId }, `Successfully navigated to stage ${stageId}`);
   }
@@ -566,6 +592,12 @@ export class ConversationRunner {
     await this.conversationService.saveConversationState(this.conversation.id, 'failed', reason);
     logger.error({ conversationId: this.stageData.conversation.id, reason }, `Conversation ${this.stageData.conversation.id} marked as failed: ${reason}`);
 
+    const eventData: ConversationFailedEventData = {
+      error: reason,
+      stageId: this.stageData.id,
+    };
+    await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_failed', eventData);
+
     // Update conversation status via ConversationService
     try {
       await this.conversationService.failConversation(this.stageData.conversation.id, reason);
@@ -580,7 +612,9 @@ export class ConversationRunner {
    */
   private async processUserInput(context: ConversationContext) {
     await this.changeState('processing_user_input');
+    const originalText = context.userInput;
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, context);
+
     const stageActions = this.stageData.stage.actions;
     const actions = classificationResults.map(r => {
       const stageAction = stageActions[r.actionName];
@@ -591,19 +625,64 @@ export class ConversationRunner {
       return stageAction;
     }).filter(a => a !== null) as StageAction[];
 
-    const actionResults = await this.actionsExecutor.executeActions(actions, this, context)
+    // Register action events before execution
+    for (const action of actions) {
+      const actionEventData: ActionEventData = {
+        actionName: action.name || '',
+        stageId: this.stageData.id,
+        operations: action.operations,
+      };
+      await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
+    }
 
-    const shouldGenerateResponse = !actionResults.some(r => r.shouldAbortConversation);
+    const executionOutcome = await this.actionsExecutor.executeActions(actions, this, context)
+    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
+
+    // Save event for user message
+    const messageEventData: MessageEventData = {
+      role: 'user',
+      text: context.userInput,
+      originalText: context.originalUserInput,
+      metadata: {
+        source: context.userInputSource,
+      }
+    };
+    await this.conversationService.saveConversationEvent(this.stageData.conversation.id, 'message', messageEventData);
+
+
     if (shouldGenerateResponse) {
       await this.changeState('generating_response');
       this.generateResonse();
+    } else if (executionOutcome.shouldEndConversation) {
+      const eventData: ConversationEndEventData = {
+        stageId: this.stageData.id,
+        reason: executionOutcome.endReason || 'Action execution completed conversation',
+      };
+      await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_end', eventData);
+      await this.changeState('finished');
+    } else if (executionOutcome.shouldAbortConversation) {
+      const eventData: ConversationAbortedEventData = {
+        stageId: this.stageData.id,
+        reason: executionOutcome.abortReason || 'Conversation aborted by action',
+      };
+      await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_aborted', eventData);
+      await this.changeState('finished');
     } else {
-      // it means the conversation was aborted
       await this.changeState('finished');
     }
   }
 
   private async generateResonse() {
+    // TODO: Implement response generation
+    // When implemented, this should:
+    // 1. Generate AI response using the completion LLM provider
+    // 2. Register a 'message' event with role: 'assistant' and the generated content
+    // Example:
+    // const messageEventData: MessageEventData = {
+    //   role: 'assistant',
+    //   content: generatedResponse,
+    // };
+    // await this.conversationService.saveConversationEvent(this.conversation.id, 'message', messageEventData);
     throw new Error("Method not implemented.");
   }
 

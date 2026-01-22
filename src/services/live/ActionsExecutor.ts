@@ -10,15 +10,28 @@ import { ConversationContext, ConversationContextBuilder } from './ConversationC
 /**
  * Execution result for an action
  */
-export type ActionExecutionResult = {
-  actionName: string;
+export type ActionsExecutionOutcome = {
   success: boolean;
   shouldEndConversation: boolean;
-  shouldAbortConversation: boolean;
   endReason?: string;
+  shouldAbortConversation: boolean;
   abortReason?: string;
+  hasModifiedVars: boolean;
+  hasModifiedUserInput: boolean;
   error?: string;
 };
+
+/**
+ * Outcome of an operation execution
+ */
+export type OperationOutcome = {
+    shouldEndConversation: boolean;
+    endReason?: string;
+    shouldAbortConversation: boolean;
+    abortReason?: string;
+    modifiedUserInput?: string;
+    modifiedVars?: Record<string, any>;
+  };
 
 /**
  * Operation with its source action for tracking
@@ -170,13 +183,14 @@ export class ActionsExecutor {
    * Gathers all operations from all actions, sorts by priority, resolves conflicts, and executes in order
    * @param actions - Array of actions to execute (can be stage actions or global actions)
    * @param runner - The conversation runner instance
+   * @param context - Execution context
    * @returns Array of execution results for each action
    */
   async executeActions(
     actions: (StageAction | GlobalAction)[],
     runner: ConversationRunner,
     context: ConversationContext
-  ): Promise<ActionExecutionResult[]> {
+  ): Promise<ActionsExecutionOutcome> {
     logger.info({ conversationId: context.conversationId, actionCount: actions.length }, `Executing ${actions.length} action(s)`);
 
     // Gather all operations from all actions with their source information
@@ -207,12 +221,13 @@ export class ActionsExecutor {
     logger.debug({ conversationId: context.conversationId, operationOrder: sortedOperations.map(op => ({ type: op.operation.type, action: op.actionName })) }, `Executing operations in global priority order after conflict resolution`);
 
     // Track results per action
-    const results: ActionExecutionResult[] = actions.map(action => ({
-      actionName: this.getActionName(action),
+    const outcome: ActionsExecutionOutcome = {
       success: true,
       shouldEndConversation: false,
       shouldAbortConversation: false,
-    }));
+      hasModifiedVars: false,
+      hasModifiedUserInput: false,
+    };
 
     let currentContext = { ...context };
     let shouldStop = false;
@@ -232,32 +247,43 @@ export class ActionsExecutor {
         // Update context with modified user input if applicable
         if (operationResult.modifiedUserInput) {
           currentContext.userInput = operationResult.modifiedUserInput;
+          outcome.hasModifiedUserInput = true;
+        }
+
+        // Update modified variables in context if applicable
+        if (operationResult.modifiedVars) {
+          currentContext.vars = {
+            ...currentContext.vars,
+            ...operationResult.modifiedVars,
+          };
+          outcome.hasModifiedVars = true;
         }
 
         // Check if operation resulted in conversation termination
         if (operationResult.shouldEndConversation) {
-          results[actionIndex].shouldEndConversation = true;
-          results[actionIndex].endReason = operationResult.endReason;
+
+          outcome.shouldEndConversation = true;
+          outcome.endReason = operationResult.endReason;
           shouldStop = true;
           logger.info({ conversationId: context.conversationId, actionName, endReason: operationResult.endReason }, `Conversation will end gracefully - skipping remaining operations`);
         }
 
         if (operationResult.shouldAbortConversation) {
-          results[actionIndex].shouldAbortConversation = true;
-          results[actionIndex].abortReason = operationResult.abortReason;
+          outcome.shouldAbortConversation = true;
+          outcome.abortReason = operationResult.abortReason;
           shouldStop = true;
           logger.info({ conversationId: context.conversationId, actionName, abortReason: operationResult.abortReason }, `Conversation will abort immediately - skipping remaining operations`);
         }
       } catch (error) {
-        results[actionIndex].success = false;
-        results[actionIndex].error = error instanceof Error ? error.message : String(error);
-        logger.error({ conversationId: context.conversationId, actionName, operationType: operation.type, error: results[actionIndex].error }, `Failed to execute operation: ${operation.type}`);
-        // Continue executing other operations even if one fails
+        outcome.success = false;
+        outcome.error = error instanceof Error ? error.message : String(error);
+        logger.error({ conversationId: context.conversationId, actionName, operationType: operation.type, error: outcome.error }, `Failed to execute operation: ${operation.type}`);
+        // Continue executing other operations even if one fails?
       }
     }
 
     logger.info({ conversationId: context.conversationId, executedOperations: sortedOperations.length, actionCount: actions.length }, `Completed execution of operations from ${actions.length} action(s)`);
-    return results;
+    return outcome;
   }
 
   /**
@@ -271,13 +297,7 @@ export class ActionsExecutor {
     operation: Operation,
     runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{
-    shouldEndConversation: boolean;
-    shouldAbortConversation: boolean;
-    endReason?: string;
-    abortReason?: string;
-    modifiedUserInput?: string;
-  }> {
+  ): Promise<OperationOutcome> {
     switch (operation.type) {
       case 'end_conversation':
         return await this.executeEndConversation(operation, runner, context);

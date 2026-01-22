@@ -21,6 +21,21 @@ import {
   projects,
 } from '../db/schema';
 
+// Re-export conversation event types from schema
+export type {
+  ConversationEventType,
+  ConversationEventData,
+  MessageEventData,
+  ClassificationEventData,
+  ActionEventData,
+  CommandEventData,
+  ConversationStartEventData,
+  ConversationResumeEventData,
+  ConversationEndEventData,
+  ConversationAbortedEventData,
+  ConversationFailedEventData,
+} from '../db/schema';
+
 // Inferred select models from Drizzle schema
 export type User = InferSelectModel<typeof users>;
 export type Conversation = InferSelectModel<typeof conversations>;
