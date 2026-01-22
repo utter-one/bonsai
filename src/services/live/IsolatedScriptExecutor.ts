@@ -19,10 +19,8 @@ import { ConversationContext } from './ConversationContextBuilder';
  * - `projectId` - ID of the project the conversation belongs to
  * - `stageId` - ID of the current stage in the conversation
  * - `history` - Array of conversation messages with role and content
- * - `command` - Current command being executed, if any
- * - `variables` - Read-only object containing all stage variables
- * - `setVariable(name, value)` - Sets a stage variable
- * - `getVariable(name)` - Gets a stage variable (includes pending updates)
+ * - `explicitAction` - The explicitly called action by the frontend, if any
+ * - `vars` - Read-only object containing all stage variables
  * - `console.log()`, `console.error()`, `console.warn()` - Logging functions
  */
 @injectable()
@@ -61,7 +59,7 @@ export class IsolatedScriptExecutor {
       await jail.set('projectId', new ivm.ExternalCopy(context.projectId).copyInto());
       await jail.set('stageId', new ivm.ExternalCopy(context.stageId).copyInto());
       await jail.set('history', new ivm.ExternalCopy(context.history).copyInto());
-      await jail.set('command', new ivm.ExternalCopy(context.command).copyInto());
+      await jail.set('explicitAction', new ivm.ExternalCopy(context.explicitAction).copyInto());
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
 
       // Inject console.log, console.error, console.warn

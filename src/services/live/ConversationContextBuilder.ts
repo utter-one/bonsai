@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { conversationEvents, db } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
-import { Conversation, MessageEventData } from "../../types/models";
+import { Conversation, GlobalAction, MessageEventData, StageAction } from "../../types/models";
 
 export type ConversationContext = {
   /** ID of the conversation */
@@ -23,8 +23,8 @@ export type ConversationContext = {
     content: string;
   }>;
 
-  /** Current command being executed, if any */
-  command: any;
+  /** Explicitly called action by the frontend */
+  explicitAction?: StageAction | GlobalAction | null;
 
   /** User input that triggered processing (can be null if not triggered by user input) */
   userInput?: string;
@@ -48,7 +48,40 @@ export type ConversationContext = {
  */
 @singleton()
 export class ConversationContextBuilder {
-  async buildContextForSession(conversation: Conversation, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+  async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, vars: Record<string, any>): Promise<ConversationContext> {
+    const context = {
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      stageId: conversation.stageId,
+      vars,
+      history: [],
+      command: action,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+    };
+
+    // Get history from database
+    const messages = await db.query.conversationEvents.findMany({
+      where: and(
+        eq(conversationEvents.conversationId, conversation.id),
+        eq(conversationEvents.eventType, 'message')
+      ),
+      orderBy: asc(conversationEvents.timestamp),
+    });
+    context.history = messages.map(msg => {
+      const eventData = msg.eventData as MessageEventData;
+      return {
+        role: eventData.role,
+        content: eventData.text,
+      };
+    });
+
+    return context;
+  }
+  
+  async buildContextForUserInput(conversation: Conversation, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,

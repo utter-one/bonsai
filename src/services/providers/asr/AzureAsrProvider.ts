@@ -141,6 +141,9 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
       this.speechRecognizer!.startContinuousRecognitionAsync(
         () => {
           logger.info(`[ASR] Started recognition`);
+          if (this.onRecognitionStartedCallback) {
+            this.onRecognitionStartedCallback();
+          }
           if (this.audioStream) {
             for (const buffer of this.bufferArray) {
               const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;

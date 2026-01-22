@@ -76,6 +76,13 @@ export interface IAsrProvider {
   setOnRecognitionStopped(cb: () => void): void;
 
   /**
+   * Registers a callback for when the speech recognition session is started
+   * This is called when the ASR provider successfully begins recognition
+   * @param cb Callback function that is invoked when recognition starts
+   */
+  setOnRecognitionStarted(cb: () => void): void;
+
+  /**
    * Registers a callback for handling fatal recognition errors
    * This is called when an unrecoverable error occurs during recognition
    * @param cb Callback function that receives the error
