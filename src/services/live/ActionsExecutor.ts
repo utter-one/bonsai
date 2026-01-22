@@ -2,6 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
 import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
+import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
 import type { AbortConversationOperation, CallToolOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
 import type { GlobalAction } from '../../types/models';
@@ -53,6 +54,7 @@ export class ActionsExecutor {
     @inject(IsolatedScriptExecutor) private readonly scriptRunner: IsolatedScriptExecutor,
     @inject(ToolService) private readonly toolService: ToolService,
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
+    @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
   ) {}
 
   /**
@@ -401,7 +403,7 @@ export class ActionsExecutor {
 
   /**
    * Executes modify_user_input operation
-   * Renders a template and replaces the user input with it
+   * Renders a template using TemplatingEngine and replaces the user input with it
    */
   private async executeModifyUserInput(
     operation: ModifyUserInputOperation,
@@ -411,18 +413,8 @@ export class ActionsExecutor {
     logger.info({ conversationId: context.conversationId, originalInput: context.userInput, template: operation.template }, `Modifying user input`);
 
     try {
-      // Get all current variables for template rendering
-      const variables = await runner.getAllVariables(context.stageId);
-
-      // Simple template rendering: replace {{variable}} with actual values
-      let modifiedInput = operation.template;
-      for (const [key, value] of Object.entries(variables)) {
-        const placeholder = `{{${key}}}`;
-        modifiedInput = modifiedInput.replace(new RegExp(placeholder, 'g'), String(value));
-      }
-
-      // Also support {{userInput}} to include original input
-      modifiedInput = modifiedInput.replace(/\{\{userInput\}\}/g, context.userInput);
+      // Render the template using the templating engine with full context
+      const modifiedInput = await this.templatingEngine.render(operation.template, context);
 
       logger.info({ conversationId: context.conversationId, originalInput: context.userInput, modifiedInput }, `User input modified`);
 
