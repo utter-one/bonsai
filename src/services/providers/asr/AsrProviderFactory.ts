@@ -2,7 +2,7 @@ import { singleton } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IAsrProvider } from './IAsrProvider';
-import { AzureAsrProvider, AzureAsrProviderConfig } from './AzureAsrProvider';
+import { AzureAsrProvider, AzureAsrProviderConfig, AzureAsrSettings } from './AzureAsrProvider';
 
 /**
  * Supported ASR provider API types
@@ -21,7 +21,7 @@ export class AsrProviderFactory {
    * @returns Configured ASR provider instance
    * @throws {Error} When provider type is not 'asr' or when API type is not supported
    */
-  createProvider(provider: Provider): IAsrProvider {
+  createProvider(provider: Provider, settings: unknown): IAsrProvider {
     // Validate provider type
     if (provider.providerType !== 'asr') {
       const errorMessage = `Provider ${provider.id} is not an ASR provider. Expected providerType 'asr', got '${provider.providerType}'`;
@@ -32,7 +32,7 @@ export class AsrProviderFactory {
     // Create provider instance based on API type
     switch (provider.apiType) {
       case 'azure':
-        return this.createAzureProvider(provider);
+        return this.createAzureProvider(provider, settings as AzureAsrSettings);
 
       default:
         const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure`;
@@ -47,7 +47,7 @@ export class AsrProviderFactory {
    * @returns Configured Azure ASR provider
    * @throws {Error} When required Azure configuration fields are missing
    */
-  private createAzureProvider(provider: Provider): AzureAsrProvider {
+  private createAzureProvider(provider: Provider, settings: AzureAsrSettings): AzureAsrProvider {
     const config = provider.config as Partial<AzureAsrProviderConfig>;
 
     // Validate required fields
@@ -61,12 +61,10 @@ export class AsrProviderFactory {
     const azureConfig: AzureAsrProviderConfig = {
       region: config.region,
       subscriptionKey: config.subscriptionKey,
-      language: config.language,
-      dictionaryPhrases: config.dictionaryPhrases,
     };
 
     logger.info(`Creating Azure ASR provider for provider ${provider.id} with region ${azureConfig.region}`);
-    return new AzureAsrProvider(azureConfig);
+    return new AzureAsrProvider(azureConfig, settings);
   }
 
   /**

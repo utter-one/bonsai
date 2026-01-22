@@ -158,6 +158,14 @@ export class ConversationRunner {
     }
 
     // TODO: Initialize ASR provider if configured
+    if (project.asrConfig?.asrProviderId && project.asrConfig.settings) {
+      const asrProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, project.asrConfig.asrProviderId) });
+      if (asrProviderEntity) {
+        stageData.asrProvider = this.asrProviderFactory.createProvider(asrProviderEntity, project.asrConfig.settings);
+      } else {
+        throw new NotFoundError(`ASR Provider with ID ${project.asrConfig.asrProviderId} not found`);
+      }
+    }
 
     return stageData;
   }

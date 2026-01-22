@@ -8,11 +8,24 @@ extendZodWithOpenApi(z);
  */
 
 /**
+ * Schema for ASR configuration settings
+ * Provides configuration for automatic speech recognition
+ */
+export const asrConfigSchema = z.object({
+  asrProviderId: z.string().optional().describe('ID of the ASR provider (e.g., "azure-speech", "openai-whisper")'),
+  settings: z.unknown().optional().describe('ASR-specific settings including model, language preferences, etc.'),
+}).optional().describe('ASR configuration settings');
+
+export type AsrConfig = z.infer<typeof asrConfigSchema>;
+
+/**
  * Schema for creating a new project
  */
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(255).describe('The name of the project'),
   description: z.string().optional().describe('A description of the project'),
+  asrConfig: asrConfigSchema.describe('Optional ASR configuration settings'),
+  constants: z.record(z.string(), z.any()).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
 });
 
@@ -24,6 +37,8 @@ export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
 export const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional().describe('The updated name of the project'),
   description: z.string().optional().describe('The updated description of the project'),
+  asrConfig: asrConfigSchema.describe('Updated ASR configuration settings'),
+  constants: z.record(z.string(), z.any()).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
 });
 
@@ -36,6 +51,8 @@ export const projectResponseSchema = z.object({
   id: z.string().describe('The unique identifier of the project'),
   name: z.string().describe('The name of the project'),
   description: z.string().optional().describe('A description of the project'),
+  asrConfig: asrConfigSchema.describe('ASR configuration settings'),
+  constants: z.record(z.string(), z.any()).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.string().describe('The timestamp when the project was created'),
