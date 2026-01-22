@@ -1,7 +1,96 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { StageAction } from '../http/contracts/stage';
+import { StageAction, Operation } from '../http/contracts/stage';
 import { ConversationState } from '../services/live/ConversationRunner';
+
+// Conversation Event Types
+export type ConversationEventType =
+  | 'message'
+  | 'classification'
+  | 'action'
+  | 'command'
+  | 'conversation_start'
+  | 'conversation_resume'
+  | 'conversation_end'
+  | 'conversation_aborted'
+  | 'conversation_failed'
+  | 'jump_to_stage';
+
+// Event Data Types
+export type MessageEventData = {
+  role: 'user' | 'assistant';
+  text: string;
+  originalText: string;
+  metadata?: Record<string, any>;
+};
+
+export type ClassificationEventData = {
+  classifierId: string;
+  input: string;
+  actions: StageAction[];
+  metadata?: Record<string, any>;
+};
+
+export type ActionEventData = {
+  actionName: string;
+  stageId: string;
+  operations: Operation[];
+  metadata?: Record<string, any>;
+};
+
+export type CommandEventData = {
+  command: string;
+  parameters?: Record<string, any>;
+  metadata?: Record<string, any>;
+};
+
+export type ConversationStartEventData = {
+  stageId: string;
+  initialVariables?: Record<string, any>;
+  metadata?: Record<string, any>;
+};
+
+export type JumpToStageEventData = {
+  fromStageId: string;
+  toStageId: string;
+  metadata?: Record<string, any>;
+};
+
+export type ConversationResumeEventData = {
+  previousStatus: ConversationState;
+  stageId: string;
+  metadata?: Record<string, any>;
+};
+
+export type ConversationEndEventData = {
+  reason?: string;
+  stageId: string;
+  metadata?: Record<string, any>;
+};
+
+export type ConversationAbortedEventData = {
+  reason: string;
+  stageId: string;
+  metadata?: Record<string, any>;
+};
+
+export type ConversationFailedEventData = {
+  error: string;
+  stageId?: string;
+  metadata?: Record<string, any>;
+};
+
+export type ConversationEventData =
+  | MessageEventData
+  | ClassificationEventData
+  | ActionEventData
+  | CommandEventData
+  | ConversationStartEventData
+  | ConversationResumeEventData
+  | ConversationEndEventData
+  | ConversationAbortedEventData
+  | ConversationFailedEventData
+  | JumpToStageEventData;
 
 // User table
 export const users = pgTable('users', {
@@ -30,8 +119,8 @@ export const conversations = pgTable('conversations', {
 export const conversationEvents = pgTable('conversation_events', {
   id: text('id').primaryKey(),
   conversationId: text('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  eventType: text('event_type').notNull(),
-  eventData: jsonb('event_data').notNull().$type<Record<string, any>>(),
+  eventType: text('event_type').notNull().$type<ConversationEventType>(),
+  eventData: jsonb('event_data').notNull().$type<ConversationEventData>(),
   timestamp: timestamp('timestamp').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
 });
@@ -183,7 +272,7 @@ export const globalActions = pgTable('global_actions', {
   name: text('name').notNull(),
   condition: text('condition'),
   promptTrigger: text('prompt_trigger').notNull(),
-  operations: jsonb('operations').notNull().default([]).$type<string[]>(),
+  operations: jsonb('operations').notNull().default([]).$type<Operation[]>(),
   template: text('template'),
   examples: jsonb('examples').$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),

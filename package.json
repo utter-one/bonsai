@@ -31,6 +31,7 @@
     "drizzle-zod": "^0.8.3",
     "express": "^5.2.1",
     "handlebars": "^4.7.8",
+    "isolated-vm": "^5.0.4",
     "jsonwebtoken": "^9.0.3",
     "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
     "openai": "^6.15.0",
@@ -41,11 +42,11 @@
     "routing-controllers": "^0.11.3",
     "routing-controllers-openapi": "^5.0.0",
     "swagger-ui-express": "^5.0.1",
+    "tsx": "^4.21.0",
     "tsyringe": "^4.10.0",
     "uuid": "^13.0.0",
     "ws": "^8.18.3",
-    "zod": "^4.2.1",
-    "tsx": "^4.21.0"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/pg": "^8.16.0",

@@ -11,6 +11,7 @@
 - Always create and update JSDoc comments for functions, methods and classes if necessary
 - Use IoC container for classes with implicit registration by @singleton or @injectable decorator
 - Always verify changes by running `npm run build`
+- Place private methods AFTER the public ones
 
 ## Security and Authorization
 - **Defense in depth**: Security checks must be enforced at BOTH controller and service layers

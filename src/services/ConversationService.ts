@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
-import { conversations, conversationEvents } from '../db/schema';
+import { conversations, conversationEvents, ConversationEventType, ConversationEventData } from '../db/schema';
 import type { ConversationResponse, ConversationListResponse, ConversationEventResponse, ConversationEventListResponse } from '../http/contracts/conversation';
 import type { ListParams } from '../http/contracts/common';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../http/contracts/conversation';
@@ -10,7 +10,7 @@ import { NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
-import type { RequestContext } from '../types/request-context';
+import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { randomUUID } from 'crypto';
 import { ConversationState } from './live/ConversationRunner';
@@ -114,6 +114,36 @@ export class ConversationService extends BaseService {
       logger.debug({ conversationId }, 'Conversation state saved successfully');
     } catch (error) {
       logger.error({ error, conversationId }, 'Failed to save conversation state');
+      throw error;
+    }
+  }
+
+  /**
+   * Saves a conversation event with current timestamp (internal use only)
+   * @param conversationId - The unique identifier of the conversation
+   * @param eventType - The type of event being recorded
+   * @param eventData - The data associated with the event
+   * @param metadata - Optional metadata for the event
+   */
+  async saveConversationEvent(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, metadata?: Record<string, any>): Promise<void> {
+    logger.debug({ conversationId, eventType }, 'Saving conversation event');
+
+    try {
+      const eventId = randomUUID();
+      const eventRecord = {
+        id: eventId,
+        conversationId,
+        eventType,
+        eventData,
+        timestamp: new Date(),
+        metadata: metadata ?? null,
+      };
+
+      await db.insert(conversationEvents).values(eventRecord);
+
+      logger.debug({ conversationId, eventId, eventType }, 'Conversation event saved successfully');
+    } catch (error) {
+      logger.error({ error, conversationId, eventType }, 'Failed to save conversation event');
       throw error;
     }
   }

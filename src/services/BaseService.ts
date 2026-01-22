@@ -1,4 +1,4 @@
-import type { RequestContext } from '../types/request-context';
+import type { RequestContext } from './RequestContext';
 import type { Permission } from '../permissions';
 import { hasAllPermissions } from '../permissions';
 import { ForbiddenError } from '../errors';
