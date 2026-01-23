@@ -2,11 +2,11 @@ import { inject } from "tsyringe";
 import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, Project, Stage, StageAction } from "../../types/models";
 import { db } from "../../db";
-import { ConversationEventType, MessageEventData, ClassificationEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData } from "../../db/schema";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, conversations, users } from "../../db/schema";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
-import { Connection, ConnectionManager } from "../../websocket/ConnectionManager";
+import { Connection } from "../../websocket/ConnectionManager";
 import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../websocket/contracts/aiResponse";
 import { ILlmProvider } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
@@ -16,8 +16,9 @@ import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { UserInputProcessor } from "./UserInputProcessor";
 import { VoiceConfig } from "../../http/contracts/persona";
-import { ActionsExecutor } from "./ActionsExecutor";
+import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
+import { eq } from "drizzle-orm";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -49,6 +50,7 @@ export type ConversationState =
   | 'processing_user_input' // Conversation is processing user input (classification/transformation)
   | 'generating_response' // Conversation is generating a response  
   | 'finished' // Conversation has finished
+  | 'aborted' // Conversation has been aborted by user or system
   | 'failed'; // Conversation has failed due to an error
 
 /** 
@@ -663,24 +665,67 @@ export class ConversationRunner {
       throw new NotFoundError(`Action ${actionName} not found in project ${this.stageData.project.id}`);
     }
 
-    if (stageAction) { // Prefer stage-specific action if available
-      // Execute stage action
-      logger.info({ conversationId: this.conversation.id, actionName }, `Executing stage action ${actionName}`);
-      const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, stageAction, parameters);
-      await this.actionsExecutor.executeActions([stageAction], this, context);
-    } else {
-      // Execute global action
-      logger.info({ conversationId: this.conversation.id, actionName }, `Executing global action ${actionName}`);
-      const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, globalAction, parameters);
-      await this.actionsExecutor.executeActions([globalAction], this, context);
-    }
-    
-    // This would involve running the action's operations with the provided parameters
-    logger.warn({ conversationId: this.conversation.id, actionName }, `Action execution not yet fully implemented`);
-
+    const actionToExecute = stageAction || globalAction;
+    logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
+    const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionToExecute, parameters);
+    const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
+    await this.applyActionOutcome(context, outcome);
+  
     logger.info({ conversationId: this.conversation.id, actionName }, `Action ${actionName} executed`);
-
     return { status: 'completed', message: 'Action execution not yet implemented' };
+  }
+
+  /**
+   * Applies the outcome of action execution to the conversation state
+   * @param outcome Result from executing actions
+   * @return True if continue execution, false if conversation failed, ended or aborted
+   */
+  private async applyActionOutcome(context: ConversationContext, outcome: ActionsExecutionOutcome): Promise<boolean> {
+    const conversationId = this.conversation.id;
+
+    if (!outcome.success) {
+      logger.error({ conversationId, error: outcome.error }, `Action execution failed: ${outcome.error}`);
+      await this.markAsFailed(`Action execution failed: ${outcome.error}`);
+      return false;
+    }
+
+    // Apply variable modifications if any
+    if (outcome.hasModifiedVars) {
+      logger.debug({ conversationId, stageId: this.stageData.id }, `Variables were modified during action execution`);
+      await db.update(conversations)
+        .set({ stageVars: context.vars, updatedAt: new Date() })
+        .where(eq(conversations.id, this.conversation.id));
+    }
+
+    // Apply user profile modifications if any
+    if (outcome.hasModifiedUserProfile) {
+      logger.debug({ conversationId, userId: this.conversation.userId }, `User profile was modified during action execution`);
+      await db.update(users)
+        .set({ profile: context.userProfile, updatedAt: new Date() })
+        .where(eq(users.id, this.conversation.userId));
+    }
+
+    // Apply stage navigation if specified
+    if (outcome.goToStageId && outcome.goToStageId !== this.stageData.id) {
+      logger.info({ conversationId, currentStageId: this.stageData.id, targetStageId: outcome.goToStageId }, `Applying stage navigation`);
+      await this.goToStage(outcome.goToStageId);
+    }
+
+    if (outcome.shouldAbortConversation) {
+      logger.info({ conversationId }, `Conversation marked for abortion by action execution`);
+      await db.update(conversations)
+        .set({ status: 'aborted', updatedAt: new Date() })
+        .where(eq(conversations.id, this.conversation.id));
+      return false;
+    }
+
+    if (outcome.shouldEndConversation) {
+      logger.info({ conversationId }, `Conversation marked for ending by action execution`);
+      return true; // Let caller handle ending the conversation
+    }
+
+    logger.debug({ conversationId, hasModifiedVars: outcome.hasModifiedVars, hasModifiedUserInput: outcome.hasModifiedUserInput, hasModifiedUserProfile: outcome.hasModifiedUserProfile, shouldEndConversation: outcome.shouldEndConversation, shouldAbortConversation: outcome.shouldAbortConversation }, `Action outcome applied successfully`);
+    return true;
   }
 
   /**
@@ -736,7 +781,8 @@ export class ConversationRunner {
       await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
     }
 
-    const executionOutcome = await this.actionsExecutor.executeActions(actions, this, context)
+    const executionOutcome = await this.actionsExecutor.executeActions(actions, context)
+    await this.applyActionOutcome(context, executionOutcome);
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
 
     // Save event for user message

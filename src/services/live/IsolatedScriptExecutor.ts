@@ -30,13 +30,11 @@ export class IsolatedScriptExecutor {
    * Executes JavaScript code in an isolated VM with access to full conversation context.
    * 
    * @param code - The JavaScript code to execute
-   * @param runner - The conversation runner instance for variable access
    * @param context - Execution context containing conversation and stage information
    * @throws Error if script execution fails or times out
    */
   async executeScript(
     code: string,
-    runner: ConversationRunner,
     context: ConversationContext,
   ): Promise<void> {
     logger.info({ conversationId: context.conversationId, stageId: context.stageId, codeLength: code.length }, `Running script in isolated VM`);
