@@ -21,6 +21,7 @@ import { ConversationContext } from './ConversationContextBuilder';
  * - `history` - Array of conversation messages with role and content
  * - `explicitAction` - The explicitly called action by the frontend, if any
  * - `vars` - Read-only object containing all stage variables
+ * - `userProfile` - Read-only object containing user profile data
  * - `console.log()`, `console.error()`, `console.warn()` - Logging functions
  */
 @injectable()
@@ -29,13 +30,11 @@ export class IsolatedScriptExecutor {
    * Executes JavaScript code in an isolated VM with access to full conversation context.
    * 
    * @param code - The JavaScript code to execute
-   * @param runner - The conversation runner instance for variable access
    * @param context - Execution context containing conversation and stage information
    * @throws Error if script execution fails or times out
    */
   async executeScript(
     code: string,
-    runner: ConversationRunner,
     context: ConversationContext,
   ): Promise<void> {
     logger.info({ conversationId: context.conversationId, stageId: context.stageId, codeLength: code.length }, `Running script in isolated VM`);
@@ -61,6 +60,7 @@ export class IsolatedScriptExecutor {
       await jail.set('history', new ivm.ExternalCopy(context.history).copyInto());
       await jail.set('explicitAction', new ivm.ExternalCopy(context.explicitAction).copyInto());
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
+      await jail.set('userProfile', new ivm.ExternalCopy(context.userProfile).copyInto());
 
       // Inject console.log, console.error, console.warn
       await jail.set('console', new ivm.ExternalCopy({

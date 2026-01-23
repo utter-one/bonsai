@@ -1,8 +1,8 @@
 import { and, asc, eq } from "drizzle-orm";
-import { conversationEvents, db } from "../../db";
+import { conversationEvents, db, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
-import { Conversation, GlobalAction, MessageEventData, StageAction } from "../../types/models";
+import { Conversation, GlobalAction, MessageEventData, StageAction, User } from "../../types/models";
 
 export type ConversationContext = {
   /** ID of the conversation */
@@ -16,6 +16,9 @@ export type ConversationContext = {
 
   /** Stage variables */
   vars: Record<string, any>;
+
+  /** User profile data */
+  userProfile: Record<string, any>;
 
   /** Conversation history as an array of messages */
   history: Array<{
@@ -49,11 +52,17 @@ export type ConversationContext = {
 @singleton()
 export class ConversationContextBuilder {
   async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, vars: Record<string, any>): Promise<ConversationContext> {
+    // Load user data
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, conversation.userId),
+    });
+
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       stageId: conversation.stageId,
       vars,
+      userProfile: user?.profile || {},
       history: [],
       command: action,
       results: {
@@ -82,11 +91,17 @@ export class ConversationContextBuilder {
   }
   
   async buildContextForUserInput(conversation: Conversation, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+    // Load user data
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, conversation.userId),
+    });
+
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       stageId: conversation.stageId,
       vars: {},
+      userProfile: user?.profile || {},
       history: [],
       command: null,
       userInput,

@@ -4,7 +4,7 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
-import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
+import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyUserProfileOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 
@@ -19,6 +19,8 @@ export type ActionsExecutionOutcome = {
   abortReason?: string;
   hasModifiedVars: boolean;
   hasModifiedUserInput: boolean;
+  hasModifiedUserProfile: boolean;
+  goToStageId?: string;
   error?: string;
 };
 
@@ -30,8 +32,10 @@ export type OperationOutcome = {
     endReason?: string;
     shouldAbortConversation: boolean;
     abortReason?: string;
-    modifiedUserInput?: string;
-    modifiedVars?: Record<string, any>;
+    hasModifiedVars?: boolean;
+    hasModifiedUserInput?: boolean;
+    hasModifiedUserProfile?: boolean;
+    newStageId?: string;
   };
 
 /**
@@ -83,16 +87,18 @@ export class ActionsExecutor {
         return 2;
       case 'modify_variables':
         return 3;
-      case 'modify_user_input':
+      case 'modify_user_profile':
         return 4;
-      case 'run_script':
+      case 'modify_user_input':
         return 5;
-      case 'end_conversation':
+      case 'run_script':
         return 6;
-      case 'abort_conversation':
+      case 'end_conversation':
         return 7;
-      case 'go_to_stage':
+      case 'abort_conversation':
         return 8;
+      case 'go_to_stage':
+        return 9;
       default:
         return 999; // Unknown operations execute last
     }
@@ -192,7 +198,6 @@ export class ActionsExecutor {
    */
   async executeActions(
     actions: (StageAction | GlobalAction)[],
-    runner: ConversationRunner,
     context: ConversationContext
   ): Promise<ActionsExecutionOutcome> {
     logger.info({ conversationId: context.conversationId, actionCount: actions.length }, `Executing ${actions.length} action(s)`);
@@ -231,6 +236,7 @@ export class ActionsExecutor {
       shouldAbortConversation: false,
       hasModifiedVars: false,
       hasModifiedUserInput: false,
+      hasModifiedUserProfile: false,
     };
 
     let currentContext = { ...context };
@@ -246,21 +252,26 @@ export class ActionsExecutor {
       logger.debug({ conversationId: context.conversationId, actionName, operationType: operation.type }, `Executing operation: ${operation.type} from action: ${actionName}`);
 
       try {
-        const operationResult = await this.executeOperation(operation, runner, currentContext);
+        const operationResult = await this.executeOperation(operation, currentContext);
 
         // Update context with modified user input if applicable
-        if (operationResult.modifiedUserInput) {
-          currentContext.userInput = operationResult.modifiedUserInput;
+        if (operationResult.hasModifiedUserInput) {
           outcome.hasModifiedUserInput = true;
         }
 
         // Update modified variables in context if applicable
-        if (operationResult.modifiedVars) {
-          currentContext.vars = {
-            ...currentContext.vars,
-            ...operationResult.modifiedVars,
-          };
+        if (operationResult.hasModifiedVars) {
           outcome.hasModifiedVars = true;
+        }
+
+        // Update modified user profile in context if applicable
+        if (operationResult.hasModifiedUserProfile) {
+          outcome.hasModifiedUserProfile = true;
+        }
+
+        // Check if operation resulted in stage change
+        if (operationResult.newStageId) {
+          outcome.goToStageId = operationResult.newStageId;
         }
 
         // Check if operation resulted in conversation termination
@@ -299,38 +310,38 @@ export class ActionsExecutor {
    */
   private async executeOperation(
     operation: Operation,
-    runner: ConversationRunner,
     context: ConversationContext,
   ): Promise<OperationOutcome> {
     switch (operation.type) {
       case 'end_conversation':
-        return await this.executeEndConversation(operation, runner, context);
+        return await this.executeEndConversation(operation, context);
 
       case 'abort_conversation':
-        return await this.executeAbortConversation(operation, runner, context);
+        return await this.executeAbortConversation(operation, context);
 
       case 'go_to_stage':
-        return await this.executeGoToStage(operation, runner, context);
+        return await this.executeGoToStage(operation, context);
 
       case 'run_script':
-        return await this.executeRunScript(operation, runner, context);
+        return await this.executeRunScript(operation, context);
 
       case 'modify_user_input':
-        return await this.executeModifyUserInput(operation, runner, context);
+        return await this.executeModifyUserInput(operation, context);
 
       case 'modify_variables':
-        return await this.executeModifyVariables(operation, runner, context);
+        return await this.executeModifyVariables(operation, context);
+
+      case 'modify_user_profile':
+        return await this.executeModifyUserProfile(operation, context);
 
       case 'call_tool':
-        return await this.executeCallTool(operation, runner, context);
+        return await this.executeCallTool(operation, context);
 
       case 'call_webhook':
-        return await this.executeCallWebhook(operation, runner, context);
+        return await this.executeCallWebhook(operation, context);
 
       default:
-        // TypeScript should ensure this is unreachable
-        const exhaustiveCheck: never = operation;
-        throw new Error(`Unknown operation type: ${(exhaustiveCheck as any).type}`);
+        throw new Error(`Unknown operation`);
     }
   }
 
@@ -339,9 +350,8 @@ export class ActionsExecutor {
    */
   private async executeEndConversation(
     operation: EndConversationOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: true; shouldAbortConversation: false; endReason?: string }> {
+  ): Promise<OperationOutcome> {
     logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Ending conversation gracefully`);
     return {
       shouldEndConversation: true,
@@ -355,9 +365,8 @@ export class ActionsExecutor {
    */
   private async executeAbortConversation(
     operation: AbortConversationOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: true; abortReason?: string }> {
+  ): Promise<OperationOutcome> {
     logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Aborting conversation immediately`);
     return {
       shouldEndConversation: false,
@@ -371,12 +380,9 @@ export class ActionsExecutor {
    */
   private async executeGoToStage(
     operation: GoToStageOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+  ): Promise<OperationOutcome> {
     logger.info({ conversationId: context.conversationId, targetStageId: operation.stageId, currentStageId: context.stageId }, `Navigating to stage: ${operation.stageId}`);
-
-    await runner.goToStage(operation.stageId);
 
     // Update context with new stage ID
     context.stageId = operation.stageId;
@@ -386,6 +392,7 @@ export class ActionsExecutor {
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,
+      newStageId: operation.stageId,
     };
   }
 
@@ -395,10 +402,9 @@ export class ActionsExecutor {
    */
   private async executeRunScript(
     operation: RunScriptOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
-    await this.scriptRunner.executeScript(operation.code, runner, context);
+  ): Promise<OperationOutcome> {
+    await this.scriptRunner.executeScript(operation.code, context);
 
     return {
       shouldEndConversation: false,
@@ -412,9 +418,8 @@ export class ActionsExecutor {
    */
   private async executeModifyUserInput(
     operation: ModifyUserInputOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false; modifiedUserInput: string }> {
+  ): Promise<OperationOutcome> {
     logger.info({ conversationId: context.conversationId, originalInput: context.userInput, template: operation.template }, `Modifying user input`);
 
     try {
@@ -426,7 +431,7 @@ export class ActionsExecutor {
       return {
         shouldEndConversation: false,
         shouldAbortConversation: false,
-        modifiedUserInput: modifiedInput,
+        hasModifiedUserInput: true,
       };
     } catch (error) {
       logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user input`);
@@ -440,10 +445,10 @@ export class ActionsExecutor {
    */
   private async executeModifyVariables(
     operation: ModifyVariablesOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+  ): Promise<OperationOutcome> {
     logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: operation.modifications.length }, `Modifying variables`);
+    let hasModifiedVars = false;
 
     try {
       for (const modification of operation.modifications) {
@@ -451,36 +456,40 @@ export class ActionsExecutor {
 
         switch (op) {
           case 'set': {
-            await runner.setVariable(context.stageId, variableName, value);
+            context.vars[variableName] = value;
+            hasModifiedVars = true;
             logger.debug({ conversationId: context.conversationId, variableName, value }, `Set variable: ${variableName}`);
             break;
           }
 
           case 'reset': {
-            await runner.setVariable(context.stageId, variableName, undefined);
+            context.vars[variableName] = undefined;
+            hasModifiedVars = true;
             logger.debug({ conversationId: context.conversationId, variableName }, `Reset variable: ${variableName}`);
             break;
           }
 
           case 'add': {
-            const currentValue = await runner.getVariable(context.stageId, variableName);
+            const currentValue = context.vars[variableName];
             if (!Array.isArray(currentValue)) {
               logger.warn({ conversationId: context.conversationId, variableName, currentValue }, `Variable ${variableName} is not an array, initializing as array`);
-              await runner.setVariable(context.stageId, variableName, [value]);
+              context.vars[variableName] = [value];
             } else {
-              await runner.setVariable(context.stageId, variableName, [...currentValue, value]);
+              context.vars[variableName] = [...currentValue, value];
             }
+            hasModifiedVars = true;
             logger.debug({ conversationId: context.conversationId, variableName, value }, `Added to variable array: ${variableName}`);
             break;
           }
 
           case 'remove': {
-            const currentValue = await runner.getVariable(context.stageId, variableName);
+            const currentValue = context.vars[variableName];
             if (!Array.isArray(currentValue)) {
               logger.warn({ conversationId: context.conversationId, variableName, currentValue }, `Variable ${variableName} is not an array, cannot remove value`);
             } else {
               const newValue = currentValue.filter(item => JSON.stringify(item) !== JSON.stringify(value));
-              await runner.setVariable(context.stageId, variableName, newValue);
+              context.vars[variableName] = newValue;
+              hasModifiedVars = true;
               logger.debug({ conversationId: context.conversationId, variableName, value, removedCount: currentValue.length - newValue.length }, `Removed from variable array: ${variableName}`);
             }
             break;
@@ -502,6 +511,83 @@ export class ActionsExecutor {
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,
+      hasModifiedVars,
+    };
+  }
+
+  /**
+   * Executes modify_user_profile operation
+   * Updates user profile fields using specific operations (set, reset, add, remove)
+   */
+  private async executeModifyUserProfile(
+    operation: ModifyUserProfileOperation,
+    context: ConversationContext,
+  ): Promise<OperationOutcome> {
+    logger.info({ conversationId: context.conversationId, modificationCount: operation.modifications.length }, `Modifying user profile`);
+    let hasModifiedUserProfile = false;
+
+    try {
+      for (const modification of operation.modifications) {
+        const { fieldName, value } = modification;
+
+        switch (modification.operation) {
+          case 'set': {
+            context.userProfile[fieldName] = value;
+            hasModifiedUserProfile = true;
+            logger.debug({ conversationId: context.conversationId, fieldName, value }, `Set user profile field: ${fieldName}`);
+            break;
+          }
+
+          case 'reset': {
+            context.userProfile[fieldName] = undefined;
+            hasModifiedUserProfile = true;
+            logger.debug({ conversationId: context.conversationId, fieldName }, `Reset user profile field: ${fieldName}`);
+            break;
+          }
+
+          case 'add': {
+            const currentValue = context.userProfile[fieldName];
+            if (!Array.isArray(currentValue)) {
+              logger.warn({ conversationId: context.conversationId, fieldName, currentValue }, `User profile field ${fieldName} is not an array, initializing as array`);
+              context.userProfile[fieldName] = [value];
+            } else {
+              context.userProfile[fieldName] = [...currentValue, value];
+            }
+            hasModifiedUserProfile = true;
+            logger.debug({ conversationId: context.conversationId, fieldName, value }, `Added to user profile array field: ${fieldName}`);
+            break;
+          }
+
+          case 'remove': {
+            const currentValue = context.userProfile[fieldName];
+            if (!Array.isArray(currentValue)) {
+              logger.warn({ conversationId: context.conversationId, fieldName, currentValue }, `User profile field ${fieldName} is not an array, cannot remove value`);
+            } else {
+              const newValue = currentValue.filter(item => JSON.stringify(item) !== JSON.stringify(value));
+              context.userProfile[fieldName] = newValue;
+              hasModifiedUserProfile = true;
+              logger.debug({ conversationId: context.conversationId, fieldName, value, removedCount: currentValue.length - newValue.length }, `Removed from user profile array field: ${fieldName}`);
+            }
+            break;
+          }
+
+          default: {
+            const exhaustiveCheck: never = modification.operation;
+            throw new Error(`Unknown user profile operation: ${exhaustiveCheck}`);
+          }
+        }
+      }
+
+      logger.info({ conversationId: context.conversationId, modificationCount: operation.modifications.length }, `User profile modified successfully`);
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user profile`);
+      throw error;
+    }
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+      hasModifiedUserProfile,
     };
   }
 
@@ -511,9 +597,8 @@ export class ActionsExecutor {
    */
   private async executeCallTool(
     operation: CallToolOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+  ): Promise<OperationOutcome> {
     logger.info({ conversationId: context.conversationId, toolId: operation.toolId, parameterCount: Object.keys(operation.parameters).length }, `Calling tool: ${operation.toolId}`);
 
     try {
@@ -547,9 +632,8 @@ export class ActionsExecutor {
    */
   private async executeCallWebhook(
     operation: CallWebhookOperation,
-    runner: ConversationRunner,
     context: ConversationContext,
-  ): Promise<{ shouldEndConversation: false; shouldAbortConversation: false }> {
+  ): Promise<OperationOutcome> {
     logger.info({ conversationId: context.conversationId, url: operation.url, method: operation.method || 'GET', resultKey: operation.resultKey }, `Calling webhook: ${operation.url}`);
 
     try {
