@@ -109,7 +109,7 @@ export interface LlmGenerationOptions {
 /**
  * Callback for streaming chunks
  */
-export type LlmChunkCallback = (chunk: LlmChunk) => void | Promise<void>;
+export type LlmChunkCallback = (chunk: LlmChunk) => Promise<void> | Promise<void>;
 
 /**
  * Callback for complete generation

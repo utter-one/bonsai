@@ -167,6 +167,10 @@ export abstract class LlmProviderBase<TConfig extends LlmProviderConfig = LlmPro
       throw new Error('Messages array cannot be empty');
     }
 
+    if (messages[0].role !== 'system') {
+      throw new Error('First message must have role "system"');
+    }
+
     for (const message of messages) {
       if (!message.role) {
         throw new Error('Message role is required');
