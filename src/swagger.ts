@@ -218,11 +218,17 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Audit routes from AuditController
+  const auditPaths = AuditController.getOpenAPIPaths();
+  for (const path of auditPaths) {
+    registry.registerPath(path);
+  }
+
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
   const controllers = [AuthController, SetupController, UserController,
     ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
-    PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController, AuditController];
+    PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {

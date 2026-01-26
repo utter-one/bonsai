@@ -105,7 +105,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
+    controllers: [AuthController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
@@ -117,6 +117,9 @@ export function createApp(): express.Application {
   
   const projectController = container.resolve(ProjectController);
   projectController.registerRoutes(app);
+
+  const auditController = container.resolve(AuditController);
+  auditController.registerRoutes(app);
 
   app.use(errorHandler);
 
