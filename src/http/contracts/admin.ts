@@ -2,8 +2,14 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
+import { ROLES } from '../../permissions';
 
 extendZodWithOpenApi(z);
+
+/**
+ * Valid role names that can be assigned to admin users
+ */
+export const VALID_ROLES = Object.keys(ROLES) as [string, ...string[]];
 
 export { listParamsSchema, type ListParams };
 
@@ -22,7 +28,7 @@ export const adminRouteParamsSchema = z.object({
 export const createAdminSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the admin user'),
   displayName: z.string().min(1).describe('Display name for the admin user'),
-  roles: z.array(z.string().min(1)).min(1).describe('Array of role identifiers assigned to the admin (at least one required)'),
+  roles: z.array(z.enum(VALID_ROLES)).min(1).describe(`Array of role identifiers assigned to the admin (at least one required). Valid roles: ${VALID_ROLES.join(', ')}`),
   password: z.string().min(1).describe('Admin user password (will be hashed)'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Optional metadata as key-value pairs'),
 });
@@ -35,7 +41,7 @@ export const createAdminSchema = z.object({
 export const updateAdminBodySchema = z.object({
   version: z.number().int().positive().describe('Current version number for optimistic locking (prevents concurrent updates)'),
   displayName: z.string().min(1).optional().describe('Updated display name for the admin user'),
-  roles: z.array(z.string().min(1)).min(1).optional().describe('Updated array of role identifiers'),
+  roles: z.array(z.enum(VALID_ROLES)).min(1).optional().describe(`Updated array of role identifiers. Valid roles: ${VALID_ROLES.join(', ')}`),
   password: z.string().min(1).optional().describe('New password (will be hashed)'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata (merges with existing)'),
 });

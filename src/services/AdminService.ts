@@ -12,7 +12,7 @@ import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
-import { PERMISSIONS } from '../permissions';
+import { PERMISSIONS, ROLES } from '../permissions';
 
 /**
  * Service for managing admin users with full CRUD operations and audit logging
@@ -34,6 +34,9 @@ export class AdminService extends BaseService {
     logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
 
     try {
+      // Validate roles exist in ROLES definition
+      this.validateRoles(input.roles);
+
       // Hash password before storing
       const hashedPassword = await this.authService.hashPassword(input.password);
 
@@ -184,6 +187,11 @@ export class AdminService extends BaseService {
         throw new OptimisticLockError(`Admin version mismatch. Expected ${expectedVersion}, got ${existingAdmin.version}`);
       }
 
+      // Validate roles if being updated
+      if (input.roles) {
+        this.validateRoles(input.roles);
+      }
+
       // Hash password if it's being updated
       const updateData: any = {
         displayName: input.displayName,
@@ -266,6 +274,20 @@ export class AdminService extends BaseService {
     } catch (error) {
       logger.error({ error, adminId }, 'Failed to fetch admin audit logs');
       throw error;
+    }
+  }
+
+  /**
+   * Validates that all provided roles exist in the ROLES definition
+   * @param roles - Array of role names to validate
+   * @throws {Error} When any role is invalid
+   */
+  private validateRoles(roles: string[]): void {
+    const validRoles = Object.keys(ROLES);
+    const invalidRoles = roles.filter(role => !(role in ROLES));
+    
+    if (invalidRoles.length > 0) {
+      throw new Error(`Invalid roles: ${invalidRoles.join(', ')}. Valid roles are: ${validRoles.join(', ')}`);
     }
   }
 }
