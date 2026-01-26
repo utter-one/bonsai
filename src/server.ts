@@ -105,13 +105,16 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, AdminController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
+    controllers: [AuthController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
   });
 
-  // Register explicit routes for ProjectController
+  // Register explicit routes for migrated controllers
+  const adminController = container.resolve(AdminController);
+  adminController.registerRoutes(app);
+  
   const projectController = container.resolve(ProjectController);
   projectController.registerRoutes(app);
 
