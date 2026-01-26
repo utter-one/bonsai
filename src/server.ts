@@ -37,6 +37,9 @@ import logger from './utils/logger';
 export function createApp(): express.Application {
   const app = express();
 
+  // Parse JSON bodies
+  app.use(express.json());
+
   // CORS configuration
   app.use(cors({
     origin: process.env.CORS_ORIGIN || '*',
@@ -102,11 +105,15 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, AdminController, UserController, PersonaController, ProjectController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
+    controllers: [AuthController, AdminController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
   });
+
+  // Register explicit routes for ProjectController
+  const projectController = container.resolve(ProjectController);
+  projectController.registerRoutes(app);
 
   app.use(errorHandler);
 

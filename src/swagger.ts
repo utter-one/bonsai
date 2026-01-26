@@ -206,9 +206,15 @@ export function getOpenAPISpec(): any {
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
+  // Register Project routes from ProjectController
+  const projectPaths = ProjectController.getOpenAPIPaths();
+  for (const path of projectPaths) {
+    registry.registerPath(path);
+  }
+
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AuthController, SetupController, AdminController, UserController, ProjectController,
+  const controllers = [AuthController, SetupController, AdminController, UserController,
     ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
     PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController, AuditController];
 

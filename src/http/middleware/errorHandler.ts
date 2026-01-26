@@ -8,6 +8,7 @@ import logger from '../../utils/logger';
  */
 export function errorHandler(err: any, req: Request, res: Response, next: NextFunction): void {
   if (err instanceof z.ZodError) {
+    logger.error({ validationProblems: JSON.parse(err.message) }, 'Validation error');
     res.status(400).json({ error: 'Validation failed', details: err.issues });
     return;
   }
