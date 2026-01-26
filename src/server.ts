@@ -19,6 +19,7 @@ import { ContextTransformerController } from './http/controllers/ContextTransfor
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
+import { ProviderController } from './http/controllers/ProviderController';
 import { AuditController } from './http/controllers/AuditController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
@@ -105,7 +106,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, UserController, PersonaController, KnowledgeController, IssueController, StageController, ToolController, GlobalActionController, EnvironmentController],
+    controllers: [AuthController, UserController, PersonaController, KnowledgeController, StageController, ToolController, ProviderController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
@@ -129,6 +130,15 @@ export function createApp(): express.Application {
 
   const conversationController = container.resolve(ConversationController);
   conversationController.registerRoutes(app);
+
+  const environmentController = container.resolve(EnvironmentController);
+  environmentController.registerRoutes(app);
+
+  const globalActionController = container.resolve(GlobalActionController);
+  globalActionController.registerRoutes(app);
+
+  const issueController = container.resolve(IssueController);
+  issueController.registerRoutes(app);
 
   app.use(errorHandler);
 

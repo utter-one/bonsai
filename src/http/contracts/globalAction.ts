@@ -28,6 +28,11 @@ import type {
 extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
+
+export const globalActionRouteParamsSchema = z.object({
+  id: z.string().describe('Global Action ID'),
+});
+
 export {
   operationSchema,
   endConversationOperationSchema,

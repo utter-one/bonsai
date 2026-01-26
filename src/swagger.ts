@@ -15,8 +15,8 @@ import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageR
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './http/contracts/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
-import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from './http/contracts/globalAction';
-import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from './http/contracts/environment';
+import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
+import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { listParamsSchema } from './http/contracts/common';
@@ -242,11 +242,29 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Environment routes from EnvironmentController
+  const environmentPaths = EnvironmentController.getOpenAPIPaths();
+  for (const path of environmentPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register GlobalAction routes from GlobalActionController
+  const globalActionPaths = GlobalActionController.getOpenAPIPaths();
+  for (const path of globalActionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Issue routes from IssueController
+  const issuePaths = IssueController.getOpenAPIPaths();
+  for (const path of issuePaths) {
+    registry.registerPath(path);
+  }
+
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
   const controllers = [AuthController, SetupController, UserController,
     StageController, ToolController, 
-    PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController];
+    PersonaController, KnowledgeController, ProviderController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {

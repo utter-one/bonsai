@@ -1,208 +1,247 @@
-import 'reflect-metadata';
-import { JsonController, Get, Post, Put, Delete, Param, Body, HttpCode, Req } from 'routing-controllers';
-import { injectable, inject } from 'tsyringe';
-import { Validated } from '../decorators/validation';
-import { OpenAPI } from '../decorators/openapi';
-import { RequirePermissions } from '../decorators/auth';
+import { inject, singleton } from 'tsyringe';
+import type { Request, Response, Router } from 'express';
+import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
-import type { Request } from 'express';
 import { EnvironmentService } from '../../services/EnvironmentService';
-import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from '../contracts/environment';
+import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from '../contracts/environment';
 import type { CreateEnvironmentRequest, UpdateEnvironmentRequest, DeleteEnvironmentRequest } from '../contracts/environment';
 import { listParamsSchema } from '../contracts/common';
-import type { ListParams } from '../contracts/common';
+import { checkPermissions } from '../../utils/permissions';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 /**
- * Controller for environment management with decorator-based routing
+ * Controller for environment management with explicit routing
  * Manages environments which are used for data migration between server instances
  */
-@injectable()
-@JsonController('/api/environments')
+@singleton()
 export class EnvironmentController {
   constructor(@inject(EnvironmentService) private readonly environmentService: EnvironmentService) {}
+
+  /**
+   * Get OpenAPI path definitions for this controller
+   */
+  static getOpenAPIPaths(): RouteConfig[] {
+    return [
+      {
+        method: 'post',
+        path: '/api/environments',
+        tags: ['Environments'],
+        summary: 'Create a new environment',
+        description: 'Creates a new environment configuration for data migration between server instances',
+        request: {
+          body: {
+            content: {
+              'application/json': {
+                schema: createEnvironmentSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Environment created successfully',
+            content: {
+              'application/json': {
+                schema: environmentResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          409: { description: 'Environment already exists' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/environments/{id}',
+        tags: ['Environments'],
+        summary: 'Get environment by ID',
+        description: 'Retrieves a single environment by its unique identifier (password excluded)',
+        request: {
+          params: environmentRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Environment retrieved successfully',
+            content: {
+              'application/json': {
+                schema: environmentResponseSchema,
+              },
+            },
+          },
+          404: { description: 'Environment not found' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/environments',
+        tags: ['Environments'],
+        summary: 'List environments',
+        description: 'Retrieves a paginated list of environments with optional filtering and sorting (passwords excluded)',
+        request: {
+          query: listParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'List of environments retrieved successfully',
+            content: {
+              'application/json': {
+                schema: environmentListResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid query parameters' },
+        },
+      },
+      {
+        method: 'put',
+        path: '/api/environments/{id}',
+        tags: ['Environments'],
+        summary: 'Update environment',
+        description: 'Updates an existing environment with optimistic locking',
+        request: {
+          params: environmentRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: updateEnvironmentBodySchema,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Environment updated successfully',
+            content: {
+              'application/json': {
+                schema: environmentResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Environment not found' },
+          409: { description: 'Version conflict - entity was modified' },
+        },
+      },
+      {
+        method: 'delete',
+        path: '/api/environments/{id}',
+        tags: ['Environments'],
+        summary: 'Delete environment',
+        description: 'Deletes an environment with optimistic locking',
+        request: {
+          params: environmentRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: deleteEnvironmentBodySchema,
+              },
+            },
+          },
+        },
+        responses: {
+          204: { description: 'Environment deleted successfully' },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Environment not found' },
+          409: { description: 'Version conflict - entity was modified' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/environments/{id}/audit-logs',
+        tags: ['Environments'],
+        summary: 'Get environment audit logs',
+        description: 'Retrieves audit logs for a specific environment',
+        request: {
+          params: environmentRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Audit logs retrieved successfully',
+          },
+          404: { description: 'Environment not found' },
+        },
+      },
+    ];
+  }
+
+  /**
+   * Register all routes for this controller
+   */
+  registerRoutes(router: Router): void {
+    router.post('/api/environments', asyncHandler(this.createEnvironment.bind(this)));
+    router.get('/api/environments/:id', asyncHandler(this.getEnvironmentById.bind(this)));
+    router.get('/api/environments', asyncHandler(this.listEnvironments.bind(this)));
+    router.put('/api/environments/:id', asyncHandler(this.updateEnvironment.bind(this)));
+    router.delete('/api/environments/:id', asyncHandler(this.deleteEnvironment.bind(this)));
+    router.get('/api/environments/:id/audit-logs', asyncHandler(this.getEnvironmentAuditLogs.bind(this)));
+  }
 
   /**
    * POST /api/environments
    * Create a new environment
    */
-  @RequirePermissions([PERMISSIONS.ENVIRONMENT_WRITE])
-  @OpenAPI({
-    tags: ['Environments'],
-    summary: 'Create a new environment',
-    description: 'Creates a new environment configuration for data migration between server instances',
-    request: {
-      body: {
-        content: {
-          'application/json': {
-            schema: createEnvironmentSchema,
-          },
-        },
-      },
-    },
-    responses: {
-      201: {
-        description: 'Environment created successfully',
-        content: {
-          'application/json': {
-            schema: environmentResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      409: { description: 'Environment already exists' },
-    },
-  })
-  @Post('/')
-  @HttpCode(201)
-  async createEnvironment(@Validated(createEnvironmentSchema) @Body() body: CreateEnvironmentRequest, @Req() req: Request) {
+  private async createEnvironment(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ENVIRONMENT_WRITE]);
+    const body = createEnvironmentSchema.parse(req.body);
     const environment = await this.environmentService.createEnvironment(body, req.context);
-    return environment;
+    res.status(201).json(environment);
   }
 
   /**
    * GET /api/environments/:id
    * Get an environment by ID
    */
-  @RequirePermissions([PERMISSIONS.ENVIRONMENT_READ])
-  @OpenAPI({
-    tags: ['Environments'],
-    summary: 'Get environment by ID',
-    description: 'Retrieves a single environment by its unique identifier (password excluded)',
-    responses: {
-      200: {
-        description: 'Environment retrieved successfully',
-        content: {
-          'application/json': {
-            schema: environmentResponseSchema,
-          },
-        },
-      },
-      404: { description: 'Environment not found' },
-    },
-  })
-  @Get('/:id')
-  async getEnvironmentById(@Param('id') id: string) {
-    const environment = await this.environmentService.getEnvironmentById(id);
-    return environment;
+  private async getEnvironmentById(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ENVIRONMENT_READ]);
+    const params = environmentRouteParamsSchema.parse(req.params);
+    const environment = await this.environmentService.getEnvironmentById(params.id);
+    res.status(200).json(environment);
   }
 
   /**
    * GET /api/environments
    * List environments with optional filters
    */
-  @RequirePermissions([PERMISSIONS.ENVIRONMENT_READ])
-  @OpenAPI({
-    tags: ['Environments'],
-    summary: 'List environments',
-    description: 'Retrieves a paginated list of environments with optional filtering and sorting (passwords excluded)',
-    request: {
-      query: listParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'List of environments retrieved successfully',
-        content: {
-          'application/json': {
-            schema: environmentListResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid query parameters' },
-    },
-  })
-  @Get('/')
-  async listEnvironments(@Validated(listParamsSchema, 'query') @Req() req: Request) {
-    return await this.environmentService.listEnvironments(req.query as unknown as ListParams);
+  private async listEnvironments(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ENVIRONMENT_READ]);
+    const query = listParamsSchema.parse(req.query);
+    const environments = await this.environmentService.listEnvironments(query);
+    res.status(200).json(environments);
   }
 
   /**
    * PUT /api/environments/:id
    * Update an environment
    */
-  @RequirePermissions([PERMISSIONS.ENVIRONMENT_WRITE])
-  @OpenAPI({
-    tags: ['Environments'],
-    summary: 'Update environment',
-    description: 'Updates an existing environment with optimistic locking',
-    request: {
-      body: {
-        content: {
-          'application/json': {
-            schema: updateEnvironmentBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'Environment updated successfully',
-        content: {
-          'application/json': {
-            schema: environmentResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      404: { description: 'Environment not found' },
-      409: { description: 'Version conflict - entity was modified' },
-    },
-  })
-  @Put('/:id')
-  async updateEnvironment(@Param('id') id: string, @Validated(updateEnvironmentBodySchema) @Body() body: UpdateEnvironmentRequest, @Req() req: Request) {
+  private async updateEnvironment(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ENVIRONMENT_WRITE]);
+    const params = environmentRouteParamsSchema.parse(req.params);
+    const body = updateEnvironmentBodySchema.parse(req.body);
     const { version, ...updateData } = body;
-    const environment = await this.environmentService.updateEnvironment(id, updateData, version, req.context);
-    return environment;
+    const environment = await this.environmentService.updateEnvironment(params.id, updateData, version, req.context);
+    res.status(200).json(environment);
   }
 
   /**
    * DELETE /api/environments/:id
    * Delete an environment
    */
-  @RequirePermissions([PERMISSIONS.ENVIRONMENT_DELETE])
-  @OpenAPI({
-    tags: ['Environments'],
-    summary: 'Delete environment',
-    description: 'Deletes an environment with optimistic locking',
-    request: {
-      body: {
-        content: {
-          'application/json': {
-            schema: deleteEnvironmentBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      204: { description: 'Environment deleted successfully' },
-      400: { description: 'Invalid request body' },
-      404: { description: 'Environment not found' },
-      409: { description: 'Version conflict - entity was modified' },
-    },
-  })
-  @Delete('/:id')
-  @HttpCode(204)
-  async deleteEnvironment(@Param('id') id: string, @Validated(deleteEnvironmentBodySchema) @Body() body: DeleteEnvironmentRequest, @Req() req: Request) {
-    await this.environmentService.deleteEnvironment(id, body.version, req.context);
+  private async deleteEnvironment(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ENVIRONMENT_DELETE]);
+    const params = environmentRouteParamsSchema.parse(req.params);
+    const body = deleteEnvironmentBodySchema.parse(req.body);
+    await this.environmentService.deleteEnvironment(params.id, body.version, req.context);
+    res.status(204).send();
   }
 
   /**
    * GET /api/environments/:id/audit-logs
    * Get audit logs for an environment
    */
-  @RequirePermissions([PERMISSIONS.AUDIT_READ])
-  @OpenAPI({
-    tags: ['Environments'],
-    summary: 'Get environment audit logs',
-    description: 'Retrieves audit logs for a specific environment',
-    responses: {
-      200: {
-        description: 'Audit logs retrieved successfully',
-      },
-      404: { description: 'Environment not found' },
-    },
-  })
-  @Get('/:id/audit-logs')
-  async getEnvironmentAuditLogs(@Param('id') id: string) {
-    return await this.environmentService.getEnvironmentAuditLogs(id);
+  private async getEnvironmentAuditLogs(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
+    const params = environmentRouteParamsSchema.parse(req.params);
+    const logs = await this.environmentService.getEnvironmentAuditLogs(params.id);
+    res.status(200).json(logs);
   }
 }

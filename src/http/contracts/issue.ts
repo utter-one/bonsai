@@ -7,6 +7,10 @@ extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 
+export const issueRouteParamsSchema = z.object({
+  id: z.string().describe('Issue ID'),
+});
+
 /**
  * Schema for creating a new issue
  * Required fields: environment, buildVersion, severity, category, bugDescription, expectedBehaviour, status
