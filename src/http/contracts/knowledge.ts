@@ -7,6 +7,23 @@ extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 
+// Route param schemas
+export const knowledgeSectionRouteParamsSchema = z.object({
+  id: z.string().describe('Knowledge section ID'),
+});
+
+export const knowledgeCategoryRouteParamsSchema = z.object({
+  id: z.string().describe('Knowledge category ID'),
+});
+
+export const knowledgeItemRouteParamsSchema = z.object({
+  id: z.string().describe('Knowledge item ID'),
+});
+
+export const knowledgeCategoryItemsRouteParamsSchema = z.object({
+  categoryId: z.string().describe('Knowledge category ID'),
+});
+
 // ============================================================
 // KNOWLEDGE SECTION SCHEMAS
 // ============================================================

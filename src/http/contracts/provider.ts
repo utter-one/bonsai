@@ -7,6 +7,11 @@ extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 
+// Route param schema
+export const providerRouteParamsSchema = z.object({
+  id: z.string().describe('Provider ID'),
+});
+
 /**
  * Enum for provider types
  */

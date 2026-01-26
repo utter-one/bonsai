@@ -7,6 +7,11 @@ extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 
+// Route param schema
+export const personaRouteParamsSchema = z.object({
+  id: z.string().describe('Persona ID'),
+});
+
 /**
  * Schema for voice configuration settings
  * Provides configuration for text-to-speech voice synthesis

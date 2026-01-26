@@ -242,6 +242,24 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Knowledge routes from KnowledgeController
+  const knowledgePaths = KnowledgeController.getOpenAPIPaths();
+  for (const path of knowledgePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Persona routes from PersonaController
+  const personaPaths = PersonaController.getOpenAPIPaths();
+  for (const path of personaPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Provider routes from ProviderController
+  const providerPaths = ProviderController.getOpenAPIPaths();
+  for (const path of providerPaths) {
+    registry.registerPath(path);
+  }
+
   // Register Environment routes from EnvironmentController
   const environmentPaths = EnvironmentController.getOpenAPIPaths();
   for (const path of environmentPaths) {
@@ -263,8 +281,7 @@ export function getOpenAPISpec(): any {
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
   const controllers = [AuthController, SetupController, UserController,
-    StageController, ToolController, 
-    PersonaController, KnowledgeController, ProviderController];
+    StageController, ToolController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {
