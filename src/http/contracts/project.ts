@@ -24,7 +24,7 @@ export type AsrConfig = z.infer<typeof asrConfigSchema>;
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(255).describe('The name of the project'),
   description: z.string().optional().describe('A description of the project'),
-  asrConfig: asrConfigSchema.describe('Optional ASR configuration settings'),
+  asrConfig: asrConfigSchema.optional().describe('Optional ASR configuration settings'),
   acceptVoice: z.boolean().optional().default(true).describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().default(true).describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   constants: z.record(z.string(), z.any()).optional().describe('Key-value store of constants used in templating and conversation logic'),
@@ -54,15 +54,15 @@ export type UpdateProjectRequest = z.infer<typeof updateProjectSchema>;
 export const projectResponseSchema = z.object({
   id: z.string().describe('The unique identifier of the project'),
   name: z.string().describe('The name of the project'),
-  description: z.string().optional().describe('A description of the project'),
-  asrConfig: asrConfigSchema.describe('ASR configuration settings'),
+  description: z.string().nullable().describe('A description of the project'),
+  asrConfig: asrConfigSchema.nullable().describe('ASR configuration settings'),
   acceptVoice: z.boolean().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
-  constants: z.record(z.string(), z.any()).optional().describe('Key-value store of constants used in templating and conversation logic'),
-  metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
+  constants: z.record(z.string(), z.any()).nullable().describe('Key-value store of constants used in templating and conversation logic'),
+  metadata: z.record(z.string(), z.any()).nullable().describe('Additional metadata for the project'),
   version: z.number().describe('The version number of the project'),
-  createdAt: z.string().describe('The timestamp when the project was created'),
-  updatedAt: z.string().describe('The timestamp when the project was last updated'),
+  createdAt: z.coerce.date().describe('The timestamp when the project was created'),
+  updatedAt: z.coerce.date().describe('The timestamp when the project was last updated'),
 });
 
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;

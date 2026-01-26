@@ -7,6 +7,10 @@ extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 
+export const environmentRouteParamsSchema = z.object({
+  id: z.string().describe('Environment ID'),
+});
+
 /**
  * Schema for creating a new environment
  * Required fields: id, description, url, login, password

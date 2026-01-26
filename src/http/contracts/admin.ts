@@ -8,6 +8,13 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for admin route parameters (ID param)
+ */
+export const adminRouteParamsSchema = z.object({
+  id: z.string().min(1).describe('Admin user ID'),
+});
+
+/**
  * Schema for creating a new admin user
  * Required fields: id, displayName, roles (at least one), password
  * Optional fields: metadata
@@ -81,3 +88,6 @@ export type AdminResponse = z.infer<typeof adminResponseSchema>;
 
 /** Response for paginated list of admin users with metadata */
 export type AdminListResponse = z.infer<typeof adminListResponseSchema>;
+
+/** Route parameters for admin endpoints */
+export type AdminRouteParams = z.infer<typeof adminRouteParamsSchema>;

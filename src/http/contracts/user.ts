@@ -8,6 +8,15 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for user route parameters
+ */
+export const userRouteParamsSchema = z.object({
+  id: z.string().min(1).describe('User ID'),
+});
+
+export type UserRouteParams = z.infer<typeof userRouteParamsSchema>;
+
+/**
  * Schema for creating a new user
  * Required fields: id, profile
  * Profile is a flexible JSON object containing user-specific data

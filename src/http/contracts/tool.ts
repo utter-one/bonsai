@@ -8,6 +8,15 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for tool route parameters
+ */
+export const toolRouteParamsSchema = z.object({
+  id: z.string().min(1).describe('Tool ID'),
+});
+
+export type ToolRouteParams = z.infer<typeof toolRouteParamsSchema>;
+
+/**
  * Schema for creating a new tool
  * Required fields: id, name, prompt, inputType, outputType
  * Optional fields: description, llmProviderId, metadata

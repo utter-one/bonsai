@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
-import { useExpressServer, useContainer } from 'routing-controllers';
 import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
 import { AdminController } from './http/controllers/AdminController';
@@ -10,6 +9,7 @@ import { UserController } from './http/controllers/UserController';
 import { PersonaController } from './http/controllers/PersonaController';
 import { ProjectController } from './http/controllers/ProjectController';
 import { AuthController } from './http/controllers/AuthController';
+import { SetupController } from './http/controllers/SetupController';
 import { KnowledgeController } from './http/controllers/KnowledgeController';
 import { IssueController } from './http/controllers/IssueController';
 import { ConversationController } from './http/controllers/ConversationController';
@@ -19,16 +19,13 @@ import { ContextTransformerController } from './http/controllers/ContextTransfor
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
+import { ProviderController } from './http/controllers/ProviderController';
 import { AuditController } from './http/controllers/AuditController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
-import { ValidationMiddleware } from './http/middleware/validation';
-import { PermissionInterceptor } from './http/middleware/authorization';
 import { getOpenAPISpec } from './swagger';
-import { SetupService } from './services/SetupService';
 import { ConversationServer } from './websocket/ConversationServer';
-import { initialAdminSetupSchema } from './http/contracts/setup';
 import logger from './utils/logger';
 
 /**
@@ -36,6 +33,9 @@ import logger from './utils/logger';
  */
 export function createApp(): express.Application {
   const app = express();
+
+  // Parse JSON bodies
+  app.use(express.json());
 
   // CORS configuration
   app.use(cors({
@@ -51,28 +51,6 @@ export function createApp(): express.Application {
       status: 'healthy',
       timestamp: new Date().toISOString(),
     });
-  });
-
-  // Setup endpoints - public routes that bypass authentication
-  const setupService = container.resolve(SetupService);
-  
-  app.get('/api/setup/status', async (req, res, next) => {
-    try {
-      const status = await setupService.getSetupStatus();
-      res.status(200).json(status);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post('/api/setup/initial-admin', async (req, res, next) => {
-    try {
-      const validated = initialAdminSetupSchema.parse(req.body);
-      const result = await setupService.createInitialAdmin(validated);
-      res.status(201).json(result);
-    } catch (error) {
-      next(error);
-    }
   });
 
   app.use((req, res, next) => {
@@ -97,16 +75,57 @@ export function createApp(): express.Application {
   // Request context middleware (creates req.context from req.user)
   app.use(requestContextMiddleware);
 
-  useContainer({
-    get: (cls) => container.resolve(cls),
-  });
+  // Register routes for all controllers
+  const authController = container.resolve(AuthController);
+  authController.registerRoutes(app);
 
-  useExpressServer(app, {
-    controllers: [AuthController, AdminController, UserController, PersonaController, ProjectController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
-    middlewares: [ValidationMiddleware],
-    interceptors: [PermissionInterceptor],
-    defaultErrorHandler: false,
-  });
+  const setupController = container.resolve(SetupController);
+  setupController.registerRoutes(app);
+
+  const adminController = container.resolve(AdminController);
+  adminController.registerRoutes(app);
+  
+  const projectController = container.resolve(ProjectController);
+  projectController.registerRoutes(app);
+
+  const auditController = container.resolve(AuditController);
+  auditController.registerRoutes(app);
+
+  const classifierController = container.resolve(ClassifierController);
+  classifierController.registerRoutes(app);
+
+  const contextTransformerController = container.resolve(ContextTransformerController);
+  contextTransformerController.registerRoutes(app);
+
+  const conversationController = container.resolve(ConversationController);
+  conversationController.registerRoutes(app);
+
+  const environmentController = container.resolve(EnvironmentController);
+  environmentController.registerRoutes(app);
+
+  const globalActionController = container.resolve(GlobalActionController);
+  globalActionController.registerRoutes(app);
+
+  const issueController = container.resolve(IssueController);
+  issueController.registerRoutes(app);
+
+  const knowledgeController = container.resolve(KnowledgeController);
+  knowledgeController.registerRoutes(app);
+
+  const personaController = container.resolve(PersonaController);
+  personaController.registerRoutes(app);
+
+  const providerController = container.resolve(ProviderController);
+  providerController.registerRoutes(app);
+
+  const stageController = container.resolve(StageController);
+  stageController.registerRoutes(app);
+
+  const toolController = container.resolve(ToolController);
+  toolController.registerRoutes(app);
+
+  const userController = container.resolve(UserController);
+  userController.registerRoutes(app);
 
   app.use(errorHandler);
 

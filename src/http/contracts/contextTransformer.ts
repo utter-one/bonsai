@@ -8,6 +8,13 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for context transformer route params
+ */
+export const contextTransformerRouteParamsSchema = z.object({
+  id: z.string().describe('Context transformer ID'),
+});
+
+/**
  * Schema for creating a new context transformer
  * Required fields: id, name, prompt
  * Optional fields: description, contextFields, llmProviderId, metadata

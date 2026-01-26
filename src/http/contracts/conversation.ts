@@ -8,6 +8,21 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for conversation route params
+ */
+export const conversationRouteParamsSchema = z.object({
+  id: z.string().describe('Conversation ID'),
+});
+
+/**
+ * Schema for conversation event route params
+ */
+export const conversationEventRouteParamsSchema = z.object({
+  id: z.string().describe('Conversation ID'),
+  eventId: z.string().describe('Event ID'),
+});
+
+/**
  * Schema for conversation state structure
  * Contains variables and current actions for the conversation
  */
@@ -26,7 +41,7 @@ export const conversationResponseSchema = z.object({
   userId: z.string().describe('Identifier of the user associated with this conversation'),
   clientId: z.string().describe('Client identifier for the conversation'),
   stageId: z.string().describe('Current stage identifier for the conversation'),
-  state: conversationStateSchema.describe('Current state of the conversation'),
+  state: conversationStateSchema.nullable().describe('Current state of the conversation'),
   status: z.string().describe('Current status of the conversation (e.g., ongoing, completed, abandoned)'),
   statusReason: z.string().nullable().describe('Optional reason for the current status'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata associated with the conversation'),

@@ -15,12 +15,11 @@ import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageR
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './http/contracts/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
-import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema } from './http/contracts/globalAction';
-import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema } from './http/contracts/environment';
+import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
+import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { listParamsSchema } from './http/contracts/common';
-import { getOpenAPIMetadata } from './http/decorators/openapi';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -38,80 +37,8 @@ import { GlobalActionController } from './http/controllers/GlobalActionControlle
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { AuditController } from './http/controllers/AuditController';
-import { getMetadataArgsStorage } from 'routing-controllers';
 
 extendZodWithOpenApi(z);
-
-// Define param schemas
-const adminIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Admin user ID', example: 'admin-123' }),
-});
-
-const userIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'User ID', example: 'user-123' }),
-});
-
-const projectIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Project ID', example: 'proj-123' }),
-});
-
-const personaIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Persona ID', example: 'persona-123' }),
-});
-
-const knowledgeSectionIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Knowledge section ID', example: 'section-123' }),
-});
-
-const knowledgeCategoryIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Knowledge category ID', example: 'category-123' }),
-  categoryId: z.string().optional().openapi({ description: 'Knowledge category ID (for nested routes)', example: 'category-123' }),
-});
-
-const knowledgeItemIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Knowledge item ID', example: 'item-123' }),
-});
-
-const issueIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Issue ID', example: '1' }),
-});
-
-const conversationIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Conversation ID', example: 'conv-123' }),
-});
-
-const conversationEventIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Conversation ID', example: 'conv-123' }),
-  eventId: z.string().openapi({ description: 'Event ID', example: 'event-123' }),
-});
-
-const stageIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Stage ID', example: 'stage-123' }),
-});
-
-const classifierIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Classifier ID', example: 'classifier-123' }),
-});
-
-const contextTransformerIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Context transformer ID', example: 'transformer-123' }),
-});
-
-const toolIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Tool ID', example: 'tool-123' }),
-});
-
-const globalActionIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Global action ID', example: 'action-123' }),
-});
-
-const environmentIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Environment ID', example: 'env-123' }),
-});
-
-const providerIdParamSchema = z.object({
-  id: z.string().openapi({ description: 'Provider ID', example: 'provider-123' }),
-});
 
 /**
  * Generate OpenAPI specification from Zod schemas and controller decorators
@@ -206,71 +133,106 @@ export function getOpenAPISpec(): any {
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
   registry.register('ListParams', listParamsSchema);
 
-  // Get routing-controllers metadata
-  const metadata = getMetadataArgsStorage();
-  const controllers = [AuthController, SetupController, AdminController, UserController, ProjectController,
-    ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
-    PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController, AuditController];
+  // Register Admin routes from AdminController
+  const adminPaths = AdminController.getOpenAPIPaths();
+  for (const path of adminPaths) {
+    registry.registerPath(path);
+  }
 
-  // Map of param schemas for different routes
-  const paramSchemaMap: Record<string, any> = {
-    '/api/admins/:id': adminIdParamSchema,
-    '/api/users/:id': userIdParamSchema,
-    '/api/projects/:id': projectIdParamSchema,
-    '/api/personas/:id': personaIdParamSchema,
-    '/api/knowledge/sections/:id': knowledgeSectionIdParamSchema,
-    '/api/knowledge/categories/:id': knowledgeCategoryIdParamSchema,
-    '/api/knowledge/categories/:categoryId': knowledgeCategoryIdParamSchema,
-    '/api/knowledge/items/:id': knowledgeItemIdParamSchema,
-    '/api/issues/:id': issueIdParamSchema,
-    '/api/conversations/:id': conversationIdParamSchema,
-    '/api/conversations/:id/events/:eventId': conversationEventIdParamSchema,
-    '/api/stages/:id': stageIdParamSchema,
-    '/api/classifiers/:id': classifierIdParamSchema,
-    '/api/context-transformers/:id': contextTransformerIdParamSchema,
-    '/api/tools/:id': toolIdParamSchema,
-    '/api/global-actions/:id': globalActionIdParamSchema,
-    '/api/environments/:id': environmentIdParamSchema,
-    '/api/providers/:id': providerIdParamSchema,
-  };
+  // Register Auth routes from AuthController
+  const authPaths = AuthController.getOpenAPIPaths();
+  for (const path of authPaths) {
+    registry.registerPath(path);
+  }
 
-  // Register API paths from controller metadata
-  for (const controllerClass of controllers) {
-    const controllerMetadata = metadata.controllers.find(c => c.target === controllerClass);
-    if (!controllerMetadata) continue;
+  // Register Setup routes from SetupController
+  const setupPaths = SetupController.getOpenAPIPaths();
+  for (const path of setupPaths) {
+    registry.registerPath(path);
+  }
 
-    const actions = metadata.actions.filter(a => a.target === controllerClass);
+  // Register Project routes from ProjectController
+  const projectPaths = ProjectController.getOpenAPIPaths();
+  for (const path of projectPaths) {
+    registry.registerPath(path);
+  }
 
-    for (const action of actions) {
-      const openAPIConfig = getOpenAPIMetadata(controllerClass.prototype, action.method);
-      if (!openAPIConfig || !openAPIConfig.responses) continue;
+  // Register Audit routes from AuditController
+  const auditPaths = AuditController.getOpenAPIPaths();
+  for (const path of auditPaths) {
+    registry.registerPath(path);
+  }
 
-      // Build the full path
-      const basePath = controllerMetadata.route || '';
-      const actionPath = action.route || '';
-      const fullPath = `${basePath}${actionPath}`.replace(/\/\//g, '/');
+  // Register Classifier routes from ClassifierController
+  const classifierPaths = ClassifierController.getOpenAPIPaths();
+  for (const path of classifierPaths) {
+    registry.registerPath(path);
+  }
 
-      // Determine if this route has params
-      const hasParams = fullPath.includes(':id') || fullPath.includes(':categoryId') || fullPath.includes(':eventId');
-      const paramKey = fullPath.replace(/\/\d+$/, '/:id').replace(/\/audit-logs$/, '').replace(/\/items$/, '').replace(/\/events$/, '');
-      const paramSchema = hasParams && !fullPath.includes('/audit-logs') && !fullPath.endsWith('/items') && !fullPath.endsWith('/events') ? paramSchemaMap[paramKey] : undefined;
+  // Register ContextTransformer routes from ContextTransformerController
+  const contextTransformerPaths = ContextTransformerController.getOpenAPIPaths();
+  for (const path of contextTransformerPaths) {
+    registry.registerPath(path);
+  }
 
-      // Build request object
-      const request: any = { ...openAPIConfig.request };
-      if (paramSchema) {
-        request.params = paramSchema;
-      }
+  // Register Conversation routes from ConversationController
+  const conversationPaths = ConversationController.getOpenAPIPaths();
+  for (const path of conversationPaths) {
+    registry.registerPath(path);
+  }
 
-      registry.registerPath({
-        method: action.type as any,
-        path: fullPath,
-        tags: openAPIConfig.tags,
-        summary: openAPIConfig.summary,
-        description: openAPIConfig.description,
-        request,
-        responses: openAPIConfig.responses as any,
-      });
-    }
+  // Register Knowledge routes from KnowledgeController
+  const knowledgePaths = KnowledgeController.getOpenAPIPaths();
+  for (const path of knowledgePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Persona routes from PersonaController
+  const personaPaths = PersonaController.getOpenAPIPaths();
+  for (const path of personaPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Provider routes from ProviderController
+  const providerPaths = ProviderController.getOpenAPIPaths();
+  for (const path of providerPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Environment routes from EnvironmentController
+  const environmentPaths = EnvironmentController.getOpenAPIPaths();
+  for (const path of environmentPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register GlobalAction routes from GlobalActionController
+  const globalActionPaths = GlobalActionController.getOpenAPIPaths();
+  for (const path of globalActionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Issue routes from IssueController
+  const issuePaths = IssueController.getOpenAPIPaths();
+  for (const path of issuePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Stage routes from StageController
+  const stagePaths = StageController.getOpenAPIPaths();
+  for (const path of stagePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Tool routes from ToolController
+  const toolPaths = ToolController.getOpenAPIPaths();
+  for (const path of toolPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register User routes from UserController
+  const userPaths = UserController.getOpenAPIPaths();
+  for (const path of userPaths) {
+    registry.registerPath(path);
   }
 
   const generator = new OpenApiGeneratorV3(registry.definitions);

@@ -9,6 +9,15 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for stage route parameters
+ */
+export const stageRouteParamsSchema = z.object({
+  id: z.string().min(1).describe('Stage ID'),
+});
+
+export type StageRouteParams = z.infer<typeof stageRouteParamsSchema>;
+
+/**
  * Operation type: End Conversation
  * Gracefully ends conversation with an AI response
  */

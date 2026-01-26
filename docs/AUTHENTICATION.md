@@ -88,39 +88,22 @@ Creates the `RequestContext` from authenticated user:
 - Creates `req.context` with user info, IP, user agent, etc.
 - Only creates context if `req.user` exists
 
-#### AuthorizationChecker (`src/middleware/authorization.ts`)
+### 5. Permission Utilities (`src/utils/permissions.ts`)
 
-Integrates with routing-controllers for authorization:
+#### checkPermissions(req: Request, permissions: Permission[])
 
-- Used by routing-controllers framework
-- Returns current user from request
-- Extensible for future authorization logic
-
-### 5. Authorization Decorators (`src/decorators/auth.ts`)
-
-#### @RequirePermissions(permissions: string[])
-
-Marks a route as requiring specific permissions:
+Checks if the authenticated user has all required permissions:
 
 ```typescript
-@RequirePermissions([PERMISSIONS.ADMIN_WRITE])
-@Post('/')
-async createAdmin(@Body() body: CreateAdminRequest) {
-  // ...
+import { checkPermissions } from '../../utils/permissions';
+
+async createAdmin(req: Request, res: Response): Promise<void> {
+  checkPermissions(req, [PERMISSIONS.ADMIN_WRITE]);
+  // ... rest of handler
 }
 ```
 
-#### @PublicRoute()
-
-Marks a route as public (no authentication required):
-
-```typescript
-@PublicRoute()
-@Post('/auth/login')
-async login(@Body() body: LoginRequest) {
-  // ...
-}
-```
+Throws `UnauthorizedError` if not authenticated, or `ForbiddenError` if lacking permissions.
 
 ## 🔑 Authentication Service (`src/services/AuthService.ts`)
 
@@ -266,10 +249,10 @@ JWT Bearer authentication is configured in Swagger UI:
 
 ### Controllers
 
-- **AdminController**: Uses @RequirePermissions decorators
-- **UserController**: Uses @RequirePermissions decorators
-- **PersonaController**: Uses @RequirePermissions decorators
-- **AuthController**: New controller with @PublicRoute decorators
+- **AdminController**: Uses checkPermissions in handlers
+- **UserController**: Uses checkPermissions in handlers
+- **PersonaController**: Uses checkPermissions in handlers
+- **AuthController**: Public routes (no authentication required)
 
 ### Error Handling
 
@@ -341,7 +324,7 @@ async createUser(input: CreateUserRequest, context?: RequestContext): Promise<Us
 
 ## 📚 Adding New Permissions
 
-1. Add permission to `PERMISSIONS` in `src/config/permissions.ts`:
+1. Add permission to `PERMISSIONS` in `src/permissions.ts`:
    ```typescript
    NEW_ENTITY_READ: 'newentity:read',
    NEW_ENTITY_WRITE: 'newentity:write',
@@ -350,9 +333,12 @@ async createUser(input: CreateUserRequest, context?: RequestContext): Promise<Us
 
 2. Add to relevant roles in `ROLES` configuration
 
-3. Use `@RequirePermissions` decorator in controller:
+3. Use `checkPermissions` in controller handlers:
    ```typescript
-   @RequirePermissions([PERMISSIONS.NEW_ENTITY_READ])
+   private async createEntity(req: Request, res: Response): Promise<void> {
+     checkPermissions(req, [PERMISSIONS.NEW_ENTITY_WRITE]);
+     // ... handler implementation
+   }
    ```
 
 4. Update Swagger documentation with permission info
@@ -469,8 +455,7 @@ The following dependencies are included in `package.json`:
 - ✅ Password hashing with bcrypt (10 salt rounds)
 - ✅ Request context tracking for auditing
 - ✅ BaseService with permission checking utilities
-- ✅ Decorator-based route protection (`@RequirePermissions`, `@PublicRoute`)
-- ✅ PermissionInterceptor enforces authorization before controller actions
+- ✅ Decorator-based route protection (via `checkPermissions` utility)
 - ✅ Comprehensive error handling (401 Unauthorized, 403 Forbidden)
 - ✅ Swagger UI with JWT authentication
 - ✅ Full TypeScript support
@@ -497,9 +482,9 @@ The following dependencies are included in `package.json`:
 - Check token expiration time
 
 ### Permission Interceptor Not Working
-- Ensure `PermissionInterceptor` is registered in server.ts
-- Verify decorators are properly applied to controller methods
-- Check that `@PublicRoute()` is used for public endpoints
+- Ensure `checkPermissions` is called at the start of each protected handler
+- Verify user is authenticated (req.user exists)
+- Check that public routes (like /auth/login) don't call checkPermissions
 
 ## 🎯 Next Steps & Enhancements
 

@@ -7,6 +7,11 @@ extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 
+// Route param schema
+export const providerRouteParamsSchema = z.object({
+  id: z.string().describe('Provider ID'),
+});
+
 /**
  * Enum for provider types
  */
@@ -63,12 +68,12 @@ export const deleteProviderBodySchema = z.object({
 export const providerResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the provider'),
   displayName: z.string().describe('Human-readable name of the provider'),
-  description: z.string().optional().describe('Description of provider purpose and use case'),
+  description: z.string().nullable().describe('Description of provider purpose and use case'),
   providerType: providerTypeSchema.describe('Provider category (asr, tts, llm, embeddings)'),
   apiType: providerNameSchema.describe('Specific provider implementation'),
   config: z.record(z.string(), z.unknown()).describe('Provider-specific configuration object'),
-  createdBy: z.string().optional().describe('Admin user ID who created the provider'),
-  tags: z.array(z.string()).optional().describe('Tags for organization and search'),
+  createdBy: z.string().nullable().describe('Admin user ID who created the provider'),
+  tags: z.array(z.string()).nullable().describe('Tags for organization and search'),
   version: z.number().int().describe('Current version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the provider was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the provider was last updated'),
