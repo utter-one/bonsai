@@ -105,7 +105,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController],
+    controllers: [AuthController, UserController, PersonaController, KnowledgeController, IssueController, StageController, ToolController, GlobalActionController, EnvironmentController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
@@ -120,6 +120,15 @@ export function createApp(): express.Application {
 
   const auditController = container.resolve(AuditController);
   auditController.registerRoutes(app);
+
+  const classifierController = container.resolve(ClassifierController);
+  classifierController.registerRoutes(app);
+
+  const contextTransformerController = container.resolve(ContextTransformerController);
+  contextTransformerController.registerRoutes(app);
+
+  const conversationController = container.resolve(ConversationController);
+  conversationController.registerRoutes(app);
 
   app.use(errorHandler);
 

@@ -8,6 +8,21 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for conversation route params
+ */
+export const conversationRouteParamsSchema = z.object({
+  id: z.string().describe('Conversation ID'),
+});
+
+/**
+ * Schema for conversation event route params
+ */
+export const conversationEventRouteParamsSchema = z.object({
+  id: z.string().describe('Conversation ID'),
+  eventId: z.string().describe('Event ID'),
+});
+
+/**
  * Schema for conversation state structure
  * Contains variables and current actions for the conversation
  */

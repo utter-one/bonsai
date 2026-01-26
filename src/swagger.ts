@@ -224,10 +224,28 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Classifier routes from ClassifierController
+  const classifierPaths = ClassifierController.getOpenAPIPaths();
+  for (const path of classifierPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register ContextTransformer routes from ContextTransformerController
+  const contextTransformerPaths = ContextTransformerController.getOpenAPIPaths();
+  for (const path of contextTransformerPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Conversation routes from ConversationController
+  const conversationPaths = ConversationController.getOpenAPIPaths();
+  for (const path of conversationPaths) {
+    registry.registerPath(path);
+  }
+
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
   const controllers = [AuthController, SetupController, UserController,
-    ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, 
+    StageController, ToolController, 
     PersonaController, KnowledgeController, IssueController, GlobalActionController, EnvironmentController, ProviderController];
 
   // Map of param schemas for different routes

@@ -8,6 +8,13 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for classifier route params
+ */
+export const classifierRouteParamsSchema = z.object({
+  id: z.string().describe('Classifier ID'),
+});
+
+/**
  * Schema for creating a new classifier
  * Required fields: id, name, prompt
  * Optional fields: description, llmProviderId, metadata
