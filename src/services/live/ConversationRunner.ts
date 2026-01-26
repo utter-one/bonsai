@@ -8,7 +8,7 @@ import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
 import { Connection } from "../../websocket/ConnectionManager";
 import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../websocket/contracts/aiResponse";
-import { ILlmProvider } from "../providers/llm/ILlmProvider";
+import { ILlmProvider, LlmChunk } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
@@ -19,6 +19,7 @@ import { VoiceConfig } from "../../http/contracts/persona";
 import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { eq } from "drizzle-orm";
+import { ResponseGenerator } from "./ResponseGenerator";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -71,6 +72,7 @@ export class ConversationRunner {
     @inject(PersonaService) private personaService: PersonaService,
     @inject(UserInputProcessor) private userInputProcessor: UserInputProcessor,
     @inject(ActionsExecutor) private actionsExecutor: ActionsExecutor,
+    @inject(ResponseGenerator) private responseGenerator: ResponseGenerator,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -185,7 +187,7 @@ export class ConversationRunner {
         asrProvider.setOnRecognitionStarted(async () => {
           isRecognizing = true;
         });
-        
+
         asrProvider.setOnRecognitionStopped(async () => {
           logger.info({ conversationId }, `ASR recognition stopped for conversation ${conversationId}`);
 
@@ -259,6 +261,8 @@ export class ConversationRunner {
             requestId: null
           } as EndAiVoiceOutputMessage;
           this.ws.send(JSON.stringify(message));
+
+          this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
         });
 
         ttsProvider.setOnSpeechGenerating(async (chunk) => {
@@ -305,16 +309,39 @@ export class ConversationRunner {
 
     // Initialize and wire up completion LLM provider
     if (completionLlmProvider) {
-      try {
-        completionLlmProvider.setOnError(async (error: Error) => {
-          logger.error({ conversationId, error: error.message }, `LLM completion error for conversation ${conversationId}: ${error.message}`);
-          await this.markAsFailed(`LLM completion error: ${error.message}`);
-        });
+      completionLlmProvider.setOnChunk(async (chunk: LlmChunk) => {
+        logger.debug({ conversationId, chunkLength: chunk.content.length }, `LLM completion chunk for conversation ${conversationId}: ${chunk.content.length} characters`);
+        if (ttsProvider) {
+          // Pass chunk text to TTS provider for speech synthesis
+          await ttsProvider.sendText(chunk.content);
+        }
+      });
 
-        logger.info({ conversationId, stageId: this.stageData.id }, `Completion LLM provider wired up for conversation ${conversationId}`);
-      } catch (error) {
-        logger.error({ conversationId, stageId: this.stageData.id, error: error instanceof Error ? error.message : String(error) }, `Failed to wire up completion LLM provider for conversation ${conversationId}`);
-      }
+      completionLlmProvider.setOnComplete(async (result) => {
+        logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
+        
+        // Save AI message event with usage info
+        const messageEventData: MessageEventData = {
+          text: result.content,
+          role: 'assistant',
+          originalText: result.content,
+          metadata: { llmUsage: result.usage || {} },
+        }
+        await this.conversationService.saveConversationEvent(this.stageData.conversation.id, 'message', messageEventData);
+
+        // In case of no TTS provider, change state to awaiting user input
+        if (!ttsProvider) {
+          await this.changeState('awaiting_user_input');
+        }
+      });
+
+
+      completionLlmProvider.setOnError(async (error: Error) => {
+        logger.error({ conversationId, error: error.message }, `LLM completion error for conversation ${conversationId}: ${error.message}`);
+        await this.markAsFailed(`LLM completion error: ${error.message}`);
+      });
+
+      logger.info({ conversationId, stageId: this.stageData.id }, `Completion LLM provider wired up for conversation ${conversationId}`);
     } else {
       logger.warn({ conversationId, stageId: this.stageData.id }, `No completion LLM provider available for conversation ${conversationId}`);
     }
@@ -587,7 +614,7 @@ export class ConversationRunner {
     // Load current user from database
     const { users } = await import('../../db/schema');
     const { eq } = await import('drizzle-orm');
-    
+
     const currentUser = await db.query.users.findFirst({
       where: eq(users.id, this.conversation.userId),
     });
@@ -622,7 +649,7 @@ export class ConversationRunner {
 
     const { users } = await import('../../db/schema');
     const { eq } = await import('drizzle-orm');
-    
+
     const user = await db.query.users.findFirst({
       where: eq(users.id, this.conversation.userId),
     });
@@ -670,7 +697,8 @@ export class ConversationRunner {
     const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionToExecute, parameters);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
     await this.applyActionOutcome(context, outcome);
-  
+    await this.generateResponse(context, outcome);
+
     logger.info({ conversationId: this.conversation.id, actionName }, `Action ${actionName} executed`);
     return { status: 'completed', message: 'Action execution not yet implemented' };
   }
@@ -783,7 +811,6 @@ export class ConversationRunner {
 
     const executionOutcome = await this.actionsExecutor.executeActions(actions, context)
     await this.applyActionOutcome(context, executionOutcome);
-    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
 
     // Save event for user message
     const messageEventData: MessageEventData = {
@@ -795,11 +822,14 @@ export class ConversationRunner {
       }
     };
     await this.conversationService.saveConversationEvent(this.stageData.conversation.id, 'message', messageEventData);
+    await this.generateResponse(context, executionOutcome);
+  }
 
-
+  private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
+    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
     if (shouldGenerateResponse) {
       await this.changeState('generating_response');
-      this.generateResonse();
+      await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.completionLlmProvider);
     } else if (executionOutcome.shouldEndConversation) {
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
@@ -817,20 +847,6 @@ export class ConversationRunner {
     } else {
       await this.changeState('finished');
     }
-  }
-
-  private async generateResonse() {
-    // TODO: Implement response generation
-    // When implemented, this should:
-    // 1. Generate AI response using the completion LLM provider
-    // 2. Register a 'message' event with role: 'assistant' and the generated content
-    // Example:
-    // const messageEventData: MessageEventData = {
-    //   role: 'assistant',
-    //   content: generatedResponse,
-    // };
-    // await this.conversationService.saveConversationEvent(this.conversation.id, 'message', messageEventData);
-    throw new Error("Method not implemented.");
   }
 
   /**

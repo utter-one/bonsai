@@ -71,8 +71,8 @@ export class ConversationController {
   })
   @RequirePermissions([PERMISSIONS.CONVERSATION_READ])
   @Get('/')
-  async listConversations(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    return await this.conversationService.listConversations(query);
+  async listConversations(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.conversationService.listConversations(req.query as unknown as ListParams);
   }
 
   /**
@@ -121,8 +121,8 @@ export class ConversationController {
   })
   @RequirePermissions([PERMISSIONS.CONVERSATION_READ])
   @Get('/:id/events')
-  async getConversationEvents(@Param('id') id: string, @Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    return await this.conversationService.getConversationEvents(id, query);
+  async getConversationEvents(@Param('id') id: string, @Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.conversationService.getConversationEvents(id, req.query as unknown as ListParams);
   }
 
   /**
