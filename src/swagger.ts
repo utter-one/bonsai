@@ -278,10 +278,27 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Stage routes from StageController
+  const stagePaths = StageController.getOpenAPIPaths();
+  for (const path of stagePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Tool routes from ToolController
+  const toolPaths = ToolController.getOpenAPIPaths();
+  for (const path of toolPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register User routes from UserController
+  const userPaths = UserController.getOpenAPIPaths();
+  for (const path of userPaths) {
+    registry.registerPath(path);
+  }
+
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AuthController, SetupController, UserController,
-    StageController, ToolController];
+  const controllers = [AuthController, SetupController];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {

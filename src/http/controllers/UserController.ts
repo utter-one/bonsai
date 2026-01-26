@@ -1,194 +1,233 @@
-import 'reflect-metadata';
-import { JsonController, Get, Post, Put, Delete, Param, Body, HttpCode, Req } from 'routing-controllers';
-import { injectable, inject } from 'tsyringe';
-import { Validated } from '../decorators/validation';
-import { OpenAPI } from '../decorators/openapi';
-import { RequirePermissions } from '../decorators/auth';
+import { inject, singleton } from 'tsyringe';
+import type { Request, Response, Router } from 'express';
+import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
-import type { Request } from 'express';
 import { UserService } from '../../services/UserService';
-import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from '../contracts/user';
-import type { CreateUserRequest, UpdateUserRequest } from '../contracts/user';
+import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema, userRouteParamsSchema } from '../contracts/user';
 import { listParamsSchema } from '../contracts/common';
-import type { ListParams } from '../contracts/common';
+import { checkPermissions } from '../../utils/permissions';
+import { asyncHandler } from '../../utils/asyncHandler';
 
 /**
- * Controller for user management with decorator-based routing
+ * Controller for user management with explicit routing
  */
-@injectable()
-@JsonController('/api/users')
+@singleton()
 export class UserController {
   constructor(@inject(UserService) private readonly userService: UserService) {}
+
+  /**
+   * Get OpenAPI path definitions for this controller
+   */
+  static getOpenAPIPaths(): RouteConfig[] {
+    return [
+      {
+        method: 'post',
+        path: '/api/users',
+        tags: ['Users'],
+        summary: 'Create a new user',
+        description: 'Creates a new user with the specified profile data',
+        request: {
+          body: {
+            content: {
+              'application/json': {
+                schema: createUserSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'User created successfully',
+            content: {
+              'application/json': {
+                schema: userResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          409: { description: 'User already exists' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/users/{id}',
+        tags: ['Users'],
+        summary: 'Get user by ID',
+        description: 'Retrieves a single user by their unique identifier',
+        request: {
+          params: userRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'User retrieved successfully',
+            content: {
+              'application/json': {
+                schema: userResponseSchema,
+              },
+            },
+          },
+          404: { description: 'User not found' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/users',
+        tags: ['Users'],
+        summary: 'List users',
+        description: 'Retrieves a paginated list of users with optional filtering',
+        request: {
+          query: listParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'List of users retrieved successfully',
+            content: {
+              'application/json': {
+                schema: userListResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid query parameters' },
+        },
+      },
+      {
+        method: 'put',
+        path: '/api/users/{id}',
+        tags: ['Users'],
+        summary: 'Update user',
+        description: 'Updates an existing user',
+        request: {
+          params: userRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: updateUserBodySchema,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'User updated successfully',
+            content: {
+              'application/json': {
+                schema: userResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'User not found' },
+        },
+      },
+      {
+        method: 'delete',
+        path: '/api/users/{id}',
+        tags: ['Users'],
+        summary: 'Delete user',
+        description: 'Deletes a user',
+        request: {
+          params: userRouteParamsSchema,
+        },
+        responses: {
+          204: { description: 'User deleted successfully' },
+          404: { description: 'User not found' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/users/{id}/audit-logs',
+        tags: ['Users'],
+        summary: 'Get user audit logs',
+        description: 'Retrieves audit logs for a specific user',
+        request: {
+          params: userRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Audit logs retrieved successfully',
+          },
+          404: { description: 'User not found' },
+        },
+      },
+    ];
+  }
+
+  /**
+   * Register all routes for this controller
+   */
+  registerRoutes(router: Router): void {
+    router.post('/api/users', asyncHandler(this.createUser.bind(this)));
+    router.get('/api/users/:id', asyncHandler(this.getUserById.bind(this)));
+    router.get('/api/users', asyncHandler(this.listUsers.bind(this)));
+    router.put('/api/users/:id', asyncHandler(this.updateUser.bind(this)));
+    router.delete('/api/users/:id', asyncHandler(this.deleteUser.bind(this)));
+    router.get('/api/users/:id/audit-logs', asyncHandler(this.getUserAuditLogs.bind(this)));
+  }
 
   /**
    * POST /api/users
    * Create a new user
    */
-  @OpenAPI({
-    tags: ['Users'],
-    summary: 'Create a new user',
-    description: 'Creates a new user with the specified profile data',
-    request: {
-      body: {
-        content: {
-          'application/json': {
-            schema: createUserSchema,
-          },
-        },
-      },
-    },
-    responses: {
-      201: {
-        description: 'User created successfully',
-        content: {
-          'application/json': {
-            schema: userResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      409: { description: 'User already exists' },
-    },
-  })
-  @RequirePermissions([PERMISSIONS.USER_WRITE])
-  @Post('/')
-  @HttpCode(201)
-  async createUser(@Validated(createUserSchema) @Body() body: CreateUserRequest, @Req() req: Request) {
+  private async createUser(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.USER_WRITE]);
+    const body = createUserSchema.parse(req.body);
     const user = await this.userService.createUser(body, req.context);
-    return user;
+    res.status(201).json(user);
   }
 
   /**
    * GET /api/users/:id
    * Get a user by ID
    */
-  @OpenAPI({
-    tags: ['Users'],
-    summary: 'Get user by ID',
-    description: 'Retrieves a single user by their unique identifier',
-    responses: {
-      200: {
-        description: 'User retrieved successfully',
-        content: {
-          'application/json': {
-            schema: userResponseSchema,
-          },
-        },
-      },
-      404: { description: 'User not found' },
-    },
-  })
-  @RequirePermissions([PERMISSIONS.USER_READ])
-  @Get('/:id')
-  async getUserById(@Param('id') id: string) {
-    const user = await this.userService.getUserById(id);
-    return user;
+  private async getUserById(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.USER_READ]);
+    const params = userRouteParamsSchema.parse(req.params);
+    const user = await this.userService.getUserById(params.id);
+    res.status(200).json(user);
   }
 
   /**
    * GET /api/users
    * List users with optional filters
    */
-  @OpenAPI({
-    tags: ['Users'],
-    summary: 'List users',
-    description: 'Retrieves a paginated list of users with optional filtering',
-    request: {
-      query: listParamsSchema,
-    },
-    responses: {
-      200: {
-        description: 'List of users retrieved successfully',
-        content: {
-          'application/json': {
-            schema: userListResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid query parameters' },
-    },
-  })
-  @RequirePermissions([PERMISSIONS.USER_READ])
-  @Get('/')
-  async listUsers(@Validated(listParamsSchema, 'query') @Req() req: Request) {
-    return await this.userService.listUsers(req.query as unknown as ListParams);
+  private async listUsers(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.USER_READ]);
+    const query = listParamsSchema.parse(req.query);
+    const users = await this.userService.listUsers(query);
+    res.status(200).json(users);
   }
 
   /**
    * PUT /api/users/:id
    * Update a user
    */
-  @OpenAPI({
-    tags: ['Users'],
-    summary: 'Update user',
-    description: 'Updates an existing user',
-    request: {
-      body: {
-        content: {
-          'application/json': {
-            schema: updateUserBodySchema,
-          },
-        },
-      },
-    },
-    responses: {
-      200: {
-        description: 'User updated successfully',
-        content: {
-          'application/json': {
-            schema: userResponseSchema,
-          },
-        },
-      },
-      400: { description: 'Invalid request body' },
-      404: { description: 'User not found' },
-    },
-  })
-  @RequirePermissions([PERMISSIONS.USER_WRITE])
-  @Put('/:id')
-  async updateUser(@Param('id') id: string, @Validated(updateUserBodySchema) @Body() body: UpdateUserRequest, @Req() req: Request) {
-    const user = await this.userService.updateUser(id, body, req.context);
-    return user;
+  private async updateUser(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.USER_WRITE]);
+    const params = userRouteParamsSchema.parse(req.params);
+    const body = updateUserBodySchema.parse(req.body);
+    const user = await this.userService.updateUser(params.id, body, req.context);
+    res.status(200).json(user);
   }
 
   /**
    * DELETE /api/users/:id
    * Delete a user
    */
-  @OpenAPI({
-    tags: ['Users'],
-    summary: 'Delete user',
-    description: 'Deletes a user',
-    responses: {
-      204: { description: 'User deleted successfully' },
-      404: { description: 'User not found' },
-    },
-  })
-  @RequirePermissions([PERMISSIONS.USER_DELETE])
-  @Delete('/:id')
-  @HttpCode(204)
-  async deleteUser(@Param('id') id: string, @Req() req: Request) {
-    await this.userService.deleteUser(id, req.context);
+  private async deleteUser(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.USER_DELETE]);
+    const params = userRouteParamsSchema.parse(req.params);
+    await this.userService.deleteUser(params.id, req.context);
+    res.status(204).send();
   }
 
   /**
    * GET /api/users/:id/audit-logs
    * Get audit logs for a user
    */
-  @OpenAPI({
-    tags: ['Users'],
-    summary: 'Get user audit logs',
-    description: 'Retrieves audit logs for a specific user',
-    responses: {
-      200: {
-        description: 'Audit logs retrieved successfully',
-      },
-      404: { description: 'User not found' },
-    },
-  })
-  @RequirePermissions([PERMISSIONS.AUDIT_READ])
-  @Get('/:id/audit-logs')
-  async getUserAuditLogs(@Param('id') id: string) {
-    return await this.userService.getUserAuditLogs(id);
+  private async getUserAuditLogs(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
+    const params = userRouteParamsSchema.parse(req.params);
+    const logs = await this.userService.getUserAuditLogs(params.id);
+    res.status(200).json(logs);
   }
 }

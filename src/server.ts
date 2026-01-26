@@ -106,7 +106,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, UserController, StageController, ToolController],
+    controllers: [AuthController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
@@ -148,6 +148,15 @@ export function createApp(): express.Application {
 
   const providerController = container.resolve(ProviderController);
   providerController.registerRoutes(app);
+
+  const stageController = container.resolve(StageController);
+  stageController.registerRoutes(app);
+
+  const toolController = container.resolve(ToolController);
+  toolController.registerRoutes(app);
+
+  const userController = container.resolve(UserController);
+  userController.registerRoutes(app);
 
   app.use(errorHandler);
 
