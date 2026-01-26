@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
-import { useExpressServer, useContainer } from 'routing-controllers';
 import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
 import { AdminController } from './http/controllers/AdminController';
@@ -25,8 +24,6 @@ import { AuditController } from './http/controllers/AuditController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
-import { ValidationMiddleware } from './http/middleware/validation';
-import { PermissionInterceptor } from './http/middleware/authorization';
 import { getOpenAPISpec } from './swagger';
 import { ConversationServer } from './websocket/ConversationServer';
 import logger from './utils/logger';
@@ -78,18 +75,7 @@ export function createApp(): express.Application {
   // Request context middleware (creates req.context from req.user)
   app.use(requestContextMiddleware);
 
-  useContainer({
-    get: (cls) => container.resolve(cls),
-  });
-
-  useExpressServer(app, {
-    controllers: [],
-    middlewares: [ValidationMiddleware],
-    interceptors: [PermissionInterceptor],
-    defaultErrorHandler: false,
-  });
-
-  // Register explicit routes for migrated controllers
+  // Register routes for all controllers
   const authController = container.resolve(AuthController);
   authController.registerRoutes(app);
 

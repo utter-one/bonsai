@@ -14,10 +14,8 @@
 - Place private methods AFTER the public ones
 
 ## Controller Architecture
-We are migrating away from routing-controllers to plain Express with explicit route registration. Follow these patterns:
 
-### New Pattern (Plain Express)
-Used by: AdminController, ProjectController, AuditController, ClassifierController, ContextTransformerController, ConversationController
+All controllers use plain Express with explicit route registration. Follow this pattern:
 
 **Controller structure:**
 ```typescript
@@ -70,9 +68,8 @@ export class ExampleController {
 }
 ```
 
-**Key points for new pattern:**
+**Key points:**
 - Use `@singleton()` decorator (not `@injectable()`)
-- No routing-controllers decorators (`@JsonController`, `@Get`, `@Post`, etc.)
 - Manual validation using `schema.parse()` in each handler
 - Manual authorization using `checkPermissions(req, [PERMISSIONS.XXX])` at start of each handler
 - Wrap all handlers with `asyncHandler()` to catch errors
@@ -83,16 +80,10 @@ export class ExampleController {
 - Register controller in server.ts: `container.resolve(ExampleController).registerRoutes(app)`
 - Register OpenAPI paths in swagger.ts: `ExampleController.getOpenAPIPaths()`
 
-### Old Pattern (routing-controllers)
-Used by: AuthController, UserController, PersonaController, KnowledgeController, IssueController, StageController, ToolController, GlobalActionController, EnvironmentController, ProviderController, SetupController
-
-*(Will be migrated gradually - do not use for new controllers)*
-
 ## Security and Authorization
 - **Defense in depth**: Security checks must be enforced at BOTH controller and service layers
 - **Controller layer** (first line of defense):
-  - **New pattern (plain Express)**: Call `checkPermissions(req, [PERMISSIONS.XXX])` at the start of each handler method
-  - **Old pattern (routing-controllers)**: Use `@RequirePermissions([PERMISSIONS.XXX])` decorator before `@OpenAPI()` decorator
+  - Call `checkPermissions(req, [PERMISSIONS.XXX])` at the start of each handler method
   - Use appropriate permissions: READ for GET, WRITE for POST/PUT, DELETE for DELETE
   - Import `PERMISSIONS` from `/src/permissions`
 - **Service layer** (critical security boundary):
@@ -100,9 +91,9 @@ Used by: AuthController, UserController, PersonaController, KnowledgeController,
   - `context` parameter MUST be required (not optional) for all write operations: `context: RequestContext` not `context?: RequestContext`
   - Read operations can have optional context but should check if provided
   - This ensures security even when services are called internally (from other services, background jobs, etc.)
-- **Example patterns**:
+- **Example pattern**:
   ```typescript
-  // New pattern (plain Express)
+  // Controller
   private async createAdmin(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ADMIN_WRITE]);
     const body = createAdminSchema.parse(req.body);
@@ -110,15 +101,7 @@ Used by: AuthController, UserController, PersonaController, KnowledgeController,
     res.status(201).json(result);
   }
   
-  // Old pattern (routing-controllers)
-  @RequirePermissions([PERMISSIONS.ADMIN_WRITE])
-  @OpenAPI({ ... })
-  @Post('/')
-  async createAdmin(@Body() body: CreateAdminRequest, @Req() req: Request) {
-    return await this.adminService.createAdmin(body, req.context);
-  }
-  
-  // Service (same for both patterns)
+  // Service
   async createAdmin(input: CreateAdminRequest, context: RequestContext): Promise<AdminResponse> {
     this.requirePermission(context, PERMISSIONS.ADMIN_WRITE);
     // ... rest of implementation
@@ -136,19 +119,16 @@ Used by: AuthController, UserController, PersonaController, KnowledgeController,
   - Export corresponding TypeScript types (e.g., `export type CreateAdminRequest = z.infer<typeof createAdminSchema>`)
   - Export route params schemas (e.g., `export const adminRouteParamsSchema = z.object({ id: z.string() })`)
   - Extend Zod with OpenAPI using `extendZodWithOpenApi(z)` at the top of each contract file
-- **New pattern (plain Express)**: Call `schema.parse()` manually in each handler method:
+- Call `schema.parse()` manually in each handler method:
   - For body: `const body = createSchema.parse(req.body)`
   - For query: `const query = listParamsSchema.parse(req.query)`
   - For params: `const params = routeParamsSchema.parse(req.params)`
-- **Old pattern (routing-controllers)**: Use `@Validated(schema)` decorator on parameters:
-  - For body: `@Validated(createAdminSchema) @Body() body: CreateAdminRequest`
-  - For query: `@Validated(listParamsSchema, 'query') @Req() req: Request` then access `req.query as unknown as ListParams`
-  - For params: `@Validated(routeParamsSchema, 'params') @Params() params: RouteParams`
-- Import both the schema and type from contract files in controllersfinitions using /src/swagger.ts
+- Import both the schema and type from contract files in controllers
+- Define OpenAPI documentation in `static getOpenAPIPaths()` method
 - **ALWAYS add tags to group endpoints by controller** (e.g., `tags: ['Admins']`, `tags: ['Users']`) - this organizes endpoints in Swagger UI
 - Swagger UI is available at /api-docs endpoint
 
-### New Pattern (plain Express)
+## OpenAPI Documentation
 - Define a static `getOpenAPIPaths()` method in the controller that returns `RouteConfig[]`
 - Include tags, summary, description, request (body/query/params), and responses for each route
 - Register the routes in swagger.ts by calling the static method:
@@ -194,10 +174,3 @@ Used by: AuthController, UserController, PersonaController, KnowledgeController,
   }
   ```
 
-### Old Pattern (routing-controllers)
-- Use `@OpenAPI()` decorator on controller methods
-- Place decorator immediately before route decorators (`@Post`, `@Get`, etc.)
-- The system automatically extracts this metadata from decoratorsst('/')
-  @HttpCode(201)
-  async createAdmin(@Body() body: CreateAdminRequest) { ... }
-  ```
