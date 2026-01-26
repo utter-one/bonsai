@@ -212,6 +212,18 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Auth routes from AuthController
+  const authPaths = AuthController.getOpenAPIPaths();
+  for (const path of authPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Setup routes from SetupController
+  const setupPaths = SetupController.getOpenAPIPaths();
+  for (const path of setupPaths) {
+    registry.registerPath(path);
+  }
+
   // Register Project routes from ProjectController
   const projectPaths = ProjectController.getOpenAPIPaths();
   for (const path of projectPaths) {
@@ -298,7 +310,7 @@ export function getOpenAPISpec(): any {
 
   // Get routing-controllers metadata
   const metadata = getMetadataArgsStorage();
-  const controllers = [AuthController, SetupController];
+  const controllers: any[] = [];
 
   // Map of param schemas for different routes
   const paramSchemaMap: Record<string, any> = {

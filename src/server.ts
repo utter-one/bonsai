@@ -10,6 +10,7 @@ import { UserController } from './http/controllers/UserController';
 import { PersonaController } from './http/controllers/PersonaController';
 import { ProjectController } from './http/controllers/ProjectController';
 import { AuthController } from './http/controllers/AuthController';
+import { SetupController } from './http/controllers/SetupController';
 import { KnowledgeController } from './http/controllers/KnowledgeController';
 import { IssueController } from './http/controllers/IssueController';
 import { ConversationController } from './http/controllers/ConversationController';
@@ -27,9 +28,7 @@ import { requestContextMiddleware } from './http/middleware/requestContext';
 import { ValidationMiddleware } from './http/middleware/validation';
 import { PermissionInterceptor } from './http/middleware/authorization';
 import { getOpenAPISpec } from './swagger';
-import { SetupService } from './services/SetupService';
 import { ConversationServer } from './websocket/ConversationServer';
-import { initialAdminSetupSchema } from './http/contracts/setup';
 import logger from './utils/logger';
 
 /**
@@ -55,28 +54,6 @@ export function createApp(): express.Application {
       status: 'healthy',
       timestamp: new Date().toISOString(),
     });
-  });
-
-  // Setup endpoints - public routes that bypass authentication
-  const setupService = container.resolve(SetupService);
-  
-  app.get('/api/setup/status', async (req, res, next) => {
-    try {
-      const status = await setupService.getSetupStatus();
-      res.status(200).json(status);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post('/api/setup/initial-admin', async (req, res, next) => {
-    try {
-      const validated = initialAdminSetupSchema.parse(req.body);
-      const result = await setupService.createInitialAdmin(validated);
-      res.status(201).json(result);
-    } catch (error) {
-      next(error);
-    }
   });
 
   app.use((req, res, next) => {
@@ -106,13 +83,19 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController],
+    controllers: [],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,
   });
 
   // Register explicit routes for migrated controllers
+  const authController = container.resolve(AuthController);
+  authController.registerRoutes(app);
+
+  const setupController = container.resolve(SetupController);
+  setupController.registerRoutes(app);
+
   const adminController = container.resolve(AdminController);
   adminController.registerRoutes(app);
   
