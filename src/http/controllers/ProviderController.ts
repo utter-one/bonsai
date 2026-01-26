@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpCode, Req } from 'routing-controllers';
+import { JsonController, Get, Post, Put, Delete, Param, Body, HttpCode, Req } from 'routing-controllers';
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
@@ -110,8 +110,8 @@ export class ProviderController {
     },
   })
   @Get('/')
-  async listProviders(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams, @Req() req: Request) {
-    return await this.providerService.listProviders(query, req.context);
+  async listProviders(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.providerService.listProviders(req.query as unknown as ListParams, req.context);
   }
 
   /**

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpCode, Req } from 'routing-controllers';
+import { JsonController, Get, Post, Put, Delete, Param, Body, HttpCode, Req } from 'routing-controllers';
 import { injectable, inject } from 'tsyringe';
 import { z } from 'zod';
 import { Validated } from '../decorators/validation';
@@ -113,8 +113,8 @@ export class KnowledgeController {
     },
   })
   @Get('/sections')
-  async listKnowledgeSections(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    return await this.knowledgeService.listKnowledgeSections(query);
+  async listKnowledgeSections(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.knowledgeService.listKnowledgeSections(req.query as unknown as ListParams);
   }
 
   /**
@@ -265,8 +265,8 @@ export class KnowledgeController {
     },
   })
   @Get('/categories')
-  async listKnowledgeCategories(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    return await this.knowledgeService.listKnowledgeCategories(query);
+  async listKnowledgeCategories(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.knowledgeService.listKnowledgeCategories(req.query as unknown as ListParams);
   }
 
   /**
@@ -430,8 +430,8 @@ export class KnowledgeController {
     },
   })
   @Get('/items')
-  async listKnowledgeItems(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    return await this.knowledgeService.listKnowledgeItems(query);
+  async listKnowledgeItems(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.knowledgeService.listKnowledgeItems(req.query as unknown as ListParams);
   }
 
   /**

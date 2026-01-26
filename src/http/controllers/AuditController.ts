@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { JsonController, Get, QueryParams, Req } from 'routing-controllers';
+import { JsonController, Get, Req } from 'routing-controllers';
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
@@ -46,7 +46,7 @@ export class AuditController {
     },
   })
   @Get('/')
-  async listAuditLogs(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams, @Req() req: Request) {
-    return await this.auditService.listAuditLogs(query);
+  async listAuditLogs(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.auditService.listAuditLogs(req.query as unknown as ListParams);
   }
 }

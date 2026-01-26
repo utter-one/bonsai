@@ -261,6 +261,8 @@ export class ConversationRunner {
             requestId: null
           } as EndAiVoiceOutputMessage;
           this.ws.send(JSON.stringify(message));
+
+          this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
         });
 
         ttsProvider.setOnSpeechGenerating(async (chunk) => {
@@ -314,6 +316,25 @@ export class ConversationRunner {
           await ttsProvider.sendText(chunk.content);
         }
       });
+
+      completionLlmProvider.setOnComplete(async (result) => {
+        logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
+        
+        // Save AI message event with usage info
+        const messageEventData: MessageEventData = {
+          text: result.content,
+          role: 'assistant',
+          originalText: result.content,
+          metadata: { llmUsage: result.usage || {} },
+        }
+        await this.conversationService.saveConversationEvent(this.stageData.conversation.id, 'message', messageEventData);
+
+        // In case of no TTS provider, change state to awaiting user input
+        if (!ttsProvider) {
+          await this.changeState('awaiting_user_input');
+        }
+      });
+
 
       completionLlmProvider.setOnError(async (error: Error) => {
         logger.error({ conversationId, error: error.message }, `LLM completion error for conversation ${conversationId}: ${error.message}`);

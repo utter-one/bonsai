@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import express from 'express';
+import cors from 'cors';
 import { createServer } from 'http';
 import { useExpressServer, useContainer } from 'routing-controllers';
 import { container } from 'tsyringe';
@@ -7,6 +8,7 @@ import swaggerUi from 'swagger-ui-express';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { PersonaController } from './http/controllers/PersonaController';
+import { ProjectController } from './http/controllers/ProjectController';
 import { AuthController } from './http/controllers/AuthController';
 import { KnowledgeController } from './http/controllers/KnowledgeController';
 import { IssueController } from './http/controllers/IssueController';
@@ -35,7 +37,13 @@ import logger from './utils/logger';
 export function createApp(): express.Application {
   const app = express();
 
-  app.use(express.json());
+  // CORS configuration
+  app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
 
   // Health check endpoint - bypasses all middleware for reliability
   app.get('/health', (req, res) => {
@@ -94,7 +102,7 @@ export function createApp(): express.Application {
   });
 
   useExpressServer(app, {
-    controllers: [AuthController, AdminController, UserController, PersonaController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
+    controllers: [AuthController, AdminController, UserController, PersonaController, ProjectController, KnowledgeController, IssueController, ConversationController, StageController, ClassifierController, ContextTransformerController, ToolController, GlobalActionController, EnvironmentController, AuditController],
     middlewares: [ValidationMiddleware],
     interceptors: [PermissionInterceptor],
     defaultErrorHandler: false,

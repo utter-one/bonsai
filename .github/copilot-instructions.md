@@ -54,10 +54,11 @@
   - Extend Zod with OpenAPI using `extendZodWithOpenApi(z)` at the top of each API file
 - In controllers, use `@Validated(schema)` decorator on parameters that need validation:
   - For body: `@Validated(createAdminSchema) @Body() body: CreateAdminRequest`
-  - For query: `@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams`
+  - For query: `@Validated(listParamsSchema, 'query') @Req() req: Request` then access `req.query as unknown as ListParams`
   - For params: `@Validated(routeParamsSchema, 'params') @Params() params: RouteParams`
 - Never call `.parse()` manually in controllers - validation happens automatically via middleware
 - Import both the schema and type from API contract files in controllers
+- **Query parameters**: Use `@Req()` to access validated query params from `req.query` (validated by middleware), don't use `@QueryParams()` as it's incompatible with Zod-inferred types. Use double cast `as unknown as ListParams` for type safety.
 
 ## OpenAPI/Swagger Documentation
 - OpenAPI documentation is generated from Zod schemas and controller decorators using /src/swagger.ts - make sure to update this file when changing the API contracts

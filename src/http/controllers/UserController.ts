@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpCode, Req } from 'routing-controllers';
+import { JsonController, Get, Post, Put, Delete, Param, Body, HttpCode, Req } from 'routing-controllers';
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
@@ -110,8 +110,8 @@ export class UserController {
   })
   @RequirePermissions([PERMISSIONS.USER_READ])
   @Get('/')
-  async listUsers(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    return await this.userService.listUsers(query);
+  async listUsers(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.userService.listUsers(req.query as unknown as ListParams);
   }
 
   /**

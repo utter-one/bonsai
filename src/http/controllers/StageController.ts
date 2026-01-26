@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpCode, Req } from 'routing-controllers';
+import { JsonController, Get, Post, Put, Delete, Param, Body, HttpCode, Req } from 'routing-controllers';
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
@@ -111,8 +111,8 @@ export class StageController {
     },
   })
   @Get('/')
-  async listStages(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    return await this.stageService.listStages(query);
+  async listStages(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    return await this.stageService.listStages(req.query as unknown as ListParams);
   }
 
   /**

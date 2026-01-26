@@ -7,6 +7,7 @@ import { PublicRoute } from '../decorators/auth';
 import { AuthService } from '../../services/AuthService';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from '../contracts/auth';
 import type { LoginRequest, RefreshTokenRequest } from '../contracts/auth';
+import logger from '../../utils/logger';
 
 /**
  * Controller for authentication endpoints
@@ -49,6 +50,7 @@ export class AuthController {
   @Post('/login')
   @HttpCode(200)
   async login(@Validated(loginSchema) @Body() body: LoginRequest) {
+    logger.info(`Login attempt for user ID: ${body.id}, auth service: ${this.authService ? 'available' : 'not available'}`);
     return await this.authService.login(body.id, body.password);
   }
 

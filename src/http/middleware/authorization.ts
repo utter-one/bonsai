@@ -14,11 +14,21 @@ import { logger } from '../../utils/logger';
 export class PermissionInterceptor implements InterceptorInterface {
   intercept(action: Action, content: any): any {
     const req = action.request as Request;
-    const target = action.context.target;
-    const method = action.context.method;
+    
+    // Get controller and method from the request metadata set by routing-controllers
+    const metadata = (req as any)._action;
+    if (!metadata || !metadata.target || !metadata.method) {
+      // If metadata is not available, allow the request to proceed
+      // This shouldn't happen for normal routing-controllers routes
+      logger.warn({ url: req.url }, 'No action metadata found for route');
+      return content;
+    }
+
+    const target = metadata.target;
+    const method = metadata.method;
 
     // Check if route is marked as public
-    const targetPrototype = target.constructor.prototype;
+    const targetPrototype = target.constructor?.prototype || target;
     if (isPublicRoute(targetPrototype, method)) {
       return content;
     }

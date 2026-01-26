@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { JsonController, Get, Post, Put, Delete, Param, Body, QueryParams, HttpCode, Req } from 'routing-controllers';
+import { JsonController, Get, Post, Put, Delete, Param, Body, HttpCode, Req } from 'routing-controllers';
 import { injectable, inject } from 'tsyringe';
 import { Validated } from '../decorators/validation';
 import { OpenAPI } from '../decorators/openapi';
@@ -11,6 +11,7 @@ import { createProjectSchema, updateProjectSchema, projectResponseSchema, projec
 import type { CreateProjectRequest, UpdateProjectRequest, ProjectRouteParams } from '../contracts/project';
 import { listParamsSchema } from '../contracts/common';
 import type { ListParams } from '../contracts/common';
+import logger from '../../utils/logger';
 
 /**
  * Controller for project management with decorator-based routing
@@ -109,8 +110,8 @@ export class ProjectController {
     },
   })
   @Get('/')
-  async listProjects(@Validated(listParamsSchema, 'query') @QueryParams() query: ListParams) {
-    const projects = await this.projectService.listProjects(query);
+  async listProjects(@Validated(listParamsSchema, 'query') @Req() req: Request) {
+    const projects = await this.projectService.listProjects(req.query as unknown as ListParams);
     return projects;
   }
 

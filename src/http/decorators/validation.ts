@@ -31,8 +31,12 @@ export function getValidationMetadata(target: any, propertyKey: string): { schem
  * Marks a parameter for automatic validation using a Zod schema
  * Usage:
  * - @Validated(createAdminSchema) @Body() body: CreateAdminRequest
- * - @Validated(listParamsSchema, 'query') @QueryParams() query: ListParams
+ * - @Validated(listParamsSchema, 'query') @Req() req: Request (then access req.query as unknown as ListParams)
  * - @Validated(routeParamsSchema, 'params') @Params() params: RouteParams
+ * 
+ * Note: For query parameters, use @Req() instead of @QueryParams() because @QueryParams()
+ * is incompatible with Zod-inferred types. The middleware validates req.query automatically.
+ * Use double cast (as unknown as Type) to bypass Express's ParsedQs type.
  */
 export function Validated(schema: z.ZodType, source: ValidationSource = 'body') {
   return function (target: any, propertyKey: string, parameterIndex: number) {
