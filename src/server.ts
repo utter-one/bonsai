@@ -69,6 +69,12 @@ export function createApp(): express.Application {
     },
   }));
 
+  // OpenAPI JSON endpoint
+  app.get('/openapi.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.json(swaggerSpec);
+  });
+
   // Authentication middleware (optional - sets req.user if token is valid)
   app.use(optionalAuthMiddleware);
   
