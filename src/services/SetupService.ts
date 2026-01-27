@@ -60,7 +60,7 @@ export class SetupService {
       const hashedPassword = await this.authService.hashPassword(input.password);
 
       // Create admin with super_admin role (all permissions)
-      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
+      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
 
       const createdAdmin = admin[0];
 
@@ -74,7 +74,7 @@ export class SetupService {
           id: createdAdmin.id,
           displayName: createdAdmin.displayName,
           roles: createdAdmin.roles,
-          metadata: createdAdmin.metadata ?? undefined,
+          metadata: createdAdmin.metadata ?? {},
           createdAt: createdAdmin.createdAt,
         },
         accessToken: loginResponse.accessToken,
