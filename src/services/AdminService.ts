@@ -37,10 +37,13 @@ export class AdminService extends BaseService {
       // Validate roles exist in ROLES definition
       this.validateRoles(input.roles);
 
+      // Remove duplicate roles
+      const distinctRoles = Array.from(new Set(input.roles));
+
       // Hash password before storing
       const hashedPassword = await this.authService.hashPassword(input.password);
 
-      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: input.roles, password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
+      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: distinctRoles, password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
 
       const createdAdmin = admin[0];
 
@@ -195,7 +198,7 @@ export class AdminService extends BaseService {
       // Hash password if it's being updated
       const updateData: any = {
         displayName: input.displayName,
-        roles: input.roles,
+        roles: input.roles ? Array.from(new Set(input.roles)) : undefined,
         metadata: input.metadata,
         version: existingAdmin.version + 1,
         updatedAt: new Date(),
