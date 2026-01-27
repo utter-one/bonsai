@@ -62,7 +62,7 @@ export type {
  * Optional fields: condition, operations, template, examples, metadata
  */
 export const createGlobalActionSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the global action'),
+  id: z.string().min(1).optional().describe('Unique identifier for the global action (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this global action belongs to'),
   name: z.string().min(1).describe('Display name of the global action'),
   condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),

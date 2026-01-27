@@ -175,7 +175,7 @@ export const actionsSchema = z.record(z.string(), stageActionSchema).describe('A
  * Optional fields: llmProviderId, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, classifierIds, transformerIds, metadata
  */
 export const createStageSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the stage'),
+  id: z.string().min(1).optional().describe('Unique identifier for the stage (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this stage belongs to'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this stage'),

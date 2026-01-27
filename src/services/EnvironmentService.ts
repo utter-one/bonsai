@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing environments with full CRUD operations and audit logging
@@ -32,10 +33,11 @@ export class EnvironmentService extends BaseService {
    */
   async createEnvironment(input: CreateEnvironmentRequest, context: RequestContext): Promise<EnvironmentResponse> {
     this.requirePermission(context, PERMISSIONS.ENVIRONMENT_WRITE);
-    logger.info({ environmentId: input.id, description: input.description, adminId: context?.adminId }, 'Creating environment');
+    const environmentId = input.id ?? generateId(ID_PREFIXES.ENVIRONMENT);
+    logger.info({ environmentId, description: input.description, adminId: context?.adminId }, 'Creating environment');
 
     try {
-      const environment = await db.insert(environments).values({ id: input.id, description: input.description, url: input.url, login: input.login, password: input.password, version: 1 }).returning();
+      const environment = await db.insert(environments).values({ id: environmentId, description: input.description, url: input.url, login: input.login, password: input.password, version: 1 }).returning();
 
       const createdEnvironment = environment[0];
 

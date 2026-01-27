@@ -20,7 +20,7 @@ export const classifierRouteParamsSchema = z.object({
  * Optional fields: description, llmProviderId, metadata
  */
 export const createClassifierSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the classifier'),
+  id: z.string().min(1).optional().describe('Unique identifier for the classifier (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this classifier belongs to'),
   name: z.string().min(1).describe('Display name of the classifier'),
   description: z.string().nullable().optional().describe('Detailed description of the classifier\'s purpose and behavior'),

@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing users with full CRUD operations and audit logging
@@ -30,10 +31,11 @@ export class UserService extends BaseService {
    */
   async createUser(input: CreateUserRequest, context: RequestContext): Promise<UserResponse> {
     this.requirePermission(context, PERMISSIONS.USER_WRITE);
-    logger.info({ userId: input.id, adminId: context?.adminId }, 'Creating user');
+    const userId = input.id ?? generateId(ID_PREFIXES.USER);
+    logger.info({ userId, adminId: context?.adminId }, 'Creating user');
 
     try {
-      const user = await db.insert(users).values({ id: input.id, profile: input.profile }).returning();
+      const user = await db.insert(users).values({ id: userId, profile: input.profile }).returning();
 
       const createdUser = user[0];
 

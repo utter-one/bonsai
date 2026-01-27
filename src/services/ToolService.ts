@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing tools with full CRUD operations and audit logging
@@ -31,10 +32,11 @@ export class ToolService extends BaseService {
    */
   async createTool(input: CreateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
-    logger.info({ toolId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating tool');
+    const toolId = input.id ?? generateId(ID_PREFIXES.TOOL);
+    logger.info({ toolId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating tool');
 
     try {
-      const tool = await db.insert(tools).values({ id: input.id, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, inputType: input.inputType, outputType: input.outputType, metadata: input.metadata ?? null, version: 1 }).returning();
+      const tool = await db.insert(tools).values({ id: toolId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, inputType: input.inputType, outputType: input.outputType, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTool = tool[0];
 

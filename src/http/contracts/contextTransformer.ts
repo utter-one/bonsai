@@ -20,7 +20,7 @@ export const contextTransformerRouteParamsSchema = z.object({
  * Optional fields: description, contextFields, llmProviderId, metadata
  */
 export const createContextTransformerSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the context transformer'),
+  id: z.string().min(1).optional().describe('Unique identifier for the context transformer (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this context transformer belongs to'),
   name: z.string().min(1).describe('Display name of the context transformer'),
   description: z.string().nullable().optional().describe('Detailed description of the transformer\'s purpose and behavior'),

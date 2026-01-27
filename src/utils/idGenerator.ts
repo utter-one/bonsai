@@ -2,10 +2,23 @@
  * Entity type prefixes for ID generation
  */
 export const ID_PREFIXES = {
+  ADMIN: 'adm',
+  USER: 'user',
   PROJECT: 'proj',
+  PERSONA: 'pers',
+  CLASSIFIER: 'clas',
+  CONTEXT_TRANSFORMER: 'tran',
+  TOOL: 'tool',
+  STAGE: 'stag',
+  KNOWLEDGE_SECTION: 'ksec',
+  KNOWLEDGE_CATEGORY: 'kcat',
+  KNOWLEDGE_ITEM: 'kitm',
+  GLOBAL_ACTION: 'gact',
+  PROVIDER: 'prov',
+  ENVIRONMENT: 'env',
   CONVERSATION: 'conv',
-  AUDIT: 'audit',
-  EVENT: 'event',
+  AUDIT: 'audt',
+  EVENT: 'evnt',
   REQUEST: 'req',
 } as const;
 

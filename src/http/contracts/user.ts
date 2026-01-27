@@ -22,7 +22,7 @@ export type UserRouteParams = z.infer<typeof userRouteParamsSchema>;
  * Profile is a flexible JSON object containing user-specific data
  */
 export const createUserSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the user'),
+  id: z.string().min(1).optional().describe('Unique identifier for the user (auto-generated if not provided)'),
   profile: z.record(z.string(), z.unknown()).describe('User profile data as flexible key-value pairs'),
 });
 

@@ -28,7 +28,7 @@ export const providerNameSchema = z.string().describe('Specific provider impleme
  * Optional fields: description, createdBy, tags
  */
 export const createProviderSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the provider'),
+  id: z.string().min(1).optional().describe('Unique identifier for the provider (auto-generated if not provided)'),
   displayName: z.string().min(1).describe('Human-readable name for the provider'),
   description: z.string().optional().describe('Detailed description of provider purpose and use case'),
   providerType: providerTypeSchema.describe('Provider category: asr, tts, llm, or embeddings'),
