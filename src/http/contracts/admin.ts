@@ -55,6 +55,31 @@ export const deleteAdminBodySchema = z.object({
 });
 
 /**
+ * Schema for updating the logged-in admin's own profile
+ * Allows changing display name and/or password
+ * If changing password, old password is required for verification
+ */
+export const updateProfileSchema = z.object({
+  displayName: z.string().min(1).optional().describe('Updated display name for the admin user'),
+  oldPassword: z.string().min(1).optional().describe('Current password (required when changing password)'),
+  newPassword: z.string().min(1).optional().describe('New password to set (requires oldPassword)'),
+});
+
+/**
+ * Schema for profile response (subset of admin response)
+ * Includes: id, displayName, roles, metadata, version, createdAt, updatedAt
+ */
+export const profileResponseSchema = z.object({
+  id: z.string().describe('Unique identifier for the admin user'),
+  displayName: z.string().describe('Display name of the admin user'),
+  roles: z.array(z.string()).describe('Array of role identifiers assigned to the admin'),
+  metadata: z.record(z.string(), z.unknown()).optional().describe('Metadata as key-value pairs'),
+  version: z.number().int().describe('Current version number for optimistic locking'),
+  createdAt: z.coerce.date().describe('Timestamp when the admin user was created'),
+  updatedAt: z.coerce.date().describe('Timestamp when the admin user was last updated'),
+});
+
+/**
  * Schema for admin user response
  * Excludes password field for security
  * Includes: id, displayName, roles, metadata, version, createdAt, updatedAt
@@ -97,3 +122,9 @@ export type AdminListResponse = z.infer<typeof adminListResponseSchema>;
 
 /** Route parameters for admin endpoints */
 export type AdminRouteParams = z.infer<typeof adminRouteParamsSchema>;
+
+/** Request body for updating the logged-in admin's profile */
+export type UpdateProfileRequest = z.infer<typeof updateProfileSchema>;
+
+/** Response for profile information */
+export type ProfileResponse = z.infer<typeof profileResponseSchema>;

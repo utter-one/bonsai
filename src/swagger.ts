@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema } from './http/contracts/admin';
+import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/admin';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
 import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema } from './http/contracts/project';
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './http/contracts/persona';
@@ -52,6 +52,8 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteAdminRequest', deleteAdminBodySchema);
   registry.register('AdminResponse', adminResponseSchema);
   registry.register('AdminListResponse', adminListResponseSchema);
+  registry.register('UpdateProfileRequest', updateProfileSchema);
+  registry.register('ProfileResponse', profileResponseSchema);
   registry.register('CreateUserRequest', createUserSchema);
   registry.register('UpdateUserRequest', updateUserBodySchema);
   registry.register('UserResponse', userResponseSchema);

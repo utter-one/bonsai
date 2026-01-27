@@ -110,6 +110,7 @@ export class ExampleController {
 
 ## API Contracts and Validation
 - Use Zod schemas as the source of truth for API contracts
+- Don't put logic in the Zod schemas, handle it at the service level
 - All API contracts are defined in /src/http/contracts using Zod schemas
 - When creating schemas in /src/http/contracts:
   - Add comprehensive JSDoc comments to schemas

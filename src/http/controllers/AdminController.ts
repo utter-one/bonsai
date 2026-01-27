@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { AdminService } from '../../services/AdminService';
-import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema, adminRouteParamsSchema } from '../contracts/admin';
+import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema, adminRouteParamsSchema, updateProfileSchema, profileResponseSchema } from '../contracts/admin';
 import type { UpdateAdminRequest } from '../contracts/admin';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
@@ -160,6 +160,52 @@ export class AdminController {
           404: { description: 'Admin user not found' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/profile',
+        tags: ['Profile'],
+        summary: 'Get own profile',
+        description: 'Retrieves the profile information of the currently logged-in admin user',
+        responses: {
+          200: {
+            description: 'Profile retrieved successfully',
+            content: {
+              'application/json': {
+                schema: profileResponseSchema,
+              },
+            },
+          },
+          401: { description: 'Not authenticated' },
+        },
+      },
+      {
+        method: 'post',
+        path: '/api/profile',
+        tags: ['Profile'],
+        summary: 'Update own profile',
+        description: 'Updates the profile of the currently logged-in admin user. Allows changing display name and/or password. When changing password, the old password must be provided for verification.',
+        request: {
+          body: {
+            content: {
+              'application/json': {
+                schema: updateProfileSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Profile updated successfully',
+            content: {
+              'application/json': {
+                schema: profileResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          401: { description: 'Not authenticated or invalid old password' },
+        },
+      },
     ];
   }
 
@@ -173,6 +219,8 @@ export class AdminController {
     router.put('/api/admins/:id', asyncHandler(this.updateAdmin.bind(this)));
     router.delete('/api/admins/:id', asyncHandler(this.deleteAdmin.bind(this)));
     router.get('/api/admins/:id/audit-logs', asyncHandler(this.getAdminAuditLogs.bind(this)));
+    router.get('/api/profile', asyncHandler(this.getProfile.bind(this)));
+    router.post('/api/profile', asyncHandler(this.updateProfile.bind(this)));
   }
 
   /**
@@ -242,5 +290,24 @@ export class AdminController {
     const params = adminRouteParamsSchema.parse(req.params);
     const logs = await this.adminService.getAdminAuditLogs(params.id);
     res.status(200).json(logs);
+  }
+
+  /**
+   * GET /api/profile
+   * Get the profile of the currently logged-in admin user
+   */
+  private async getProfile(req: Request, res: Response): Promise<void> {
+    const profile = await this.adminService.getProfile(req.context);
+    res.status(200).json(profile);
+  }
+
+  /**
+   * POST /api/profile
+   * Update the profile of the currently logged-in admin user
+   */
+  private async updateProfile(req: Request, res: Response): Promise<void> {
+    const body = updateProfileSchema.parse(req.body);
+    const profile = await this.adminService.updateProfile(body, req.context);
+    res.status(200).json(profile);
   }
 }

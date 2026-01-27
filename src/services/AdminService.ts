@@ -2,9 +2,9 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, gte, lte, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { admins } from '../db/schema';
-import type { CreateAdminRequest, UpdateAdminRequest, AdminResponse, AdminListResponse } from '../http/contracts/admin';
+import type { CreateAdminRequest, UpdateAdminRequest, AdminResponse, AdminListResponse, UpdateProfileRequest, ProfileResponse } from '../http/contracts/admin';
 import type { ListParams } from '../http/contracts/common';
-import { adminResponseSchema, adminListResponseSchema } from '../http/contracts/admin';
+import { adminResponseSchema, adminListResponseSchema, profileResponseSchema } from '../http/contracts/admin';
 import { AuditService } from './AuditService';
 import { AuthService } from './AuthService';
 import { OptimisticLockError, NotFoundError } from '../errors';
@@ -291,6 +291,103 @@ export class AdminService extends BaseService {
     
     if (invalidRoles.length > 0) {
       throw new Error(`Invalid roles: ${invalidRoles.join(', ')}. Valid roles are: ${validRoles.join(', ')}`);
+    }
+  }
+
+  /**
+   * Retrieves the profile of the currently logged-in admin user
+   * @param context - Request context containing the authenticated admin ID
+   * @returns The profile information of the logged-in admin
+   * @throws {NotFoundError} When admin is not found
+   */
+  async getProfile(context: RequestContext): Promise<ProfileResponse> {
+    logger.debug({ adminId: context.adminId }, 'Fetching profile for logged-in admin');
+
+    try {
+      const admin = await db.query.admins.findFirst({ where: eq(admins.id, context.adminId) });
+
+      if (!admin) {
+        throw new NotFoundError(`Admin with id ${context.adminId} not found`);
+      }
+
+      return profileResponseSchema.parse(admin);
+    } catch (error) {
+      logger.error({ error, adminId: context.adminId }, 'Failed to fetch profile');
+      throw error;
+    }
+  }
+
+  /**
+   * Updates the profile of the currently logged-in admin user
+   * Allows changing display name and/or password
+   * When changing password, the old password must be verified first
+   * @param input - Profile update data including displayName, oldPassword, and newPassword
+   * @param context - Request context containing the authenticated admin ID
+   * @returns The updated profile information
+   * @throws {NotFoundError} When admin is not found
+   * @throws {Error} When old password is invalid
+   */
+  async updateProfile(input: UpdateProfileRequest, context: RequestContext): Promise<ProfileResponse> {
+    logger.info({ adminId: context.adminId }, 'Updating profile for logged-in admin');
+
+    try {
+      const existingAdmin = await db.query.admins.findFirst({ where: eq(admins.id, context.adminId) });
+
+      if (!existingAdmin) {
+        throw new NotFoundError(`Admin with id ${context.adminId} not found`);
+      }
+
+      // Verify old password if changing password
+      if (input.newPassword) {
+        if (!input.oldPassword) {
+          throw new Error('Old password is required when changing password');
+        }
+
+        const isValidPassword = await this.authService.verifyPassword(input.oldPassword, existingAdmin.password);
+        if (!isValidPassword) {
+          throw new Error('Invalid old password');
+        }
+      }
+
+      // Build update data
+      const updateData: any = {
+        version: existingAdmin.version + 1,
+        updatedAt: new Date(),
+      };
+
+      if (input.displayName) {
+        updateData.displayName = input.displayName;
+      }
+
+      if (input.newPassword) {
+        updateData.password = await this.authService.hashPassword(input.newPassword);
+      }
+
+      const updatedAdmin = await db.update(admins).set(updateData).where(eq(admins.id, context.adminId)).returning();
+
+      if (updatedAdmin.length === 0) {
+        throw new Error('Failed to update profile');
+      }
+
+      const admin = updatedAdmin[0];
+
+      // Log the update for audit purposes
+      const oldData: any = { id: existingAdmin.id, displayName: existingAdmin.displayName };
+      const newData: any = { id: admin.id, displayName: admin.displayName };
+      
+      if (input.newPassword) {
+        oldData.passwordChanged = false;
+        newData.passwordChanged = true;
+      }
+
+      await this.auditService.logUpdate('admin', admin.id, oldData, newData, context.adminId);
+
+      logger.info({ adminId: admin.id, newVersion: admin.version }, 'Profile updated successfully');
+
+      return profileResponseSchema.parse(admin);
+    } catch (error) {
+      logger.error({ error, adminId: context.adminId }, 'Failed to update profile');
+      throw error;
     }
   }
 }
