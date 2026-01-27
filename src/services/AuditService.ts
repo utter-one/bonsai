@@ -3,10 +3,10 @@ import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { auditLogs } from '../db/schema';
 import type { AuditLog } from '../types/models';
-import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import type { ListParams } from '../http/contracts/common';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 export interface AuditLogInput {
   userId?: string;
@@ -34,7 +34,7 @@ export class AuditService {
       const auditLog = await db
         .insert(auditLogs)
         .values({
-          id: uuidv4(),
+          id: generateId(ID_PREFIXES.AUDIT),
           userId: input.userId,
           action: input.action,
           entityId: input.entityId,

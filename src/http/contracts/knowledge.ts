@@ -33,7 +33,7 @@ export const knowledgeCategoryItemsRouteParamsSchema = z.object({
  * Required fields: id, name
  */
 export const createKnowledgeSectionSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the knowledge section'),
+  id: z.string().min(1).optional().describe('Unique identifier for the knowledge section (auto-generated if not provided)'),
   name: z.string().min(1).describe('Name of the knowledge section'),
 });
 
@@ -88,7 +88,7 @@ export type KnowledgeSectionListResponse = z.infer<typeof knowledgeSectionListRe
  * Optional fields: knowledgeSections, order
  */
 export const createKnowledgeCategorySchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the knowledge category'),
+  id: z.string().min(1).optional().describe('Unique identifier for the knowledge category (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this knowledge category belongs to'),
   name: z.string().min(1).describe('Name of the knowledge category'),
   promptTrigger: z.string().min(1).describe('Trigger phrase that activates this category in conversations'),
@@ -183,7 +183,7 @@ export type KnowledgeCategoryListResponse = z.infer<typeof knowledgeCategoryList
  * Optional fields: order
  */
 export const createKnowledgeItemSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the knowledge item'),
+  id: z.string().min(1).optional().describe('Unique identifier for the knowledge item (auto-generated if not provided)'),
   categoryId: z.string().min(1).describe('ID of the category this item belongs to'),
   question: z.string().min(1).describe('Question text for this knowledge item'),
   answer: z.string().min(1).describe('Answer text for this knowledge item'),

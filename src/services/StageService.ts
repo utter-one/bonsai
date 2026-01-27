@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing stages with full CRUD operations and audit logging
@@ -94,13 +95,14 @@ export class StageService extends BaseService {
    */
   async createStage(input: CreateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
-    logger.info({ id: input.id, projectId: input.projectId, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
+    const stageId = input.id ?? generateId(ID_PREFIXES.STAGE);
+    logger.info({ id: stageId, projectId: input.projectId, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
 
     try {
       // Validate referenced entities exist
       await this.validateReferencedEntities(input.personaId, input.classifierIds, input.transformerIds, input.knowledgeSections, input.globalActions);
 
-      const stage = await db.insert(stages).values({ id: input.id, projectId: input.projectId, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const stage = await db.insert(stages).values({ id: stageId, projectId: input.projectId, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdStage = stage[0];
 
@@ -110,7 +112,7 @@ export class StageService extends BaseService {
 
       return stageResponseSchema.parse(createdStage);
     } catch (error) {
-      logger.error({ error, id: input.id }, 'Failed to create stage');
+      logger.error({ error, id: stageId }, 'Failed to create stage');
       throw error;
     }
   }

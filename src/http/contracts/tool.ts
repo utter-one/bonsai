@@ -22,7 +22,7 @@ export type ToolRouteParams = z.infer<typeof toolRouteParamsSchema>;
  * Optional fields: description, llmProviderId, metadata
  */
 export const createToolSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the tool'),
+  id: z.string().min(1).optional().describe('Unique identifier for the tool (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this tool belongs to'),
   name: z.string().min(1).describe('Display name of the tool'),
   description: z.string().nullable().optional().describe('Detailed description of the tool\'s purpose and behavior'),

@@ -17,7 +17,7 @@ export const environmentRouteParamsSchema = z.object({
  * Note: Environments are used for data migration between server instances
  */
 export const createEnvironmentSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the environment'),
+  id: z.string().min(1).optional().describe('Unique identifier for the environment (auto-generated if not provided)'),
   description: z.string().min(1).describe('Human-readable description of the environment'),
   url: z.string().url().describe('Base URL of the target server instance'),
   login: z.string().min(1).describe('Authentication login/username for the environment'),

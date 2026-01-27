@@ -26,7 +26,7 @@ export const adminRouteParamsSchema = z.object({
  * Optional fields: metadata
  */
 export const createAdminSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the admin user'),
+  id: z.string().min(1).optional().describe('Unique identifier for the admin user (auto-generated if not provided)'),
   displayName: z.string().min(1).describe('Display name for the admin user'),
   roles: z.array(z.enum(VALID_ROLES)).min(1).describe(`Array of role identifiers assigned to the admin (at least one required). Valid roles: ${VALID_ROLES.join(', ')}`),
   password: z.string().min(1).describe('Admin user password (will be hashed)'),

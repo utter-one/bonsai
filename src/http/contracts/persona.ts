@@ -30,7 +30,7 @@ export type VoiceConfig = z.infer<typeof voiceConfigSchema>;
  * Optional fields: voiceConfig, metadata
  */
 export const createPersonaSchema = z.object({
-  id: z.string().min(1).describe('Unique identifier for the persona'),
+  id: z.string().min(1).optional().describe('Unique identifier for the persona (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this persona belongs to'),
   name: z.string().min(1).describe('Display name of the persona'),
   prompt: z.string().min(1).describe('Detailed prompt defining the persona\'s characteristics and behavior'),

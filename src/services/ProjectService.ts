@@ -11,8 +11,7 @@ import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
-import { PERMISSIONS } from '../permissions';
-
+import { PERMISSIONS } from '../permissions';import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 /**
  * Service for managing projects with full CRUD operations and audit logging
  */
@@ -33,7 +32,7 @@ export class ProjectService extends BaseService {
     logger.info({ name: input.name, adminId: context?.adminId }, 'Creating project');
 
     try {
-      const id = `proj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const id = generateId(ID_PREFIXES.PROJECT);
       const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, constants: input.constants, metadata: input.metadata, version: 1 }).returning();
 
       const createdProject = project[0];

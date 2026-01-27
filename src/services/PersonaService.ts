@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing personas with full CRUD operations and audit logging
@@ -30,10 +31,11 @@ export class PersonaService extends BaseService {
    */
   async createPersona(input: CreatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
     this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
-    logger.info({ personaId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
+    const personaId = input.id ?? generateId(ID_PREFIXES.PERSONA);
+    logger.info({ personaId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
-      const persona = await db.insert(personas).values({ id: input.id, projectId: input.projectId, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
+      const persona = await db.insert(personas).values({ id: personaId, projectId: input.projectId, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
 
       const createdPersona = persona[0];
 

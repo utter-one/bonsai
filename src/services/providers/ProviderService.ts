@@ -12,6 +12,7 @@ import { logger } from '../../utils/logger';
 import { BaseService } from '../BaseService';
 import type { RequestContext } from '../RequestContext';
 import { PERMISSIONS } from '../../permissions';
+import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
 
 /**
  * Service for managing provider configurations with full CRUD operations and audit logging
@@ -30,10 +31,11 @@ export class ProviderService extends BaseService {
    */
   async createProvider(input: CreateProviderRequest, context: RequestContext): Promise<ProviderResponse> {
     this.requirePermission(context, PERMISSIONS.PROVIDER_WRITE);
-    logger.info({ providerId: input.id, displayName: input.displayName, providerType: input.providerType, apiType: input.apiType, contextAdminId: context?.adminId }, 'Creating provider');
+    const providerId = input.id ?? generateId(ID_PREFIXES.PROVIDER);
+    logger.info({ providerId, displayName: input.displayName, providerType: input.providerType, apiType: input.apiType, contextAdminId: context?.adminId }, 'Creating provider');
 
     try {
-      const provider = await db.insert(providers).values({ id: input.id, displayName: input.displayName, description: input.description, providerType: input.providerType, apiType: input.apiType, config: input.config, createdBy: input.createdBy || context?.adminId, tags: input.tags, version: 1 }).returning();
+      const provider = await db.insert(providers).values({ id: providerId, displayName: input.displayName, description: input.description, providerType: input.providerType, apiType: input.apiType, config: input.config, createdBy: input.createdBy || context?.adminId, tags: input.tags, version: 1 }).returning();
 
       const createdProvider = provider[0];
 

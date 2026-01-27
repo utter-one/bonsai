@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing context transformers with full CRUD operations and audit logging
@@ -31,10 +32,11 @@ export class ContextTransformerService extends BaseService {
    */
   async createContextTransformer(input: CreateContextTransformerRequest, context: RequestContext): Promise<ContextTransformerResponse> {
     this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_WRITE);
-    logger.info({ transformerId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating context transformer');
+    const transformerId = input.id ?? generateId(ID_PREFIXES.CONTEXT_TRANSFORMER);
+    logger.info({ transformerId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating context transformer');
 
     try {
-      const transformer = await db.insert(contextTransformers).values({ id: input.id, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, contextFields: input.contextFields ?? null, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const transformer = await db.insert(contextTransformers).values({ id: transformerId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, contextFields: input.contextFields ?? null, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTransformer = transformer[0];
 

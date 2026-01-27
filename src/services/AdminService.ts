@@ -13,6 +13,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS, ROLES } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing admin users with full CRUD operations and audit logging
@@ -31,7 +32,8 @@ export class AdminService extends BaseService {
    */
   async createAdmin(input: CreateAdminRequest, context: RequestContext): Promise<AdminResponse> {
     this.requirePermission(context, PERMISSIONS.ADMIN_WRITE);
-    logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
+    const adminId = input.id ?? generateId(ID_PREFIXES.ADMIN);
+    logger.info({ adminId, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
 
     try {
       // Validate roles exist in ROLES definition
@@ -43,7 +45,7 @@ export class AdminService extends BaseService {
       // Hash password before storing
       const hashedPassword = await this.authService.hashPassword(input.password);
 
-      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: distinctRoles, password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
+      const admin = await db.insert(admins).values({ id: adminId, displayName: input.displayName, roles: distinctRoles, password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
 
       const createdAdmin = admin[0];
 

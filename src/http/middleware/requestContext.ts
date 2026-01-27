@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
 import type { RequestContext } from '../../services/RequestContext';
 
 // Extend Express Request type to include context and user
@@ -27,7 +27,7 @@ export function requestContextMiddleware(req: Request, res: Response, next: Next
       roles: req.user.roles,
       ip: (req.ip || req.socket.remoteAddress || 'unknown'),
       userAgent: req.get('user-agent') || 'unknown',
-      requestId: uuidv4(),
+      requestId: generateId(ID_PREFIXES.REQUEST),
       timestamp: new Date(),
     };
   }

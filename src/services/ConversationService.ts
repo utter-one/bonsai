@@ -12,7 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
-import { randomUUID } from 'crypto';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 import { ConversationState } from './live/ConversationRunner';
 
 /**
@@ -46,7 +46,7 @@ export class ConversationService extends BaseService {
    * @returns The created conversation
    */
   async createConversation(input: CreateConversationInput, context?: RequestContext): Promise<ConversationResponse> {
-    const conversationId = input.id ?? randomUUID();
+    const conversationId = input.id ?? generateId(ID_PREFIXES.CONVERSATION);
     logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, adminId: context?.adminId }, 'Creating conversation');
 
     try {
@@ -129,7 +129,7 @@ export class ConversationService extends BaseService {
     logger.debug({ conversationId, eventType }, 'Saving conversation event');
 
     try {
-      const eventId = randomUUID();
+      const eventId = generateId(ID_PREFIXES.EVENT);
       const eventRecord = {
         id: eventId,
         conversationId,

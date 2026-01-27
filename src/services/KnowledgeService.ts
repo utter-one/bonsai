@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing knowledge base including sections, categories, and items
@@ -35,10 +36,11 @@ export class KnowledgeService extends BaseService {
    */
   async createKnowledgeSection(input: CreateKnowledgeSectionRequest, context: RequestContext): Promise<KnowledgeSectionResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
-    logger.info({ sectionId: input.id, name: input.name, adminId: context?.adminId }, 'Creating knowledge section');
+    const sectionId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_SECTION);
+    logger.info({ sectionId, name: input.name, adminId: context?.adminId }, 'Creating knowledge section');
 
     try {
-      const section = await db.insert(knowledgeSections).values({ id: input.id, name: input.name }).returning();
+      const section = await db.insert(knowledgeSections).values({ id: sectionId, name: input.name }).returning();
 
       const createdSection = section[0];
 
@@ -198,10 +200,11 @@ export class KnowledgeService extends BaseService {
    */
   async createKnowledgeCategory(input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
-    logger.info({ categoryId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
+    const categoryId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_CATEGORY);
+    logger.info({ categoryId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
 
     try {
-      const category = await db.insert(knowledgeCategories).values({ id: input.id, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections ?? [], order: input.order ?? 0, version: 1 }).returning();
+      const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections ?? [], order: input.order ?? 0, version: 1 }).returning();
 
       const createdCategory = category[0];
 
@@ -211,7 +214,7 @@ export class KnowledgeService extends BaseService {
 
       return knowledgeCategoryResponseSchema.parse(createdCategory);
     } catch (error) {
-      logger.error({ error, categoryId: input.id }, 'Failed to create knowledge category');
+      logger.error({ error, categoryId }, 'Failed to create knowledge category');
       throw error;
     }
   }
@@ -383,10 +386,11 @@ export class KnowledgeService extends BaseService {
    */
   async createKnowledgeItem(input: CreateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
-    logger.info({ itemId: input.id, categoryId: input.categoryId, adminId: context?.adminId }, 'Creating knowledge item');
+    const itemId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_ITEM);
+    logger.info({ itemId, categoryId: input.categoryId, adminId: context?.adminId }, 'Creating knowledge item');
 
     try {
-      const item = await db.insert(knowledgeItems).values({ id: input.id, categoryId: input.categoryId, question: input.question, answer: input.answer, order: input.order ?? 0, version: 1 }).returning();
+      const item = await db.insert(knowledgeItems).values({ id: itemId, categoryId: input.categoryId, question: input.question, answer: input.answer, order: input.order ?? 0, version: 1 }).returning();
 
       const createdItem = item[0];
 
@@ -396,7 +400,7 @@ export class KnowledgeService extends BaseService {
 
       return knowledgeItemResponseSchema.parse(createdItem);
     } catch (error) {
-      logger.error({ error, itemId: input.id }, 'Failed to create knowledge item');
+      logger.error({ error, itemId }, 'Failed to create knowledge item');
       throw error;
     }
   }

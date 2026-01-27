@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing classifiers with full CRUD operations and audit logging
@@ -31,10 +32,11 @@ export class ClassifierService extends BaseService {
    */
   async createClassifier(input: CreateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
-    logger.info({ classifierId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating classifier');
+    const classifierId = input.id ?? generateId(ID_PREFIXES.CLASSIFIER);
+    logger.info({ classifierId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating classifier');
 
     try {
-      const classifier = await db.insert(classifiers).values({ id: input.id, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const classifier = await db.insert(classifiers).values({ id: classifierId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdClassifier = classifier[0];
 

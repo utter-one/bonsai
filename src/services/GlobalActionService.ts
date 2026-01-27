@@ -12,6 +12,7 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing global actions with full CRUD operations and audit logging
@@ -31,10 +32,11 @@ export class GlobalActionService extends BaseService {
    */
   async createGlobalAction(input: CreateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
-    logger.info({ globalActionId: input.id, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating global action');
+    const globalActionId = input.id ?? generateId(ID_PREFIXES.GLOBAL_ACTION);
+    logger.info({ globalActionId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating global action');
 
     try {
-      const globalAction = await db.insert(globalActions).values({ id: input.id, projectId: input.projectId, name: input.name, condition: input.condition ?? null, promptTrigger: input.promptTrigger, operations: input.operations ?? [], template: input.template ?? null, examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const globalAction = await db.insert(globalActions).values({ id: globalActionId, projectId: input.projectId, name: input.name, condition: input.condition ?? null, promptTrigger: input.promptTrigger, operations: input.operations ?? [], template: input.template ?? null, examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdGlobalAction = globalAction[0];
 
