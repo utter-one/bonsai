@@ -17,7 +17,7 @@ RUN npm ci
 # Copy source code
 COPY src/ ./src/
 COPY tsconfig.json ./
-COPY drizzle.config.js ./
+COPY drizzle.config.ts ./
 
 # Expose the application port
 EXPOSE 3000
