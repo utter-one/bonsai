@@ -36,7 +36,7 @@ export class AdminService extends BaseService {
     if (!adminId) {
       throw new InvalidOperationError('Admin ID (email) must be provided when creating an admin');
     }
-
+    
     logger.info({ adminId, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
 
     try {
