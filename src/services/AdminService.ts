@@ -7,7 +7,7 @@ import type { ListParams } from '../http/contracts/common';
 import { adminResponseSchema, adminListResponseSchema, profileResponseSchema } from '../http/contracts/admin';
 import { AuditService } from './AuditService';
 import { AuthService } from './AuthService';
-import { OptimisticLockError, NotFoundError } from '../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
@@ -32,7 +32,12 @@ export class AdminService extends BaseService {
    */
   async createAdmin(input: CreateAdminRequest, context: RequestContext): Promise<AdminResponse> {
     this.requirePermission(context, PERMISSIONS.ADMIN_WRITE);
-    logger.info({ adminId: input.id, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
+    const adminId = input.id;
+    if (!adminId) {
+      throw new InvalidOperationError('Admin ID (email) must be provided when creating an admin');
+    }
+    
+    logger.info({ adminId, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
 
     try {
       // Validate roles exist in ROLES definition
