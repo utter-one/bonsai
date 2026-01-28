@@ -68,7 +68,6 @@ export const personaResponseSchema = z.object({
   projectId: z.string().describe('ID of the project this persona belongs to'),
   name: z.string().describe('Display name of the persona'),
   prompt: z.string().describe('Prompt defining the persona\'s characteristics and behavior'),
-  voiceProviderId: z.string().nullable().describe('ID of the voice provider used for TTS, if any'),
   voiceConfig: voiceConfigSchema.nullable().describe('Voice configuration settings'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional persona-specific metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
