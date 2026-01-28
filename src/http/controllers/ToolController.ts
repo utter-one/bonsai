@@ -217,8 +217,7 @@ export class ToolController {
     checkPermissions(req, [PERMISSIONS.TOOL_WRITE]);
     const params = toolRouteParamsSchema.parse(req.params);
     const body = updateToolBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const tool = await this.toolService.updateTool(params.id, updateData, version, req.context);
+    const tool = await this.toolService.updateTool(params.id, body, req.context);
     res.status(200).json(tool);
   }
 

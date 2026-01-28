@@ -217,8 +217,7 @@ export class EnvironmentController {
     checkPermissions(req, [PERMISSIONS.ENVIRONMENT_WRITE]);
     const params = environmentRouteParamsSchema.parse(req.params);
     const body = updateEnvironmentBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const environment = await this.environmentService.updateEnvironment(params.id, updateData, version, req.context);
+    const environment = await this.environmentService.updateEnvironment(params.id, body, req.context);
     res.status(200).json(environment);
   }
 

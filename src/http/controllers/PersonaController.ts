@@ -216,8 +216,7 @@ export class PersonaController {
     checkPermissions(req, [PERMISSIONS.PERSONA_WRITE]);
     const params = personaRouteParamsSchema.parse(req.params);
     const body = updatePersonaBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const persona = await this.personaService.updatePersona(params.id, updateData, version!, req.context);
+    const persona = await this.personaService.updatePersona(params.id, body, req.context);
     res.status(200).json(persona);
   }
 

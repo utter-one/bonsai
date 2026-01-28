@@ -172,15 +172,15 @@ export class ProviderService extends BaseService {
   /**
    * Updates a provider using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the provider to update
-   * @param input - Provider update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Provider update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated provider
    * @throws {NotFoundError} When provider is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateProvider(id: string, input: Omit<UpdateProviderRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<ProviderResponse> {
+  async updateProvider(id: string, input: UpdateProviderRequest, context: RequestContext): Promise<ProviderResponse> {
     this.requirePermission(context, PERMISSIONS.PROVIDER_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ providerId: id, expectedVersion, contextAdminId: context?.adminId }, 'Updating provider');
 
     try {
@@ -194,18 +194,18 @@ export class ProviderService extends BaseService {
         throw new OptimisticLockError(`Provider version mismatch. Expected ${expectedVersion}, got ${existingProvider.version}`);
       }
 
-      const updateData: any = {
-        displayName: input.displayName,
-        description: input.description,
-        providerType: input.providerType,
-        apiType: input.apiType,
-        config: input.config,
-        tags: input.tags,
+      const updatePayload: any = {
+        displayName: updateData.displayName,
+        description: updateData.description,
+        providerType: updateData.providerType,
+        apiType: updateData.apiType,
+        config: updateData.config,
+        tags: updateData.tags,
         version: existingProvider.version + 1,
         updatedAt: new Date(),
       };
 
-      const updatedProvider = await db.update(providers).set(updateData).where(and(eq(providers.id, id), eq(providers.version, expectedVersion))).returning();
+      const updatedProvider = await db.update(providers).set(updatePayload).where(and(eq(providers.id, id), eq(providers.version, expectedVersion))).returning();
 
       if (updatedProvider.length === 0) {
         throw new OptimisticLockError(`Failed to update provider due to version conflict`);

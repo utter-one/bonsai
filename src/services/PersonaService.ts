@@ -143,15 +143,15 @@ export class PersonaService extends BaseService {
   /**
    * Updates a persona using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the persona to update
-   * @param input - Persona update data including name, prompt, voiceConfig, and metadata (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Persona update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated persona
    * @throws {NotFoundError} When persona is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updatePersona(id: string, input: Omit<UpdatePersonaRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<PersonaResponse> {
+  async updatePersona(id: string, input: UpdatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
     this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ personaId: id, expectedVersion, adminId: context?.adminId }, 'Updating persona');
 
     try {
@@ -165,7 +165,7 @@ export class PersonaService extends BaseService {
         throw new OptimisticLockError(`Persona version mismatch. Expected ${expectedVersion}, got ${existingPersona.version}`);
       }
 
-      const updatedPersona = await db.update(personas).set({ name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
+      const updatedPersona = await db.update(personas).set({ name: updateData.name, prompt: updateData.prompt, voiceConfig: updateData.voiceConfig, metadata: updateData.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
 
       if (updatedPersona.length === 0) {
         throw new OptimisticLockError(`Failed to update persona due to version conflict`);

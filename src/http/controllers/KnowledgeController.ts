@@ -548,8 +548,7 @@ export class KnowledgeController {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
     const params = knowledgeCategoryRouteParamsSchema.parse(req.params);
     const body = updateKnowledgeCategoryBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const category = await this.knowledgeService.updateKnowledgeCategory(params.id, updateData, version, req.context);
+    const category = await this.knowledgeService.updateKnowledgeCategory(params.id, body, req.context);
     res.status(200).json(category);
   }
 
@@ -610,8 +609,7 @@ export class KnowledgeController {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
     const params = knowledgeItemRouteParamsSchema.parse(req.params);
     const body = updateKnowledgeItemBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const item = await this.knowledgeService.updateKnowledgeItem(params.id, updateData, version, req.context);
+    const item = await this.knowledgeService.updateKnowledgeItem(params.id, body, req.context);
     res.status(200).json(item);
   }
 

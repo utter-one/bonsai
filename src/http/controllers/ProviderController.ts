@@ -216,8 +216,7 @@ export class ProviderController {
     checkPermissions(req, [PERMISSIONS.PROVIDER_WRITE]);
     const params = providerRouteParamsSchema.parse(req.params);
     const body = updateProviderBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const provider = await this.providerService.updateProvider(params.id, updateData, version, req.context);
+    const provider = await this.providerService.updateProvider(params.id, body, req.context);
     res.status(200).json(provider);
   }
 

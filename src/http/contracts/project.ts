@@ -44,6 +44,7 @@ export const updateProjectSchema = z.object({
   generateVoice: z.boolean().optional().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   constants: z.record(z.string(), z.any()).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
+  version: z.number().describe('The current version number for optimistic locking'),
 });
 
 export type UpdateProjectRequest = z.infer<typeof updateProjectSchema>;

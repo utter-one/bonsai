@@ -147,15 +147,15 @@ export class ToolService extends BaseService {
   /**
    * Updates a tool using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the tool to update
-   * @param input - Tool update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Tool update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated tool
    * @throws {NotFoundError} When tool is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateTool(id: string, input: Omit<UpdateToolRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<ToolResponse> {
+  async updateTool(id: string, input: UpdateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ toolId: id, expectedVersion, adminId: context?.adminId }, 'Updating tool');
 
     try {
@@ -169,16 +169,16 @@ export class ToolService extends BaseService {
         throw new OptimisticLockError(`Tool version mismatch. Expected ${expectedVersion}, got ${existingTool.version}`);
       }
 
-      const updateData: any = { version: existingTool.version + 1, updatedAt: new Date() };
-      if (input.name !== undefined) updateData.name = input.name;
-      if (input.description !== undefined) updateData.description = input.description;
-      if (input.prompt !== undefined) updateData.prompt = input.prompt;
-      if (input.llmProviderId !== undefined) updateData.llmProviderId = input.llmProviderId;
-      if (input.inputType !== undefined) updateData.inputType = input.inputType;
-      if (input.outputType !== undefined) updateData.outputType = input.outputType;
-      if (input.metadata !== undefined) updateData.metadata = input.metadata;
+      const updatePayload: any = { version: existingTool.version + 1, updatedAt: new Date() };
+      if (updateData.name !== undefined) updatePayload.name = updateData.name;
+      if (updateData.description !== undefined) updatePayload.description = updateData.description;
+      if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
+      if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
+      if (updateData.inputType !== undefined) updatePayload.inputType = updateData.inputType;
+      if (updateData.outputType !== undefined) updatePayload.outputType = updateData.outputType;
+      if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedTool = await db.update(tools).set(updateData).where(and(eq(tools.id, id), eq(tools.version, expectedVersion))).returning();
+      const updatedTool = await db.update(tools).set(updatePayload).where(and(eq(tools.id, id), eq(tools.version, expectedVersion))).returning();
 
       if (updatedTool.length === 0) {
         throw new OptimisticLockError(`Failed to update tool due to version conflict`);

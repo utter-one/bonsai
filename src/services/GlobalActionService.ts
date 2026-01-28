@@ -144,15 +144,15 @@ export class GlobalActionService extends BaseService {
   /**
    * Updates a global action using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the global action to update
-   * @param input - Global action update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Global action update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated global action
    * @throws {NotFoundError} When global action is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateGlobalAction(id: string, input: Omit<UpdateGlobalActionRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<GlobalActionResponse> {
+  async updateGlobalAction(id: string, input: UpdateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ globalActionId: id, expectedVersion, adminId: context?.adminId }, 'Updating global action');
 
     try {
@@ -166,16 +166,16 @@ export class GlobalActionService extends BaseService {
         throw new OptimisticLockError(`Global action version mismatch. Expected ${expectedVersion}, got ${existingGlobalAction.version}`);
       }
 
-      const updateData: any = { version: existingGlobalAction.version + 1, updatedAt: new Date() };
-      if (input.name !== undefined) updateData.name = input.name;
-      if (input.condition !== undefined) updateData.condition = input.condition;
-      if (input.promptTrigger !== undefined) updateData.promptTrigger = input.promptTrigger;
-      if (input.operations !== undefined) updateData.operations = input.operations;
-      if (input.template !== undefined) updateData.template = input.template;
-      if (input.examples !== undefined) updateData.examples = input.examples;
-      if (input.metadata !== undefined) updateData.metadata = input.metadata;
+      const updatePayload: any = { version: existingGlobalAction.version + 1, updatedAt: new Date() };
+      if (updateData.name !== undefined) updatePayload.name = updateData.name;
+      if (updateData.condition !== undefined) updatePayload.condition = updateData.condition;
+      if (updateData.promptTrigger !== undefined) updatePayload.promptTrigger = updateData.promptTrigger;
+      if (updateData.operations !== undefined) updatePayload.operations = updateData.operations;
+      if (updateData.template !== undefined) updatePayload.template = updateData.template;
+      if (updateData.examples !== undefined) updatePayload.examples = updateData.examples;
+      if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedGlobalAction = await db.update(globalActions).set(updateData).where(and(eq(globalActions.id, id), eq(globalActions.version, expectedVersion))).returning();
+      const updatedGlobalAction = await db.update(globalActions).set(updatePayload).where(and(eq(globalActions.id, id), eq(globalActions.version, expectedVersion))).returning();
 
       if (updatedGlobalAction.length === 0) {
         throw new OptimisticLockError(`Failed to update global action due to version conflict`);

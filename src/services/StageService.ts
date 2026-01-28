@@ -212,15 +212,15 @@ export class StageService extends BaseService {
   /**
    * Updates a stage using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the stage to update
-   * @param input - Stage update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Stage update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated stage
    * @throws {NotFoundError} When stage is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateStage(id: string, input: Omit<UpdateStageRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<StageResponse> {
+  async updateStage(id: string, input: UpdateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ id, expectedVersion, adminId: context?.adminId }, 'Updating stage');
 
     try {
@@ -235,30 +235,30 @@ export class StageService extends BaseService {
       }
 
       // Validate referenced entities if they are being updated
-      const personaIdToValidate = input.personaId ?? existingStage.personaId;
-      const classifierIdsToValidate = input.classifierIds !== undefined ? input.classifierIds : existingStage.classifierIds;
-      const transformerIdsToValidate = input.transformerIds !== undefined ? input.transformerIds : existingStage.transformerIds;
-      const knowledgeSectionsToValidate = input.knowledgeSections !== undefined ? input.knowledgeSections : existingStage.knowledgeSections;
-      const globalActionsToValidate = input.globalActions !== undefined ? input.globalActions : existingStage.globalActions;
+      const personaIdToValidate = updateData.personaId ?? existingStage.personaId;
+      const classifierIdsToValidate = updateData.classifierIds !== undefined ? updateData.classifierIds : existingStage.classifierIds;
+      const transformerIdsToValidate = updateData.transformerIds !== undefined ? updateData.transformerIds : existingStage.transformerIds;
+      const knowledgeSectionsToValidate = updateData.knowledgeSections !== undefined ? updateData.knowledgeSections : existingStage.knowledgeSections;
+      const globalActionsToValidate = updateData.globalActions !== undefined ? updateData.globalActions : existingStage.globalActions;
 
       await this.validateReferencedEntities(personaIdToValidate, classifierIdsToValidate, transformerIdsToValidate, knowledgeSectionsToValidate, globalActionsToValidate);
 
-      const updateData: any = { version: existingStage.version + 1, updatedAt: new Date() };
-      if (input.prompt !== undefined) updateData.prompt = input.prompt;
-      if (input.llmProviderId !== undefined) updateData.llmProviderId = input.llmProviderId;
-      if (input.personaId !== undefined) updateData.personaId = input.personaId;
-      if (input.enterBehavior !== undefined) updateData.enterBehavior = input.enterBehavior;
-      if (input.useKnowledge !== undefined) updateData.useKnowledge = input.useKnowledge;
-      if (input.knowledgeSections !== undefined) updateData.knowledgeSections = input.knowledgeSections;
-      if (input.useGlobalActions !== undefined) updateData.useGlobalActions = input.useGlobalActions;
-      if (input.globalActions !== undefined) updateData.globalActions = input.globalActions;
-      if (input.variables !== undefined) updateData.variables = input.variables;
-      if (input.actions !== undefined) updateData.actions = input.actions;
-      if (input.classifierIds !== undefined) updateData.classifierIds = input.classifierIds;
-      if (input.transformerIds !== undefined) updateData.transformerIds = input.transformerIds;
-      if (input.metadata !== undefined) updateData.metadata = input.metadata;
+      const updatePayload: any = { version: existingStage.version + 1, updatedAt: new Date() };
+      if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
+      if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
+      if (updateData.personaId !== undefined) updatePayload.personaId = updateData.personaId;
+      if (updateData.enterBehavior !== undefined) updatePayload.enterBehavior = updateData.enterBehavior;
+      if (updateData.useKnowledge !== undefined) updatePayload.useKnowledge = updateData.useKnowledge;
+      if (updateData.knowledgeSections !== undefined) updatePayload.knowledgeSections = updateData.knowledgeSections;
+      if (updateData.useGlobalActions !== undefined) updatePayload.useGlobalActions = updateData.useGlobalActions;
+      if (updateData.globalActions !== undefined) updatePayload.globalActions = updateData.globalActions;
+      if (updateData.variables !== undefined) updatePayload.variables = updateData.variables;
+      if (updateData.actions !== undefined) updatePayload.actions = updateData.actions;
+      if (updateData.classifierIds !== undefined) updatePayload.classifierIds = updateData.classifierIds;
+      if (updateData.transformerIds !== undefined) updatePayload.transformerIds = updateData.transformerIds;
+      if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedStage = await db.update(stages).set(updateData).where(and(eq(stages.id, id), eq(stages.version, expectedVersion))).returning();
+      const updatedStage = await db.update(stages).set(updatePayload).where(and(eq(stages.id, id), eq(stages.version, expectedVersion))).returning();
 
       if (updatedStage.length === 0) {
         throw new OptimisticLockError(`Failed to update stage due to version conflict`);

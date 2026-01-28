@@ -217,8 +217,7 @@ export class GlobalActionController {
     checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_WRITE]);
     const params = globalActionRouteParamsSchema.parse(req.params);
     const body = updateGlobalActionBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const globalAction = await this.globalActionService.updateGlobalAction(params.id, updateData, version, req.context);
+    const globalAction = await this.globalActionService.updateGlobalAction(params.id, body, req.context);
     res.status(200).json(globalAction);
   }
 

@@ -174,15 +174,15 @@ export class AdminService extends BaseService {
   /**
    * Updates an admin user using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the admin user to update
-   * @param input - Admin update data including displayName, roles, password, and metadata (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Admin update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated admin user (without password)
    * @throws {NotFoundError} When admin is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateAdmin(id: string, input: Omit<UpdateAdminRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<AdminResponse> {
+  async updateAdmin(id: string, input: UpdateAdminRequest, context: RequestContext): Promise<AdminResponse> {
     this.requirePermission(context, PERMISSIONS.ADMIN_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ adminId: id, expectedVersion, contextAdminId: context?.adminId }, 'Updating admin');
 
     try {
@@ -197,24 +197,24 @@ export class AdminService extends BaseService {
       }
 
       // Validate roles if being updated
-      if (input.roles) {
-        this.validateRoles(input.roles);
+      if (updateData.roles) {
+        this.validateRoles(updateData.roles);
       }
 
       // Hash password if it's being updated
-      const updateData: any = {
-        displayName: input.displayName,
-        roles: input.roles ? Array.from(new Set(input.roles)) : undefined,
-        metadata: input.metadata,
+      const updatePayload: any = {
+        displayName: updateData.displayName,
+        roles: updateData.roles ? Array.from(new Set(updateData.roles)) : undefined,
+        metadata: updateData.metadata,
         version: existingAdmin.version + 1,
         updatedAt: new Date(),
       };
 
-      if (input.password) {
-        updateData.password = await this.authService.hashPassword(input.password);
+      if (updateData.password) {
+        updatePayload.password = await this.authService.hashPassword(updateData.password);
       }
 
-      const updatedAdmin = await db.update(admins).set(updateData).where(and(eq(admins.id, id), eq(admins.version, expectedVersion))).returning();
+      const updatedAdmin = await db.update(admins).set(updatePayload).where(and(eq(admins.id, id), eq(admins.version, expectedVersion))).returning();
 
       if (updatedAdmin.length === 0) {
         throw new OptimisticLockError(`Failed to update admin due to version conflict`);

@@ -145,15 +145,15 @@ export class ContextTransformerService extends BaseService {
   /**
    * Updates a context transformer using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the context transformer to update
-   * @param input - Context transformer update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Context transformer update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated context transformer
    * @throws {NotFoundError} When context transformer is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateContextTransformer(id: string, input: Omit<UpdateContextTransformerRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<ContextTransformerResponse> {
+  async updateContextTransformer(id: string, input: UpdateContextTransformerRequest, context: RequestContext): Promise<ContextTransformerResponse> {
     this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ transformerId: id, expectedVersion, adminId: context?.adminId }, 'Updating context transformer');
 
     try {
@@ -167,15 +167,15 @@ export class ContextTransformerService extends BaseService {
         throw new OptimisticLockError(`Context transformer version mismatch. Expected ${expectedVersion}, got ${existingTransformer.version}`);
       }
 
-      const updateData: any = { version: existingTransformer.version + 1, updatedAt: new Date() };
-      if (input.name !== undefined) updateData.name = input.name;
-      if (input.description !== undefined) updateData.description = input.description;
-      if (input.prompt !== undefined) updateData.prompt = input.prompt;
-      if (input.contextFields !== undefined) updateData.contextFields = input.contextFields;
-      if (input.llmProviderId !== undefined) updateData.llmProviderId = input.llmProviderId;
-      if (input.metadata !== undefined) updateData.metadata = input.metadata;
+      const updatePayload: any = { version: existingTransformer.version + 1, updatedAt: new Date() };
+      if (updateData.name !== undefined) updatePayload.name = updateData.name;
+      if (updateData.description !== undefined) updatePayload.description = updateData.description;
+      if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
+      if (updateData.contextFields !== undefined) updatePayload.contextFields = updateData.contextFields;
+      if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
+      if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedTransformer = await db.update(contextTransformers).set(updateData).where(and(eq(contextTransformers.id, id), eq(contextTransformers.version, expectedVersion))).returning();
+      const updatedTransformer = await db.update(contextTransformers).set(updatePayload).where(and(eq(contextTransformers.id, id), eq(contextTransformers.version, expectedVersion))).returning();
 
       if (updatedTransformer.length === 0) {
         throw new OptimisticLockError(`Failed to update context transformer due to version conflict`);
