@@ -147,15 +147,15 @@ export class EnvironmentService extends BaseService {
   /**
    * Updates an environment using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the environment to update
-   * @param input - Environment update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Environment update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated environment (without password)
    * @throws {NotFoundError} When environment is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateEnvironment(id: string, input: Omit<UpdateEnvironmentRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<EnvironmentResponse> {
+  async updateEnvironment(id: string, input: UpdateEnvironmentRequest, context: RequestContext): Promise<EnvironmentResponse> {
     this.requirePermission(context, PERMISSIONS.ENVIRONMENT_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ environmentId: id, expectedVersion, adminId: context?.adminId }, 'Updating environment');
 
     try {
@@ -169,13 +169,13 @@ export class EnvironmentService extends BaseService {
         throw new OptimisticLockError(`Environment version mismatch. Expected ${expectedVersion}, got ${existingEnvironment.version}`);
       }
 
-      const updateData: any = { version: existingEnvironment.version + 1, updatedAt: new Date() };
-      if (input.description !== undefined) updateData.description = input.description;
-      if (input.url !== undefined) updateData.url = input.url;
-      if (input.login !== undefined) updateData.login = input.login;
-      if (input.password !== undefined) updateData.password = input.password;
+      const updatePayload: any = { version: existingEnvironment.version + 1, updatedAt: new Date() };
+      if (updateData.description !== undefined) updatePayload.description = updateData.description;
+      if (updateData.url !== undefined) updatePayload.url = updateData.url;
+      if (updateData.login !== undefined) updatePayload.login = updateData.login;
+      if (updateData.password !== undefined) updatePayload.password = updateData.password;
 
-      const updatedEnvironment = await db.update(environments).set(updateData).where(and(eq(environments.id, id), eq(environments.version, expectedVersion))).returning();
+      const updatedEnvironment = await db.update(environments).set(updatePayload).where(and(eq(environments.id, id), eq(environments.version, expectedVersion))).returning();
 
       if (updatedEnvironment.length === 0) {
         throw new OptimisticLockError(`Failed to update environment due to version conflict`);

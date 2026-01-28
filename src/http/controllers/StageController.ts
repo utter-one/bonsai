@@ -217,8 +217,7 @@ export class StageController {
     checkPermissions(req, [PERMISSIONS.STAGE_WRITE]);
     const params = stageRouteParamsSchema.parse(req.params);
     const body = updateStageBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const stage = await this.stageService.updateStage(params.id, updateData, version, req.context);
+    const stage = await this.stageService.updateStage(params.id, body, req.context);
     res.status(200).json(stage);
   }
 

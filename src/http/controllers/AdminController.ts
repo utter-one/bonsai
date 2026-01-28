@@ -264,8 +264,7 @@ export class AdminController {
     checkPermissions(req, [PERMISSIONS.ADMIN_WRITE]);
     const params = adminRouteParamsSchema.parse(req.params);
     const body = updateAdminBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const admin = await this.adminService.updateAdmin(params.id, updateData, version, req.context);
+    const admin = await this.adminService.updateAdmin(params.id, body, req.context);
     res.status(200).json(admin);
   }
 

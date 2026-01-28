@@ -215,8 +215,7 @@ export class ClassifierController {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_WRITE]);
     const params = classifierRouteParamsSchema.parse(req.params);
     const body = updateClassifierBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const classifier = await this.classifierService.updateClassifier(params.id, updateData, version, req.context);
+    const classifier = await this.classifierService.updateClassifier(params.id, body, req.context);
     res.status(200).json(classifier);
   }
 

@@ -215,8 +215,7 @@ export class ContextTransformerController {
     checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_WRITE]);
     const params = contextTransformerRouteParamsSchema.parse(req.params);
     const body = updateContextTransformerBodySchema.parse(req.body);
-    const { version, ...updateData } = body;
-    const transformer = await this.contextTransformerService.updateContextTransformer(params.id, updateData, version, req.context);
+    const transformer = await this.contextTransformerService.updateContextTransformer(params.id, body, req.context);
     res.status(200).json(transformer);
   }
 

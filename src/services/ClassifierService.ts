@@ -145,15 +145,15 @@ export class ClassifierService extends BaseService {
   /**
    * Updates a classifier using optimistic locking to prevent concurrent modifications
    * @param id - The unique identifier of the classifier to update
-   * @param input - Classifier update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Classifier update data (with version)
    * @param context - Request context for auditing and authorization
    * @returns The updated classifier
    * @throws {NotFoundError} When classifier is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateClassifier(id: string, input: Omit<UpdateClassifierRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<ClassifierResponse> {
+  async updateClassifier(id: string, input: UpdateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ classifierId: id, expectedVersion, adminId: context?.adminId }, 'Updating classifier');
 
     try {
@@ -167,14 +167,14 @@ export class ClassifierService extends BaseService {
         throw new OptimisticLockError(`Classifier version mismatch. Expected ${expectedVersion}, got ${existingClassifier.version}`);
       }
 
-      const updateData: any = { version: existingClassifier.version + 1, updatedAt: new Date() };
-      if (input.name !== undefined) updateData.name = input.name;
-      if (input.description !== undefined) updateData.description = input.description;
-      if (input.prompt !== undefined) updateData.prompt = input.prompt;
-      if (input.llmProviderId !== undefined) updateData.llmProviderId = input.llmProviderId;
-      if (input.metadata !== undefined) updateData.metadata = input.metadata;
+      const updatePayload: any = { version: existingClassifier.version + 1, updatedAt: new Date() };
+      if (updateData.name !== undefined) updatePayload.name = updateData.name;
+      if (updateData.description !== undefined) updatePayload.description = updateData.description;
+      if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
+      if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
+      if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedClassifier = await db.update(classifiers).set(updateData).where(and(eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
+      const updatedClassifier = await db.update(classifiers).set(updatePayload).where(and(eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
 
       if (updatedClassifier.length === 0) {
         throw new OptimisticLockError(`Failed to update classifier due to version conflict`);

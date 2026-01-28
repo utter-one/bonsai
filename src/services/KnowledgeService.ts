@@ -295,15 +295,15 @@ export class KnowledgeService extends BaseService {
   /**
    * Updates a knowledge category using optimistic locking
    * @param id - The unique identifier of the category to update
-   * @param input - Category update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Category update data (with version)
    * @param context - Request context for auditing
    * @returns The updated knowledge category
    * @throws {NotFoundError} When category is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async updateKnowledgeCategory(id: string, input: Omit<UpdateKnowledgeCategoryRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<KnowledgeCategoryResponse> {
+  async updateKnowledgeCategory(id: string, input: UpdateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ categoryId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge category');
 
     try {
@@ -317,7 +317,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge category version mismatch. Expected ${expectedVersion}, got ${existingCategory.version}`);
       }
 
-      const updatedCategory = await db.update(knowledgeCategories).set({ name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections, order: input.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
+      const updatedCategory = await db.update(knowledgeCategories).set({ name: updateData.name, promptTrigger: updateData.promptTrigger, knowledgeSections: updateData.knowledgeSections, order: updateData.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
 
       if (updatedCategory.length === 0) {
         throw new OptimisticLockError(`Failed to update knowledge category due to version conflict`);
@@ -483,15 +483,15 @@ export class KnowledgeService extends BaseService {
   /**
    * Updates a knowledge item using optimistic locking
    * @param id - The unique identifier of the item to update
-   * @param input - Item update data (without version)
-   * @param expectedVersion - The expected version number for optimistic locking
+   * @param input - Item update data (with version)
    * @param context - Request context for auditing
    * @returns The updated knowledge item
    * @throws {NotFoundError} When item is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async updateKnowledgeItem(id: string, input: Omit<UpdateKnowledgeItemRequest, 'version'>, expectedVersion: number, context: RequestContext): Promise<KnowledgeItemResponse> {
+  async updateKnowledgeItem(id: string, input: UpdateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
+    const { version: expectedVersion, ...updateData } = input;
     logger.info({ itemId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge item');
 
     try {
@@ -505,7 +505,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge item version mismatch. Expected ${expectedVersion}, got ${existingItem.version}`);
       }
 
-      const updatedItem = await db.update(knowledgeItems).set({ categoryId: input.categoryId, question: input.question, answer: input.answer, order: input.order, version: existingItem.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
+      const updatedItem = await db.update(knowledgeItems).set({ categoryId: updateData.categoryId, question: updateData.question, answer: updateData.answer, order: updateData.order, version: existingItem.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
 
       if (updatedItem.length === 0) {
         throw new OptimisticLockError(`Failed to update knowledge item due to version conflict`);

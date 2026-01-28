@@ -119,7 +119,7 @@ export class ProjectService extends BaseService {
    * @throws {NotFoundError} When project is not found
    * @throws {OptimisticLockError} When the version does not match, indicating concurrent modification
    */
-  async updateProject(id: string, input: UpdateProjectRequest & { version: number }, context: RequestContext): Promise<ProjectResponse> {
+  async updateProject(id: string, input: UpdateProjectRequest, context: RequestContext): Promise<ProjectResponse> {
     this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
     logger.info({ projectId: id, adminId: context?.adminId }, 'Updating project');
 
@@ -131,6 +131,7 @@ export class ProjectService extends BaseService {
       }
 
       if (existingProject.version !== input.version) {
+        logger.warn({ projectId: id, expectedVersion: input.version, actualVersion: existingProject.version }, 'Optimistic lock version mismatch');
         throw new OptimisticLockError('Project');
       }
 
