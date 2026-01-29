@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema } from './common';
+import { listParamsSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
 
 extendZodWithOpenApi(z);
@@ -26,6 +26,7 @@ export const createClassifierSchema = z.object({
   description: z.string().nullable().optional().describe('Detailed description of the classifier\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the classification logic and instructions'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this classifier'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this classifier'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional classifier-specific metadata'),
 });
 
@@ -38,6 +39,7 @@ export const updateClassifierBodySchema = z.object({
   description: z.string().nullable().optional().describe('Updated description'),
   prompt: z.string().min(1).optional().describe('Updated classification prompt'),
   llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -61,6 +63,7 @@ export const classifierResponseSchema = z.object({
   description: z.string().nullable().describe('Detailed description of the classifier'),
   prompt: z.string().describe('Prompt defining the classification logic'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the classifier was created'),

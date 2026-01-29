@@ -1,29 +1,36 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, TextContent } from './ILlmProvider';
+import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+
+extendZodWithOpenApi(z);
 
 /**
  * Anthropic-specific configuration
  */
-export interface AnthropicLlmProviderConfig extends LlmProviderConfig {
+export type AnthropicLlmProviderConfig = {
   /** Anthropic API key */
   apiKey: string;
   /** Optional base URL for custom endpoints */
   baseUrl?: string;
-  /** Model name (e.g., claude-3-5-sonnet-20241022, claude-3-opus-20240229) */
-  model: string;
-  /** Default max tokens (required by Anthropic) */
-  defaultMaxTokens: number;
-  /** Default temperature */
-  defaultTemperature?: number;
-  /** Default top-p */
-  defaultTopP?: number;
-  /** Request timeout in milliseconds */
-  timeout?: number;
-  /** Anthropic API version */
-  anthropicVersion?: string;
 }
+
+/**
+ * Schema for Anthropic LLM settings
+ * Used with Claude models
+ */
+export const anthropicLlmSettingsSchema = z.object({
+  model: z.string().min(1).describe('Model name (e.g., claude-3-5-sonnet-20241022, claude-3-opus-20240229)'),
+  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
+  defaultTemperature: z.number().min(0).max(1).optional().describe('Default temperature for generation (0-1)'),
+  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
+  timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
+  anthropicVersion: z.string().optional().describe('Anthropic API version'),
+});
+
+export type AnthropicLlmSettings = z.infer<typeof anthropicLlmSettingsSchema>;
 
 /**
  * Anthropic LLM provider implementation using Claude models
@@ -31,21 +38,27 @@ export interface AnthropicLlmProviderConfig extends LlmProviderConfig {
  */
 export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderConfig> {
   private client?: Anthropic;
+  private settings: AnthropicLlmSettings;
+
+  constructor(config: AnthropicLlmProviderConfig, settings: AnthropicLlmSettings) {
+    super(config);
+    this.settings = settings;
+  }
 
   /**
    * Initialize the Anthropic provider
    */
-  async init(config: AnthropicLlmProviderConfig): Promise<void> {
-    await super.init(config);
+  async init(): Promise<void> {
+    await super.init();
 
     this.client = new Anthropic({
-      apiKey: config.apiKey,
-      baseURL: config.baseUrl,
-      timeout: config.timeout,
-      defaultHeaders: config.anthropicVersion ? { 'anthropic-version': config.anthropicVersion } : undefined,
+      apiKey: this.config.apiKey,
+      baseURL: this.config.baseUrl,
+      timeout: this.settings.timeout,
+      defaultHeaders: this.settings.anthropicVersion ? { 'anthropic-version': this.settings.anthropicVersion } : undefined,
     });
 
-    logger.info(`Anthropic LLM provider initialized with model: ${config.model}`);
+    logger.info(`Anthropic LLM provider initialized with model: ${this.settings.model}`);
   }
 
   /**
@@ -63,11 +76,11 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
     const { system, messages: anthropicMessages } = this.convertToAnthropicMessages(messages);
 
     try {
-      logger.info(`Generating Anthropic completion with model: ${this.config!.model}`);
+      logger.info(`Generating Anthropic completion with model: ${this.settings.model}`);
 
       const response = await this.client.messages.create({
-        model: this.config!.model,
-        max_tokens: mergedOptions.maxTokens || this.config!.defaultMaxTokens,
+        model: this.settings.model,
+        max_tokens: mergedOptions.maxTokens || this.settings.defaultMaxTokens,
         messages: anthropicMessages,
         system: system || undefined,
         temperature: mergedOptions.temperature,
@@ -127,11 +140,11 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
     const { system, messages: anthropicMessages } = this.convertToAnthropicMessages(messages);
 
     try {
-      logger.info(`Starting Anthropic streaming completion with model: ${this.config!.model}`);
+      logger.info(`Starting Anthropic streaming completion with model: ${this.settings.model}`);
 
       const stream = await this.client.messages.create({
-        model: this.config!.model,
-        max_tokens: mergedOptions.maxTokens || this.config!.defaultMaxTokens,
+        model: this.settings.model,
+        max_tokens: mergedOptions.maxTokens || this.settings.defaultMaxTokens,
         messages: anthropicMessages,
         system: system || undefined,
         temperature: mergedOptions.temperature,
@@ -175,7 +188,7 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
           totalTokens: inputTokens + outputTokens,
         },
         metadata: {
-          model: this.config!.model,
+          model: this.settings.model,
           stopReason: finalStopReason,
         },
       };

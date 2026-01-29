@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema } from './common';
+import { listParamsSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
 
 extendZodWithOpenApi(z);
@@ -27,6 +27,7 @@ export const createContextTransformerSchema = z.object({
   prompt: z.string().min(1).describe('Prompt that defines the transformation logic and instructions'),
   contextFields: z.array(z.string()).optional().describe('List of context field names to be transformed'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this transformer'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this transformer'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional transformer-specific metadata'),
 });
 
@@ -40,6 +41,7 @@ export const updateContextTransformerBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated transformation prompt'),
   contextFields: z.array(z.string()).optional().describe('Updated context field names'),
   llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -64,6 +66,7 @@ export const contextTransformerResponseSchema = z.object({
   prompt: z.string().describe('Prompt defining the transformation logic'),
   contextFields: z.array(z.string()).nullable().describe('Context field names to be transformed'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the transformer was created'),

@@ -2,6 +2,7 @@ import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizz
 import { relations } from 'drizzle-orm';
 import { StageAction, Operation } from '../http/contracts/stage';
 import { ConversationState } from '../services/live/ConversationRunner';
+import { LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 
 // Conversation Event Types
 export type ConversationEventType =
@@ -180,6 +181,7 @@ export const classifiers = pgTable('classifiers', {
   description: text('description'),
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -195,6 +197,7 @@ export const contextTransformers = pgTable('context_transformers', {
   prompt: text('prompt').notNull(),
   contextFields: jsonb('context_fields').$type<string[]>(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -209,6 +212,7 @@ export const tools = pgTable('tools', {
   description: text('description'),
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   inputType: text('input_type').notNull(),
   outputType: text('output_type').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -223,6 +227,7 @@ export const stages = pgTable('stages', {
   projectId: text('project_id').notNull().references(() => projects.id),
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   personaId: text('persona_id').notNull().references(() => personas.id),
   enterBehavior: text('enter_behavior').notNull().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),

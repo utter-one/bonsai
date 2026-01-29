@@ -119,27 +119,27 @@ export type LlmCompleteCallback = (result: LlmGenerationResult) => void | Promis
 /**
  * Base configuration for all LLM providers
  */
-export interface LlmProviderConfig {
-  apiKey: string;
-  baseUrl?: string;
-  model: string;
-  defaultMaxTokens?: number;
-  defaultTemperature?: number;
-  defaultTopP?: number;
-  timeout?: number;
-  [key: string]: any;
-}
+// export interface LlmProviderConfig {
+//   apiKey: string;
+//   baseUrl?: string;
+//   model: string;
+//   defaultMaxTokens?: number;
+//   defaultTemperature?: number;
+//   defaultTopP?: number;
+//   timeout?: number;
+//   [key: string]: any;
+// }
 
 /**
  * Interface for LLM provider implementations
  * Supports both streaming and non-streaming generation with multi-modal messages
  */
-export interface ILlmProvider<TConfig extends LlmProviderConfig = LlmProviderConfig> {
+export interface ILlmProvider {
   /**
    * Initialize the provider with configuration
    * @param config Provider-specific configuration
    */
-  init(config: TConfig): Promise<void>;
+  init(): Promise<void>;
 
   /**
    * Generate a non-streaming response
@@ -180,11 +180,6 @@ export interface ILlmProvider<TConfig extends LlmProviderConfig = LlmProviderCon
    * @param callback Function to call on fatal error
    */
   setOnError(callback: ErrorCallback): void;
-
-  /**
-   * Get the current configuration
-   */
-  getConfig(): TConfig;
 
   /**
    * Check if provider is initialized

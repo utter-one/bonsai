@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema } from './common';
+import { listParamsSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
 
 extendZodWithOpenApi(z);
@@ -28,6 +28,7 @@ export const createToolSchema = z.object({
   description: z.string().nullable().optional().describe('Detailed description of the tool\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Handlebars template for tool invocation'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this tool'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this tool'),
   inputType: z.string().min(1).describe('Expected input format ("text", "json", "image")'),
   outputType: z.string().min(1).describe('Expected output format ("text", "json", "image")'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional tool-specific metadata'),
@@ -42,6 +43,7 @@ export const updateToolBodySchema = z.object({
   description: z.string().nullable().optional().describe('Updated description'),
   prompt: z.string().min(1).optional().describe('Updated tool prompt template'),
   llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
   inputType: z.string().min(1).optional().describe('Updated input format'),
   outputType: z.string().min(1).optional().describe('Updated output format'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
@@ -67,6 +69,7 @@ export const toolResponseSchema = z.object({
   description: z.string().nullable().describe('Detailed description of the tool'),
   prompt: z.string().describe('Handlebars template for tool invocation'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
   inputType: z.string().describe('Expected input format'),
   outputType: z.string().describe('Expected output format'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),

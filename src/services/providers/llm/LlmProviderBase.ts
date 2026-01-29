@@ -1,12 +1,13 @@
 import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
-import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig } from './ILlmProvider';
+import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptions, LlmGenerationResult, LlmMessage } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+import { log } from 'handlebars';
 
 /**
  * Abstract base class for LLM provider implementations
  * Provides common functionality for callback management, lifecycle, and error handling
  */
-export abstract class LlmProviderBase<TConfig extends LlmProviderConfig = LlmProviderConfig> implements ILlmProvider<TConfig> {
+export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   protected config?: TConfig;
   protected initialized: boolean = false;
   protected onChunkCallback?: LlmChunkCallback;
@@ -14,13 +15,16 @@ export abstract class LlmProviderBase<TConfig extends LlmProviderConfig = LlmPro
   protected onReadyCallback?: SimpleCallback;
   protected onErrorCallback?: ErrorCallback;
 
+  constructor(config: TConfig) {
+    this.config = config;
+  }
+
   /**
    * Initialize the provider with configuration
    * Subclasses should override this and call super.init() first
    */
-  async init(config: TConfig): Promise<void> {
-    this.config = config;
-    logger.info(`Initializing LLM provider with model: ${config.model}`);
+  async init(): Promise<void> {
+    logger.info('Initializing LLM provider...');
     this.initialized = true;
     await this.notifyReady();
   }
@@ -149,9 +153,9 @@ export abstract class LlmProviderBase<TConfig extends LlmProviderConfig = LlmPro
    */
   protected applyDefaultOptions(options?: LlmGenerationOptions): LlmGenerationOptions {
     return {
-      maxTokens: options?.maxTokens ?? this.config?.defaultMaxTokens,
-      temperature: options?.temperature ?? this.config?.defaultTemperature ?? 0.7,
-      topP: options?.topP ?? this.config?.defaultTopP ?? 1.0,
+      maxTokens: options?.maxTokens ?? 1024,
+      temperature: options?.temperature ?? 0.7,
+      topP: options?.topP ?? 1.0,
       stopSequences: options?.stopSequences,
       frequencyPenalty: options?.frequencyPenalty,
       presencePenalty: options?.presencePenalty,

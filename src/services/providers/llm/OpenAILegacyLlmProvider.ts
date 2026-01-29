@@ -1,30 +1,38 @@
 import OpenAI from 'openai';
 import type { ChatCompletionMessageParam, ChatCompletionContentPart } from 'openai/resources/chat/completions';
+import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, TextContent } from './ILlmProvider';
+import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+
+extendZodWithOpenApi(z);
 
 /**
  * OpenAI-specific configuration for legacy Chat Completions API
  */
-export interface OpenAILegacyLlmProviderConfig extends LlmProviderConfig {
+export type OpenAILegacyLlmProviderConfig = {
   /** OpenAI API key */
   apiKey: string;
   /** Optional organization ID */
   organizationId?: string;
   /** Optional base URL for OpenAI-compatible APIs */
   baseUrl?: string;
-  /** Model name (e.g., gpt-4, gpt-3.5-turbo, gpt-4-turbo) */
-  model: string;
-  /** Default max tokens */
-  defaultMaxTokens?: number;
-  /** Default temperature */
-  defaultTemperature?: number;
-  /** Default top-p */
-  defaultTopP?: number;
-  /** Request timeout in milliseconds */
-  timeout?: number;
 }
+
+/**
+ * Schema for OpenAI Legacy LLM settings
+ * Used with OpenAI-compatible APIs (OpenAI Legacy, Groq) using Chat Completions API
+ */
+export const openAILegacyLlmSettingsSchema = z.object({
+  model: z.string().min(1).describe('Model name (e.g., gpt-4, gpt-3.5-turbo, gpt-4-turbo)'),
+  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
+  defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
+  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
+  timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
+});
+
+export type OpenAILegacyLlmSettings = z.infer<typeof openAILegacyLlmSettingsSchema>;
 
 /**
  * OpenAI LLM provider implementation using the legacy Chat Completions API
@@ -33,21 +41,27 @@ export interface OpenAILegacyLlmProviderConfig extends LlmProviderConfig {
  */
 export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProviderConfig> {
   private client?: OpenAI;
+  private settings: OpenAILegacyLlmSettings;
+
+  constructor(config: OpenAILegacyLlmProviderConfig, settings: OpenAILegacyLlmSettings) {
+    super(config);
+    this.settings = settings;
+  }
 
   /**
    * Initialize the OpenAI legacy provider
    */
-  async init(config: OpenAILegacyLlmProviderConfig): Promise<void> {
-    await super.init(config);
+  async init(): Promise<void> {
+    await super.init();
 
     this.client = new OpenAI({
-      apiKey: config.apiKey,
-      organization: config.organizationId,
-      baseURL: config.baseUrl,
-      timeout: config.timeout,
+      apiKey: this.config!.apiKey,
+      organization: this.config!.organizationId,
+      baseURL: this.config!.baseUrl,
+      timeout: this.settings.timeout,
     });
 
-    logger.info(`OpenAI Legacy LLM provider initialized with model: ${config.model}`);
+    logger.info(`OpenAI Legacy LLM provider initialized with model: ${this.settings.model}`);
   }
 
   /**
@@ -65,10 +79,10 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
     const openAIMessages = this.convertToOpenAIMessages(messages);
 
     try {
-      logger.info(`Generating OpenAI Chat Completion with model: ${this.config!.model}`);
+      logger.info(`Generating OpenAI Chat Completion with model: ${this.settings.model}`);
 
       const completion = await this.client.chat.completions.create({
-        model: this.config!.model,
+        model: this.settings.model,
         messages: openAIMessages,
         max_tokens: mergedOptions.maxTokens,
         temperature: mergedOptions.temperature,
@@ -125,10 +139,10 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
     const openAIMessages = this.convertToOpenAIMessages(messages);
 
     try {
-      logger.info(`Starting OpenAI Chat Completion streaming with model: ${this.config!.model}`);
+      logger.info(`Starting OpenAI Chat Completion streaming with model: ${this.settings.model}`);
 
       const stream = await this.client.chat.completions.create({
-        model: this.config!.model,
+        model: this.settings.model,
         messages: openAIMessages,
         max_tokens: mergedOptions.maxTokens,
         temperature: mergedOptions.temperature,
@@ -185,7 +199,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
           totalTokens: finalUsage.totalTokens || 0,
         } : undefined,
         metadata: {
-          model: this.config!.model,
+          model: this.settings.model,
         },
       };
 
