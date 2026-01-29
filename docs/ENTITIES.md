@@ -143,6 +143,7 @@ Represents an AI assistant character/personality with voice and behavior configu
 | `id` | String | Primary Key | Unique identifier for the persona |
 | `name` | String | Not Null | Display name of the persona |
 | `prompt` | String | Not Null | Detailed prompt defining the persona's characteristics and behavior |
+| `ttsProviderId` | String (FK) | Nullable | References `providers.id` - The TTS provider for this persona |
 | `voiceConfig` | JSON Object | Nullable | Voice configuration settings for text-to-speech |
 | `metadata` | JSON Object | Nullable | Additional persona-specific data |
 | `version` | Integer | Not Null | Version number for optimistic locking |
@@ -151,6 +152,7 @@ Represents an AI assistant character/personality with voice and behavior configu
 
 ### Relationships
 - Referenced by Stage (`personaId`)
+- References Provider (`ttsProviderId`)
 
 ### Indexes
 - Primary key on `id`
@@ -158,22 +160,26 @@ Represents an AI assistant character/personality with voice and behavior configu
 ### Voice Configuration Structure
 ```typescript
 {
-  voiceProviderId?: string; // ID of a voice provider (e.g. 'eleven-labs')
+  model?: string; // TTS model ID (e.g., 'eleven_flash_v2_5', 'eleven_multilingual_v2')
   voiceId?: string; // Text-to-speech voice identifier
-  settings: {
-    model?: string; // TTS model ID (e.g., 'eleven_flash_v2_5', 'eleven_multilingual_v2')
-    speed?: number; // Range: 0.7-1.2, TTS speech speed (default 1.0)
-    stability?: number; // Range: 0.0-1.0, Voice stability (default 0.5)
-    similarityBoost?: number; // Range: 0.0-1.0, Voice similarity boost (default 0.75)
-    style?: number; // Range: 0.0-1.0, Voice style for V2+ models (default 0)
-    useSpeakerBoost?: boolean; // Use speaker boost for V2+ models (default true)
-  }
+  noSpeechMarkers?: Array<{ start: string; end: string }>; // Markers to identify sections that should not be spoken
+  removeExclamationMarks?: boolean; // Whether to replace exclamation marks with periods
+  stability?: number | null; // Range: 0.0-1.0, Voice stability (default 0.5)
+  similarityBoost?: number | null; // Range: 0.0-1.0, Voice similarity boost (default 0.75)
+  style?: number | null; // Range: 0.0-1.0, Voice style for V2+ models (default 0)
+  useSpeakerBoost?: boolean | null; // Use speaker boost for V2+ models (default true)
+  speed?: number | null; // Range: 0.7-1.2, TTS speech speed (default 1.0)
+  useGlobalPreview?: boolean; // Use global preview endpoint for geographic proximity optimization
+  inactivityTimeout?: number; // WebSocket inactivity timeout in seconds (default 180)
+  useSentenceSplitter?: boolean; // Whether to use sentence splitter for text processing (default true)
 }
 ```
 
 ### Voice Configuration Notes
 - Voice settings are specific to ElevenLabs TTS provider and can be different with other providers
 - Different models support different features (V2+ models have more options)
+- The `ttsProviderId` field references the provider containing the API credentials
+- Voice configuration contains voice-specific settings without credentials
 
 ---
 
