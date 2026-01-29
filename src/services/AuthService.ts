@@ -25,7 +25,7 @@ export type LoginResponse = {
   refreshToken: string;
   expiresIn: number;
   adminId: string;
-  displayName: string;
+  name: string;
   roles: string[];
 };
 
@@ -115,7 +115,7 @@ export class AuthService {
         refreshToken,
         expiresIn: 900, // 15 minutes in seconds
         adminId: admin.id,
-        displayName: admin.displayName,
+        name: admin.name,
         roles: admin.roles,
       };
     } catch (error) {

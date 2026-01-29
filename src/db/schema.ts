@@ -133,7 +133,7 @@ export const conversationEvents = pgTable('conversation_events', {
 // Admin table
 export const admins = pgTable('admins', {
   id: text('id').primaryKey(),
-  displayName: text('display_name').notNull(),
+  name: text('name').notNull(),
   roles: jsonb('roles').notNull().$type<string[]>(),
   password: text('password').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -165,6 +165,7 @@ export const personas = pgTable('personas', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
+  description: text('description'),
   prompt: text('prompt').notNull(),
   ttsProviderId: text('tts_provider_id').references(() => providers.id),
   voiceConfig: jsonb('voice_config').$type<TtsSettings>(),
@@ -226,6 +227,8 @@ export const tools = pgTable('tools', {
 export const stages = pgTable('stages', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  description: text('description'),
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
   llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
@@ -329,7 +332,7 @@ export const environments = pgTable('environments', {
 // Provider table
 export const providers = pgTable('providers', {
   id: text('id').primaryKey(),
-  displayName: text('display_name').notNull(),
+  name: text('name').notNull(),
   description: text('description'),
   providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings
   apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex

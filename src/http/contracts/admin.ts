@@ -22,12 +22,12 @@ export const adminRouteParamsSchema = z.object({
 
 /**
  * Schema for creating a new admin user
- * Required fields: id, displayName, roles (at least one), password
+ * Required fields: id, name, roles (at least one), password
  * Optional fields: metadata
  */
 export const createAdminSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the admin user (auto-generated if not provided)'),
-  displayName: z.string().min(1).describe('Display name for the admin user'),
+  name: z.string().min(1).describe('Display name for the admin user'),
   roles: z.array(z.enum(VALID_ROLES)).min(1).describe(`Array of role identifiers assigned to the admin (at least one required). Valid roles: ${VALID_ROLES.join(', ')}`),
   password: z.string().min(1).describe('Admin user password (will be hashed)'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Optional metadata as key-value pairs'),
@@ -36,11 +36,11 @@ export const createAdminSchema = z.object({
 /**
  * Schema for updating an admin user
  * Required fields: version (for optimistic locking)
- * Optional fields: displayName, roles, password, metadata
+ * Optional fields: name, roles, password, metadata
  */
 export const updateAdminBodySchema = z.object({
   version: z.number().int().positive().describe('Current version number for optimistic locking (prevents concurrent updates)'),
-  displayName: z.string().min(1).optional().describe('Updated display name for the admin user'),
+  name: z.string().min(1).optional().describe('Updated display name for the admin user'),
   roles: z.array(z.enum(VALID_ROLES)).min(1).optional().describe(`Updated array of role identifiers. Valid roles: ${VALID_ROLES.join(', ')}`),
   password: z.string().min(1).optional().describe('New password (will be hashed)'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata (merges with existing)'),
@@ -60,18 +60,18 @@ export const deleteAdminBodySchema = z.object({
  * If changing password, old password is required for verification
  */
 export const updateProfileSchema = z.object({
-  displayName: z.string().min(1).optional().describe('Updated display name for the admin user'),
+  name: z.string().min(1).optional().describe('Updated display name for the admin user'),
   oldPassword: z.string().min(1).optional().describe('Current password (required when changing password)'),
   newPassword: z.string().min(1).optional().describe('New password to set (requires oldPassword)'),
 });
 
 /**
  * Schema for profile response (subset of admin response)
- * Includes: id, displayName, roles, metadata, version, createdAt, updatedAt
+ * Includes: id, name, roles, metadata, version, createdAt, updatedAt
  */
 export const profileResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the admin user'),
-  displayName: z.string().describe('Display name of the admin user'),
+  name: z.string().describe('Display name of the admin user'),
   roles: z.array(z.string()).describe('Array of role identifiers assigned to the admin'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Metadata as key-value pairs'),
   version: z.number().int().describe('Current version number for optimistic locking'),
@@ -82,11 +82,11 @@ export const profileResponseSchema = z.object({
 /**
  * Schema for admin user response
  * Excludes password field for security
- * Includes: id, displayName, roles, metadata, version, createdAt, updatedAt
+ * Includes: id, name, roles, metadata, version, createdAt, updatedAt
  */
 export const adminResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the admin user'),
-  displayName: z.string().describe('Display name of the admin user'),
+  name: z.string().describe('Display name of the admin user'),
   roles: z.array(z.string()).describe('Array of role identifiers assigned to the admin'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Metadata as key-value pairs'),
   version: z.number().int().describe('Current version number for optimistic locking'),
