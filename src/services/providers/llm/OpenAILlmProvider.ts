@@ -8,16 +8,15 @@ import { logger } from '../../../utils/logger';
 extendZodWithOpenApi(z);
 
 /**
- * OpenAI-specific configuration
+ * Schema for OpenAI-specific configuration
  */
-export type OpenAILlmProviderConfig = {
-  /** OpenAI API key */
-  apiKey: string;
-  /** Optional organization ID */
-  organizationId?: string;
-  /** Optional base URL for OpenAI-compatible APIs */
-  baseUrl?: string;
-}
+export const openAILlmProviderConfigSchema = z.object({
+  apiKey: z.string().describe('OpenAI API key'),
+  organizationId: z.string().optional().describe('Optional organization ID'),
+  baseUrl: z.string().optional().describe('Optional base URL for OpenAI-compatible APIs'),
+});
+
+export type OpenAILlmProviderConfig = z.infer<typeof openAILlmProviderConfigSchema>;
 
 /**
  * Schema for OpenAI LLM settings

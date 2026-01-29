@@ -3,9 +3,48 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
 
+// Import provider config schemas
+import { openAILlmProviderConfigSchema } from '../../services/providers/llm/OpenAILlmProvider';
+import { openAILegacyLlmProviderConfigSchema } from '../../services/providers/llm/OpenAILegacyLlmProvider';
+import { anthropicLlmProviderConfigSchema } from '../../services/providers/llm/AnthropicLlmProvider';
+import { geminiLlmProviderConfigSchema } from '../../services/providers/llm/GeminiLlmProvider';
+import { elevenLabsTtsProviderConfigSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
+import { azureAsrProviderConfigSchema } from '../../services/providers/asr/AzureAsrProvider';
+
 extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
+
+/**
+ * Union schema for all LLM provider configurations
+ */
+export const llmProviderConfigSchema = z.union([
+  openAILlmProviderConfigSchema,
+  openAILegacyLlmProviderConfigSchema,
+  anthropicLlmProviderConfigSchema,
+  geminiLlmProviderConfigSchema,
+]).describe('LLM provider configuration');
+
+/**
+ * Union schema for all TTS provider configurations
+ */
+export const ttsProviderConfigSchema = elevenLabsTtsProviderConfigSchema.describe('TTS provider configuration');
+
+/**
+ * Union schema for all ASR provider configurations
+ */
+export const asrProviderConfigSchema = azureAsrProviderConfigSchema.describe('ASR provider configuration');
+
+/**
+ * Union schema for all provider configurations
+ */
+export const providerConfigSchema = z.union([
+  llmProviderConfigSchema,
+  ttsProviderConfigSchema,
+  asrProviderConfigSchema,
+]).describe('Provider-specific configuration object');
+
+export type ProviderConfig = z.infer<typeof providerConfigSchema>;
 
 // Route param schema
 export const providerRouteParamsSchema = z.object({
@@ -33,7 +72,7 @@ export const createProviderSchema = z.object({
   description: z.string().optional().describe('Detailed description of provider purpose and use case'),
   providerType: providerTypeSchema.describe('Provider category: asr, tts, llm, or embeddings'),
   apiType: providerNameSchema.describe('Specific provider implementation (e.g., openai, anthropic, azure, elevenlabs)'),
-  config: z.record(z.string(), z.unknown()).describe('Provider-specific configuration object (varies by providerType and apiType)'),
+  config: providerConfigSchema.describe('Provider-specific configuration object (varies by providerType and apiType)'),
   createdBy: z.string().optional().describe('Admin user ID who created the provider'),
   tags: z.array(z.string()).optional().describe('Searchable tags for organization (e.g., ["production", "low-latency"])'),
 });
@@ -49,7 +88,7 @@ export const updateProviderBodySchema = z.object({
   description: z.string().optional().describe('Updated description of provider purpose'),
   providerType: providerTypeSchema.optional().describe('Updated provider category'),
   apiType: providerNameSchema.optional().describe('Updated specific provider implementation'),
-  config: z.record(z.string(), z.unknown()).optional().describe('Updated provider-specific configuration'),
+  config: providerConfigSchema.optional().describe('Updated provider-specific configuration'),
   tags: z.array(z.string()).optional().describe('Updated searchable tags'),
 });
 
@@ -71,7 +110,7 @@ export const providerResponseSchema = z.object({
   description: z.string().nullable().describe('Description of provider purpose and use case'),
   providerType: providerTypeSchema.describe('Provider category (asr, tts, llm, embeddings)'),
   apiType: providerNameSchema.describe('Specific provider implementation'),
-  config: z.record(z.string(), z.unknown()).describe('Provider-specific configuration object'),
+  config: providerConfigSchema.describe('Provider-specific configuration object'),
   createdBy: z.string().nullable().describe('Admin user ID who created the provider'),
   tags: z.array(z.string()).nullable().describe('Tags for organization and search'),
   version: z.number().int().describe('Current version number for optimistic locking'),

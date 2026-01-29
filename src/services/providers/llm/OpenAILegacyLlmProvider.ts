@@ -9,16 +9,15 @@ import { logger } from '../../../utils/logger';
 extendZodWithOpenApi(z);
 
 /**
- * OpenAI-specific configuration for legacy Chat Completions API
+ * Schema for OpenAI-specific configuration for legacy Chat Completions API
  */
-export type OpenAILegacyLlmProviderConfig = {
-  /** OpenAI API key */
-  apiKey: string;
-  /** Optional organization ID */
-  organizationId?: string;
-  /** Optional base URL for OpenAI-compatible APIs */
-  baseUrl?: string;
-}
+export const openAILegacyLlmProviderConfigSchema = z.object({
+  apiKey: z.string().describe('OpenAI API key'),
+  organizationId: z.string().optional().describe('Optional organization ID'),
+  baseUrl: z.string().optional().describe('Optional base URL for OpenAI-compatible APIs'),
+});
+
+export type OpenAILegacyLlmProviderConfig = z.infer<typeof openAILegacyLlmProviderConfigSchema>;
 
 /**
  * Schema for OpenAI Legacy LLM settings

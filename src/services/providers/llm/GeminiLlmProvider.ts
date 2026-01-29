@@ -8,12 +8,13 @@ import { logger } from '../../../utils/logger';
 extendZodWithOpenApi(z);
 
 /**
- * Google Gemini-specific configuration
+ * Schema for Google Gemini-specific configuration
  */
-export type GeminiLlmProviderConfig = {
-  /** Google API key */
-  apiKey: string;
-}
+export const geminiLlmProviderConfigSchema = z.object({
+  apiKey: z.string().describe('Google API key'),
+});
+
+export type GeminiLlmProviderConfig = z.infer<typeof geminiLlmProviderConfigSchema>;
 
 /**
  * Schema for Google Gemini LLM settings

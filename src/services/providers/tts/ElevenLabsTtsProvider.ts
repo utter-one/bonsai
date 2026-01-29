@@ -1,17 +1,22 @@
 import WebSocket, {  } from 'ws';
+import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import { VoiceConfig } from '../../../http/contracts/persona';
 
+extendZodWithOpenApi(z);
+
 /**
- * Configuration for ElevenLabs TTS provider
+ * Schema for ElevenLabs TTS provider configuration
  */
-export type ElevenLabsTtsProviderConfig = {
-  /** API key for authenticating with ElevenLabs */
-  apiKey: string;
-};
+export const elevenLabsTtsProviderConfigSchema = z.object({
+  apiKey: z.string().describe('API key for authenticating with ElevenLabs'),
+});
+
+export type ElevenLabsTtsProviderConfig = z.infer<typeof elevenLabsTtsProviderConfigSchema>;
 
 export type ElevenLabsTtsVoiceSettings = {
   /** Model ID to use for speech synthesis (e.g., 'eleven_flash_v2_5') */

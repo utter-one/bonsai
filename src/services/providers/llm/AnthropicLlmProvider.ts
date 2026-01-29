@@ -8,14 +8,14 @@ import { logger } from '../../../utils/logger';
 extendZodWithOpenApi(z);
 
 /**
- * Anthropic-specific configuration
+ * Schema for Anthropic-specific configuration
  */
-export type AnthropicLlmProviderConfig = {
-  /** Anthropic API key */
-  apiKey: string;
-  /** Optional base URL for custom endpoints */
-  baseUrl?: string;
-}
+export const anthropicLlmProviderConfigSchema = z.object({
+  apiKey: z.string().describe('Anthropic API key'),
+  baseUrl: z.string().optional().describe('Optional base URL for custom endpoints'),
+});
+
+export type AnthropicLlmProviderConfig = z.infer<typeof anthropicLlmProviderConfigSchema>;
 
 /**
  * Schema for Anthropic LLM settings

@@ -2,7 +2,9 @@ import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizz
 import { relations } from 'drizzle-orm';
 import { StageAction, Operation } from '../http/contracts/stage';
 import { ConversationState } from '../services/live/ConversationRunner';
-import { LlmSettings } from '../services/providers/llm/LlmProviderFactory';
+import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
+import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
+import { TtsProviderConfig } from '../services/providers/tts/TtsProviderFactory';
 
 // Conversation Event Types
 export type ConversationEventType =
@@ -92,6 +94,8 @@ export type ConversationEventData =
   | ConversationAbortedEventData
   | ConversationFailedEventData
   | JumpToStageEventData;
+
+export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig;
 
 // User table
 export const users = pgTable('users', {
@@ -332,7 +336,7 @@ export const providers = pgTable('providers', {
   description: text('description'),
   providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings
   apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex
-  config: jsonb('config').notNull().$type<Record<string, any>>(),
+  config: jsonb('config').notNull().$type<ProviderConfig>(),
   createdBy: text('created_by').references(() => admins.id),
   tags: jsonb('tags').$type<string[]>(),
   version: integer('version').notNull().default(1),

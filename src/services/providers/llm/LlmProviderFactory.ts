@@ -2,10 +2,10 @@ import { singleton } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ILlmProvider } from './ILlmProvider';
-import { OpenAILlmProvider, OpenAILlmProviderConfig, OpenAILlmSettings } from './OpenAILlmProvider';
-import { OpenAILegacyLlmProvider, OpenAILegacyLlmProviderConfig, OpenAILegacyLlmSettings } from './OpenAILegacyLlmProvider';
-import { AnthropicLlmProvider, AnthropicLlmProviderConfig, AnthropicLlmSettings } from './AnthropicLlmProvider';
-import { GeminiLlmProvider, GeminiLlmProviderConfig, GeminiLlmSettings } from './GeminiLlmProvider';
+import { OpenAILlmProvider, OpenAILlmProviderConfig, openAILlmProviderConfigSchema, OpenAILlmSettings } from './OpenAILlmProvider';
+import { OpenAILegacyLlmProvider, OpenAILegacyLlmProviderConfig, openAILegacyLlmProviderConfigSchema, OpenAILegacyLlmSettings } from './OpenAILegacyLlmProvider';
+import { AnthropicLlmProvider, AnthropicLlmProviderConfig, anthropicLlmProviderConfigSchema, AnthropicLlmSettings } from './AnthropicLlmProvider';
+import { GeminiLlmProvider, GeminiLlmProviderConfig, geminiLlmProviderConfigSchema, GeminiLlmSettings } from './GeminiLlmProvider';
 
 /**
  * Supported LLM provider API types
@@ -16,6 +16,11 @@ export type LlmProviderApiType = 'openai' | 'openai-legacy' | 'anthropic' | 'gem
  * Union type for all LLM provider settings
  */
 export type LlmSettings = OpenAILlmSettings | OpenAILegacyLlmSettings | AnthropicLlmSettings | GeminiLlmSettings;
+
+/**
+ * Union type for all LLM provider configurations
+ */
+export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProviderConfig | AnthropicLlmProviderConfig | GeminiLlmProviderConfig;
 
 /**
  * Factory service for creating LLM provider instances based on provider entity configuration
@@ -67,11 +72,11 @@ export class LlmProviderFactory {
    * @throws {Error} When required OpenAI configuration fields are missing
    */
   private createOpenAIProvider(provider: Provider, settings: OpenAILlmSettings): OpenAILlmProvider {
-    const config = provider.config as OpenAILlmProviderConfig;
+    const config = openAILlmProviderConfigSchema.parse(provider.config);
 
-    // Validate required fields
-    if (!config.apiKey || !settings.model) {
-      const errorMessage = `Invalid OpenAI LLM provider configuration for provider ${provider.id}. Required fields: apiKey, model`;
+    // Validate required fields in settings
+    if (!settings.model) {
+      const errorMessage = `Invalid OpenAI LLM provider settings for provider ${provider.id}. Required field: model`;
       logger.error(errorMessage);
       throw new Error(errorMessage);
     }
@@ -89,11 +94,11 @@ export class LlmProviderFactory {
    * @throws {Error} When required OpenAI Legacy configuration fields are missing
    */
   private createOpenAILegacyProvider(provider: Provider, settings: OpenAILegacyLlmSettings): OpenAILegacyLlmProvider {
-    const config = provider.config as OpenAILegacyLlmProviderConfig;
+    const config = openAILegacyLlmProviderConfigSchema.parse(provider.config);
 
-    // Validate required fields
-    if (!config.apiKey || !settings.model) {
-      const errorMessage = `Invalid OpenAI Legacy LLM provider configuration for provider ${provider.id}. Required fields: apiKey, model`;
+    // Validate required fields in settings
+    if (!settings.model) {
+      const errorMessage = `Invalid OpenAI Legacy LLM provider settings for provider ${provider.id}. Required field: model`;
       logger.error(errorMessage);
       throw new Error(errorMessage);
     }
@@ -111,11 +116,11 @@ export class LlmProviderFactory {
    * @throws {Error} When required Anthropic configuration fields are missing
    */
   private createAnthropicProvider(provider: Provider, settings: AnthropicLlmSettings): AnthropicLlmProvider {
-    const config = provider.config as AnthropicLlmProviderConfig;
+    const config = anthropicLlmProviderConfigSchema.parse(provider.config);
 
-    // Validate required fields
-    if (!config.apiKey || !settings.model) {
-      const errorMessage = `Invalid Anthropic LLM provider configuration for provider ${provider.id}. Required fields: apiKey, model`;
+    // Validate required fields in settings
+    if (!settings.model) {
+      const errorMessage = `Invalid Anthropic LLM provider settings for provider ${provider.id}. Required field: model`;
       logger.error(errorMessage);
       throw new Error(errorMessage);
     }
@@ -134,11 +139,11 @@ export class LlmProviderFactory {
    * @throws {Error} When required Gemini configuration fields are missing
    */
   private createGeminiProvider(provider: Provider, settings: GeminiLlmSettings): GeminiLlmProvider {
-    const config = provider.config as GeminiLlmProviderConfig;
+    const config = geminiLlmProviderConfigSchema.parse(provider.config);
 
-    // Validate required fields
-    if (!config.apiKey || !settings.model) {
-      const errorMessage = `Invalid Gemini LLM provider configuration for provider ${provider.id}. Required fields: apiKey, model`;
+    // Validate required fields in settings
+    if (!settings.model) {
+      const errorMessage = `Invalid Gemini LLM provider settings for provider ${provider.id}. Required field: model`;
       logger.error(errorMessage);
       throw new Error(errorMessage);
     }

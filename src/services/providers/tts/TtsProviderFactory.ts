@@ -2,12 +2,22 @@ import { singleton } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ITtsProvider } from './ITtsProvider';
-import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig } from './ElevenLabsTtsProvider';
+import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProviderConfigSchema } from './ElevenLabsTtsProvider';
 
 /**
  * Supported TTS provider API types
  */
 export type TtsProviderApiType = 'elevenlabs';
+
+/**
+ * Union type for all TTS provider settings
+ */
+export type TtsSettings = ElevenLabsTtsProviderConfig;
+
+/**
+ * Union type for all TTS provider configurations
+ */
+export type TtsProviderConfig = ElevenLabsTtsProviderConfig;
 
 /**
  * Factory service for creating TTS provider instances based on provider entity configuration
@@ -48,22 +58,10 @@ export class TtsProviderFactory {
    * @throws {Error} When required ElevenLabs configuration fields are missing
    */
   private createElevenLabsProvider(provider: Provider): ElevenLabsTtsProvider {
-    const config = provider.config as Partial<ElevenLabsTtsProviderConfig>;
-
-    // Validate required fields
-    if (!config.apiKey) {
-      const errorMessage = `Invalid ElevenLabs TTS provider configuration for provider ${provider.id}. Required field: apiKey`;
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    // Build ElevenLabs provider configuration
-    const elevenLabsConfig: ElevenLabsTtsProviderConfig = {
-      apiKey: config.apiKey,
-    };
+    const config = elevenLabsTtsProviderConfigSchema.parse(provider.config);
 
     logger.info(`Creating ElevenLabs TTS provider for provider ${provider.id}`);
-    return new ElevenLabsTtsProvider(elevenLabsConfig);
+    return new ElevenLabsTtsProvider(config);
   }
 
   /**
