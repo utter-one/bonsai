@@ -32,14 +32,14 @@ export class ProviderService extends BaseService {
   async createProvider(input: CreateProviderRequest, context: RequestContext): Promise<ProviderResponse> {
     this.requirePermission(context, PERMISSIONS.PROVIDER_WRITE);
     const providerId = input.id ?? generateId(ID_PREFIXES.PROVIDER);
-    logger.info({ providerId, displayName: input.displayName, providerType: input.providerType, apiType: input.apiType, contextAdminId: context?.adminId }, 'Creating provider');
+    logger.info({ providerId, name: input.name, providerType: input.providerType, apiType: input.apiType, contextAdminId: context?.adminId }, 'Creating provider');
 
     try {
-      const provider = await db.insert(providers).values({ id: providerId, displayName: input.displayName, description: input.description, providerType: input.providerType, apiType: input.apiType, config: input.config, createdBy: input.createdBy || context?.adminId, tags: input.tags, version: 1 }).returning();
+      const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: input.config, createdBy: input.createdBy || context?.adminId, tags: input.tags, version: 1 }).returning();
 
       const createdProvider = provider[0];
 
-      await this.auditService.logCreate('provider', createdProvider.id, { id: createdProvider.id, displayName: createdProvider.displayName, providerType: createdProvider.providerType, apiType: createdProvider.apiType, config: createdProvider.config, tags: createdProvider.tags }, context?.adminId);
+      await this.auditService.logCreate('provider', createdProvider.id, { id: createdProvider.id, name: createdProvider.name, providerType: createdProvider.providerType, apiType: createdProvider.apiType, config: createdProvider.config, tags: createdProvider.tags }, context?.adminId);
 
       logger.info({ providerId: createdProvider.id }, 'Provider created successfully');
 
@@ -97,7 +97,7 @@ export class ProviderService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: providers.id,
-        displayName: providers.displayName,
+        name: providers.name,
         providerType: providers.providerType,
         apiType: providers.apiType,
         createdBy: providers.createdBy,
@@ -116,11 +116,11 @@ export class ProviderService extends BaseService {
         }
       }
 
-      // Apply text search (searches displayName, description, and id)
+      // Apply text search (searches name, description, and id)
       if (params?.textSearch) {
         const searchTerm = `%${params.textSearch}%`;
         const { like, or } = await import('drizzle-orm');
-        conditions.push(or(like(providers.displayName, searchTerm), like(providers.description, searchTerm), like(providers.id, searchTerm))!);
+        conditions.push(or(like(providers.name, searchTerm), like(providers.description, searchTerm), like(providers.id, searchTerm))!);
       }
 
       // Build order by clause
@@ -195,7 +195,7 @@ export class ProviderService extends BaseService {
       }
 
       const updatePayload: any = {
-        displayName: updateData.displayName,
+        name: updateData.name,
         description: updateData.description,
         providerType: updateData.providerType,
         apiType: updateData.apiType,
@@ -213,7 +213,7 @@ export class ProviderService extends BaseService {
 
       const provider = updatedProvider[0];
 
-      await this.auditService.logUpdate('provider', provider.id, { id: existingProvider.id, displayName: existingProvider.displayName, providerType: existingProvider.providerType, apiType: existingProvider.apiType, config: existingProvider.config, tags: existingProvider.tags }, { id: provider.id, displayName: provider.displayName, providerType: provider.providerType, apiType: provider.apiType, config: provider.config, tags: provider.tags }, context?.adminId);
+      await this.auditService.logUpdate('provider', provider.id, { id: existingProvider.id, name: existingProvider.name, providerType: existingProvider.providerType, apiType: existingProvider.apiType, config: existingProvider.config, tags: existingProvider.tags }, { id: provider.id, name: provider.name, providerType: provider.providerType, apiType: provider.apiType, config: provider.config, tags: provider.tags }, context?.adminId);
 
       logger.info({ providerId: provider.id, newVersion: provider.version }, 'Provider updated successfully');
 
@@ -253,7 +253,7 @@ export class ProviderService extends BaseService {
         throw new OptimisticLockError(`Failed to delete provider due to version conflict`);
       }
 
-      await this.auditService.logDelete('provider', id, { id: existingProvider.id, displayName: existingProvider.displayName, providerType: existingProvider.providerType, apiType: existingProvider.apiType, config: existingProvider.config, tags: existingProvider.tags }, context?.adminId);
+      await this.auditService.logDelete('provider', id, { id: existingProvider.id, name: existingProvider.name, providerType: existingProvider.providerType, apiType: existingProvider.apiType, config: existingProvider.config, tags: existingProvider.tags }, context?.adminId);
 
       logger.info({ providerId: id }, 'Provider deleted successfully');
     } catch (error) {

@@ -37,12 +37,13 @@ export type VoiceConfig = z.infer<typeof voiceConfigSchema>;
 /**
  * Schema for creating a new persona
  * Required fields: id, name, prompt
- * Optional fields: voiceConfig, metadata
+ * Optional fields: description, voiceConfig, metadata
  */
 export const createPersonaSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the persona (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this persona belongs to'),
   name: z.string().min(1).describe('Display name of the persona'),
+  description: z.string().optional().describe('Detailed description of the persona purpose'),
   prompt: z.string().min(1).describe('Detailed prompt defining the persona\'s characteristics and behavior'),
   ttsProviderId: z.string().optional().describe('ID of the TTS provider (e.g., "eleven-labs")'),
   voiceConfig: voiceConfigSchema.describe('Optional voice configuration settings for TTS'),
@@ -51,11 +52,12 @@ export const createPersonaSchema = z.object({
 
 /**
  * Schema for updating a persona
- * Optional fields: name, prompt, voiceConfig, metadata, version
+ * Optional fields: name, description, prompt, voiceConfig, metadata, version
  * Version is required for optimistic locking
  */
 export const updatePersonaBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
+  description: z.string().optional().describe('Updated detailed description of the persona'),
   prompt: z.string().min(1).optional().describe('Updated prompt defining behavior'),
   ttsProviderId: z.string().optional().describe('Updated TTS provider ID'),
   voiceConfig: voiceConfigSchema.describe('Updated voice configuration'),
@@ -73,12 +75,13 @@ export const deletePersonaBodySchema = z.object({
 
 /**
  * Schema for persona response
- * Includes: id, name, prompt, voiceConfig, metadata, version, createdAt, updatedAt
+ * Includes: id, name, description, prompt, voiceConfig, metadata, version, createdAt, updatedAt
  */
 export const personaResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the persona'),
   projectId: z.string().describe('ID of the project this persona belongs to'),
   name: z.string().describe('Display name of the persona'),
+  description: z.string().nullable().describe('Detailed description of the persona purpose'),
   prompt: z.string().describe('Prompt defining the persona\'s characteristics and behavior'),
   ttsProviderId: z.string().nullable().describe('ID of the TTS provider'),
   voiceConfig: voiceConfigSchema.nullable().describe('Voice configuration settings'),

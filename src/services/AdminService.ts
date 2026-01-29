@@ -26,7 +26,7 @@ export class AdminService extends BaseService {
 
   /**
    * Creates a new admin user and logs the creation in the audit trail
-   * @param input - Admin creation data including id, displayName, roles, password, and optional metadata
+   * @param input - Admin creation data including id, name, roles, password, and optional metadata
    * @param context - Request context for auditing and authorization
    * @returns The created admin user (without password)
    */
@@ -37,7 +37,7 @@ export class AdminService extends BaseService {
       throw new InvalidOperationError('Admin ID (email) must be provided when creating an admin');
     }
     
-    logger.info({ adminId, displayName: input.displayName, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
+    logger.info({ adminId, name: input.name, roles: input.roles, contextAdminId: context?.adminId }, 'Creating admin');
 
     try {
       // Validate roles exist in ROLES definition
@@ -49,11 +49,11 @@ export class AdminService extends BaseService {
       // Hash password before storing
       const hashedPassword = await this.authService.hashPassword(input.password);
 
-      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: distinctRoles, password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
+      const admin = await db.insert(admins).values({ id: input.id, name: input.name, roles: distinctRoles, password: hashedPassword, metadata: input.metadata, version: 1 }).returning();
 
       const createdAdmin = admin[0];
 
-      await this.auditService.logCreate('admin', createdAdmin.id, { id: createdAdmin.id, displayName: createdAdmin.displayName, roles: createdAdmin.roles, metadata: createdAdmin.metadata }, context?.adminId);
+      await this.auditService.logCreate('admin', createdAdmin.id, { id: createdAdmin.id, name: createdAdmin.name, roles: createdAdmin.roles, metadata: createdAdmin.metadata }, context?.adminId);
 
       logger.info({ adminId: createdAdmin.id }, 'Admin created successfully');
 
@@ -103,7 +103,7 @@ export class AdminService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: admins.id,
-        displayName: admins.displayName,
+        name: admins.name,
         version: admins.version,
         createdAt: admins.createdAt,
         updatedAt: admins.updatedAt,
@@ -119,10 +119,10 @@ export class AdminService extends BaseService {
         }
       }
 
-      // Apply text search (searches displayName and id)
+      // Apply text search (searches name and id)
       if (params?.textSearch) {
         const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(admins.displayName, searchTerm));
+        conditions.push(like(admins.name, searchTerm));
       }
 
       // Build order by clause
@@ -203,7 +203,7 @@ export class AdminService extends BaseService {
 
       // Hash password if it's being updated
       const updatePayload: any = {
-        displayName: updateData.displayName,
+        name: updateData.name,
         roles: updateData.roles ? Array.from(new Set(updateData.roles)) : undefined,
         metadata: updateData.metadata,
         version: existingAdmin.version + 1,
@@ -222,7 +222,7 @@ export class AdminService extends BaseService {
 
       const admin = updatedAdmin[0];
 
-      await this.auditService.logUpdate('admin', admin.id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, { id: admin.id, displayName: admin.displayName, roles: admin.roles, metadata: admin.metadata }, context?.adminId);
+      await this.auditService.logUpdate('admin', admin.id, { id: existingAdmin.id, name: existingAdmin.name, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, { id: admin.id, name: admin.name, roles: admin.roles, metadata: admin.metadata }, context?.adminId);
 
       logger.info({ adminId: admin.id, newVersion: admin.version }, 'Admin updated successfully');
 
@@ -261,7 +261,7 @@ export class AdminService extends BaseService {
         throw new OptimisticLockError(`Failed to delete admin due to version conflict`);
       }
 
-      await this.auditService.logDelete('admin', id, { id: existingAdmin.id, displayName: existingAdmin.displayName, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, context?.adminId);
+      await this.auditService.logDelete('admin', id, { id: existingAdmin.id, name: existingAdmin.name, roles: existingAdmin.roles, metadata: existingAdmin.metadata }, context?.adminId);
 
       logger.info({ adminId: id }, 'Admin deleted successfully');
     } catch (error) {
@@ -327,7 +327,7 @@ export class AdminService extends BaseService {
    * Updates the profile of the currently logged-in admin user
    * Allows changing display name and/or password
    * When changing password, the old password must be verified first
-   * @param input - Profile update data including displayName, oldPassword, and newPassword
+   * @param input - Profile update data including name, oldPassword, and newPassword
    * @param context - Request context containing the authenticated admin ID
    * @returns The updated profile information
    * @throws {NotFoundError} When admin is not found
@@ -361,8 +361,8 @@ export class AdminService extends BaseService {
         updatedAt: new Date(),
       };
 
-      if (input.displayName) {
-        updateData.displayName = input.displayName;
+      if (input.name) {
+        updateData.name = input.name;
       }
 
       if (input.newPassword) {
@@ -378,8 +378,8 @@ export class AdminService extends BaseService {
       const admin = updatedAdmin[0];
 
       // Log the update for audit purposes
-      const oldData: any = { id: existingAdmin.id, displayName: existingAdmin.displayName };
-      const newData: any = { id: admin.id, displayName: admin.displayName };
+      const oldData: any = { id: existingAdmin.id, name: existingAdmin.name };
+      const newData: any = { id: admin.id, name: admin.name };
       
       if (input.newPassword) {
         oldData.passwordChanged = false;

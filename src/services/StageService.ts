@@ -96,17 +96,17 @@ export class StageService extends BaseService {
   async createStage(input: CreateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
     const stageId = input.id ?? generateId(ID_PREFIXES.STAGE);
-    logger.info({ id: stageId, projectId: input.projectId, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
+    logger.info({ id: stageId, projectId: input.projectId, name: input.name, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
 
     try {
       // Validate referenced entities exist
       await this.validateReferencedEntities(input.personaId, input.classifierIds, input.transformerIds, input.knowledgeSections, input.globalActions);
 
-      const stage = await db.insert(stages).values({ id: stageId, projectId: input.projectId, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const stage = await db.insert(stages).values({ id: stageId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdStage = stage[0];
 
-      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeSections: createdStage.knowledgeSections, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variables: createdStage.variables, actions: createdStage.actions, classifierIds: createdStage.classifierIds, transformerIds: createdStage.transformerIds, metadata: createdStage.metadata }, context?.adminId);
+      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeSections: createdStage.knowledgeSections, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variables: createdStage.variables, actions: createdStage.actions, classifierIds: createdStage.classifierIds, transformerIds: createdStage.transformerIds, metadata: createdStage.metadata }, context?.adminId);
 
       logger.info({ id: createdStage.id }, 'Stage created successfully');
 
@@ -156,6 +156,7 @@ export class StageService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: stages.id,
+        name: stages.name,
         personaId: stages.personaId,
         useKnowledge: stages.useKnowledge,
         useGlobalActions: stages.useGlobalActions,
@@ -174,10 +175,11 @@ export class StageService extends BaseService {
         }
       }
 
-      // Apply text search (searches id and personaId)
+      // Apply text search (searches name and id)
       if (params?.textSearch) {
         const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(stages.id, searchTerm));
+        const { or } = await import('drizzle-orm');
+        conditions.push(or(like(stages.name, searchTerm), like(stages.id, searchTerm))!);
       }
 
       // Build order by clause
@@ -244,6 +246,8 @@ export class StageService extends BaseService {
       await this.validateReferencedEntities(personaIdToValidate, classifierIdsToValidate, transformerIdsToValidate, knowledgeSectionsToValidate, globalActionsToValidate);
 
       const updatePayload: any = { version: existingStage.version + 1, updatedAt: new Date() };
+      if (updateData.name !== undefined) updatePayload.name = updateData.name;
+      if (updateData.description !== undefined) updatePayload.description = updateData.description;
       if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
       if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
       if (updateData.personaId !== undefined) updatePayload.personaId = updateData.personaId;
@@ -266,7 +270,7 @@ export class StageService extends BaseService {
 
       const stage = updatedStage[0];
 
-      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, classifierIds: existingStage.classifierIds, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, { id: stage.id, prompt: stage.prompt, llmProviderId: stage.llmProviderId, personaId: stage.personaId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeSections: stage.knowledgeSections, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variables: stage.variables, actions: stage.actions, classifierIds: stage.classifierIds, transformerIds: stage.transformerIds, metadata: stage.metadata }, context?.adminId);
+      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, classifierIds: existingStage.classifierIds, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, personaId: stage.personaId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeSections: stage.knowledgeSections, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variables: stage.variables, actions: stage.actions, classifierIds: stage.classifierIds, transformerIds: stage.transformerIds, metadata: stage.metadata }, context?.adminId);
 
       logger.info({ id: stage.id, newVersion: stage.version }, 'Stage updated successfully');
 
@@ -306,7 +310,7 @@ export class StageService extends BaseService {
         throw new OptimisticLockError(`Failed to delete stage due to version conflict`);
       }
 
-      await this.auditService.logDelete('stage', id, { id: existingStage.id, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, classifierIds: existingStage.classifierIds, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, context?.adminId);
+      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, classifierIds: existingStage.classifierIds, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, context?.adminId);
 
       logger.info({ id }, 'Stage deleted successfully');
     } catch (error) {

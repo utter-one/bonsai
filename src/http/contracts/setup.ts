@@ -14,12 +14,12 @@ export const setupStatusResponseSchema = z.object({
 
 /**
  * Schema for creating the initial admin account during system setup
- * Required fields: id, displayName, password
+ * Required fields: id, name, password
  * The admin will automatically receive all permissions (super_admin role)
  */
 export const initialAdminSetupSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the admin user (typically an email address)'),
-  displayName: z.string().min(1).describe('Display name for the admin user'),
+  name: z.string().min(1).describe('Display name for the admin user'),
   password: z.string().min(8).describe('Admin user password (minimum 8 characters, will be hashed)'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Optional metadata as key-value pairs'),
 });
@@ -31,7 +31,7 @@ export const initialAdminSetupSchema = z.object({
 export const initialAdminSetupResponseSchema = z.object({
   admin: z.object({
     id: z.string().describe('Unique identifier for the admin user'),
-    displayName: z.string().describe('Display name of the admin user'),
+    name: z.string().describe('Display name of the admin user'),
     roles: z.array(z.string()).describe('Array of role identifiers assigned to the admin'),
     metadata: z.record(z.string(), z.unknown()).optional().describe('Metadata as key-value pairs'),
     createdAt: z.coerce.date().describe('Timestamp when the admin user was created'),

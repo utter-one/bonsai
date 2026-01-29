@@ -41,11 +41,11 @@ export class SetupService {
   /**
    * Create the initial admin account with super_admin role
    * This endpoint can only be used when no admin accounts exist
-   * @param input - Initial admin creation data (id, displayName, password, optional metadata)
+   * @param input - Initial admin creation data (id, name, password, optional metadata)
    * @returns Admin details and authentication tokens for immediate login
    */
   async createInitialAdmin(input: InitialAdminSetupRequest): Promise<InitialAdminSetupResponse> {
-    logger.info({ adminId: input.id, displayName: input.displayName }, 'Creating initial admin account');
+    logger.info({ adminId: input.id, name: input.name }, 'Creating initial admin account');
 
     try {
       // Check if any admin accounts exist
@@ -60,7 +60,7 @@ export class SetupService {
       const hashedPassword = await this.authService.hashPassword(input.password);
 
       // Create admin with super_admin role (all permissions)
-      const admin = await db.insert(admins).values({ id: input.id, displayName: input.displayName, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
+      const admin = await db.insert(admins).values({ id: input.id, name: input.name, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
 
       const createdAdmin = admin[0];
 
@@ -72,7 +72,7 @@ export class SetupService {
       return {
         admin: {
           id: createdAdmin.id,
-          displayName: createdAdmin.displayName,
+          name: createdAdmin.name,
           roles: createdAdmin.roles,
           metadata: createdAdmin.metadata ?? {},
           createdAt: createdAdmin.createdAt,

@@ -68,7 +68,7 @@ export const providerNameSchema = z.string().describe('Specific provider impleme
  */
 export const createProviderSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the provider (auto-generated if not provided)'),
-  displayName: z.string().min(1).describe('Human-readable name for the provider'),
+  name: z.string().min(1).describe('Human-readable name for the provider'),
   description: z.string().optional().describe('Detailed description of provider purpose and use case'),
   providerType: providerTypeSchema.describe('Provider category: asr, tts, llm, or embeddings'),
   apiType: providerNameSchema.describe('Specific provider implementation (e.g., openai, anthropic, azure, elevenlabs)'),
@@ -84,7 +84,7 @@ export const createProviderSchema = z.object({
  */
 export const updateProviderBodySchema = z.object({
   version: z.number().int().positive().describe('Current version number for optimistic locking (prevents concurrent updates)'),
-  displayName: z.string().min(1).optional().describe('Updated human-readable name for the provider'),
+  name: z.string().min(1).optional().describe('Updated human-readable name for the provider'),
   description: z.string().optional().describe('Updated description of provider purpose'),
   providerType: providerTypeSchema.optional().describe('Updated provider category'),
   apiType: providerNameSchema.optional().describe('Updated specific provider implementation'),
@@ -102,11 +102,11 @@ export const deleteProviderBodySchema = z.object({
 
 /**
  * Schema for provider response
- * Includes: id, displayName, description, type, providerName, config, createdBy, tags, version, createdAt, updatedAt
+ * Includes: id, name, description, type, providerName, config, createdBy, tags, version, createdAt, updatedAt
  */
 export const providerResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the provider'),
-  displayName: z.string().describe('Human-readable name of the provider'),
+  name: z.string().describe('Human-readable name of the provider'),
   description: z.string().nullable().describe('Description of provider purpose and use case'),
   providerType: providerTypeSchema.describe('Provider category (asr, tts, llm, embeddings)'),
   apiType: providerNameSchema.describe('Specific provider implementation'),
