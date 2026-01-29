@@ -18,6 +18,7 @@ import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolRespo
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
+import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { listParamsSchema } from './http/contracts/common';
 import { AdminController } from './http/controllers/AdminController';
@@ -36,6 +37,7 @@ import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
+import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 
 extendZodWithOpenApi(z);
@@ -131,6 +133,13 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteProviderRequest', deleteProviderBodySchema);
   registry.register('ProviderResponse', providerResponseSchema);
   registry.register('ProviderListResponse', providerListResponseSchema);
+  registry.register('ProviderCatalog', providerCatalogSchema);
+  registry.register('AsrProvidersResponse', asrProvidersResponseSchema);
+  registry.register('TtsProvidersResponse', ttsProvidersResponseSchema);
+  registry.register('LlmProvidersResponse', llmProvidersResponseSchema);
+  registry.register('AsrProviderInfo', asrProviderInfoSchema);
+  registry.register('TtsProviderInfo', ttsProviderInfoSchema);
+  registry.register('LlmProviderInfo', llmProviderInfoSchema);
   registry.register('AuditLogResponse', auditLogResponseSchema);
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
   registry.register('ListParams', listParamsSchema);
@@ -198,6 +207,12 @@ export function getOpenAPISpec(): any {
   // Register Provider routes from ProviderController
   const providerPaths = ProviderController.getOpenAPIPaths();
   for (const path of providerPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register ProviderCatalog routes from ProviderCatalogController
+  const providerCatalogPaths = ProviderCatalogController.getOpenAPIPaths();
+  for (const path of providerCatalogPaths) {
     registry.registerPath(path);
   }
 

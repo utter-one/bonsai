@@ -20,6 +20,7 @@ import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
+import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
@@ -123,6 +124,9 @@ export function createApp(): express.Application {
 
   const providerController = container.resolve(ProviderController);
   providerController.registerRoutes(app);
+
+  const providerCatalogController = container.resolve(ProviderCatalogController);
+  providerCatalogController.registerRoutes(app);
 
   const stageController = container.resolve(StageController);
   stageController.registerRoutes(app);
