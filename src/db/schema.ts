@@ -2,6 +2,9 @@ import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizz
 import { relations } from 'drizzle-orm';
 import { StageAction, Operation } from '../http/contracts/stage';
 import { ConversationState } from '../services/live/ConversationRunner';
+import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
+import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
+import { TtsProviderConfig } from '../services/providers/tts/TtsProviderFactory';
 
 // Conversation Event Types
 export type ConversationEventType =
@@ -92,6 +95,8 @@ export type ConversationEventData =
   | ConversationFailedEventData
   | JumpToStageEventData;
 
+export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig;
+
 // User table
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
@@ -180,6 +185,7 @@ export const classifiers = pgTable('classifiers', {
   description: text('description'),
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -195,6 +201,7 @@ export const contextTransformers = pgTable('context_transformers', {
   prompt: text('prompt').notNull(),
   contextFields: jsonb('context_fields').$type<string[]>(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -209,6 +216,7 @@ export const tools = pgTable('tools', {
   description: text('description'),
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   inputType: text('input_type').notNull(),
   outputType: text('output_type').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -223,6 +231,7 @@ export const stages = pgTable('stages', {
   projectId: text('project_id').notNull().references(() => projects.id),
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   personaId: text('persona_id').notNull().references(() => personas.id),
   enterBehavior: text('enter_behavior').notNull().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),
@@ -327,7 +336,7 @@ export const providers = pgTable('providers', {
   description: text('description'),
   providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings
   apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex
-  config: jsonb('config').notNull().$type<Record<string, any>>(),
+  config: jsonb('config').notNull().$type<ProviderConfig>(),
   createdBy: text('created_by').references(() => admins.id),
   tags: jsonb('tags').$type<string[]>(),
   version: integer('version').notNull().default(1),

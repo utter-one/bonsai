@@ -1,29 +1,36 @@
 import OpenAI from 'openai';
+import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, TextContent } from './ILlmProvider';
+import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
+extendZodWithOpenApi(z);
+
 /**
- * OpenAI-specific configuration
+ * Schema for OpenAI-specific configuration
  */
-export interface OpenAILlmProviderConfig extends LlmProviderConfig {
-  /** OpenAI API key */
-  apiKey: string;
-  /** Optional organization ID */
-  organizationId?: string;
-  /** Optional base URL for OpenAI-compatible APIs */
-  baseUrl?: string;
-  /** Model name (e.g., gpt-4, gpt-3.5-turbo) */
-  model: string;
-  /** Default max tokens */
-  defaultMaxTokens?: number;
-  /** Default temperature */
-  defaultTemperature?: number;
-  /** Default top-p */
-  defaultTopP?: number;
-  /** Request timeout in milliseconds */
-  timeout?: number;
-}
+export const openAILlmProviderConfigSchema = z.object({
+  apiKey: z.string().describe('OpenAI API key'),
+  organizationId: z.string().optional().describe('Optional organization ID'),
+  baseUrl: z.string().optional().describe('Optional base URL for OpenAI-compatible APIs'),
+});
+
+export type OpenAILlmProviderConfig = z.infer<typeof openAILlmProviderConfigSchema>;
+
+/**
+ * Schema for OpenAI LLM settings
+ * Used with OpenAI provider using the new Responses API
+ */
+export const openAILlmSettingsSchema = z.object({
+  model: z.string().min(1).describe('Model name (e.g., gpt-4, gpt-3.5-turbo)'),
+  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
+  defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
+  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
+  timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
+});
+
+export type OpenAILlmSettings = z.infer<typeof openAILlmSettingsSchema>;  
 
 /**
  * OpenAI LLM provider implementation using the new Responses API
@@ -31,6 +38,12 @@ export interface OpenAILlmProviderConfig extends LlmProviderConfig {
  */
 export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> {
   private client?: OpenAI;
+  private settings: OpenAILlmSettings;
+
+  constructor(config: OpenAILlmProviderConfig, settings: OpenAILlmSettings) {
+    super(config);
+    this.settings = settings;
+  }
 
   /**
    * Convert message content to Response API input format
@@ -97,17 +110,16 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
   /**
    * Initialize the OpenAI provider
    */
-  async init(config: OpenAILlmProviderConfig): Promise<void> {
-    await super.init(config);
-
+  async init(): Promise<void> {
+    await super.init();
     this.client = new OpenAI({
-      apiKey: config.apiKey,
-      organization: config.organizationId,
-      baseURL: config.baseUrl,
-      timeout: config.timeout,
+      apiKey: this.config!.apiKey,
+      organization: this.config!.organizationId,
+      baseURL: this.config!.baseUrl,
+      timeout: this.settings.timeout,
     });
 
-    logger.info(`OpenAI LLM provider initialized with model: ${config.model}`);
+    logger.info(`OpenAI LLM provider initialized with model: ${this.settings.model}`);
   }
 
   /**
@@ -126,10 +138,10 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
     const systemMessage = messages.find((m) => m.role === 'system');
 
     try {
-      logger.info(`Generating OpenAI response with model: ${this.config!.model}`);
+      logger.info(`Generating OpenAI response with model: ${this.settings.model}`);
 
       const response = await this.client.responses.create({
-        model: this.config!.model,
+        model: this.settings.model,
         input,
         instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
         max_output_tokens: mergedOptions.maxTokens,
@@ -197,10 +209,10 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
     const systemMessage = messages.find((m) => m.role === 'system');
 
     try {
-      logger.info(`Starting OpenAI streaming response with model: ${this.config!.model}`);
+      logger.info(`Starting OpenAI streaming response with model: ${this.settings.model}`);
 
       const stream = await this.client.responses.create({
-        model: this.config!.model,
+        model: this.settings.model,
         input,
         instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
         max_output_tokens: mergedOptions.maxTokens,
@@ -248,7 +260,7 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
           totalTokens: finalUsage.totalTokens || 0,
         } : undefined,
         metadata: {
-          model: this.config!.model,
+          model: this.settings.model,
           status: finalStatus,
         },
       };

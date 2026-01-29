@@ -4,7 +4,6 @@ import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ProviderService } from '../../services/providers/ProviderService';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerRouteParamsSchema, providerResponseSchema, providerListResponseSchema } from '../contracts/provider';
-import type { CreateProviderRequest, UpdateProviderRequest, DeleteProviderRequest } from '../contracts/provider';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';

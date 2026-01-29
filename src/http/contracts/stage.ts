@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema } from './common';
+import { listParamsSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
 import type { StageAction, Operation, EndConversationOperation, AbortConversationOperation, GoToStageOperation, RunScriptOperation, ModifyUserInputOperation, ModifyVariablesOperation, ModifyUserProfileOperation, VariableOperation, UserProfileOperation, CallToolOperation, CallWebhookOperation } from '../../types/models';
 
@@ -179,6 +179,7 @@ export const createStageSchema = z.object({
   projectId: z.string().min(1).describe('ID of the project this stage belongs to'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this stage'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this stage'),
   personaId: z.string().min(1).describe('ID of the persona associated with this stage'),
   enterBehavior: enterBehaviorSchema.optional().default('generate_response').describe('What should happen when entering the stage'),
   useKnowledge: z.boolean().optional().default(false).describe('Whether to use knowledge base in this stage'),
@@ -199,6 +200,7 @@ export const createStageSchema = z.object({
 export const updateStageBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated system prompt'),
   llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
   personaId: z.string().min(1).optional().describe('Updated persona ID'),
   enterBehavior: enterBehaviorSchema.optional().describe('Updated behavior when entering this stage'),
   useKnowledge: z.boolean().optional().describe('Updated knowledge usage flag'),
@@ -230,6 +232,7 @@ export const stageResponseSchema = z.object({
   projectId: z.string().describe('ID of the project this stage belongs to'),
   prompt: z.string().describe('System prompt defining the stage behavior'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
   personaId: z.string().describe('ID of the associated persona'),
   enterBehavior: enterBehaviorSchema.describe('What happens when entering the stage'),
   useKnowledge: z.boolean().describe('Whether knowledge base is enabled'),

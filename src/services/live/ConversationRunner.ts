@@ -123,7 +123,7 @@ export class ConversationRunner {
     if (stage.llmProviderId) {
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, stage.llmProviderId) });
       if (llmProviderEntity) {
-        stageData.completionLlmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
+        stageData.completionLlmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, stage.llmSettings);
       }
     }
 
@@ -134,7 +134,7 @@ export class ConversationRunner {
         throw new NotFoundError(`Classifier with ID ${classifierId} not found`);
       }
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, classifier.llmProviderId) });
-      const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
+      const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, classifier.llmSettings);
       stageData.classifiers.push({ classifier, llmProvider });
     }
 
@@ -145,7 +145,7 @@ export class ConversationRunner {
         throw new NotFoundError(`Transformer with ID ${transformerId} not found`);
       }
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, transformer.llmProviderId) });
-      const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity);
+      const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, transformer.llmSettings);
       stageData.transformers.push({ transformer, llmProvider });
     }
 

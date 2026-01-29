@@ -2,12 +2,22 @@ import { singleton } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IAsrProvider } from './IAsrProvider';
-import { AzureAsrProvider, AzureAsrProviderConfig, AzureAsrSettings } from './AzureAsrProvider';
+import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema, AzureAsrSettings } from './AzureAsrProvider';
 
 /**
  * Supported ASR provider API types
  */
 export type AsrProviderApiType = 'azure';
+
+/** 
+ * Union type for all ASR provider settings
+ */
+export type AsrSettings = AzureAsrSettings;
+
+/**
+ * Union type for all ASR provider configurations
+ */
+export type AsrProviderConfig = AzureAsrProviderConfig;
 
 /**
  * Factory service for creating ASR provider instances based on provider entity configuration
@@ -48,23 +58,10 @@ export class AsrProviderFactory {
    * @throws {Error} When required Azure configuration fields are missing
    */
   private createAzureProvider(provider: Provider, settings: AzureAsrSettings): AzureAsrProvider {
-    const config = provider.config as Partial<AzureAsrProviderConfig>;
+    const config = azureAsrProviderConfigSchema.parse(provider.config);
 
-    // Validate required fields
-    if (!config.region || !config.subscriptionKey) {
-      const errorMessage = `Invalid Azure ASR provider configuration for provider ${provider.id}. Required fields: region, subscriptionKey`;
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    // Build Azure provider configuration
-    const azureConfig: AzureAsrProviderConfig = {
-      region: config.region,
-      subscriptionKey: config.subscriptionKey,
-    };
-
-    logger.info(`Creating Azure ASR provider for provider ${provider.id} with region ${azureConfig.region}`);
-    return new AzureAsrProvider(azureConfig, settings);
+    logger.info(`Creating Azure ASR provider for provider ${provider.id} with region ${config.region}`);
+    return new AzureAsrProvider(config, settings);
   }
 
   /**

@@ -1,34 +1,31 @@
 import * as azureSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { CancellationReason, PhraseListGrammar } from 'microsoft-cognitiveservices-speech-sdk';
+import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
 import { logger } from '../../../utils/logger';
 
+extendZodWithOpenApi(z);
+
 /**
- * Configuration for Azure Speech Recognition service
+ * Schema for Azure Speech Recognition service configuration
  */
-export type AzureAsrProviderConfig = {
-  /**
-   * The Azure region to use for the speech recognition service.
-   */
-  region: string;
+export const azureAsrProviderConfigSchema = z.object({
+  region: z.string().describe('The Azure region to use for the speech recognition service'),
+  subscriptionKey: z.string().describe('The subscription key to use for the speech recognition service'),
+});
 
-  /**
-   * The subscription key to use for the speech recognition service.
-   */
-  subscriptionKey: string;
-};
+export type AzureAsrProviderConfig = z.infer<typeof azureAsrProviderConfigSchema>;
 
-export type AzureAsrSettings = {
-  /**
-   * The language code for speech recognition (e.g., 'en-US')
-   */
-  language?: string;
+/**
+ * Schema for Azure ASR settings
+ */
+export const azureAsrSettingsSchema = z.object({
+  language: z.string().optional().describe('The language code for speech recognition (e.g., \'en-US\')'),
+  dictionaryPhrases: z.array(z.string()).optional().describe('The phrases to add to the speech recognition dictionary'),
+});
 
-  /**
-   * The phrases to add to the speech recognition dictionary.
-   */
-  dictionaryPhrases?: string[];
-}
+export type AzureAsrSettings = z.infer<typeof azureAsrSettingsSchema>;
 
 /**
  * Implementation of ASR provider using the Azure Speech SDK

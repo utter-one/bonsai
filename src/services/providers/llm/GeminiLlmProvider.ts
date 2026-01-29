@@ -1,29 +1,36 @@
 import { GoogleGenAI, Content, Part, HarmCategory, HarmBlockThreshold, SafetySetting } from '@google/genai';
+import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, LlmProviderConfig, TextContent } from './ILlmProvider';
+import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
+extendZodWithOpenApi(z);
+
 /**
- * Google Gemini-specific configuration
+ * Schema for Google Gemini-specific configuration
  */
-export interface GeminiLlmProviderConfig extends LlmProviderConfig {
-  /** Google API key */
-  apiKey: string;
-  /** Model name (e.g., gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash) */
-  model: string;
-  /** Default max tokens */
-  defaultMaxTokens?: number;
-  /** Default temperature */
-  defaultTemperature?: number;
-  /** Default top-p */
-  defaultTopP?: number;
-  /** Default top-k */
-  defaultTopK?: number;
-  /** Request timeout in milliseconds */
-  timeout?: number;
-  /** Safety settings configuration */
-  safetySettings?: SafetySetting[];
-}
+export const geminiLlmProviderConfigSchema = z.object({
+  apiKey: z.string().describe('Google API key'),
+});
+
+export type GeminiLlmProviderConfig = z.infer<typeof geminiLlmProviderConfigSchema>;
+
+/**
+ * Schema for Google Gemini LLM settings
+ * Used with Gemini models and Vertex AI
+ */
+export const geminiLlmSettingsSchema = z.object({
+  model: z.string().min(1).describe('Model name (e.g., gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash)'),
+  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
+  defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
+  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
+  defaultTopK: z.number().int().positive().optional().describe('Default top-k for generation'),
+  timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
+  safetySettings: z.array(z.unknown()).optional().describe('Safety settings configuration'),
+});
+
+export type GeminiLlmSettings = z.infer<typeof geminiLlmSettingsSchema>;
 
 /**
  * Google Gemini LLM provider implementation
@@ -32,16 +39,22 @@ export interface GeminiLlmProviderConfig extends LlmProviderConfig {
  */
 export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> {
   private client?: GoogleGenAI;
+  private settings: GeminiLlmSettings;
+
+  constructor(config: GeminiLlmProviderConfig, settings: GeminiLlmSettings) {
+    super(config);
+    this.settings = settings;
+  }
 
   /**
    * Initialize the Gemini provider
    */
-  async init(config: GeminiLlmProviderConfig): Promise<void> {
-    await super.init(config);
+  async init(): Promise<void> {
+    await super.init();
 
-    this.client = new GoogleGenAI({ apiKey: config.apiKey });
+    this.client = new GoogleGenAI({ apiKey: this.config.apiKey });
 
-    logger.info(`Google Gemini LLM provider initialized with model: ${config.model}`);
+    logger.info(`Google Gemini LLM provider initialized with model: ${this.settings.model}`);
   }
 
   /**
@@ -59,19 +72,19 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
 
     try {
-      logger.info(`Generating Gemini completion with model: ${this.config!.model}`);
+      logger.info(`Generating Gemini completion with model: ${this.settings.model}`);
 
       const result = await this.client.models.generateContent({
-        model: this.config!.model,
+        model: this.settings.model,
         contents,
         config: {
           systemInstruction,
           maxOutputTokens: mergedOptions.maxTokens,
           temperature: mergedOptions.temperature,
           topP: mergedOptions.topP,
-          topK: (this.config as any).defaultTopK,
+          topK: this.settings.defaultTopK,
           stopSequences: mergedOptions.stopSequences,
-          safetySettings: this.config!.safetySettings,
+          safetySettings: this.settings.safetySettings,
         },
       });
 
@@ -88,7 +101,7 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
           totalTokens: result.usageMetadata.totalTokenCount || 0,
         } : undefined,
         metadata: {
-          model: this.config!.model,
+          model: this.settings.model,
           finishReason: result.candidates?.[0]?.finishReason,
           safetyRatings: result.candidates?.[0]?.safetyRatings,
         },
@@ -119,19 +132,19 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
 
     try {
-      logger.info(`Starting Gemini streaming completion with model: ${this.config!.model}`);
+      logger.info(`Starting Gemini streaming completion with model: ${this.settings.model}`);
 
       const stream = await this.client.models.generateContentStream({
-        model: this.config!.model,
+        model: this.settings.model,
         contents,
         config: {
           systemInstruction,
           maxOutputTokens: mergedOptions.maxTokens,
           temperature: mergedOptions.temperature,
           topP: mergedOptions.topP,
-          topK: (this.config as any).defaultTopK,
+          topK: this.settings.defaultTopK,
           stopSequences: mergedOptions.stopSequences,
-          safetySettings: this.config!.safetySettings,
+          safetySettings: this.settings.safetySettings,
         },
       });
 
@@ -174,7 +187,7 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
           totalTokens,
         },
         metadata: {
-          model: this.config!.model,
+          model: this.settings.model,
           finishReason: finalFinishReason,
         },
       };

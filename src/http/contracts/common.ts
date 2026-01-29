@@ -1,7 +1,15 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { openAILlmSettingsSchema } from '../../services/providers/llm/OpenAILlmProvider';
+import { openAILegacyLlmSettingsSchema } from '../../services/providers/llm/OpenAILegacyLlmProvider';
+import { anthropicLlmSettingsSchema } from '../../services/providers/llm/AnthropicLlmProvider';
+import { geminiLlmSettingsSchema } from '../../services/providers/llm/GeminiLlmProvider';
 
 extendZodWithOpenApi(z);
+
+// ==================
+// List Params Schema
+// ==================
 
 /**
  * Schema for filter operations with explicit operator and value
@@ -60,3 +68,19 @@ export type ListFilter = z.infer<typeof listFilterSchema>;
 
 /** List query parameters for filtering, sorting, pagination, and search */
 export type ListParams = z.infer<typeof listParamsSchema>;
+
+// ====================
+// LLM Settings Schemas
+// ====================
+
+/**
+ * Discriminated union of all LLM settings types
+ * Each settings object contains provider-specific configuration for LLM generation
+ * Individual schemas are defined in their respective provider files
+ */
+export const llmSettingsSchema = z.union([
+  openAILlmSettingsSchema,
+  openAILegacyLlmSettingsSchema,
+  anthropicLlmSettingsSchema,
+  geminiLlmSettingsSchema,
+]).nullable().optional().describe('LLM provider-specific settings for this stage');
