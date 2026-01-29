@@ -18,6 +18,9 @@ export const elevenLabsTtsProviderConfigSchema = z.object({
 
 export type ElevenLabsTtsProviderConfig = z.infer<typeof elevenLabsTtsProviderConfigSchema>;
 
+/**
+ * Voice-specific settings for ElevenLabs TTS
+ */
 export type ElevenLabsTtsVoiceSettings = {
   /** Model ID to use for speech synthesis (e.g., 'eleven_flash_v2_5') */
   model?: string;
@@ -69,7 +72,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   private voiceSettings: ElevenLabsTtsVoiceSettings = null;
 
   async init(voiceConfig: VoiceConfig): Promise<void> {
-    this.voiceSettings = voiceConfig.settings as ElevenLabsTtsVoiceSettings;
+    this.voiceSettings = voiceConfig as ElevenLabsTtsVoiceSettings;
   }
 
   /**

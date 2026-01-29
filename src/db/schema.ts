@@ -4,7 +4,7 @@ import { StageAction, Operation } from '../http/contracts/stage';
 import { ConversationState } from '../services/live/ConversationRunner';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
-import { TtsProviderConfig } from '../services/providers/tts/TtsProviderFactory';
+import { TtsProviderConfig, TtsSettings } from '../services/providers/tts/TtsProviderFactory';
 
 // Conversation Event Types
 export type ConversationEventType =
@@ -166,11 +166,8 @@ export const personas = pgTable('personas', {
   projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   prompt: text('prompt').notNull(),
-  voiceConfig: jsonb('voice_config').$type<{
-    voiceProviderId?: string;
-    voiceId?: string;
-    settings?: Record<string, any>;
-  }>(),
+  ttsProviderId: text('tts_provider_id').references(() => providers.id),
+  voiceConfig: jsonb('voice_config').$type<TtsSettings>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

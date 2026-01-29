@@ -2,7 +2,7 @@ import { singleton } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ITtsProvider } from './ITtsProvider';
-import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProviderConfigSchema } from './ElevenLabsTtsProvider';
+import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProviderConfigSchema, ElevenLabsTtsVoiceSettings } from './ElevenLabsTtsProvider';
 
 /**
  * Supported TTS provider API types
@@ -10,9 +10,9 @@ import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProvid
 export type TtsProviderApiType = 'elevenlabs';
 
 /**
- * Union type for all TTS provider settings
+ * Union type for all TTS voice settings
  */
-export type TtsSettings = ElevenLabsTtsProviderConfig;
+export type TtsSettings = ElevenLabsTtsVoiceSettings;
 
 /**
  * Union type for all TTS provider configurations

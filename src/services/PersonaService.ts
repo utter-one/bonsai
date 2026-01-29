@@ -25,7 +25,7 @@ export class PersonaService extends BaseService {
 
   /**
    * Creates a new persona and logs the creation in the audit trail
-   * @param input - Persona creation data including id, name, prompt, voiceConfig, and optional metadata
+   * @param input - Persona creation data including id, name, prompt, ttsProviderId, voiceConfig, and optional metadata
    * @param context - Request context for auditing and authorization
    * @returns The created persona
    */
@@ -35,11 +35,11 @@ export class PersonaService extends BaseService {
     logger.info({ personaId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
-      const persona = await db.insert(personas).values({ id: personaId, projectId: input.projectId, name: input.name, prompt: input.prompt, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
+      const persona = await db.insert(personas).values({ id: personaId, projectId: input.projectId, name: input.name, prompt: input.prompt, ttsProviderId: input.ttsProviderId, voiceConfig: input.voiceConfig, metadata: input.metadata, version: 1 }).returning();
 
       const createdPersona = persona[0];
 
-      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, projectId: createdPersona.projectId, name: createdPersona.name, prompt: createdPersona.prompt, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, context?.adminId);
+      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, projectId: createdPersona.projectId, name: createdPersona.name, prompt: createdPersona.prompt, ttsProviderId: createdPersona.ttsProviderId, voiceConfig: createdPersona.voiceConfig, metadata: createdPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: createdPersona.id }, 'Persona created successfully');
 
@@ -165,7 +165,7 @@ export class PersonaService extends BaseService {
         throw new OptimisticLockError(`Persona version mismatch. Expected ${expectedVersion}, got ${existingPersona.version}`);
       }
 
-      const updatedPersona = await db.update(personas).set({ name: updateData.name, prompt: updateData.prompt, voiceConfig: updateData.voiceConfig, metadata: updateData.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
+      const updatedPersona = await db.update(personas).set({ name: updateData.name, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, voiceConfig: updateData.voiceConfig, metadata: updateData.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
 
       if (updatedPersona.length === 0) {
         throw new OptimisticLockError(`Failed to update persona due to version conflict`);
@@ -173,7 +173,7 @@ export class PersonaService extends BaseService {
 
       const persona = updatedPersona[0];
 
-      await this.auditService.logUpdate('persona', persona.id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, { id: persona.id, name: persona.name, prompt: persona.prompt, voiceConfig: persona.voiceConfig, metadata: persona.metadata }, context?.adminId);
+      await this.auditService.logUpdate('persona', persona.id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, { id: persona.id, name: persona.name, prompt: persona.prompt, ttsProviderId: persona.ttsProviderId, voiceConfig: persona.voiceConfig, metadata: persona.metadata }, context?.adminId);
 
       logger.info({ personaId: persona.id, newVersion: persona.version }, 'Persona updated successfully');
 
@@ -213,7 +213,7 @@ export class PersonaService extends BaseService {
         throw new OptimisticLockError(`Failed to delete persona due to version conflict`);
       }
 
-      await this.auditService.logDelete('persona', id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, context?.adminId);
+      await this.auditService.logDelete('persona', id, { id: existingPersona.id, name: existingPersona.name, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId, voiceConfig: existingPersona.voiceConfig, metadata: existingPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: id }, 'Persona deleted successfully');
     } catch (error) {
