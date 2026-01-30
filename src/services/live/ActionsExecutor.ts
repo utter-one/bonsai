@@ -4,7 +4,7 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
-import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyUserProfileOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../http/contracts/stage';
+import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyUserProfileOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../types/models';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 

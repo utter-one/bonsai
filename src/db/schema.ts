@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { StageAction, Operation } from '../http/contracts/stage';
+import { StageAction, Operation } from '../types/models';
 import { ConversationState } from '../services/live/ConversationRunner';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
