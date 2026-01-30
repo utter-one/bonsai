@@ -12,7 +12,7 @@ import {
   modifyVariablesOperationSchema,
   variableOperationSchema,
   callToolOperationSchema,
-} from '../../types/models';
+} from '../../types/actions';
 import type {
   Operation,
   EndConversationOperation,
@@ -23,7 +23,7 @@ import type {
   ModifyVariablesOperation,
   VariableOperation,
   CallToolOperation,
-} from '../../types/models';
+} from '../../types/actions';
 
 extendZodWithOpenApi(z);
 

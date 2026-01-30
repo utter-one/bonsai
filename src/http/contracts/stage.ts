@@ -16,7 +16,7 @@ import {
   callToolOperationSchema,
   callWebhookOperationSchema,
   stageActionSchema,
-} from '../../types/models';
+} from '../../types/actions';
 import type {
   Operation,
   EndConversationOperation,
@@ -31,7 +31,7 @@ import type {
   CallToolOperation,
   CallWebhookOperation,
   StageAction,
-} from '../../types/models';
+} from '../../types/actions';
 
 extendZodWithOpenApi(z);
 

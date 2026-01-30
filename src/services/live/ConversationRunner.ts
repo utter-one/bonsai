@@ -1,6 +1,7 @@
 import { inject } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, Project, Stage, StageAction } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, Project, Stage } from "../../types/models";
+import { StageAction } from "../../types/actions";
 import { db } from "../../db";
 import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, conversations, users } from "../../db/schema";
 import { ConversationService } from "../ConversationService";
