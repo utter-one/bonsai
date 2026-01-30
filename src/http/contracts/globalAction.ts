@@ -58,15 +58,18 @@ export type {
 
 /**
  * Schema for creating a new global action
- * Required fields: id, name, promptTrigger
- * Optional fields: condition, operations, template, examples, metadata
+ * Required fields: id, name, triggerOnUserInput, triggerOnClientCommand
+ * Optional fields: condition, classificationTrigger, overrideClassifierId, operations, template, examples, metadata
  */
 export const createGlobalActionSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the global action (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this global action belongs to'),
   name: z.string().min(1).describe('Display name of the global action'),
   condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
-  promptTrigger: z.string().min(1).describe('Description of when this action should be triggered'),
+  triggerOnUserInput: z.boolean().optional().default(true).describe('Whether this action should be triggered on user input'),
+  triggerOnClientCommand: z.boolean().optional().default(false).describe('Whether this action should be triggered on client commands'),
+  classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
+  overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID to override the default classifier for this action'),
   operations: z.array(operationSchema).optional().describe('Array of operations to execute when action is triggered'),
   template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).optional().describe('Example phrases that trigger this action'),
@@ -80,7 +83,10 @@ export const createGlobalActionSchema = z.object({
 export const updateGlobalActionBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
   condition: z.string().nullable().optional().describe('Updated condition expression'),
-  promptTrigger: z.string().min(1).optional().describe('Updated prompt trigger description'),
+  triggerOnUserInput: z.boolean().optional().describe('Updated trigger on user input flag'),
+  triggerOnClientCommand: z.boolean().optional().describe('Updated trigger on client command flag'),
+  classificationTrigger: z.string().nullable().optional().describe('Updated classification trigger label'),
+  overrideClassifierId: z.string().nullable().optional().describe('Updated override classifier ID'),
   operations: z.array(operationSchema).optional().describe('Updated operations array'),
   template: z.string().nullable().optional().describe('Updated message template'),
   examples: z.array(z.string()).optional().describe('Updated example phrases'),
@@ -105,7 +111,10 @@ export const globalActionResponseSchema = z.object({
   projectId: z.string().describe('ID of the project this global action belongs to'),
   name: z.string().describe('Display name of the global action'),
   condition: z.string().nullable().describe('Condition expression for action activation'),
-  promptTrigger: z.string().describe('Description of when this action should be triggered'),
+  triggerOnUserInput: z.boolean().describe('Whether this action should be triggered on user input'),
+  triggerOnClientCommand: z.boolean().describe('Whether this action should be triggered on client commands'),
+  classificationTrigger: z.string().nullable().describe('Optional classification label that triggers this action'),
+  overrideClassifierId: z.string().nullable().describe('Optional classifier ID to override the default classifier'),
   operations: z.array(operationSchema).describe('Array of operations to execute'),
   template: z.string().nullable().describe('Message template for the action'),
   examples: z.array(z.string()).nullable().describe('Example phrases that trigger this action'),
