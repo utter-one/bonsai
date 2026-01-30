@@ -1,6 +1,6 @@
 ## Important Notes
 - Try to make changes in batches, not one-by-one (especially easy ones)
-- When changing contracts, use files in /src/http/contracts
+- When changing HTTP contracts, use files in /src/http/contracts
 - Don't create example usages of newly created components
 - When creating database entities, don't forget to add models
 - Make all logger calls one-liners (even if very long) and do not use event field
@@ -12,6 +12,7 @@
 - Use IoC container for classes with implicit registration by @singleton or @injectable decorator
 - Always verify changes by running `npm run build`
 - Place private methods AFTER the public ones
+- When modifying database entities (e.g. add, rename, remove fields), apply these changes to the corresponding contracts and services
 
 ## Controller Architecture
 
