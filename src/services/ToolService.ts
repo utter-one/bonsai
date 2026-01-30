@@ -36,11 +36,11 @@ export class ToolService extends BaseService {
     logger.info({ toolId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating tool');
 
     try {
-      const tool = await db.insert(tools).values({ id: toolId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, inputType: input.inputType, outputType: input.outputType, metadata: input.metadata ?? null, version: 1 }).returning();
+      const tool = await db.insert(tools).values({ id: toolId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, inputType: input.inputType, outputType: input.outputType, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTool = tool[0];
 
-      await this.auditService.logCreate('tool', createdTool.id, { id: createdTool.id, projectId: createdTool.projectId, name: createdTool.name, description: createdTool.description, prompt: createdTool.prompt, llmProviderId: createdTool.llmProviderId, inputType: createdTool.inputType, outputType: createdTool.outputType, metadata: createdTool.metadata }, context?.adminId);
+      await this.auditService.logCreate('tool', createdTool.id, { id: createdTool.id, projectId: createdTool.projectId, name: createdTool.name, description: createdTool.description, prompt: createdTool.prompt, llmProviderId: createdTool.llmProviderId, llmSettings: createdTool.llmSettings, inputType: createdTool.inputType, outputType: createdTool.outputType, metadata: createdTool.metadata }, context?.adminId);
 
       logger.info({ toolId: createdTool.id }, 'Tool created successfully');
 
@@ -174,6 +174,7 @@ export class ToolService extends BaseService {
       if (updateData.description !== undefined) updatePayload.description = updateData.description;
       if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
       if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
+      if (updateData.llmSettings !== undefined) updatePayload.llmSettings = updateData.llmSettings;
       if (updateData.inputType !== undefined) updatePayload.inputType = updateData.inputType;
       if (updateData.outputType !== undefined) updatePayload.outputType = updateData.outputType;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
@@ -186,7 +187,7 @@ export class ToolService extends BaseService {
 
       const tool = updatedTool[0];
 
-      await this.auditService.logUpdate('tool', tool.id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, inputType: existingTool.inputType, outputType: existingTool.outputType, metadata: existingTool.metadata }, { id: tool.id, name: tool.name, description: tool.description, prompt: tool.prompt, llmProviderId: tool.llmProviderId, inputType: tool.inputType, outputType: tool.outputType, metadata: tool.metadata }, context?.adminId);
+      await this.auditService.logUpdate('tool', tool.id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, metadata: existingTool.metadata }, { id: tool.id, name: tool.name, description: tool.description, prompt: tool.prompt, llmProviderId: tool.llmProviderId, llmSettings: tool.llmSettings, inputType: tool.inputType, outputType: tool.outputType, metadata: tool.metadata }, context?.adminId);
 
       logger.info({ toolId: tool.id, newVersion: tool.version }, 'Tool updated successfully');
 
@@ -226,7 +227,7 @@ export class ToolService extends BaseService {
         throw new OptimisticLockError(`Failed to delete tool due to version conflict`);
       }
 
-      await this.auditService.logDelete('tool', id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, inputType: existingTool.inputType, outputType: existingTool.outputType, metadata: existingTool.metadata }, context?.adminId);
+      await this.auditService.logDelete('tool', id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, metadata: existingTool.metadata }, context?.adminId);
 
       logger.info({ toolId: id }, 'Tool deleted successfully');
     } catch (error) {
