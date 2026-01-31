@@ -1,7 +1,6 @@
 import { inject, singleton } from "tsyringe";
 import { z } from "zod";
 import { Connection } from "../../websocket/ConnectionManager";
-import { StageAction } from "../../http/contracts/stage";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
@@ -65,7 +64,7 @@ export class UserInputProcessor {
           input: context.userInput,
           actions: result.actions.map(action => ({
             name: action.actionName,
-            operations: [],
+            effects: [],
           })) as any,
           metadata: {
             classifierName: result.classifierName,

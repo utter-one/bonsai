@@ -3,27 +3,27 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
 import {
-  operationSchema,
-  endConversationOperationSchema,
-  abortConversationOperationSchema,
-  goToStageOperationSchema,
-  runScriptOperationSchema,
-  modifyUserInputOperationSchema,
-  modifyVariablesOperationSchema,
+  effectSchema,
+  endConversationEffectSchema,
+  abortConversationEffectSchema,
+  goToStageEffectSchema,
+  runScriptEffectSchema,
+  modifyUserInputEffectSchema,
+  modifyVariablesEffectSchema,
   variableOperationSchema,
-  callToolOperationSchema,
-} from './stage';
+  callToolEffectSchema,
+} from '../../types/actions';
 import type {
-  Operation,
-  EndConversationOperation,
-  AbortConversationOperation,
-  GoToStageOperation,
-  RunScriptOperation,
-  ModifyUserInputOperation,
-  ModifyVariablesOperation,
+  Effect,
+  EndConversationEffect,
+  AbortConversationEffect,
+  GoToStageEffect,
+  RunScriptEffect,
+  ModifyUserInputEffect,
+  ModifyVariablesEffect,
   VariableOperation,
-  CallToolOperation,
-} from './stage';
+  CallToolEffect,
+} from '../../types/actions';
 
 extendZodWithOpenApi(z);
 
@@ -34,40 +34,43 @@ export const globalActionRouteParamsSchema = z.object({
 });
 
 export {
-  operationSchema,
-  endConversationOperationSchema,
-  abortConversationOperationSchema,
-  goToStageOperationSchema,
-  runScriptOperationSchema,
-  modifyUserInputOperationSchema,
-  modifyVariablesOperationSchema,
+  effectSchema,
+  endConversationEffectSchema,
+  abortConversationEffectSchema,
+  goToStageEffectSchema,
+  runScriptEffectSchema,
+  modifyUserInputEffectSchema,
+  modifyVariablesEffectSchema,
   variableOperationSchema,
-  callToolOperationSchema,
+  callToolEffectSchema,
 };
 export type {
-  Operation,
-  EndConversationOperation,
-  AbortConversationOperation,
-  GoToStageOperation,
-  RunScriptOperation,
-  ModifyUserInputOperation,
-  ModifyVariablesOperation,
+  Effect,
+  EndConversationEffect,
+  AbortConversationEffect,
+  GoToStageEffect,
+  RunScriptEffect,
+  ModifyUserInputEffect,
+  ModifyVariablesEffect,
   VariableOperation,
-  CallToolOperation,
+  CallToolEffect,
 };
 
 /**
  * Schema for creating a new global action
- * Required fields: id, name, promptTrigger
- * Optional fields: condition, operations, template, examples, metadata
+ * Required fields: id, name, triggerOnUserInput, triggerOnClientCommand
+ * Optional fields: condition, classificationTrigger, overrideClassifierId, effects, template, examples, metadata
  */
 export const createGlobalActionSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the global action (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this global action belongs to'),
   name: z.string().min(1).describe('Display name of the global action'),
   condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
-  promptTrigger: z.string().min(1).describe('Description of when this action should be triggered'),
-  operations: z.array(operationSchema).optional().describe('Array of operations to execute when action is triggered'),
+  triggerOnUserInput: z.boolean().optional().default(true).describe('Whether this action should be triggered on user input'),
+  triggerOnClientCommand: z.boolean().optional().default(false).describe('Whether this action should be triggered on client commands'),
+  classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
+  overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID to override the default classifier for this action'),
+  effects: z.array(effectSchema).optional().describe('Array of effects to execute when action is triggered'),
   template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional action-specific metadata'),
@@ -80,8 +83,11 @@ export const createGlobalActionSchema = z.object({
 export const updateGlobalActionBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
   condition: z.string().nullable().optional().describe('Updated condition expression'),
-  promptTrigger: z.string().min(1).optional().describe('Updated prompt trigger description'),
-  operations: z.array(operationSchema).optional().describe('Updated operations array'),
+  triggerOnUserInput: z.boolean().optional().describe('Updated trigger on user input flag'),
+  triggerOnClientCommand: z.boolean().optional().describe('Updated trigger on client command flag'),
+  classificationTrigger: z.string().nullable().optional().describe('Updated classification trigger label'),
+  overrideClassifierId: z.string().nullable().optional().describe('Updated override classifier ID'),
+  effects: z.array(effectSchema).optional().describe('Updated effects array'),
   template: z.string().nullable().optional().describe('Updated message template'),
   examples: z.array(z.string()).optional().describe('Updated example phrases'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
@@ -105,8 +111,11 @@ export const globalActionResponseSchema = z.object({
   projectId: z.string().describe('ID of the project this global action belongs to'),
   name: z.string().describe('Display name of the global action'),
   condition: z.string().nullable().describe('Condition expression for action activation'),
-  promptTrigger: z.string().describe('Description of when this action should be triggered'),
-  operations: z.array(operationSchema).describe('Array of operations to execute'),
+  triggerOnUserInput: z.boolean().describe('Whether this action should be triggered on user input'),
+  triggerOnClientCommand: z.boolean().describe('Whether this action should be triggered on client commands'),
+  classificationTrigger: z.string().nullable().describe('Optional classification label that triggers this action'),
+  overrideClassifierId: z.string().nullable().describe('Optional classifier ID to override the default classifier'),
+  effects: z.array(effectSchema).describe('Array of effects to execute'),
   template: z.string().nullable().describe('Message template for the action'),
   examples: z.array(z.string()).nullable().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
