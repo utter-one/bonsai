@@ -137,6 +137,30 @@ export type CallWebhookEffect = z.infer<typeof callWebhookEffectSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 
 /**
+ * Schema for parameter types supported in stage actions
+ * Defines the valid parameter types that can be extracted from user input
+ */
+export const stageActionParameterTypeSchema = z.enum([
+  'string',
+  'number',
+  'boolean',
+  'string[]',
+  'number[]',
+  'boolean[]',
+]).describe('Type of the parameter: string, number, boolean, or arrays of these');
+
+/**
+ * Schema for a single stage action parameter
+ * Defines a parameter that can be extracted from user input and passed to effects
+ */
+export const stageActionParameterSchema = z.object({
+  name: z.string().min(1).describe('Name of the parameter (used as key when passing to effects)'),
+  type: stageActionParameterTypeSchema.describe('Expected type of the parameter value'),
+  description: z.string().min(1).describe('Description of what the parameter represents (helps with extraction)'),
+  required: z.boolean().describe('Whether this parameter must be present in the user input'),
+});
+
+/**
  * Schema for a single stage action
  * Defines an action available within a conversation stage
  */
@@ -147,10 +171,13 @@ export const stageActionSchema = z.object({
   triggerOnClientCommand: z.boolean().describe('Whether this action should be triggered on client commands'),
   classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID to override the stage classifier for this action'),
+  parameters: z.array(stageActionParameterSchema).describe('Optional array of parameters to extract from user input'),
   effects: z.array(effectSchema).describe('Array of effects to execute when action is triggered'),
   template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
 });
 
+export type StageActionParameterType = z.infer<typeof stageActionParameterTypeSchema>;
+export type StageActionParameter = z.infer<typeof stageActionParameterSchema>;
 export type StageAction = z.infer<typeof stageActionSchema>;
