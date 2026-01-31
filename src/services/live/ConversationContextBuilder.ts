@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
@@ -28,7 +28,9 @@ export type ConversationContext = {
   }>;
 
   /** Explicitly called action by the frontend */
-  explicitAction?: StageAction | GlobalAction | null;
+  actions: Record<string, {
+    parameters: Record<string, any>
+  }>;
 
   /** User input that triggered processing (can be null if not triggered by user input) */
   userInput?: string;
@@ -52,7 +54,7 @@ export type ConversationContext = {
  */
 @singleton()
 export class ConversationContextBuilder {
-  async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, vars: Record<string, any>): Promise<ConversationContext> {
+  async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: eq(users.id, conversation.userId),
@@ -62,10 +64,13 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       stageId: conversation.stageId,
-      vars,
+      vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: user?.profile || {},
       history: [],
       command: action,
+      actions: {
+        [action.name]: { parameters },
+      },
       results: {
         webhooks: {},
         tools: {},
@@ -101,10 +106,10 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       stageId: conversation.stageId,
-      vars: {},
+      vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: user?.profile || {},
       history: [],
-      command: null,
+      actions: {}, // Convert classification results to actions later
       userInput,
       originalUserInput,
       results: {

@@ -203,7 +203,7 @@ export class ConversationRunner {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
             const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, fullText, fullText);
             context.userInputSource = 'voice';
-            await this.processUserInput(context);
+            await this.processUserInput(fullText, 'voice');
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
           }
@@ -410,9 +410,7 @@ export class ConversationRunner {
       throw new Error(`Cannot receive user input in current state: ${this.conversation.status}`);
     }
 
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, userInput, userInput);
-    context.userInputSource = 'text';
-    await this.processUserInput(context);
+    await this.processUserInput(userInput, 'text');
   }
 
   async startUserVoiceInput() {
@@ -787,9 +785,10 @@ export class ConversationRunner {
    * Processes user input (text or voice) and advances the conversation state
    * @param userInput The user input text to process
    */
-  private async processUserInput(context: ConversationContext) {
+  private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
     await this.changeState('processing_user_input');
-    const originalText = context.userInput;
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, userInput, userInput);
+    context.userInputSource = userInputSource;
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, context);
 
     const stageActions = this.stageData.stage.actions;
@@ -799,6 +798,11 @@ export class ConversationRunner {
         logger.warn({ conversationId: this.conversation.id, actionName: r.actionName }, `No matching action found for classification result ${r.actionName}`);
         return null;
       }
+      
+      // inject action with parameters into context
+      context.actions[stageAction.name] = {
+        parameters: r.entities,
+      };
       return stageAction;
     }).filter(a => a !== null) as StageAction[];
 
