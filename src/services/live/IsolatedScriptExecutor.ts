@@ -58,9 +58,12 @@ export class IsolatedScriptExecutor {
       await jail.set('projectId', new ivm.ExternalCopy(context.projectId).copyInto());
       await jail.set('stageId', new ivm.ExternalCopy(context.stageId).copyInto());
       await jail.set('history', new ivm.ExternalCopy(context.history).copyInto());
-      await jail.set('explicitAction', new ivm.ExternalCopy(context.explicitAction).copyInto());
+      await jail.set('actions', new ivm.ExternalCopy(context.actions).copyInto());
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
       await jail.set('userProfile', new ivm.ExternalCopy(context.userProfile).copyInto());
+      await jail.set('userInput', new ivm.ExternalCopy(context.userInput || null).copyInto());
+      await jail.set('originalUserInput', new ivm.ExternalCopy(context.originalUserInput || null).copyInto());
+      await jail.set('results', new ivm.ExternalCopy(context.results).copyInto());
 
       // Inject console.log, console.error, console.warn
       await jail.set('console', new ivm.ExternalCopy({
