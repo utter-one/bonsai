@@ -4,7 +4,7 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
-import type { AbortConversationOperation, CallToolOperation, CallWebhookOperation, EndConversationOperation, GoToStageOperation, ModifyUserInputOperation, ModifyUserProfileOperation, ModifyVariablesOperation, Operation, RunScriptOperation, StageAction } from '../../types/actions';
+import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GoToStageEffect, ModifyUserInputEffect, ModifyUserProfileEffect, ModifyVariablesEffect, Effect, RunScriptEffect, StageAction } from '../../types/actions';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 
@@ -25,9 +25,9 @@ export type ActionsExecutionOutcome = {
 };
 
 /**
- * Outcome of an operation execution
+ * Outcome of an effect execution
  */
-export type OperationOutcome = {
+export type EffectOutcome = {
     shouldEndConversation: boolean;
     endReason?: string;
     shouldAbortConversation: boolean;
@@ -39,18 +39,18 @@ export type OperationOutcome = {
   };
 
 /**
- * Operation with its source action for tracking
+ * Effect with its source action for tracking
  */
-type OperationWithSource = {
-  operation: Operation;
+type EffectWithSource = {
+  effect: Effect;
   actionName: string;
   actionIndex: number;
 };
 
 
 /**
- * Service responsible for executing operations defined in stage actions and global actions
- * Handles all operation types: end_conversation, abort_conversation, go_to_stage, run_script, modify_user_input, call_tool
+ * Service responsible for executing effects defined in stage actions and global actions
+ * Handles all effect types: end_conversation, abort_conversation, go_to_stage, run_script, modify_user_input, call_tool
  */
 @injectable()
 export class ActionsExecutor {
@@ -74,13 +74,13 @@ export class ActionsExecutor {
   }
 
   /**
-   * Gets the execution priority for an operation type
+   * Gets the execution priority for an effect type
    * Lower numbers execute first
-   * @param operation - The operation to get priority for
+   * @param effect - The effect to get priority for
    * @returns Priority number (1-7)
    */
-  private getOperationPriority(operation: Operation): number {
-    switch (operation.type) {
+  private getEffectPriority(effect: Effect): number {
+    switch (effect.type) {
       case 'call_webhook':
         return 1;
       case 'call_tool':
@@ -100,97 +100,97 @@ export class ActionsExecutor {
       case 'go_to_stage':
         return 9;
       default:
-        return 999; // Unknown operations execute last
+        return 999; // Unknown effects execute last
     }
   }
 
   /**
-   * Detects and resolves conflicts between operations
-   * @param operations - Array of operations to check for conflicts
-   * @returns Resolved operations with conflicts handled
+   * Detects and resolves conflicts between effects
+   * @param effects - Array of effects to check for conflicts
+   * @returns Resolved effects with conflicts handled
    */
-  private resolveOperationConflicts(operations: OperationWithSource[]): OperationWithSource[] {
-    const resolvedOperations: OperationWithSource[] = [];
+  private resolveEffectConflicts(effects: EffectWithSource[]): EffectWithSource[] {
+    const resolvedEffects: EffectWithSource[] = [];
     const conflicts: string[] = [];
 
-    // Group operations by type for conflict detection
-    const goToStageOps = operations.filter(op => op.operation.type === 'go_to_stage');
-    const endConversationOps = operations.filter(op => op.operation.type === 'end_conversation');
-    const abortConversationOps = operations.filter(op => op.operation.type === 'abort_conversation');
-    const modifyUserInputOps = operations.filter(op => op.operation.type === 'modify_user_input');
+    // Group effects by type for conflict detection
+    const goToStageOps = effects.filter(op => op.effect.type === 'go_to_stage');
+    const endConversationOps = effects.filter(op => op.effect.type === 'end_conversation');
+    const abortConversationOps = effects.filter(op => op.effect.type === 'abort_conversation');
+    const modifyUserInputOps = effects.filter(op => op.effect.type === 'modify_user_input');
 
-    // Conflict 1: Multiple go_to_stage operations with different stage IDs
+    // Conflict 1: Multiple go_to_stage effects with different stage IDs
     if (goToStageOps.length > 1) {
-      const stageIds = goToStageOps.map(op => (op.operation as Extract<Operation, { type: 'go_to_stage' }>).stageId);
+      const stageIds = goToStageOps.map(op => (op.effect as Extract<Effect, { type: 'go_to_stage' }>).stageId);
       const uniqueStageIds = new Set(stageIds);
       
       if (uniqueStageIds.size > 1) {
         // Multiple different stage IDs - keep only the first one
         const firstOp = goToStageOps[0];
-        conflicts.push(`Multiple go_to_stage operations with different IDs detected (${Array.from(uniqueStageIds).join(', ')}). Using first: ${(firstOp.operation as Extract<Operation, { type: 'go_to_stage' }>).stageId} from action "${firstOp.actionName}"`);
+        conflicts.push(`Multiple go_to_stage effects with different IDs detected (${Array.from(uniqueStageIds).join(', ')}). Using first: ${(firstOp.effect as Extract<Effect, { type: 'go_to_stage' }>).stageId} from action "${firstOp.actionName}"`);
         
-        // Remove all but the first go_to_stage operation
-        const otherOps = operations.filter(op => op.operation.type !== 'go_to_stage');
-        resolvedOperations.push(...otherOps, firstOp);
+        // Remove all but the first go_to_stage effect
+        const otherOps = effects.filter(op => op.effect.type !== 'go_to_stage');
+        resolvedEffects.push(...otherOps, firstOp);
       } else {
         // Same stage ID - keep only one instance
-        conflicts.push(`Multiple go_to_stage operations with same ID detected. Using first occurrence from action "${goToStageOps[0].actionName}"`);
-        const otherOps = operations.filter(op => op.operation.type !== 'go_to_stage');
-        resolvedOperations.push(...otherOps, goToStageOps[0]);
+        conflicts.push(`Multiple go_to_stage effects with same ID detected. Using first occurrence from action "${goToStageOps[0].actionName}"`);
+        const otherOps = effects.filter(op => op.effect.type !== 'go_to_stage');
+        resolvedEffects.push(...otherOps, goToStageOps[0]);
       }
     } else {
-      resolvedOperations.push(...operations);
+      resolvedEffects.push(...effects);
     }
 
     // Conflict 2: Both abort_conversation and end_conversation present
     if (abortConversationOps.length > 0 && endConversationOps.length > 0) {
-      // Abort takes precedence - remove all end_conversation operations
+      // Abort takes precedence - remove all end_conversation effects
       const firstAbort = abortConversationOps[0];
       conflicts.push(`Both abort_conversation and end_conversation detected. Prioritizing abort_conversation from action "${firstAbort.actionName}" - conversation will abort immediately`);
       
-      resolvedOperations.splice(0, resolvedOperations.length);
-      resolvedOperations.push(...operations.filter(op => op.operation.type !== 'end_conversation'));
+      resolvedEffects.splice(0, resolvedEffects.length);
+      resolvedEffects.push(...effects.filter(op => op.effect.type !== 'end_conversation'));
     }
 
-    // Conflict 3: Multiple abort_conversation operations
+    // Conflict 3: Multiple abort_conversation effects
     if (abortConversationOps.length > 1) {
       const firstAbort = abortConversationOps[0];
-      conflicts.push(`Multiple abort_conversation operations detected. Using first from action "${firstAbort.actionName}"`);
+      conflicts.push(`Multiple abort_conversation effects detected. Using first from action "${firstAbort.actionName}"`);
       
-      resolvedOperations.splice(0, resolvedOperations.length);
-      const otherOps = operations.filter(op => op.operation.type !== 'abort_conversation');
-      resolvedOperations.push(...otherOps, firstAbort);
+      resolvedEffects.splice(0, resolvedEffects.length);
+      const otherOps = effects.filter(op => op.effect.type !== 'abort_conversation');
+      resolvedEffects.push(...otherOps, firstAbort);
     }
 
-    // Conflict 4: Multiple end_conversation operations
+    // Conflict 4: Multiple end_conversation effects
     if (endConversationOps.length > 1 && abortConversationOps.length === 0) {
       const firstEnd = endConversationOps[0];
-      conflicts.push(`Multiple end_conversation operations detected. Using first from action "${firstEnd.actionName}"`);
+      conflicts.push(`Multiple end_conversation effects detected. Using first from action "${firstEnd.actionName}"`);
       
-      if (resolvedOperations.length === 0) {
-        resolvedOperations.push(...operations);
+      if (resolvedEffects.length === 0) {
+        resolvedEffects.push(...effects);
       }
-      const otherOps = resolvedOperations.filter(op => op.operation.type !== 'end_conversation');
-      resolvedOperations.splice(0, resolvedOperations.length);
-      resolvedOperations.push(...otherOps, firstEnd);
+      const otherOps = resolvedEffects.filter(op => op.effect.type !== 'end_conversation');
+      resolvedEffects.splice(0, resolvedEffects.length);
+      resolvedEffects.push(...otherOps, firstEnd);
     }
 
-    // Conflict 5: Multiple modify_user_input operations - this is NOT a conflict, they chain
+    // Conflict 5: Multiple modify_user_input effects - this is NOT a conflict, they chain
     if (modifyUserInputOps.length > 1) {
-      logger.debug(`Multiple modify_user_input operations detected (${modifyUserInputOps.length}). These will chain - each modifying the result of the previous`);
+      logger.debug(`Multiple modify_user_input effects detected (${modifyUserInputOps.length}). These will chain - each modifying the result of the previous`);
     }
 
     // Log all conflicts detected
     if (conflicts.length > 0) {
-      logger.warn({ conflicts }, `Resolved ${conflicts.length} operation conflict(s)`);
+      logger.warn({ conflicts }, `Resolved ${conflicts.length} effect conflict(s)`);
     }
 
-    return resolvedOperations.length > 0 ? resolvedOperations : operations;
+    return resolvedEffects.length > 0 ? resolvedEffects : effects;
   }
 
   /**
-   * Executes all operations for a list of actions
-   * Gathers all operations from all actions, sorts by priority, resolves conflicts, and executes in order
+   * Executes all effects for a list of actions
+   * Gathers all effects from all actions, sorts by priority, resolves conflicts, and executes in order
    * @param actions - Array of actions to execute (can be stage actions or global actions)
    * @param runner - The conversation runner instance
    * @param context - Execution context
@@ -202,32 +202,32 @@ export class ActionsExecutor {
   ): Promise<ActionsExecutionOutcome> {
     logger.info({ conversationId: context.conversationId, actionCount: actions.length }, `Executing ${actions.length} action(s)`);
 
-    // Gather all operations from all actions with their source information
-    const allOperations: OperationWithSource[] = [];
+    // Gather all effects from all actions with their source information
+    const allEffects: EffectWithSource[] = [];
     for (let i = 0; i < actions.length; i++) {
       const action = actions[i];
       const actionName = this.getActionName(action);
       
-      for (const operation of action.operations) {
-        allOperations.push({
-          operation,
+      for (const effect of action.effects) {
+        allEffects.push({
+          effect,
           actionName,
           actionIndex: i,
         });
       }
     }
 
-    logger.info({ conversationId: context.conversationId, totalOperations: allOperations.length }, `Gathered ${allOperations.length} operation(s) from ${actions.length} action(s)`);
+    logger.info({ conversationId: context.conversationId, totalEffects: allEffects.length }, `Gathered ${allEffects.length} effect(s) from ${actions.length} action(s)`);
 
-    // Sort all operations by priority (lower numbers execute first)
-    let sortedOperations = allOperations.sort(
-      (a, b) => this.getOperationPriority(a.operation) - this.getOperationPriority(b.operation)
+    // Sort all effects by priority (lower numbers execute first)
+    let sortedEffects = allEffects.sort(
+      (a, b) => this.getEffectPriority(a.effect) - this.getEffectPriority(b.effect)
     );
 
-    // Resolve conflicts between operations
-    sortedOperations = this.resolveOperationConflicts(sortedOperations);
+    // Resolve conflicts between effects
+    sortedEffects = this.resolveEffectConflicts(sortedEffects);
 
-    logger.debug({ conversationId: context.conversationId, operationOrder: sortedOperations.map(op => ({ type: op.operation.type, action: op.actionName })) }, `Executing operations in global priority order after conflict resolution`);
+    logger.debug({ conversationId: context.conversationId, effectOrder: sortedEffects.map(op => ({ type: op.effect.type, action: op.actionName })) }, `Executing effects in global priority order after conflict resolution`);
 
     // Track results
     const outcome: ActionsExecutionOutcome = {
@@ -242,169 +242,169 @@ export class ActionsExecutor {
     let currentContext = { ...context };
     let shouldStop = false;
 
-    // Execute all operations in priority order
-    for (const { operation, actionName, actionIndex } of sortedOperations) {
+    // Execute all effects in priority order
+    for (const { effect, actionName, actionIndex } of sortedEffects) {
       if (shouldStop) {
-        logger.debug({ conversationId: context.conversationId, operationType: operation.type, actionName }, `Skipping operation due to conversation termination`);
+        logger.debug({ conversationId: context.conversationId, effectType: effect.type, actionName }, `Skipping effect due to conversation termination`);
         continue;
       }
 
-      logger.debug({ conversationId: context.conversationId, actionName, operationType: operation.type }, `Executing operation: ${operation.type} from action: ${actionName}`);
+      logger.debug({ conversationId: context.conversationId, actionName, effectType: effect.type }, `Executing effect: ${effect.type} from action: ${actionName}`);
 
       try {
-        const operationResult = await this.executeOperation(operation, currentContext);
+        const effectResult = await this.executeEffect(effect, currentContext);
 
         // Update context with modified user input if applicable
-        if (operationResult.hasModifiedUserInput) {
+        if (effectResult.hasModifiedUserInput) {
           outcome.hasModifiedUserInput = true;
         }
 
         // Update modified variables in context if applicable
-        if (operationResult.hasModifiedVars) {
+        if (effectResult.hasModifiedVars) {
           outcome.hasModifiedVars = true;
         }
 
         // Update modified user profile in context if applicable
-        if (operationResult.hasModifiedUserProfile) {
+        if (effectResult.hasModifiedUserProfile) {
           outcome.hasModifiedUserProfile = true;
         }
 
-        // Check if operation resulted in stage change
-        if (operationResult.newStageId) {
-          outcome.goToStageId = operationResult.newStageId;
+        // Check if effect resulted in stage change
+        if (effectResult.newStageId) {
+          outcome.goToStageId = effectResult.newStageId;
         }
 
-        // Check if operation resulted in conversation termination
-        if (operationResult.shouldEndConversation) {
+        // Check if effect resulted in conversation termination
+        if (effectResult.shouldEndConversation) {
 
           outcome.shouldEndConversation = true;
-          outcome.endReason = operationResult.endReason;
+          outcome.endReason = effectResult.endReason;
           shouldStop = true;
-          logger.info({ conversationId: context.conversationId, actionName, endReason: operationResult.endReason }, `Conversation will end gracefully - skipping remaining operations`);
+          logger.info({ conversationId: context.conversationId, actionName, endReason: effectResult.endReason }, `Conversation will end gracefully - skipping remaining effects`);
         }
 
-        if (operationResult.shouldAbortConversation) {
+        if (effectResult.shouldAbortConversation) {
           outcome.shouldAbortConversation = true;
-          outcome.abortReason = operationResult.abortReason;
+          outcome.abortReason = effectResult.abortReason;
           shouldStop = true;
-          logger.info({ conversationId: context.conversationId, actionName, abortReason: operationResult.abortReason }, `Conversation will abort immediately - skipping remaining operations`);
+          logger.info({ conversationId: context.conversationId, actionName, abortReason: effectResult.abortReason }, `Conversation will abort immediately - skipping remaining effects`);
         }
       } catch (error) {
         outcome.success = false;
         outcome.error = error instanceof Error ? error.message : String(error);
-        logger.error({ conversationId: context.conversationId, actionName, operationType: operation.type, error: outcome.error }, `Failed to execute operation: ${operation.type}`);
-        // Continue executing other operations even if one fails?
+        logger.error({ conversationId: context.conversationId, actionName, effectType: effect.type, error: outcome.error }, `Failed to execute effect: ${effect.type}`);
+        // Continue executing other effects even if one fails?
       }
     }
 
-    logger.info({ conversationId: context.conversationId, executedOperations: sortedOperations.length, actionCount: actions.length }, `Completed execution of operations from ${actions.length} action(s)`);
+    logger.info({ conversationId: context.conversationId, executedEffects: sortedEffects.length, actionCount: actions.length }, `Completed execution of effects from ${actions.length} action(s)`);
     return outcome;
   }
 
   /**
-   * Executes a single operation based on its type
-   * @param operation - The operation to execute
+   * Executes a single effect based on its type
+   * @param effect - The effect to execute
    * @param runner - The conversation runner instance
    * @param context - Execution context
    * @returns Result indicating if conversation should end/abort and any modified user input
    */
-  private async executeOperation(
-    operation: Operation,
+  private async executeEffect(
+    effect: Effect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    switch (operation.type) {
+  ): Promise<EffectOutcome> {
+    switch (effect.type) {
       case 'end_conversation':
-        return await this.executeEndConversation(operation, context);
+        return await this.executeEndConversation(effect, context);
 
       case 'abort_conversation':
-        return await this.executeAbortConversation(operation, context);
+        return await this.executeAbortConversation(effect, context);
 
       case 'go_to_stage':
-        return await this.executeGoToStage(operation, context);
+        return await this.executeGoToStage(effect, context);
 
       case 'run_script':
-        return await this.executeRunScript(operation, context);
+        return await this.executeRunScript(effect, context);
 
       case 'modify_user_input':
-        return await this.executeModifyUserInput(operation, context);
+        return await this.executeModifyUserInput(effect, context);
 
       case 'modify_variables':
-        return await this.executeModifyVariables(operation, context);
+        return await this.executeModifyVariables(effect, context);
 
       case 'modify_user_profile':
-        return await this.executeModifyUserProfile(operation, context);
+        return await this.executeModifyUserProfile(effect, context);
 
       case 'call_tool':
-        return await this.executeCallTool(operation, context);
+        return await this.executeCallTool(effect, context);
 
       case 'call_webhook':
-        return await this.executeCallWebhook(operation, context);
+        return await this.executeCallWebhook(effect, context);
 
       default:
-        throw new Error(`Unknown operation`);
+        throw new Error(`Unknown effect`);
     }
   }
 
   /**
-   * Executes end_conversation operation
+   * Executes end_conversation effect
    */
   private async executeEndConversation(
-    operation: EndConversationOperation,
+    effect: EndConversationEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Ending conversation gracefully`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, reason: effect.reason }, `Ending conversation gracefully`);
     return {
       shouldEndConversation: true,
       shouldAbortConversation: false,
-      endReason: operation.reason,
+      endReason: effect.reason,
     };
   }
 
   /**
-   * Executes abort_conversation operation
+   * Executes abort_conversation effect
    */
   private async executeAbortConversation(
-    operation: AbortConversationOperation,
+    effect: AbortConversationEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, reason: operation.reason }, `Aborting conversation immediately`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, reason: effect.reason }, `Aborting conversation immediately`);
     return {
       shouldEndConversation: false,
       shouldAbortConversation: true,
-      abortReason: operation.reason,
+      abortReason: effect.reason,
     };
   }
 
   /**
-   * Executes go_to_stage operation
+   * Executes go_to_stage effect
    */
   private async executeGoToStage(
-    operation: GoToStageOperation,
+    effect: GoToStageEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, targetStageId: operation.stageId, currentStageId: context.stageId }, `Navigating to stage: ${operation.stageId}`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, targetStageId: effect.stageId, currentStageId: context.stageId }, `Navigating to stage: ${effect.stageId}`);
 
     // Update context with new stage ID
-    context.stageId = operation.stageId;
+    context.stageId = effect.stageId;
 
-    logger.info({ conversationId: context.conversationId, newStageId: operation.stageId }, `Successfully navigated to stage: ${operation.stageId}`);
+    logger.info({ conversationId: context.conversationId, newStageId: effect.stageId }, `Successfully navigated to stage: ${effect.stageId}`);
 
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,
-      newStageId: operation.stageId,
+      newStageId: effect.stageId,
     };
   }
 
   /**
-   * Executes run_script operation
+   * Executes run_script effect
    * Delegates to StageScriptRunner for secure script execution in isolated VM
    */
   private async executeRunScript(
-    operation: RunScriptOperation,
+    effect: RunScriptEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    await this.scriptRunner.executeScript(operation.code, context);
+  ): Promise<EffectOutcome> {
+    await this.scriptRunner.executeScript(effect.code, context);
 
     return {
       shouldEndConversation: false,
@@ -413,18 +413,18 @@ export class ActionsExecutor {
   }
 
   /**
-   * Executes modify_user_input operation
+   * Executes modify_user_input effect
    * Renders a template using TemplatingEngine and replaces the user input with it
    */
   private async executeModifyUserInput(
-    operation: ModifyUserInputOperation,
+    effect: ModifyUserInputEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, originalInput: context.userInput, template: operation.template }, `Modifying user input`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, originalInput: context.userInput, template: effect.template }, `Modifying user input`);
 
     try {
       // Render the template using the templating engine with full context
-      const modifiedInput = await this.templatingEngine.render(operation.template, context);
+      const modifiedInput = await this.templatingEngine.render(effect.template, context);
 
       logger.info({ conversationId: context.conversationId, originalInput: context.userInput, modifiedInput }, `User input modified`);
 
@@ -440,18 +440,18 @@ export class ActionsExecutor {
   }
 
   /**
-   * Executes modify_variables operation
+   * Executes modify_variables effect
    * Updates stage variables using specific operations (set, reset, add, remove)
    */
   private async executeModifyVariables(
-    operation: ModifyVariablesOperation,
+    effect: ModifyVariablesEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: operation.modifications.length }, `Modifying variables`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: effect.modifications.length }, `Modifying variables`);
     let hasModifiedVars = false;
 
     try {
-      for (const modification of operation.modifications) {
+      for (const modification of effect.modifications) {
         const { variableName, operation: op, value } = modification;
 
         switch (op) {
@@ -502,7 +502,7 @@ export class ActionsExecutor {
         }
       }
 
-      logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: operation.modifications.length }, `Variables modified successfully`);
+      logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: effect.modifications.length }, `Variables modified successfully`);
     } catch (error) {
       logger.error({ conversationId: context.conversationId, stageId: context.stageId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify variables`);
       throw error;
@@ -516,18 +516,18 @@ export class ActionsExecutor {
   }
 
   /**
-   * Executes modify_user_profile operation
+   * Executes modify_user_profile effect
    * Updates user profile fields using specific operations (set, reset, add, remove)
    */
   private async executeModifyUserProfile(
-    operation: ModifyUserProfileOperation,
+    effect: ModifyUserProfileEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, modificationCount: operation.modifications.length }, `Modifying user profile`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, modificationCount: effect.modifications.length }, `Modifying user profile`);
     let hasModifiedUserProfile = false;
 
     try {
-      for (const modification of operation.modifications) {
+      for (const modification of effect.modifications) {
         const { fieldName, value } = modification;
 
         switch (modification.operation) {
@@ -578,7 +578,7 @@ export class ActionsExecutor {
         }
       }
 
-      logger.info({ conversationId: context.conversationId, modificationCount: operation.modifications.length }, `User profile modified successfully`);
+      logger.info({ conversationId: context.conversationId, modificationCount: effect.modifications.length }, `User profile modified successfully`);
     } catch (error) {
       logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user profile`);
       throw error;
@@ -592,18 +592,18 @@ export class ActionsExecutor {
   }
 
   /**
-   * Executes call_tool operation
+   * Executes call_tool effect
    * Calls a tool with the specified parameters and stores the result
    */
   private async executeCallTool(
-    operation: CallToolOperation,
+    effect: CallToolEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, toolId: operation.toolId, parameterCount: Object.keys(operation.parameters).length }, `Calling tool: ${operation.toolId}`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
 
     try {
       // Load the tool
-      const tool = await this.toolService.getToolById(operation.toolId);
+      const tool = await this.toolService.getToolById(effect.toolId);
 
       // TODO: Implement actual tool execution logic
       // This would involve:
@@ -612,11 +612,11 @@ export class ActionsExecutor {
       // 3. Storing the result in context or variables
       // 4. Validating output against tool.outputType
 
-      logger.warn({ conversationId: context.conversationId, toolId: operation.toolId }, `Tool execution not yet fully implemented`);
+      logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool execution not yet fully implemented`);
 
-      logger.info({ conversationId: context.conversationId, toolId: operation.toolId }, `Tool called successfully: ${tool.name}`);
+      logger.info({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool called successfully: ${tool.name}`);
     } catch (error) {
-      logger.error({ conversationId: context.conversationId, toolId: operation.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
+      logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
       throw error;
     }
 
@@ -627,39 +627,39 @@ export class ActionsExecutor {
   }
 
   /**
-   * Executes call_webhook operation
+   * Executes call_webhook effect
    * Calls an HTTP(S) endpoint and stores the result in conversation context
    */
   private async executeCallWebhook(
-    operation: CallWebhookOperation,
+    effect: CallWebhookEffect,
     context: ConversationContext,
-  ): Promise<OperationOutcome> {
-    logger.info({ conversationId: context.conversationId, url: operation.url, method: operation.method || 'GET', resultKey: operation.resultKey }, `Calling webhook: ${operation.url}`);
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, url: effect.url, method: effect.method || 'GET', resultKey: effect.resultKey }, `Calling webhook: ${effect.url}`);
 
     try {
       // Render URL through templating engine
-      const renderedUrl = await this.templatingEngine.render(operation.url, context);
+      const renderedUrl = await this.templatingEngine.render(effect.url, context);
 
       // Render headers through templating engine
       const renderedHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (operation.headers) {
-        for (const [key, value] of Object.entries(operation.headers)) {
+      if (effect.headers) {
+        for (const [key, value] of Object.entries(effect.headers)) {
           renderedHeaders[key] = await this.templatingEngine.render(value, context);
         }
       }
 
       // Prepare fetch options
       const fetchOptions: RequestInit = {
-        method: operation.method || 'GET',
+        method: effect.method || 'GET',
         headers: renderedHeaders,
       };
 
       // Add body for POST/PUT/PATCH requests
-      if (operation.body && ['POST', 'PUT', 'PATCH'].includes(operation.method || 'GET')) {
+      if (effect.body && ['POST', 'PUT', 'PATCH'].includes(effect.method || 'GET')) {
         // Render body through templating engine
-        const bodyString = typeof operation.body === 'string' ? operation.body : JSON.stringify(operation.body);
+        const bodyString = typeof effect.body === 'string' ? effect.body : JSON.stringify(effect.body);
         const renderedBody = await this.templatingEngine.render(bodyString, context);
         fetchOptions.body = renderedBody;
       }
@@ -690,16 +690,16 @@ export class ActionsExecutor {
         headersObj[key] = value;
       });
       
-      context.results.webhooks[operation.resultKey] = {
+      context.results.webhooks[effect.resultKey] = {
         status: response.status,
         statusText: response.statusText,
         headers: headersObj,
         data: result,
       };
 
-      logger.info({ conversationId: context.conversationId, url: operation.url, status: response.status, resultKey: operation.resultKey }, `Webhook called successfully and result stored`);
+      logger.info({ conversationId: context.conversationId, url: effect.url, status: response.status, resultKey: effect.resultKey }, `Webhook called successfully and result stored`);
     } catch (error) {
-      logger.error({ conversationId: context.conversationId, url: operation.url, error: error instanceof Error ? error.message : String(error) }, `Failed to call webhook`);
+      logger.error({ conversationId: context.conversationId, url: effect.url, error: error instanceof Error ? error.message : String(error) }, `Failed to call webhook`);
       throw error;
     }
 

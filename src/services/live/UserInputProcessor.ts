@@ -64,7 +64,7 @@ export class UserInputProcessor {
           input: context.userInput,
           actions: result.actions.map(action => ({
             name: action.actionName,
-            operations: [],
+            effects: [],
           })) as any,
           metadata: {
             classifierName: result.classifierName,

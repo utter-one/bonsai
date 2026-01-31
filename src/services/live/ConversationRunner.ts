@@ -807,7 +807,7 @@ export class ConversationRunner {
       const actionEventData: ActionEventData = {
         actionName: action.name || '',
         stageId: this.stageData.id,
-        operations: action.operations,
+        effects: action.effects,
       };
       await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
     }

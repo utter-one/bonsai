@@ -395,7 +395,7 @@ Represents global user actions that can be triggered at any point during a conve
 | `name` | String | Not Null | Display name of the action |
 | `condition` | String | Nullable | Optional condition expression for action activation |
 | `promptTrigger` | String | Not Null | Description of when this action should be triggered |
-| `operations` | JSON Array | Not Null, Default: `[]` | Array of operations to execute |
+| `effects` | JSON Array | Not Null, Default: `[]` | Array of effects to execute |
 | `template` | String | Nullable | Optional message template for the action |
 | `examples` | JSON Array | Nullable | Example phrases that trigger this action |
 | `metadata` | JSON Object | Nullable | Additional action-specific data |
@@ -403,7 +403,7 @@ Represents global user actions that can be triggered at any point during a conve
 | `createdAt` | Timestamp | Auto-managed | Record creation timestamp |
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
-### Action Operations
+### Action Effects
 - 'ai_response' - generate AI response (voice)
 - 'modify_variables' - modify one or more stage variables
 - 'modify_utterance' - modify user utterance

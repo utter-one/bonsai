@@ -3,26 +3,26 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
 import {
-  operationSchema,
-  endConversationOperationSchema,
-  abortConversationOperationSchema,
-  goToStageOperationSchema,
-  runScriptOperationSchema,
-  modifyUserInputOperationSchema,
-  modifyVariablesOperationSchema,
+  effectSchema,
+  endConversationEffectSchema,
+  abortConversationEffectSchema,
+  goToStageEffectSchema,
+  runScriptEffectSchema,
+  modifyUserInputEffectSchema,
+  modifyVariablesEffectSchema,
   variableOperationSchema,
-  callToolOperationSchema,
+  callToolEffectSchema,
 } from '../../types/actions';
 import type {
-  Operation,
-  EndConversationOperation,
-  AbortConversationOperation,
-  GoToStageOperation,
-  RunScriptOperation,
-  ModifyUserInputOperation,
-  ModifyVariablesOperation,
+  Effect,
+  EndConversationEffect,
+  AbortConversationEffect,
+  GoToStageEffect,
+  RunScriptEffect,
+  ModifyUserInputEffect,
+  ModifyVariablesEffect,
   VariableOperation,
-  CallToolOperation,
+  CallToolEffect,
 } from '../../types/actions';
 
 extendZodWithOpenApi(z);
@@ -34,32 +34,32 @@ export const globalActionRouteParamsSchema = z.object({
 });
 
 export {
-  operationSchema,
-  endConversationOperationSchema,
-  abortConversationOperationSchema,
-  goToStageOperationSchema,
-  runScriptOperationSchema,
-  modifyUserInputOperationSchema,
-  modifyVariablesOperationSchema,
+  effectSchema,
+  endConversationEffectSchema,
+  abortConversationEffectSchema,
+  goToStageEffectSchema,
+  runScriptEffectSchema,
+  modifyUserInputEffectSchema,
+  modifyVariablesEffectSchema,
   variableOperationSchema,
-  callToolOperationSchema,
+  callToolEffectSchema,
 };
 export type {
-  Operation,
-  EndConversationOperation,
-  AbortConversationOperation,
-  GoToStageOperation,
-  RunScriptOperation,
-  ModifyUserInputOperation,
-  ModifyVariablesOperation,
+  Effect,
+  EndConversationEffect,
+  AbortConversationEffect,
+  GoToStageEffect,
+  RunScriptEffect,
+  ModifyUserInputEffect,
+  ModifyVariablesEffect,
   VariableOperation,
-  CallToolOperation,
+  CallToolEffect,
 };
 
 /**
  * Schema for creating a new global action
  * Required fields: id, name, triggerOnUserInput, triggerOnClientCommand
- * Optional fields: condition, classificationTrigger, overrideClassifierId, operations, template, examples, metadata
+ * Optional fields: condition, classificationTrigger, overrideClassifierId, effects, template, examples, metadata
  */
 export const createGlobalActionSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the global action (auto-generated if not provided)'),
@@ -70,7 +70,7 @@ export const createGlobalActionSchema = z.object({
   triggerOnClientCommand: z.boolean().optional().default(false).describe('Whether this action should be triggered on client commands'),
   classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID to override the default classifier for this action'),
-  operations: z.array(operationSchema).optional().describe('Array of operations to execute when action is triggered'),
+  effects: z.array(effectSchema).optional().describe('Array of effects to execute when action is triggered'),
   template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional action-specific metadata'),
@@ -87,7 +87,7 @@ export const updateGlobalActionBodySchema = z.object({
   triggerOnClientCommand: z.boolean().optional().describe('Updated trigger on client command flag'),
   classificationTrigger: z.string().nullable().optional().describe('Updated classification trigger label'),
   overrideClassifierId: z.string().nullable().optional().describe('Updated override classifier ID'),
-  operations: z.array(operationSchema).optional().describe('Updated operations array'),
+  effects: z.array(effectSchema).optional().describe('Updated effects array'),
   template: z.string().nullable().optional().describe('Updated message template'),
   examples: z.array(z.string()).optional().describe('Updated example phrases'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
@@ -115,7 +115,7 @@ export const globalActionResponseSchema = z.object({
   triggerOnClientCommand: z.boolean().describe('Whether this action should be triggered on client commands'),
   classificationTrigger: z.string().nullable().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().describe('Optional classifier ID to override the default classifier'),
-  operations: z.array(operationSchema).describe('Array of operations to execute'),
+  effects: z.array(effectSchema).describe('Array of effects to execute'),
   template: z.string().nullable().describe('Message template for the action'),
   examples: z.array(z.string()).nullable().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),

@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { StageAction, Operation } from '../types/actions';
+import { StageAction, Effect } from '../types/actions';
 import { ConversationState } from '../services/live/ConversationRunner';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
@@ -37,7 +37,7 @@ export type ClassificationEventData = {
 export type ActionEventData = {
   actionName: string;
   stageId: string;
-  operations: Operation[];
+  effects: Effect[];
   metadata?: Record<string, any>;
 };
 
@@ -291,7 +291,7 @@ export const globalActions = pgTable('global_actions', {
   triggerOnClientCommand: boolean('trigger_on_client_command').notNull().default(false),
   classificationTrigger: text('classification_trigger'),
   overrideClassifierId: text('override_classifier_id'),
-  operations: jsonb('operations').notNull().default([]).$type<Operation[]>(),
+  effects: jsonb('effects').notNull().default([]).$type<Effect[]>(),
   template: text('template'),
   examples: jsonb('examples').$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
