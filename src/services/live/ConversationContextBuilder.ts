@@ -2,7 +2,7 @@ import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
-import { Conversation, GlobalAction, MessageEventData } from "../../types/models";
+import { Conversation, GlobalAction, MessageEventData, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
 
 export type ConversationContext = {
@@ -54,6 +54,24 @@ export type ConversationContext = {
  */
 @singleton()
 export class ConversationContextBuilder {
+  async buildContextForClassifier(conversation: Conversation, stage: Stage): Promise<ConversationContext> {
+    const context: ConversationContext = {
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      stageId: conversation.stageId,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      userProfile: {},
+      history: [],
+      actions: {},
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+    };
+
+    return context;
+  }
+
   async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({

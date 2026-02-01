@@ -206,6 +206,9 @@ export const contextTransformers = pgTable('context_transformers', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export type ToolInputType = 'text' | 'image' | 'multi-modal';
+export type ToolOutputType = 'text' | 'image' | 'multi-modal';
+
 // Tool table
 export const tools = pgTable('tools', {
   id: text('id').primaryKey(),
@@ -215,8 +218,8 @@ export const tools = pgTable('tools', {
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
   llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
-  inputType: text('input_type').notNull(),
-  outputType: text('output_type').notNull(),
+  inputType: text('input_type').$type<ToolInputType>().notNull(),
+  outputType: text('output_type').$type<ToolOutputType>().notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

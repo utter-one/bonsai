@@ -8,6 +8,18 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
+ * Schema for tool input types
+ * Defines the format of data the tool accepts
+ */
+export const toolInputTypeSchema = z.enum(['text', 'image', 'multi-modal']).describe('Type of input the tool accepts: text (plain text), image (image data), multi-modal (combination of text and images)');
+
+/**
+ * Schema for tool output types
+ * Defines the format of data the tool produces
+ */
+export const toolOutputTypeSchema = z.enum(['text', 'image', 'multi-modal']).describe('Type of output the tool produces: text (plain text), image (image data), multi-modal (combination of text and images)');
+
+/**
  * Schema for tool route parameters
  */
 export const toolRouteParamsSchema = z.object({
@@ -29,8 +41,8 @@ export const createToolSchema = z.object({
   prompt: z.string().min(1).describe('Handlebars template for tool invocation'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this tool'),
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this tool'),
-  inputType: z.string().min(1).describe('Expected input format ("text", "json", "image")'),
-  outputType: z.string().min(1).describe('Expected output format ("text", "json", "image")'),
+  inputType: toolInputTypeSchema.describe('Expected input format for the tool'),
+  outputType: toolOutputTypeSchema.describe('Expected output format from the tool'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional tool-specific metadata'),
 });
 
@@ -44,8 +56,8 @@ export const updateToolBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated tool prompt template'),
   llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
   llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
-  inputType: z.string().min(1).optional().describe('Updated input format'),
-  outputType: z.string().min(1).optional().describe('Updated output format'),
+  inputType: toolInputTypeSchema.optional().describe('Updated input format'),
+  outputType: toolOutputTypeSchema.optional().describe('Updated output format'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -70,8 +82,8 @@ export const toolResponseSchema = z.object({
   prompt: z.string().describe('Handlebars template for tool invocation'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
-  inputType: z.string().describe('Expected input format'),
-  outputType: z.string().describe('Expected output format'),
+  inputType: toolInputTypeSchema.describe('Expected input format'),
+  outputType: toolOutputTypeSchema.describe('Expected output format'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the tool was created'),
