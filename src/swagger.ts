@@ -20,7 +20,14 @@ import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironment
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
-import { listParamsSchema } from './http/contracts/common';
+import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
+import { voiceConfigSchema } from './http/contracts/persona';
+import { asrConfigSchema } from './http/contracts/project';
+import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, runScriptEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, callWebhookEffectSchema, stageActionSchema, stageActionParameterSchema } from './types/actions';
+import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
+import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
+import { anthropicLlmSettingsSchema } from './services/providers/llm/AnthropicLlmProvider';
+import { geminiLlmSettingsSchema } from './services/providers/llm/GeminiLlmProvider';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -48,7 +55,40 @@ extendZodWithOpenApi(z);
 export function getOpenAPISpec(): any {
   const registry = new OpenAPIRegistry();
 
-  // Register schemas
+  // Register common/reusable sub-schemas first (these will be referenced by other schemas)
+  // This prevents them from being inlined and makes them reusable across the API
+  
+  // Common schemas
+  registry.register('ListParams', listParamsSchema);
+  
+  // LLM settings schemas (provider-specific)
+  registry.register('OpenAILlmSettings', openAILlmSettingsSchema);
+  registry.register('OpenAILegacyLlmSettings', openAILegacyLlmSettingsSchema);
+  registry.register('AnthropicLlmSettings', anthropicLlmSettingsSchema);
+  registry.register('GeminiLlmSettings', geminiLlmSettingsSchema);
+  registry.register('LlmSettings', llmSettingsSchema);
+  
+  // Voice and ASR configuration schemas
+  registry.register('VoiceConfig', voiceConfigSchema);
+  registry.register('AsrConfig', asrConfigSchema);
+  
+  // Effect schemas (for stages and global actions)
+  registry.register('EndConversationEffect', endConversationEffectSchema);
+  registry.register('AbortConversationEffect', abortConversationEffectSchema);
+  registry.register('GoToStageEffect', goToStageEffectSchema);
+  registry.register('RunScriptEffect', runScriptEffectSchema);
+  registry.register('ModifyUserInputEffect', modifyUserInputEffectSchema);
+  registry.register('ModifyVariablesEffect', modifyVariablesEffectSchema);
+  registry.register('ModifyUserProfileEffect', modifyUserProfileEffectSchema);
+  registry.register('VariableOperation', variableOperationSchema);
+  registry.register('UserProfileOperation', userProfileOperationSchema);
+  registry.register('CallToolEffect', callToolEffectSchema);
+  registry.register('CallWebhookEffect', callWebhookEffectSchema);
+  registry.register('Effect', effectSchema);
+  registry.register('StageActionParameter', stageActionParameterSchema);
+  registry.register('StageAction', stageActionSchema);
+
+  // Register main API schemas
   registry.register('CreateAdminRequest', createAdminSchema);
   registry.register('UpdateAdminRequest', updateAdminBodySchema);
   registry.register('DeleteAdminRequest', deleteAdminBodySchema);
@@ -142,7 +182,6 @@ export function getOpenAPISpec(): any {
   registry.register('LlmProviderInfo', llmProviderInfoSchema);
   registry.register('AuditLogResponse', auditLogResponseSchema);
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
-  registry.register('ListParams', listParamsSchema);
 
   // Register Admin routes from AdminController
   const adminPaths = AdminController.getOpenAPIPaths();

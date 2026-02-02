@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+
+extendZodWithOpenApi(z);
 
 // Effect schemas and types for stage actions and global actions
 
@@ -9,7 +12,7 @@ import { z } from 'zod';
 export const endConversationEffectSchema = z.object({
   type: z.literal('end_conversation').describe('Effect type'),
   reason: z.string().optional().describe('Optional reason for ending the conversation'),
-});
+}).openapi('EndConversationEffect');
 
 /**
  * Effect type: Abort Conversation
@@ -18,7 +21,7 @@ export const endConversationEffectSchema = z.object({
 export const abortConversationEffectSchema = z.object({
   type: z.literal('abort_conversation').describe('Effect type'),
   reason: z.string().optional().describe('Optional reason for aborting the conversation'),
-});
+}).openapi('AbortConversationEffect');
 
 /**
  * Effect type: Go To Stage
@@ -27,7 +30,7 @@ export const abortConversationEffectSchema = z.object({
 export const goToStageEffectSchema = z.object({
   type: z.literal('go_to_stage').describe('Effect type'),
   stageId: z.string().min(1).describe('ID of the stage to switch to'),
-});
+}).openapi('GoToStageEffect');
 
 /**
  * Effect type: Run Script
@@ -36,7 +39,7 @@ export const goToStageEffectSchema = z.object({
 export const runScriptEffectSchema = z.object({
   type: z.literal('run_script').describe('Effect type'),
   code: z.string().min(1).describe('JavaScript code to execute in isolated context'),
-});
+}).openapi('RunScriptEffect');
 
 /**
  * Effect type: Modify User Input
@@ -45,7 +48,7 @@ export const runScriptEffectSchema = z.object({
 export const modifyUserInputEffectSchema = z.object({
   type: z.literal('modify_user_input').describe('Effect type'),
   template: z.string().min(1).describe('Template to render and replace user input with'),
-});
+}).openapi('ModifyUserInputEffect');
 
 /**
  * Schema for a single variable modification operation
@@ -54,7 +57,7 @@ export const variableOperationSchema = z.object({
   variableName: z.string().min(1).describe('Name of the variable to modify'),
   operation: z.enum(['set', 'reset', 'add', 'remove']).describe('Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)'),
   value: z.unknown().describe('Value for the operation (not used for reset operation)'),
-});
+}).openapi('VariableOperation');
 
 /**
  * Schema for a single user profile modification operation
@@ -63,7 +66,7 @@ export const userProfileOperationSchema = z.object({
   fieldName: z.string().min(1).describe('Name of the profile field to modify'),
   operation: z.enum(['set', 'reset', 'add', 'remove']).describe('Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)'),
   value: z.unknown().describe('Value for the operation (not used for reset operation)'),
-});
+}).openapi('UserProfileOperation');
 
 /**
  * Effect type: Modify Variables
@@ -72,7 +75,7 @@ export const userProfileOperationSchema = z.object({
 export const modifyVariablesEffectSchema = z.object({
   type: z.literal('modify_variables').describe('Effect type'),
   modifications: z.array(variableOperationSchema).min(1).describe('Array of variable modifications to apply'),
-});
+}).openapi('ModifyVariablesEffect');
 
 /**
  * Effect type: Modify User Profile
@@ -81,7 +84,7 @@ export const modifyVariablesEffectSchema = z.object({
 export const modifyUserProfileEffectSchema = z.object({
   type: z.literal('modify_user_profile').describe('Effect type'),
   modifications: z.array(userProfileOperationSchema).min(1).describe('Array of user profile field modifications to apply'),
-});
+}).openapi('ModifyUserProfileEffect');
 
 /**
  * Effect type: Call Tool
@@ -91,7 +94,7 @@ export const callToolEffectSchema = z.object({
   type: z.literal('call_tool').describe('Effect type'),
   toolId: z.string().min(1).describe('ID of the tool to call'),
   parameters: z.record(z.string(), z.unknown()).describe('Parameters to pass to the tool'),
-});
+}).openapi('CallToolEffect');
 
 /**
  * Effect type: Call Webhook
@@ -104,7 +107,7 @@ export const callWebhookEffectSchema = z.object({
   headers: z.record(z.string(), z.string()).optional().describe('HTTP headers to send with the request'),
   body: z.unknown().optional().describe('Request body for POST/PUT/PATCH requests'),
   resultKey: z.string().min(1).describe('Key name to store the webhook result under in context.results.webhooks'),
-});
+}).openapi('CallWebhookEffect');
 
 /**
  * Discriminated union of all effect types
@@ -120,7 +123,7 @@ export const effectSchema = z.discriminatedUnion('type', [
   modifyUserProfileEffectSchema,
   callToolEffectSchema,
   callWebhookEffectSchema,
-]);
+]).openapi('Effect');
 
 // Infer types from schemas
 export type EndConversationEffect = z.infer<typeof endConversationEffectSchema>;
@@ -158,7 +161,7 @@ export const stageActionParameterSchema = z.object({
   type: stageActionParameterTypeSchema.describe('Expected type of the parameter value'),
   description: z.string().min(1).describe('Description of what the parameter represents (helps with extraction)'),
   required: z.boolean().describe('Whether this parameter must be present in the user input'),
-});
+}).openapi('StageActionParameter');
 
 /**
  * Schema for a single stage action
@@ -176,7 +179,7 @@ export const stageActionSchema = z.object({
   template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
-});
+}).openapi('StageAction');
 
 export type StageActionParameterType = z.infer<typeof stageActionParameterTypeSchema>;
 export type StageActionParameter = z.infer<typeof stageActionParameterSchema>;

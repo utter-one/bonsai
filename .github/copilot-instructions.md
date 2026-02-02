@@ -121,6 +121,10 @@ export class ExampleController {
   - Export corresponding TypeScript types (e.g., `export type CreateAdminRequest = z.infer<typeof createAdminSchema>`)
   - Export route params schemas (e.g., `export const adminRouteParamsSchema = z.object({ id: z.string() })`)
   - Extend Zod with OpenAPI using `extendZodWithOpenApi(z)` at the top of each contract file
+  - **For reusable sub-schemas, add `.openapi('ComponentName')` to make them reusable $ref components**
+    - Example: `export const voiceConfigSchema = z.object({...}).openapi('VoiceConfig').optional()`
+    - This prevents schema inlining and creates clean, reusable components in OpenAPI spec
+    - Apply `.openapi()` BEFORE modifiers like `.optional()`, `.nullable()`, `.array()`, etc.
 - Call `schema.parse()` manually in each handler method:
   - For body: `const body = createSchema.parse(req.body)`
   - For query: `const query = listParamsSchema.parse(req.query)`
@@ -129,6 +133,13 @@ export class ExampleController {
 - Define OpenAPI documentation in `static getOpenAPIPaths()` method
 - **ALWAYS add tags to group endpoints by controller** (e.g., `tags: ['Admins']`, `tags: ['Users']`) - this organizes endpoints in Swagger UI
 - Swagger UI is available at /api-docs endpoint
+- **Register and mark reusable sub-schemas for OpenAPI:**
+  - Add `.openapi('ComponentName')` to sub-schema definitions to create reusable components
+  - Register these schemas in swagger.ts BEFORE main schemas to ensure proper $ref resolution
+  - Sub-schemas include: `VoiceConfig`, `AsrConfig`, `Effect`, `StageAction`, `StageActionParameter`, LLM settings, etc.
+  - Place sub-schema registrations at the top of the registry in `getOpenAPISpec()` function
+  - This prevents inlining and makes the OpenAPI spec cleaner and more maintainable
+  - Example registration: `registry.register('VoiceConfig', voiceConfigSchema);`
 
 ## OpenAPI Documentation
 - Define a static `getOpenAPIPaths()` method in the controller that returns `RouteConfig[]`

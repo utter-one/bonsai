@@ -30,7 +30,7 @@ export const voiceConfigSchema = z.object({
   useGlobalPreview: z.boolean().optional().describe('Use global preview endpoint for geographic proximity optimization'),
   inactivityTimeout: z.number().optional().describe('WebSocket inactivity timeout in seconds, defaults to 180'),
   useSentenceSplitter: z.boolean().optional().describe('Whether to use sentence splitter for text processing, defaults to true'),
-}).optional().describe('Voice configuration for TTS');
+}).optional().openapi('VoiceConfig').describe('Voice configuration for TTS');
 
 export type VoiceConfig = z.infer<typeof voiceConfigSchema>;
 
