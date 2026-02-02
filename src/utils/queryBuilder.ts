@@ -3,6 +3,27 @@ import type { ListFilter, ListFilterOperation } from '../http/contracts/common';
 import type { Logger } from 'pino';
 
 /**
+ * Converts a value to a Date object if it's an ISO 8601 string, otherwise returns the value as-is
+ * @param value - The value to potentially convert
+ * @returns Date object if value is an ISO string, otherwise the original value
+ */
+function convertToDateIfIsoString(value: any): any {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/.test(value)) {
+    return new Date(value);
+  }
+  return value;
+}
+
+/**
+ * Converts array values to Date objects if they are ISO 8601 strings
+ * @param values - Array of values to potentially convert
+ * @returns Array with ISO strings converted to Date objects
+ */
+function convertArrayToDateIfIsoString(values: any[]): any[] {
+  return values.map(convertToDateIfIsoString);
+}
+
+/**
  * Builds a SQL condition from a filter specification
  * @param field - The field name to filter on
  * @param filter - The filter value or operation
@@ -24,12 +45,12 @@ export function buildFilterCondition(
 
   // Handle simple value filters
   if (typeof filter === 'string' || typeof filter === 'number' || typeof filter === 'boolean') {
-    return eq(column, filter as any);
+    return eq(column, convertToDateIfIsoString(filter) as any);
   }
 
   // Handle array filters (IN operation)
   if (Array.isArray(filter)) {
-    return inArray(column as any, filter);
+    return inArray(column as any, convertArrayToDateIfIsoString(filter));
   }
 
   // Handle operation filters
@@ -37,26 +58,27 @@ export function buildFilterCondition(
     const operation = filter as ListFilterOperation;
     switch (operation.op) {
       case 'eq':
-        return eq(column, operation.value as any);
+        return eq(column, convertToDateIfIsoString(operation.value) as any);
       case 'ne':
-        return ne(column, operation.value as any);
+        return ne(column, convertToDateIfIsoString(operation.value) as any);
       case 'gt':
-        return gt(column as any, operation.value as any);
+        return gt(column as any, convertToDateIfIsoString(operation.value) as any);
       case 'gte':
-        return gte(column as any, operation.value as any);
+        return gte(column as any, convertToDateIfIsoString(operation.value) as any);
       case 'lt':
-        return lt(column as any, operation.value as any);
+        return lt(column as any, convertToDateIfIsoString(operation.value) as any);
       case 'lte':
-        return lte(column as any, operation.value as any);
+        return lte(column as any, convertToDateIfIsoString(operation.value) as any);
       case 'like':
         return like(column as any, operation.value as string);
       case 'in':
-        return inArray(column as any, operation.value as any[]);
+        return inArray(column as any, Array.isArray(operation.value) ? convertArrayToDateIfIsoString(operation.value as any[]) : operation.value as any);
       case 'nin':
-        return notInArray(column as any, operation.value as any[]);
+        return notInArray(column as any, Array.isArray(operation.value) ? convertArrayToDateIfIsoString(operation.value as any[]) : operation.value as any);
       case 'between':
-        const values = operation.value as [number, number];
-        return between(column as any, values[0], values[1]);
+        const values = operation.value as [number, number] | [string, string];
+        const convertedValues: [any, any] = [convertToDateIfIsoString(values[0]), convertToDateIfIsoString(values[1])];
+        return between(column as any, convertedValues[0], convertedValues[1]);
       default:
         logger.warn({ operation: operation.op }, 'Unknown filter operation');
         return null;
