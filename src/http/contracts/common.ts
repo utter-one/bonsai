@@ -25,7 +25,7 @@ const listFilterOperationSchema = z.object({
     z.array(z.number()),
     z.array(z.boolean()),
   ]).describe('Filter value to compare against. For "in", "nin", and "between" operations, use an array'),
-});
+}).openapi('ListFilterOperation').describe('Filter operation with explicit operator and value');
 
 /**
  * Schema for flexible filter values
@@ -58,7 +58,7 @@ export const listParamsSchema = z.object({
   orderBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to sort by. Use "-" prefix for descending order (e.g., "-createdAt")'),
   groupBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to group results by (optional)'),
   filters: z.record(z.string(), listFilterSchema).nullable().optional().describe('Dynamic field filters as key-value pairs. Values can be direct values, arrays (for IN), or operation objects'),
-});
+}).openapi('ListParams').describe('List query parameters for filtering, sorting, pagination, and search');
 
 /** Filter operation with explicit operator (eq, ne, gt, gte, lt, lte, like, in, nin, between) and value */
 export type ListFilterOperation = z.infer<typeof listFilterOperationSchema>;
@@ -83,4 +83,4 @@ export const llmSettingsSchema = z.union([
   openAILegacyLlmSettingsSchema,
   anthropicLlmSettingsSchema,
   geminiLlmSettingsSchema,
-]).nullable().optional().describe('LLM provider-specific settings for this stage');
+]).openapi('LlmSettings').nullable().optional().describe('LLM provider-specific settings for this stage');

@@ -28,7 +28,7 @@ export const geminiLlmSettingsSchema = z.object({
   defaultTopK: z.number().int().positive().optional().describe('Default top-k for generation'),
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
   safetySettings: z.array(z.unknown()).optional().describe('Safety settings configuration'),
-});
+}).openapi('GeminiLlmSettings');
 
 export type GeminiLlmSettings = z.infer<typeof geminiLlmSettingsSchema>;
 

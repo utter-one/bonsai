@@ -28,7 +28,7 @@ export const anthropicLlmSettingsSchema = z.object({
   defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
   anthropicVersion: z.string().optional().describe('Anthropic API version'),
-});
+}).openapi('AnthropicLlmSettings');
 
 export type AnthropicLlmSettings = z.infer<typeof anthropicLlmSettingsSchema>;
 

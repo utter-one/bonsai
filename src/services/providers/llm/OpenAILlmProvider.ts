@@ -28,7 +28,7 @@ export const openAILlmSettingsSchema = z.object({
   defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
   defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
-});
+}).openapi('OpenAILlmSettings');
 
 export type OpenAILlmSettings = z.infer<typeof openAILlmSettingsSchema>;  
 

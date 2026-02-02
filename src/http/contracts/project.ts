@@ -14,7 +14,7 @@ extendZodWithOpenApi(z);
 export const asrConfigSchema = z.object({
   asrProviderId: z.string().optional().describe('ID of the ASR provider (e.g., "azure-speech", "openai-whisper")'),
   settings: z.unknown().optional().describe('ASR-specific settings including model, language preferences, etc.'),
-}).optional().describe('ASR configuration settings');
+}).openapi('AsrConfig').optional().describe('ASR configuration settings');
 
 export type AsrConfig = z.infer<typeof asrConfigSchema>;
 
