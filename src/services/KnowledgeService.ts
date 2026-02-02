@@ -257,6 +257,7 @@ export class KnowledgeService extends BaseService {
 
       const columnMap = {
         id: knowledgeCategories.id,
+        projectId: knowledgeCategories.projectId,
         name: knowledgeCategories.name,
         order: knowledgeCategories.order,
         version: knowledgeCategories.version,

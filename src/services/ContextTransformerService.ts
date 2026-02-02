@@ -90,6 +90,7 @@ export class ContextTransformerService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: contextTransformers.id,
+        projectId: contextTransformers.projectId,
         name: contextTransformers.name,
         llmProviderId: contextTransformers.llmProviderId,
         version: contextTransformers.version,

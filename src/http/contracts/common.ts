@@ -49,7 +49,7 @@ const listFilterSchema = z.union([
  * - textSearch: Full-text search query (optional)
  * - orderBy: Field(s) to sort by. Use '-' prefix for descending (e.g., '-createdAt')
  * - groupBy: Field(s) to group results by (optional)
- * - filters: Dynamic field filters as key-value pairs
+ * - filters: Dynamic field filters as key-value pairs (use bracket notation: filters[projectId]=value)
  */
 export const listParamsSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0).describe('Starting index for pagination (default: 0)'),
@@ -57,7 +57,7 @@ export const listParamsSchema = z.object({
   textSearch: z.string().nullable().optional().describe('Full-text search query string (optional)'),
   orderBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to sort by. Use "-" prefix for descending order (e.g., "-createdAt")'),
   groupBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to group results by (optional)'),
-  filters: z.record(z.string(), listFilterSchema).nullable().optional().describe('Dynamic field filters as key-value pairs. Values can be direct values, arrays (for IN), or operation objects'),
+  filters: z.record(z.string(), listFilterSchema).nullable().optional().describe('Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects'),
 }).openapi('ListParams').describe('List query parameters for filtering, sorting, pagination, and search');
 
 /** Filter operation with explicit operator (eq, ne, gt, gte, lt, lte, like, in, nin, between) and value */

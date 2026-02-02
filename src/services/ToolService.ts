@@ -90,6 +90,7 @@ export class ToolService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: tools.id,
+        projectId: tools.projectId,
         name: tools.name,
         inputType: tools.inputType,
         outputType: tools.outputType,

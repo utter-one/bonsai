@@ -89,6 +89,7 @@ export class PersonaService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: personas.id,
+        projectId: personas.projectId,
         name: personas.name,
         version: personas.version,
         createdAt: personas.createdAt,

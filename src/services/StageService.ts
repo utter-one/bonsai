@@ -156,6 +156,7 @@ export class StageService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: stages.id,
+        projectId: stages.projectId,
         name: stages.name,
         personaId: stages.personaId,
         useKnowledge: stages.useKnowledge,
