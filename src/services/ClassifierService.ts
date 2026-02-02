@@ -90,6 +90,7 @@ export class ClassifierService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: classifiers.id,
+        projectId: classifiers.projectId,
         name: classifiers.name,
         llmProviderId: classifiers.llmProviderId,
         version: classifiers.version,

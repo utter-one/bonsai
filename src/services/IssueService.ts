@@ -87,6 +87,7 @@ export class IssueService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: issues.id,
+        projectId: issues.projectId,
         environment: issues.environment,
         buildVersion: issues.buildVersion,
         beat: issues.beat,

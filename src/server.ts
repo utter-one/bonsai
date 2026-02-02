@@ -4,6 +4,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
+import qs from 'qs';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { PersonaController } from './http/controllers/PersonaController';
@@ -34,6 +35,9 @@ import logger from './utils/logger';
  */
 export function createApp(): express.Application {
   const app = express();
+
+  // Configure query parser to use qs for nested query parameters
+  app.set('query parser', (str: string) => qs.parse(str, { allowDots: true, depth: 10 }));
 
   // Parse JSON bodies
   app.use(express.json());

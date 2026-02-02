@@ -90,6 +90,7 @@ export class GlobalActionService extends BaseService {
       // Column map for filter and order by operations
       const columnMap = {
         id: globalActions.id,
+        projectId: globalActions.projectId,
         name: globalActions.name,
         version: globalActions.version,
         createdAt: globalActions.createdAt,

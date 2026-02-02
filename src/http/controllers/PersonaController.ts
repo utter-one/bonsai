@@ -8,6 +8,7 @@ import type { CreatePersonaRequest, UpdatePersonaRequest, DeletePersonaRequest }
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
+import logger from '../../utils/logger';
 
 /**
  * Controller for persona management with explicit routing
@@ -202,6 +203,7 @@ export class PersonaController {
    * List personas with optional filters
    */
   private async listPersonas(req: Request, res: Response): Promise<void> {
+    logger.info({query: req.query}, 'Listing personas with query');
     checkPermissions(req, [PERMISSIONS.PERSONA_READ]);
     const query = listParamsSchema.parse(req.query);
     const personas = await this.personaService.listPersonas(query);
