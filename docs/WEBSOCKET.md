@@ -56,7 +56,12 @@ Authentication is **required** before using most WebSocket features. Only the `a
 ```
 
 ### API Key Configuration
-Ensure you have the correct API key before attempting to connect. The key is tied to a particular project.
+Ensure you have a valid API key before attempting to connect. API keys are managed through the Admin API:
+- Each API key is tied to a specific project
+- Keys can be created via `POST /api/api-keys` 
+- Keys can be activated/deactivated via `PUT /api/api-keys/:id`
+- Keys are stored securely in the database
+- The full secret key is only shown once at creation time
 
 ## 📨 Message Format
 
@@ -896,10 +901,13 @@ async function main() {
 ## 🔒 Security Considerations
 
 1. **API Key Protection**: Never expose API keys in client-side code (use environment variables or secure storage)
-2. **Secure WebSocket**: Use `wss://` in production environments
-3. **Input Validation**: Validate all user input before sending to the server
-4. **Rate Limiting**: Implement client-side rate limiting to prevent abuse
-5. **Session Management**: Properly clean up sessions and conversations on disconnect
+2. **API Key Management**: API keys are stored in the database and can be managed through the Admin API
+3. **Project Isolation**: Each API key is scoped to a specific project, providing natural isolation
+4. **Key Rotation**: Disable old keys and create new ones regularly for enhanced security
+5. **Secure WebSocket**: Use `wss://` in production environments
+6. **Input Validation**: Validate all user input before sending to the server
+7. **Rate Limiting**: Implement client-side rate limiting to prevent abuse
+8. **Session Management**: Properly clean up sessions and conversations on disconnect
 
 ## 📝 Additional Resources
 
@@ -910,8 +918,9 @@ async function main() {
 ## 🆘 Common Issues
 
 ### Authentication Failed
-- Verify API key is correct
-- Check that `WEBSOCKET_API_KEY` or `API_KEY` is set on the server
+- Verify API key is correct and active
+- Check that the API key exists in the database via `GET /api/api-keys`
+- Ensure the API key is associated with a valid project
 - Ensure you're sending the `auth` message first
 
 ### Session Not Found

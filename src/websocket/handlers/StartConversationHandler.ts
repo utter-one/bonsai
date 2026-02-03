@@ -38,6 +38,11 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
     try {
       // Get stage to extract projectId
       const stage = await this.stageService.getStageById(message.stageId);
+
+      // Validate that the stage belongs to the project the API key is authorized for
+      if (stage.projectId !== context.connection.projectId) {
+        throw new NotFoundError('Stage not found');
+      }
       
       const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, clientId: context.connection.id, status: 'initialized' });
       const conversationId = conversation.id;
