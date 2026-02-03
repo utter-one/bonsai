@@ -23,6 +23,7 @@ import { EnvironmentController } from './http/controllers/EnvironmentController'
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
+import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -140,6 +141,9 @@ export function createApp(): express.Application {
 
   const userController = container.resolve(UserController);
   userController.registerRoutes(app);
+
+  const apiKeyController = container.resolve(ApiKeyController);
+  apiKeyController.registerRoutes(app);
 
   app.use(errorHandler);
 

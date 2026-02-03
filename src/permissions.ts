@@ -75,6 +75,11 @@ export const PERMISSIONS = {
   PROVIDER_WRITE: 'provider:write',
   PROVIDER_DELETE: 'provider:delete',
 
+  // API Key permissions
+  API_KEY_READ: 'api_key:read',
+  API_KEY_WRITE: 'api_key:write',
+  API_KEY_DELETE: 'api_key:delete',
+
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',
@@ -116,6 +121,9 @@ export const ROLES = {
       PERMISSIONS.KNOWLEDGE_WRITE,
       PERMISSIONS.PROVIDER_READ,
       PERMISSIONS.PROVIDER_WRITE,
+      PERMISSIONS.API_KEY_READ,
+      PERMISSIONS.API_KEY_WRITE,
+      PERMISSIONS.API_KEY_DELETE,
       PERMISSIONS.AUDIT_READ,
     ],
   },
@@ -148,6 +156,7 @@ export const ROLES = {
       PERMISSIONS.KNOWLEDGE_READ,
       PERMISSIONS.ISSUE_READ,
       PERMISSIONS.PROVIDER_READ,
+      PERMISSIONS.API_KEY_READ,
       PERMISSIONS.SYSTEM_CONFIG,
       PERMISSIONS.AUDIT_READ,
     ],
@@ -168,6 +177,7 @@ export const ROLES = {
       PERMISSIONS.KNOWLEDGE_READ,
       PERMISSIONS.ISSUE_READ,
       PERMISSIONS.PROVIDER_READ,
+      PERMISSIONS.API_KEY_READ,
       PERMISSIONS.AUDIT_READ,
     ],
   },

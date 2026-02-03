@@ -113,6 +113,25 @@ export class ConversationContextBuilder {
 
     return context;
   }
+
+
+  async buildContextForConversationStart(conversation: Conversation): Promise<ConversationContext> {
+    const context: ConversationContext = {
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      stageId: conversation.stageId,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      userProfile: {},
+      history: [],
+      actions: {},
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+    };
+
+    return context;
+  }
   
   async buildContextForUserInput(conversation: Conversation, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     // Load user data

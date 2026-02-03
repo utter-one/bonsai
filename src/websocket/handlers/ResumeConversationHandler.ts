@@ -37,6 +37,11 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
       throw new NotFoundError('Conversation not found');
     }
 
+    // Validate that the conversation belongs to the project the API key is authorized for
+    if (conversation.projectId !== context.connection.projectId) {
+      throw new NotFoundError('Conversation not found');
+    }
+
     this.connectionManager.attachConversationToSession(message.sessionId, message.conversationId);
 
     // Return success response

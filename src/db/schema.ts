@@ -226,6 +226,8 @@ export const tools = pgTable('tools', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export type StageEnterBehavior = 'generate_response' | 'await_user_input';
+
 // Stage table
 export const stages = pgTable('stages', {
   id: text('id').primaryKey(),
@@ -236,7 +238,7 @@ export const stages = pgTable('stages', {
   llmProviderId: text('llm_provider_id'),
   llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   personaId: text('persona_id').notNull().references(() => personas.id),
-  enterBehavior: text('enter_behavior').notNull().default('generate_response'),
+  enterBehavior: text('enter_behavior').notNull().$type<StageEnterBehavior>().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),
   knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
   useGlobalActions: boolean('use_global_actions').notNull().default(true),
@@ -350,6 +352,20 @@ export const providers = pgTable('providers', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// ApiKey table
+export const apiKeys = pgTable('api_keys', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  key: text('key').notNull().unique(),
+  lastUsedAt: timestamp('last_used_at'),
+  isActive: boolean('is_active').notNull().default(true),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // AuditLog table
 export const auditLogs = pgTable('audit_logs', {
   id: text('id').primaryKey(),
@@ -411,6 +427,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   knowledgeCategories: many(knowledgeCategories),
   globalActions: many(globalActions),
   issues: many(issues),
+  apiKeys: many(apiKeys),
 }));
 
 export const personasRelations = relations(personas, ({ one, many }) => ({
@@ -505,5 +522,12 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   admin: one(admins, {
     fields: [auditLogs.userId],
     references: [admins.id],
+  }),
+}));
+
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  project: one(projects, {
+    fields: [apiKeys.projectId],
+    references: [projects.id],
   }),
 }));

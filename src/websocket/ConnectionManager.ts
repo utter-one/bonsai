@@ -7,6 +7,8 @@ export type Connection =
 { 
   /** Unique identifier for the session. */
   id: string,
+  /** ID of the project this session is authenticated for. */
+  projectId: string;
   /** ID of the conversation currently active in this session, empty string if none. */
   conversationId: string
   /** Conversation runner instance for managing the conversation. */
@@ -29,11 +31,12 @@ export class ConnectionManager {
   /**
    * Creates a new session for a WebSocket connection.
    * @param ws - The WebSocket connection to create a session for.
+   * @param projectId - The project ID this session is authenticated for.
    * @returns The generated session ID.
    */
-  createSession(ws: WebSocket) {
+  createSession(ws: WebSocket, projectId: string) {
     const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
-    this.socketMap.set(ws, { id: sessionId, conversationId: null, runner: null, ws });
+    this.socketMap.set(ws, { id: sessionId, projectId, conversationId: null, runner: null, ws });
     this.connectionMap.set(sessionId, ws);
     return sessionId;
   }
@@ -62,7 +65,7 @@ export class ConnectionManager {
    * @param conversationId - The conversation ID to attach.
    * @throws Error if the session is not found.
    */
-  attachConversationToSession(sessionId: string, conversationId: string) {
+  async attachConversationToSession(sessionId: string, conversationId: string) {
     const socket = this.connectionMap.get(sessionId);
     if (!socket) {
       throw new Error('Session not found');
@@ -72,7 +75,7 @@ export class ConnectionManager {
     if (session) {
       session.conversationId = conversationId;
       session.runner = container.resolve(ConversationRunner);
-      session.runner.prepareConversation(conversationId, session, this.socketMap.get(socket).ws);
+      await session.runner.prepareConversation(conversationId, session, this.socketMap.get(socket).ws);
       this.socketMap.set(socket, session);
     }
   }

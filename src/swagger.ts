@@ -20,6 +20,7 @@ import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironment
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
+import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { voiceConfigSchema } from './http/contracts/persona';
 import { asrConfigSchema } from './http/contracts/project';
@@ -46,6 +47,7 @@ import { EnvironmentController } from './http/controllers/EnvironmentController'
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
+import { ApiKeyController } from './http/controllers/ApiKeyController';
 
 extendZodWithOpenApi(z);
 
@@ -182,6 +184,11 @@ export function getOpenAPISpec(): any {
   registry.register('LlmProviderInfo', llmProviderInfoSchema);
   registry.register('AuditLogResponse', auditLogResponseSchema);
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
+  registry.register('CreateApiKeyRequest', createApiKeySchema);
+  registry.register('UpdateApiKeyRequest', updateApiKeySchema);
+  registry.register('DeleteApiKeyRequest', deleteApiKeyBodySchema);
+  registry.register('ApiKeyResponse', apiKeyResponseSchema);
+  registry.register('ApiKeyListResponse', apiKeyListResponseSchema);
 
   // Register Admin routes from AdminController
   const adminPaths = AdminController.getOpenAPIPaths();
@@ -288,6 +295,12 @@ export function getOpenAPISpec(): any {
   // Register User routes from UserController
   const userPaths = UserController.getOpenAPIPaths();
   for (const path of userPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register ApiKey routes from ApiKeyController
+  const apiKeyPaths = ApiKeyController.getOpenAPIPaths();
+  for (const path of apiKeyPaths) {
     registry.registerPath(path);
   }
 
