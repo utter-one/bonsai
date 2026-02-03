@@ -33,7 +33,7 @@ export const conversationStateSchema = z.object({
 
 /**
  * Schema for conversation response
- * Includes: id, projectId, userId, clientId, stageId, state, status, statusReason, metadata, createdAt, updatedAt
+ * Includes: id, projectId, userId, clientId, stageId, stageVars, status, statusDetails, metadata, createdAt, updatedAt
  */
 export const conversationResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the conversation'),
@@ -41,9 +41,9 @@ export const conversationResponseSchema = z.object({
   userId: z.string().describe('Identifier of the user associated with this conversation'),
   clientId: z.string().describe('Client identifier for the conversation'),
   stageId: z.string().describe('Current stage identifier for the conversation'),
-  state: conversationStateSchema.nullable().describe('Current state of the conversation'),
-  status: z.string().describe('Current status of the conversation (e.g., ongoing, completed, abandoned)'),
-  statusReason: z.string().nullable().describe('Optional reason for the current status'),
+  stageVars: z.record(z.string(), z.record(z.string(), z.unknown())).nullable().describe('Variables stored per stage in the conversation'),
+  status: z.string().describe('Current status of the conversation (e.g., initialized, active, completed, failed)'),
+  statusDetails: z.string().nullable().describe('Optional details about the current status'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata associated with the conversation'),
   createdAt: z.coerce.date().describe('Timestamp when the conversation was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the conversation was last updated'),

@@ -7,6 +7,7 @@ import { StageService } from '../../services/StageService';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { UserService } from '../../services/UserService';
 
 /**
  * Handles start conversation requests.
@@ -19,6 +20,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
 
   constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, 
     @inject(ConversationService) private conversationService: ConversationService, 
+    @inject(UserService) private userService: UserService,
     @inject(StageService) private stageService: StageService) {}
 
   /**
@@ -36,6 +38,12 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
     }
 
     try {
+      // Check if user exists
+      const user = await this.userService.getUserById(message.userId);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+      
       // Get stage to extract projectId
       const stage = await this.stageService.getStageById(message.stageId);
 

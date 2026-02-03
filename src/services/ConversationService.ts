@@ -192,7 +192,7 @@ export class ConversationService extends BaseService {
         clientId: conversations.clientId,
         stageId: conversations.stageId,
         status: conversations.status,
-        statusReason: conversations.statusDetails,
+        statusDetails: conversations.statusDetails,
         createdAt: conversations.createdAt,
         updatedAt: conversations.updatedAt,
       };
