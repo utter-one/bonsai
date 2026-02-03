@@ -1,4 +1,4 @@
-import { inject } from "tsyringe";
+import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, Project, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
@@ -58,6 +58,7 @@ export type ConversationState =
 /** 
  * Manages the lifecycle and state of a conversation. Runners are hosted by the SessionManager.
  */
+@injectable()
 export class ConversationRunner {
   private stageData: StageRuntimeData;
   private session: Connection;
@@ -91,7 +92,7 @@ export class ConversationRunner {
     }
 
     // Check if conversation is active
-    if (this.conversation.status == 'finished' || this.conversation.status !== 'failed') {
+    if (this.conversation.status === 'finished' || this.conversation.status === 'failed' || this.conversation.status === 'aborted') {
       throw new Error(`Conversation with ID ${conversationId} is not active`);
     }
 
@@ -151,9 +152,9 @@ export class ConversationRunner {
     }
 
     // Initialize TTS provider if configured
-    const persona = await this.personaService.getPersonaById(this.stageData.stage.personaId);
+    const persona = await this.personaService.getPersonaById(stageData.stage.personaId);
     if (!persona) {
-      throw new NotFoundError(`Persona with ID ${this.stageData.stage.personaId} not found`);
+      throw new NotFoundError(`Persona with ID ${stageData.stage.personaId} not found`);
     }
     const voiceConfig = persona.voiceConfig;
     if (project.generateVoice && persona.ttsProviderId) {

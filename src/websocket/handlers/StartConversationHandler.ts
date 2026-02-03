@@ -55,7 +55,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, clientId: context.connection.id, status: 'initialized' });
       const conversationId = conversation.id;
 
-      this.connectionManager.attachConversationToSession(message.sessionId, conversationId);
+      await this.connectionManager.attachConversationToSession(message.sessionId, conversationId);
 
       logger.info({ sessionId: message.sessionId, conversationId }, 'Conversation created and attached to session');
 

@@ -65,7 +65,7 @@ export class ConnectionManager {
    * @param conversationId - The conversation ID to attach.
    * @throws Error if the session is not found.
    */
-  attachConversationToSession(sessionId: string, conversationId: string) {
+  async attachConversationToSession(sessionId: string, conversationId: string) {
     const socket = this.connectionMap.get(sessionId);
     if (!socket) {
       throw new Error('Session not found');
@@ -75,7 +75,7 @@ export class ConnectionManager {
     if (session) {
       session.conversationId = conversationId;
       session.runner = container.resolve(ConversationRunner);
-      session.runner.prepareConversation(conversationId, session, this.socketMap.get(socket).ws);
+      await session.runner.prepareConversation(conversationId, session, this.socketMap.get(socket).ws);
       this.socketMap.set(socket, session);
     }
   }
