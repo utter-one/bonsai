@@ -16,6 +16,7 @@ export const ID_PREFIXES = {
   GLOBAL_ACTION: 'gact',
   PROVIDER: 'prov',
   ENVIRONMENT: 'env',
+  API_KEY: 'akey',
   CONVERSATION: 'conv',
   AUDIT: 'audt',
   EVENT: 'evnt',
