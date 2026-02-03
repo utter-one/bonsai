@@ -391,7 +391,20 @@ export class ConversationRunner {
     await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_start', eventData);
     logger.info({ conversationId: this.conversation.id, stageId: this.stageData.id }, 'Conversation started');
 
-    throw new Error("Method not implemented.");
+    if (this.stageData.stage.enterBehavior === 'generate_response') {
+      const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+      const outcome: ActionsExecutionOutcome = {
+        hasModifiedUserInput: false,
+        hasModifiedUserProfile: false,
+        hasModifiedVars: false,
+        success: true,
+        shouldAbortConversation: false,
+        shouldEndConversation: false
+      }
+      await this.generateResponse(context, outcome)
+    } else {
+      await this.changeState('awaiting_user_input');
+    }
   }
 
   async resumeConversation() {

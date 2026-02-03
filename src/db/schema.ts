@@ -226,6 +226,8 @@ export const tools = pgTable('tools', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export type StageEnterBehavior = 'generate_response' | 'await_user_input';
+
 // Stage table
 export const stages = pgTable('stages', {
   id: text('id').primaryKey(),
@@ -236,7 +238,7 @@ export const stages = pgTable('stages', {
   llmProviderId: text('llm_provider_id'),
   llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   personaId: text('persona_id').notNull().references(() => personas.id),
-  enterBehavior: text('enter_behavior').notNull().default('generate_response'),
+  enterBehavior: text('enter_behavior').notNull().$type<StageEnterBehavior>().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),
   knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
   useGlobalActions: boolean('use_global_actions').notNull().default(true),

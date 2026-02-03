@@ -22,7 +22,7 @@ export class ResponseGenerator {
     await completionLlmProvider.generateStream([
       { role: 'system', content: renderedPrompt }, 
       ...history, 
-      { role: 'user', content: context.userInput }
+      { role: 'user', content: context.userInput ?? '---' }
     ], {});
   }
 }
