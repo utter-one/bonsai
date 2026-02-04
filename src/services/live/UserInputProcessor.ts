@@ -7,18 +7,16 @@ import { ConversationContext, ConversationContextBuilder } from "./ConversationC
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
 import { ClassificationEventData } from "../../db/schema";
+import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 
-const actionClassificationResultSchema = z.object({
-  actionName: z.string(),
-  entities: z.record(z.string(), z.any())
+export const classificationResultSchema = z.object({
+  actions: z.record(z.string(), z.record(z.string(), z.any())).optional().default({}),
 });
 
-const classificationResultSchema = z.object({
-  actions: z.array(actionClassificationResultSchema)
-});
-
-type ActionClassificationResult = z.infer<typeof actionClassificationResultSchema>;
-type ClassificationResult = z.infer<typeof classificationResultSchema>;
+export type ActionClassificationResult = {
+  actionName: string;
+  entities: Record<string, any>;
+};
 
 export type ClassificationResultWithClassifier = {
   classifierId: string;
@@ -33,7 +31,6 @@ export type ClassificationResultWithClassifier = {
 @singleton()
 export class UserInputProcessor {
   constructor(
-    @inject(ConversationContextBuilder) private llmContextBuilder: ConversationContextBuilder,
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(ConversationService) private conversationService: ConversationService
   ) {}
@@ -100,12 +97,19 @@ export class UserInputProcessor {
       ];
 
       const result = await llmProvider.generate(messages);
-      const classificationResult = classificationResultSchema.parse(result.content);
+      logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received classification result from LLM provider: ${result.content}`);
+      const classificationResult = classificationResultSchema.parse(parseJsonFromMarkdown(result.content));
+      
+      // Convert actions object to array format
+      const actions: ActionClassificationResult[] = Object.entries(classificationResult.actions).map(([actionName, entities]) => ({
+        actionName,
+        entities,
+      }));
       
       return {
         classifierId: classifier.id,
         classifierName: classifier.name,
-        actions: classificationResult.actions,
+        actions,
       };
     } catch (error) {
       logger.error({ error, sessionId: session.id, classifierId: classifierData.classifier.id }, 'Error classifying text input');
