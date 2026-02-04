@@ -28,6 +28,7 @@ export const endAiVoiceOutputMessageSchema = sessionOutputMessageSchema.extend({
   type: z.literal('end_ai_voice_output').describe('Message type for ending AI voice output'),
   conversationId: z.string().describe('Unique identifier of the conversation'),
   voiceOutputId: z.string().describe('Unique identifier for this voice output sequence for correlation'),
+  fullText: z.string().describe('The full text that was converted to speech, if available'),
 });
 
 export type EndAiVoiceOutputMessage = z.infer<typeof endAiVoiceOutputMessageSchema>;

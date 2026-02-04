@@ -9,7 +9,7 @@ import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
 import { Connection } from "../../websocket/ConnectionManager";
 import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../websocket/contracts/aiResponse";
-import { ILlmProvider, LlmChunk } from "../providers/llm/ILlmProvider";
+import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
@@ -38,11 +38,13 @@ export type StageRuntimeData = {
   project: Project;
   stage: Stage;
   completionLlmProvider?: ILlmProvider;
+  lastCompletionResult?: LlmGenerationResult;
   classifiers: ClassifierRuntimeData[];
   transformers: TransformerRuntimeData[];
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   voiceConfig?: VoiceConfig;
+  shouldEndConversation: boolean;
 }
 
 export type ConversationState =
@@ -115,10 +117,12 @@ export class ConversationRunner {
       project: project,
       conversation: conversation,
       completionLlmProvider: undefined,
+      lastCompletionResult: null,
       classifiers: [],
       transformers: [],
       asrProvider: undefined,
       ttsProvider: undefined,
+      shouldEndConversation: false,
     };
 
     // Load completion LLM provider for the stage
@@ -262,7 +266,8 @@ export class ConversationRunner {
             conversationId,
             voiceOutputId,
             sessionId: this.session.id,
-            requestId: null
+            requestId: null,
+            fullText: this.stageData.lastCompletionResult?.content || ''
           } as EndAiVoiceOutputMessage;
           this.ws.send(JSON.stringify(message));
 
@@ -323,6 +328,7 @@ export class ConversationRunner {
 
       completionLlmProvider.setOnComplete(async (result) => {
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
+        this.stageData.lastCompletionResult = result;
         
         // Save AI message event with usage info
         const messageEventData: MessageEventData = {
@@ -333,9 +339,10 @@ export class ConversationRunner {
         }
         await this.conversationService.saveConversationEvent(this.stageData.conversation.id, 'message', messageEventData);
 
-        // In case of no TTS provider, change state to awaiting user input
         if (!ttsProvider) {
-          await this.changeState('awaiting_user_input');
+          await this.changeState('awaiting_user_input'); // In case of no TTS provider, change state to awaiting user input
+        } else {
+          await ttsProvider.end(); // Signal TTS provider that generation is complete so it can finalize audio output and notify client
         }
       });
 
@@ -850,8 +857,11 @@ export class ConversationRunner {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
     if (shouldGenerateResponse) {
       await this.changeState('generating_response');
+      if (this.stageData.ttsProvider) {
+        await this.stageData.ttsProvider.start();
+      }
       await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.completionLlmProvider);
-    } else if (executionOutcome.shouldEndConversation) {
+    } else if (executionOutcome.shouldEndConversation) { // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
         reason: executionOutcome.endReason || 'Action execution completed conversation',
