@@ -206,7 +206,7 @@ export class ConversationRunner {
 
           if (fullText) {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
-            const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, fullText, fullText);
+            const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, fullText, fullText);
             context.userInputSource = 'voice';
             await this.processUserInput(fullText, 'voice');
           } else {
@@ -808,7 +808,7 @@ export class ConversationRunner {
    */
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
     await this.changeState('processing_user_input');
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, userInput, userInput);
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, userInput, userInput);
     context.userInputSource = userInputSource;
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, context);
 

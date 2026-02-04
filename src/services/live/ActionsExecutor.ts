@@ -382,10 +382,10 @@ export class ActionsExecutor {
     effect: GoToStageEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
-    logger.info({ conversationId: context.conversationId, targetStageId: effect.stageId, currentStageId: context.stageId }, `Navigating to stage: ${effect.stageId}`);
+    logger.info({ conversationId: context.conversationId, targetStageId: effect.stageId, currentStageId: context.stage.id }, `Navigating to stage: ${effect.stageId}`);
 
     // Update context with new stage ID
-    context.stageId = effect.stageId;
+    context.stage.id = effect.stageId;
 
     logger.info({ conversationId: context.conversationId, newStageId: effect.stageId }, `Successfully navigated to stage: ${effect.stageId}`);
 
@@ -447,7 +447,7 @@ export class ActionsExecutor {
     effect: ModifyVariablesEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
-    logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: effect.modifications.length }, `Modifying variables`);
+    logger.info({ conversationId: context.conversationId, stageId: context.stage.id, modificationCount: effect.modifications.length }, `Modifying variables`);
     let hasModifiedVars = false;
 
     try {
@@ -502,9 +502,9 @@ export class ActionsExecutor {
         }
       }
 
-      logger.info({ conversationId: context.conversationId, stageId: context.stageId, modificationCount: effect.modifications.length }, `Variables modified successfully`);
+      logger.info({ conversationId: context.conversationId, stageId: context.stage.id, modificationCount: effect.modifications.length }, `Variables modified successfully`);
     } catch (error) {
-      logger.error({ conversationId: context.conversationId, stageId: context.stageId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify variables`);
+      logger.error({ conversationId: context.conversationId, stageId: context.stage.id, error: error instanceof Error ? error.message : String(error) }, `Failed to modify variables`);
       throw error;
     }
 

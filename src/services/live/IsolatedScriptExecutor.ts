@@ -37,7 +37,7 @@ export class IsolatedScriptExecutor {
     code: string,
     context: ConversationContext,
   ): Promise<void> {
-    logger.info({ conversationId: context.conversationId, stageId: context.stageId, codeLength: code.length }, `Running script in isolated VM`);
+    logger.info({ conversationId: context.conversationId, stageId: context.stage.id, codeLength: code.length }, `Running script in isolated VM`);
 
     // Create isolated VM instance with memory limit (16MB) and timeout protection
     const isolate = new ivm.Isolate({ memoryLimit: 16 });
@@ -55,8 +55,7 @@ export class IsolatedScriptExecutor {
 
       // Inject context fields into the VM
       await jail.set('conversationId', new ivm.ExternalCopy(context.conversationId).copyInto());
-      await jail.set('projectId', new ivm.ExternalCopy(context.projectId).copyInto());
-      await jail.set('stageId', new ivm.ExternalCopy(context.stageId).copyInto());
+      await jail.set('stageId', new ivm.ExternalCopy(context.stage.id).copyInto());
       await jail.set('history', new ivm.ExternalCopy(context.history).copyInto());
       await jail.set('actions', new ivm.ExternalCopy(context.actions).copyInto());
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
@@ -68,13 +67,13 @@ export class IsolatedScriptExecutor {
       // Inject console.log, console.error, console.warn
       await jail.set('console', new ivm.ExternalCopy({
         log: new ivm.Reference((...args: any[]) => {
-          logger.info({ conversationId: context.conversationId, stageId: context.stageId, args }, `[Script Console] ${args.join(' ')}`);
+          logger.info({ conversationId: context.conversationId, stageId: context.stage.id, args }, `[Script Console] ${args.join(' ')}`);
         }),
         error: new ivm.Reference((...args: any[]) => {
-          logger.error({ conversationId: context.conversationId, stageId: context.stageId, args }, `[Script Console] ${args.join(' ')}`);
+          logger.error({ conversationId: context.conversationId, stageId: context.stage.id, args }, `[Script Console] ${args.join(' ')}`);
         }),
         warn: new ivm.Reference((...args: any[]) => {
-          logger.warn({ conversationId: context.conversationId, stageId: context.stageId, args }, `[Script Console] ${args.join(' ')}`);
+          logger.warn({ conversationId: context.conversationId, stageId: context.stage.id, args }, `[Script Console] ${args.join(' ')}`);
         }),
       }).copyInto());
 
@@ -82,10 +81,10 @@ export class IsolatedScriptExecutor {
       const script = await isolate.compileScript(code);
       await script.run(ivmContext, { timeout: 5000 });
       
-      logger.info({ conversationId: context.conversationId, stageId: context.stageId, variableUpdates: Object.keys(variableUpdates).length }, `Script executed successfully in isolated VM`);
+      logger.info({ conversationId: context.conversationId, stageId: context.stage.id, variableUpdates: Object.keys(variableUpdates).length }, `Script executed successfully in isolated VM`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error({ conversationId: context.conversationId, stageId: context.stageId, error: errorMessage }, `Failed to execute script in isolated VM`);
+      logger.error({ conversationId: context.conversationId, stageId: context.stage.id, error: errorMessage }, `Failed to execute script in isolated VM`);
       throw new Error(`Script execution failed: ${errorMessage}`);
     } finally {
       // Clean up the isolate
