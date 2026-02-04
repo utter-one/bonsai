@@ -9,7 +9,7 @@ import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
 import { Connection } from "../../websocket/ConnectionManager";
 import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../websocket/contracts/aiResponse";
-import { ILlmProvider, LlmChunk } from "../providers/llm/ILlmProvider";
+import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
@@ -38,6 +38,7 @@ export type StageRuntimeData = {
   project: Project;
   stage: Stage;
   completionLlmProvider?: ILlmProvider;
+  lastCompletionResult?: LlmGenerationResult;
   classifiers: ClassifierRuntimeData[];
   transformers: TransformerRuntimeData[];
   asrProvider?: IAsrProvider;
@@ -116,6 +117,7 @@ export class ConversationRunner {
       project: project,
       conversation: conversation,
       completionLlmProvider: undefined,
+      lastCompletionResult: null,
       classifiers: [],
       transformers: [],
       asrProvider: undefined,
@@ -264,7 +266,8 @@ export class ConversationRunner {
             conversationId,
             voiceOutputId,
             sessionId: this.session.id,
-            requestId: null
+            requestId: null,
+            fullText: this.stageData.lastCompletionResult?.content || ''
           } as EndAiVoiceOutputMessage;
           this.ws.send(JSON.stringify(message));
 
@@ -325,6 +328,7 @@ export class ConversationRunner {
 
       completionLlmProvider.setOnComplete(async (result) => {
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
+        this.stageData.lastCompletionResult = result;
         
         // Save AI message event with usage info
         const messageEventData: MessageEventData = {
