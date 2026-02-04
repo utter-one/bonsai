@@ -59,11 +59,11 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
 
       logger.info({ sessionId: message.sessionId, conversationId }, 'Conversation created and attached to session');
 
-      const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: true, conversationId, requestId: message.requestId };
-      context.send(context.connection.ws, response);
-
       // Start the conversation
       await context.connection.runner.startConversation();
+
+      const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: true, conversationId, requestId: message.requestId };
+      context.send(context.connection.ws, response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation';
       logger.error({ error: errorMessage, sessionId: message.sessionId }, 'Failed to create conversation');

@@ -43,6 +43,7 @@ export type StageRuntimeData = {
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   voiceConfig?: VoiceConfig;
+  shouldEndConversation: boolean;
 }
 
 export type ConversationState =
@@ -119,6 +120,7 @@ export class ConversationRunner {
       transformers: [],
       asrProvider: undefined,
       ttsProvider: undefined,
+      shouldEndConversation: false,
     };
 
     // Load completion LLM provider for the stage
@@ -333,9 +335,10 @@ export class ConversationRunner {
         }
         await this.conversationService.saveConversationEvent(this.stageData.conversation.id, 'message', messageEventData);
 
-        // In case of no TTS provider, change state to awaiting user input
         if (!ttsProvider) {
-          await this.changeState('awaiting_user_input');
+          await this.changeState('awaiting_user_input'); // In case of no TTS provider, change state to awaiting user input
+        } else {
+          await ttsProvider.end(); // Signal TTS provider that generation is complete so it can finalize audio output and notify client
         }
       });
 
@@ -850,8 +853,11 @@ export class ConversationRunner {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
     if (shouldGenerateResponse) {
       await this.changeState('generating_response');
+      if (this.stageData.ttsProvider) {
+        await this.stageData.ttsProvider.start();
+      }
       await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.completionLlmProvider);
-    } else if (executionOutcome.shouldEndConversation) {
+    } else if (executionOutcome.shouldEndConversation) { // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
         reason: executionOutcome.endReason || 'Action execution completed conversation',
