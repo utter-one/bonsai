@@ -1,6 +1,7 @@
 import { logger } from '../../../utils/logger';
 import type { SimpleCallback, ErrorCallback } from '../../../types/callbacks';
 import { GeneratedAudioChunk, ITtsProvider, SpeechGenerationCallback } from './ITtsProvider';
+import type { AudioFormat } from '../../../types/audio';
 import { VoiceConfig } from '../../../http/contracts/persona';
 
 /**
@@ -40,6 +41,12 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
    * Subclasses must implement this to perform provider-specific initialization
    */
   abstract init(voiceConfig: VoiceConfig): Promise<void>;
+
+  /**
+   * Gets the list of supported audio output formats
+   * Subclasses must implement this to expose provider capabilities
+   */
+  abstract getSupportedFormats(): AudioFormat[];
 
   /**
    * Starts the speech generation session

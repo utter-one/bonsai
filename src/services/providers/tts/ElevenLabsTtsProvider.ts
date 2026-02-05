@@ -6,6 +6,7 @@ import { TtsProviderBase } from './TtsProviderBase';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import { VoiceConfig } from '../../../http/contracts/persona';
+import type { AudioFormat } from '../../../types/audio';
 
 extendZodWithOpenApi(z);
 
@@ -26,6 +27,8 @@ export type ElevenLabsTtsVoiceSettings = {
   model?: string;
   /** Default voice ID to use if not specified in start() */
   voiceId?: string;
+  /** Preferred audio output format (e.g., 'pcm_16000') */
+  audioFormat?: AudioFormat;
   /** Markers to identify sections of text that should not be spoken */
   noSpeechMarkers?: NoSpeechMarker[];
   /** Whether to replace exclamation marks with periods */
@@ -71,8 +74,18 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /** Voice configuration used for this TTS session */
   private voiceSettings: ElevenLabsTtsVoiceSettings = null;
 
+  /** Audio output format for the current session */
+  private audioFormat: AudioFormat = 'pcm_16000';
+
   async init(voiceConfig: VoiceConfig): Promise<void> {
     this.voiceSettings = voiceConfig as ElevenLabsTtsVoiceSettings;
+  }
+
+  /**
+   * Gets the list of supported audio output formats for ElevenLabs
+   */
+  getSupportedFormats(): AudioFormat[] {
+    return ['pcm_16000', 'pcm_22050', 'pcm_44100'];
   }
 
   /**
@@ -107,12 +120,14 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       this.sentenceSplitter = null;
     }
 
-    logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.voiceSettings.stability}, similarityBoost: ${this.voiceSettings.similarityBoost}`);
+    this.audioFormat = this.resolveAudioFormat(this.voiceSettings.audioFormat);
+
+    logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.voiceSettings.stability}, similarityBoost: ${this.voiceSettings.similarityBoost}, audioFormat: ${this.audioFormat}`);
 
     const useGlobalPreview = this.voiceSettings.useGlobalPreview ?? true;
     const baseUrl = useGlobalPreview ? 'wss://api-global-preview.elevenlabs.io' : 'wss://api.elevenlabs.io';
     const inactivityTimeout = this.voiceSettings.inactivityTimeout ?? 180;
-    const wsUrl = `${baseUrl}/v1/text-to-speech/${effectiveVoiceId}/stream-input?model_id=${effectiveModel}&output_format=pcm_16000&inactivity_timeout=${inactivityTimeout}`;
+    const wsUrl = `${baseUrl}/v1/text-to-speech/${effectiveVoiceId}/stream-input?model_id=${effectiveModel}&output_format=${this.audioFormat}&inactivity_timeout=${inactivityTimeout}`;
 
     return new Promise<void>((resolve, reject) => {
       this.socket = new WebSocket(wsUrl);
@@ -247,6 +262,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
           chunkId: this.generateChunkId(),
           ordinal: this.getNextOrdinal(),
           audio: concatenatedBuffer,
+          format: this.audioFormat,
           text: text + ' ',
           durationMs: chunkDuration,
           startMs: this.audioDurationMs - chunkDuration,
@@ -268,6 +284,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
           chunkId: this.generateChunkId(),
           ordinal: this.getNextOrdinal(),
           audio: concatenatedBuffer,
+          format: this.audioFormat,
           text: '',
           durationMs: 0,
           startMs: this.audioDurationMs,
@@ -414,6 +431,25 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     }
 
     return parts.filter((p, id) => id % 2 === 0);
+  }
+
+  /**
+   * Resolves the requested audio format to a supported format
+   * @param requestedFormat Optional requested audio format
+   * @returns Supported audio format to use for output
+   */
+  private resolveAudioFormat(requestedFormat?: AudioFormat): AudioFormat {
+    const supportedFormats = this.getSupportedFormats();
+    if (!requestedFormat) {
+      return supportedFormats[0];
+    }
+
+    if (supportedFormats.includes(requestedFormat)) {
+      return requestedFormat;
+    }
+
+    logger.warn(`[ElevenLabs] Requested audio format ${requestedFormat} is not supported. Falling back to ${supportedFormats[0]}.`);
+    return supportedFormats[0];
   }
 
   /**
