@@ -6,7 +6,7 @@ import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
-import { ClassificationEventData } from "../../db/schema";
+import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 
 export const classificationResultSchema = z.object({
@@ -14,8 +14,8 @@ export const classificationResultSchema = z.object({
 });
 
 export type ActionClassificationResult = {
-  actionName: string;
-  entities: Record<string, any>;
+  name: string;
+  parameters: Record<string, any>;
 };
 
 export type ClassificationResultWithClassifier = {
@@ -60,7 +60,7 @@ export class UserInputProcessor {
           classifierId: result.classifierId,
           input: context.userInput,
           actions: result.actions.map(action => ({
-            name: action.actionName,
+            name: action.name,
             effects: [],
           })) as any,
           metadata: {
@@ -101,9 +101,9 @@ export class UserInputProcessor {
       const classificationResult = classificationResultSchema.parse(parseJsonFromMarkdown(result.content));
       
       // Convert actions object to array format
-      const actions: ActionClassificationResult[] = Object.entries(classificationResult.actions).map(([actionName, entities]) => ({
-        actionName,
-        entities,
+      const actions: ActionClassificationResult[] = Object.entries(classificationResult.actions).map(([name, parameters]) => ({
+        name,
+        parameters,
       }));
       
       return {

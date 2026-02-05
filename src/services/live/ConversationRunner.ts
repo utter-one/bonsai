@@ -3,7 +3,8 @@ import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, Project, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
 import { db } from "../../db";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, conversations, users } from "../../db/schema";
+import { conversations, users } from "../../db/schema";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
@@ -814,20 +815,22 @@ export class ConversationRunner {
 
     const stageActions = this.stageData.stage.actions;
     const actions = classificationResults.map(r => {
-      const stageAction = stageActions[r.actionName];
+      const stageAction = stageActions[r.name];
       if (!stageAction) {
-        logger.warn({ conversationId: this.conversation.id, actionName: r.actionName }, `No matching action found for classification result ${r.actionName}`);
+        logger.warn({ conversationId: this.conversation.id, actionName: r.name }, `No matching action found for classification result ${r.name}`);
         return null;
       }
       
       // inject action with parameters into context
       context.actions[stageAction.name] = {
-        parameters: r.entities,
+        parameters: r.parameters,
       };
       return stageAction;
     }).filter(a => a !== null) as StageAction[];
 
-    // Register action events before execution
+    const executionOutcome = await this.actionsExecutor.executeActions(actions, context)
+
+    // Register action events after execution
     for (const action of actions) {
       const actionEventData: ActionEventData = {
         actionName: action.name || '',
@@ -837,7 +840,6 @@ export class ConversationRunner {
       await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
     }
 
-    const executionOutcome = await this.actionsExecutor.executeActions(actions, context)
     await this.applyActionOutcome(context, executionOutcome);
 
     // Save event for user message

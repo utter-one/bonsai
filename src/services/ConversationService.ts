@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
-import { conversations, conversationEvents, ConversationEventType, ConversationEventData } from '../db/schema';
+import { conversations, conversationEvents } from '../db/schema';
 import type { ConversationResponse, ConversationListResponse, ConversationEventResponse, ConversationEventListResponse } from '../http/contracts/conversation';
 import type { ListParams } from '../http/contracts/common';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../http/contracts/conversation';
@@ -14,6 +14,7 @@ import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 import { ConversationState } from './live/ConversationRunner';
+import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 
 /**
  * Input for creating a conversation (internal use only)
