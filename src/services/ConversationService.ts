@@ -140,6 +140,9 @@ export class ConversationService extends BaseService {
         metadata: metadata ?? null,
       };
 
+      // Validate before inserting
+      conversationEventResponseSchema.parse(eventRecord);
+
       await db.insert(conversationEvents).values(eventRecord);
 
       logger.debug({ conversationId, eventId, eventType }, 'Conversation event saved successfully');
