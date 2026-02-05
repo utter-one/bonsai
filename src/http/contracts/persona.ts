@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
+import { audioFormatValues } from '../../types/audio';
 import type { ListParams } from './common';
 
 extendZodWithOpenApi(z);
@@ -20,6 +21,7 @@ export const personaRouteParamsSchema = z.object({
 export const voiceConfigSchema = z.object({
   model: z.string().optional().describe('Model ID to use for speech synthesis (e.g., "eleven_flash_v2_5", "eleven_multilingual_v2")'),
   voiceId: z.string().optional().describe('Text-to-speech voice identifier'),
+  audioFormat: z.enum(audioFormatValues).optional().describe('Preferred audio output format for synthesized speech (e.g., "pcm_16000")'),
   noSpeechMarkers: z.array(z.object({ start: z.string(), end: z.string() })).optional().describe('Markers to identify sections of text that should not be spoken'),
   removeExclamationMarks: z.boolean().optional().describe('Whether to replace exclamation marks with periods'),
   stability: z.number().min(0).max(1).nullable().optional().describe('Voice stability setting (0.0-1.0), defaults to 0.5'),

@@ -278,6 +278,7 @@ export class ConversationRunner {
             conversationId,
             voiceOutputId,
             audioData: chunk.audio.toString('base64'),
+            audioFormat: chunk.format,
             chunkId: chunk.chunkId,
             ordinal: chunk.ordinal,
             isFinal: chunk.isFinal,

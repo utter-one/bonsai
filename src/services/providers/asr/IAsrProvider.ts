@@ -1,4 +1,5 @@
 import type { ErrorCallback } from '../../../types/callbacks';
+import type { AudioFormat } from '../../../types/audio';
 
 /**
  * Callback function that is invoked when speech recognition produces text output.
@@ -28,6 +29,11 @@ export type TextChunk = {
 
 export interface IAsrProvider {
   /**
+   * Gets the list of supported audio input formats for this provider
+   * @returns Array of supported audio format identifiers
+   */
+  getSupportedInputFormats(): AudioFormat[];
+  /**
    * Initializes the speech recognition session for the given context
    * @returns Promise that resolves when initialization is complete
    */
@@ -50,7 +56,7 @@ export interface IAsrProvider {
    * @param audio Binary audio data buffer to be processed
    * @returns Promise that resolves when audio data is successfully sent
    */
-  sendAudio(audio: Buffer): Promise<void>;
+  sendAudio(audio: Buffer, format?: AudioFormat): Promise<void>;
 
   /**
    * Registers a callback for partial speech recognition results

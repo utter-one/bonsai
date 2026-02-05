@@ -1,4 +1,5 @@
 import { VoiceConfig } from '../../../http/contracts/persona';
+import type { AudioFormat } from '../../../types/audio';
 import type { SimpleCallback, ErrorCallback } from '../../../types/callbacks';
 
 /**
@@ -19,6 +20,8 @@ export type GeneratedAudioChunk = {
   ordinal: number;
   /** Binary audio data buffer containing the synthesized speech */
   audio: Buffer;
+  /** Audio format for this chunk */
+  format: AudioFormat;
   /** Original text that was converted to speech for this chunk (not all TTS providers provide this) */
   text?: string;
   /** Duration of this audio chunk in milliseconds (may be undefined if not provided by the TTS provider) */
@@ -48,6 +51,11 @@ export type NoSpeechMarker = {
  * and provides callbacks for receiving generated audio chunks as they become available
  */
 export interface ITtsProvider {
+  /**
+   * Gets the list of supported audio output formats for this provider
+   * @returns Array of supported audio format identifiers
+   */
+  getSupportedFormats(): AudioFormat[];
   /**
    * Initializes the speech generation session for the given voice configuration
    * Prepares the TTS provider with the specified voice settings

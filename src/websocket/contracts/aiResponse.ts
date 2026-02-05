@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { sessionOutputMessageSchema } from './common';
+import { audioFormatValues } from '../../types/audio';
 
 /** Message indicating the start of AI voice output. */
 export const startAiVoiceOutputMessageSchema = sessionOutputMessageSchema.extend({
@@ -16,6 +17,7 @@ export const sendAiVoiceChunkMessageSchema = sessionOutputMessageSchema.extend({
   conversationId: z.string().describe('Unique identifier of the conversation'),
   voiceOutputId: z.string().describe('Unique identifier for this voice output sequence for correlation'),
   audioData: z.string().describe('Base64-encoded audio chunk data'),
+  audioFormat: z.enum(audioFormatValues).describe('Audio format of the chunk data'),
   chunkId: z.string().describe('Unique identifier for this specific audio chunk'),
   ordinal: z.number().describe('Sequential order of this chunk in the voice output sequence'),
   isFinal: z.boolean().describe('Whether this is the final chunk in the voice output sequence'),

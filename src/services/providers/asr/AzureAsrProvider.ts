@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
 import { logger } from '../../../utils/logger';
+import type { AudioFormat } from '../../../types/audio';
+import { audioFormatValues } from '../../../types/audio';
 
 extendZodWithOpenApi(z);
 
@@ -23,6 +25,7 @@ export type AzureAsrProviderConfig = z.infer<typeof azureAsrProviderConfigSchema
 export const azureAsrSettingsSchema = z.object({
   language: z.string().optional().describe('The language code for speech recognition (e.g., \'en-US\')'),
   dictionaryPhrases: z.array(z.string()).optional().describe('The phrases to add to the speech recognition dictionary'),
+  audioFormat: z.enum(audioFormatValues).optional().describe('Audio input format for speech recognition (e.g., "pcm_16000")'),
 });
 
 export type AzureAsrSettings = z.infer<typeof azureAsrSettingsSchema>;
@@ -38,6 +41,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
   private azureSpeechConfig?: azureSDK.SpeechConfig;
   private speechRecognizer?: azureSDK.SpeechRecognizer;
   private recognising = false;
+  private audioFormat: AudioFormat = 'pcm_16000';
 
   /**
    * Creates a new Azure ASR provider instance
@@ -45,6 +49,13 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    */
   constructor(config: AzureAsrProviderConfig, private settings: AzureAsrSettings) {
     super(config);
+  }
+
+  /**
+   * Gets the list of supported audio input formats for Azure ASR
+   */
+  getSupportedInputFormats(): AudioFormat[] {
+    return ['pcm_16000'];
   }
 
   /**
@@ -56,6 +67,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
 
     this.bufferArray = [];
     this.recognising = false;
+    this.audioFormat = this.resolveAudioFormat(this.settings?.audioFormat);
 
     // Check if the required configuration is present
     if (!this.config.subscriptionKey || !this.config.region) {
@@ -196,7 +208,10 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    * @param conversation The conversation context for the audio data
    * @param audio Binary audio data buffer to be processed
    */
-  async sendAudio(audio: Buffer): Promise<void> {
+  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+    if (format && format !== this.audioFormat) {
+      logger.warn(`[ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
+    }
     if (this.recognising) {
       // If the recognizer is started, write the buffer to the audio stream
       if (this.audioStream) {
@@ -233,5 +248,24 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     this.azureSpeechConfig = undefined;
     this.bufferArray = [];
     this.recognising = false;
+  }
+
+  /**
+   * Resolves the requested audio format to a supported format
+   * @param requestedFormat Optional requested audio format
+   * @returns Supported audio format to use for input
+   */
+  private resolveAudioFormat(requestedFormat?: AudioFormat): AudioFormat {
+    const supportedFormats = this.getSupportedInputFormats();
+    if (!requestedFormat) {
+      return supportedFormats[0];
+    }
+
+    if (supportedFormats.includes(requestedFormat)) {
+      return requestedFormat;
+    }
+
+    logger.warn(`[ASR] Requested audio format ${requestedFormat} is not supported. Falling back to ${supportedFormats[0]}.`);
+    return supportedFormats[0];
   }
 }
