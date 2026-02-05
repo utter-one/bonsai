@@ -43,11 +43,8 @@ export class UserInputProcessor {
       for (const result of classificationResultsWithClassifiers) {
         const eventData: ClassificationEventData = {
           classifierId: result.classifierId,
-          input: context.userInput,
-          actions: result.actions.map(action => ({
-            name: action.name,
-            effects: [],
-          })) as any,
+          input: context.userInput || '',
+          actions: [result],
           metadata: {
             classifierName: result.classifierName,
             actionCount: result.actions.length,

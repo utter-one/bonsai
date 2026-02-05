@@ -838,8 +838,8 @@ export class ConversationRunner {
     // Save event for user message
     const messageEventData: MessageEventData = {
       role: 'user',
-      text: context.userInput,
-      originalText: context.originalUserInput,
+      text: context.userInput || '',
+      originalText: context.originalUserInput || context.userInput || '',
       metadata: {
         source: context.userInputSource,
       }
