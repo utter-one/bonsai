@@ -1,10 +1,11 @@
+import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, Project, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
@@ -47,16 +48,6 @@ export type StageRuntimeData = {
   voiceConfig?: VoiceConfig;
   shouldEndConversation: boolean;
 }
-
-export type ConversationState =
-  'initialized' // Conversation has been initialized (not started yet)
-  | 'awaiting_user_input' // Conversation is waiting for user input (text or voice)
-  | 'receiving_user_voice' // Conversation is receiving voice input from user (ASR in progress)
-  | 'processing_user_input' // Conversation is processing user input (classification/transformation)
-  | 'generating_response' // Conversation is generating a response  
-  | 'finished' // Conversation has finished
-  | 'aborted' // Conversation has been aborted by user or system
-  | 'failed'; // Conversation has failed due to an error
 
 /** 
  * Manages the lifecycle and state of a conversation. Runners are hosted by the SessionManager.
@@ -743,9 +734,11 @@ export class ConversationRunner {
     // Apply variable modifications if any
     if (outcome.hasModifiedVars) {
       logger.debug({ conversationId, stageId: this.stageData.id }, `Variables were modified during action execution`);
+      const updatedStageVars = { ...this.conversation.stageVars, [this.stageData.id]: context.vars };
       await db.update(conversations)
-        .set({ stageVars: context.vars, updatedAt: new Date() })
+        .set({ stageVars: updatedStageVars, updatedAt: new Date() })
         .where(eq(conversations.id, this.conversation.id));
+      this.conversation.stageVars = updatedStageVars;
     }
 
     // Apply user profile modifications if any

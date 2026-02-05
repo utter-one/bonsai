@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema } from './common';
 import type { ListParams } from './common';
+import { conversationEventDataSchema, conversationEventTypeSchema } from '../../types/conversationEvents';
 
 extendZodWithOpenApi(z);
 
@@ -67,8 +68,8 @@ export const conversationListResponseSchema = z.object({
 export const conversationEventResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the conversation event'),
   conversationId: z.string().describe('Identifier of the conversation this event belongs to'),
-  eventType: z.string().describe('Type of the conversation event'),
-  eventData: z.record(z.string(), z.unknown()).describe('Event data payload'),
+  eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
+  eventData: conversationEventDataSchema.describe('Event data payload'),
   timestamp: z.coerce.date().describe('Timestamp when the event occurred'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata associated with the event'),
 });

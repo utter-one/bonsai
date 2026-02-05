@@ -13,7 +13,7 @@ import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
-import { ConversationState } from './live/ConversationRunner';
+import { ConversationState } from '../types/conversationEvents';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 
 /**
