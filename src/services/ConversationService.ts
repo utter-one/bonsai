@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
-import { conversations, conversationEvents, ConversationEventType, ConversationEventData } from '../db/schema';
+import { conversations, conversationEvents } from '../db/schema';
 import type { ConversationResponse, ConversationListResponse, ConversationEventResponse, ConversationEventListResponse } from '../http/contracts/conversation';
 import type { ListParams } from '../http/contracts/common';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from '../http/contracts/conversation';
@@ -13,7 +13,8 @@ import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
-import { ConversationState } from './live/ConversationRunner';
+import { ConversationState } from '../types/conversationEvents';
+import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 
 /**
  * Input for creating a conversation (internal use only)
@@ -138,6 +139,9 @@ export class ConversationService extends BaseService {
         timestamp: new Date(),
         metadata: metadata ?? null,
       };
+
+      // Validate before inserting
+      conversationEventResponseSchema.parse(eventRecord);
 
       await db.insert(conversationEvents).values(eventRecord);
 

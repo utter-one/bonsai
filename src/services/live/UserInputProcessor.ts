@@ -1,28 +1,13 @@
 import { inject, singleton } from "tsyringe";
-import { z } from "zod";
 import { Connection } from "../../websocket/ConnectionManager";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
-import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
+import { ConversationContext } from "./ConversationContextBuilder";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
-import { ClassificationEventData } from "../../db/schema";
+import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
-
-export const classificationResultSchema = z.object({
-  actions: z.record(z.string(), z.record(z.string(), z.any())).optional().default({}),
-});
-
-export type ActionClassificationResult = {
-  actionName: string;
-  entities: Record<string, any>;
-};
-
-export type ClassificationResultWithClassifier = {
-  classifierId: string;
-  classifierName: string;
-  actions: ActionClassificationResult[];
-};
+import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
 
 
 /**
@@ -58,11 +43,8 @@ export class UserInputProcessor {
       for (const result of classificationResultsWithClassifiers) {
         const eventData: ClassificationEventData = {
           classifierId: result.classifierId,
-          input: context.userInput,
-          actions: result.actions.map(action => ({
-            name: action.actionName,
-            effects: [],
-          })) as any,
+          input: context.userInput || '',
+          actions: [result],
           metadata: {
             classifierName: result.classifierName,
             actionCount: result.actions.length,
@@ -101,9 +83,9 @@ export class UserInputProcessor {
       const classificationResult = classificationResultSchema.parse(parseJsonFromMarkdown(result.content));
       
       // Convert actions object to array format
-      const actions: ActionClassificationResult[] = Object.entries(classificationResult.actions).map(([actionName, entities]) => ({
-        actionName,
-        entities,
+      const actions: ActionClassificationResult[] = Object.entries(classificationResult.actions).map(([name, parameters]) => ({
+        name,
+        parameters,
       }));
       
       return {

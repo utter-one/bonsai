@@ -2,8 +2,9 @@ import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { singleton } from "tsyringe";
-import { Conversation, GlobalAction, MessageEventData, Stage } from "../../types/models";
+import { Conversation, GlobalAction, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
+import { MessageEventData } from "../../types/conversationEvents";
 
 export type ConversationContext = {
   /** ID of the conversation */
