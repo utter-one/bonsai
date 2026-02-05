@@ -59,9 +59,10 @@ export class AsrProviderFactory {
    */
   private createAzureProvider(provider: Provider, settings: AzureAsrSettings): AzureAsrProvider {
     const config = azureAsrProviderConfigSchema.parse(provider.config);
+    const safeSettings = (settings ?? {}) as AzureAsrSettings;
 
     logger.info(`Creating Azure ASR provider for provider ${provider.id} with region ${config.region}`);
-    return new AzureAsrProvider(config, settings);
+    return new AzureAsrProvider(config, safeSettings);
   }
 
   /**

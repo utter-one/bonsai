@@ -1,6 +1,7 @@
 import { logger } from '../../../utils/logger';
 import type { ErrorCallback } from '../../../types/callbacks';
 import { IAsrProvider, TextChunk, TextRecognitionCallback } from './IAsrProvider';
+import type { AudioFormat } from '../../../types/audio';
 
 /**
  * Abstract base class for ASR provider implementations
@@ -54,6 +55,12 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   abstract start(): Promise<void>;
 
   /**
+   * Gets the list of supported audio input formats
+   * Subclasses must implement this to expose provider capabilities
+   */
+  abstract getSupportedInputFormats(): AudioFormat[];
+
+  /**
    * Stops the speech recognition session
    * Subclasses must implement this method to stop provider-specific recognition
    */
@@ -64,7 +71,7 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
    * Subclasses must implement this method to send audio to the provider
    * @param audio Binary audio data buffer to be processed
    */
-  abstract sendAudio(audio: Buffer): Promise<void>;
+  abstract sendAudio(audio: Buffer, format?: AudioFormat): Promise<void>;
   /**
    * Registers a callback for partial speech recognition results
    * @param cb Callback function that receives chunk ID and partial text
