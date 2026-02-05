@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { audioFormatValues } from '../../types/audio';
 
 extendZodWithOpenApi(z);
 
@@ -11,12 +12,19 @@ extendZodWithOpenApi(z);
  * Schema for ASR configuration settings
  * Provides configuration for automatic speech recognition
  */
+export const asrSettingsSchema = z.object({
+  language: z.string().optional().describe('The language code for speech recognition (e.g., "en-US")'),
+  dictionaryPhrases: z.array(z.string()).optional().describe('The phrases to add to the speech recognition dictionary'),
+  audioFormat: z.enum(audioFormatValues).optional().describe('Audio input format for speech recognition (e.g., "pcm_16000")'),
+}).openapi('AsrSettings').describe('ASR provider settings');
+
 export const asrConfigSchema = z.object({
   asrProviderId: z.string().optional().describe('ID of the ASR provider (e.g., "azure-speech", "openai-whisper")'),
-  settings: z.unknown().optional().describe('ASR-specific settings including model, language preferences, etc.'),
+  settings: asrSettingsSchema.optional().describe('ASR-specific settings including model, language preferences, etc.'),
 }).openapi('AsrConfig').optional().describe('ASR configuration settings');
 
 export type AsrConfig = z.infer<typeof asrConfigSchema>;
+export type AsrSettings = z.infer<typeof asrSettingsSchema>;
 
 /**
  * Schema for creating a new project

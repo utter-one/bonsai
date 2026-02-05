@@ -41,7 +41,20 @@ Authentication is **required** before using most WebSocket features. Only the `a
   "type": "auth",
   "requestId": "unique-request-id",
   "success": true,
-  "sessionId": "session_abc123xyz"
+  "sessionId": "session_abc123xyz",
+  "projectSettings": {
+    "projectId": "project_123",
+    "acceptVoice": true,
+    "generateVoice": true,
+    "asrConfig": {
+      "asrProviderId": "azure-speech",
+      "settings": {
+        "language": "en-US",
+        "dictionaryPhrases": ["Nexus", "Utter"],
+        "audioFormat": "pcm_16000"
+      }
+    }
+  }
 }
 ```
 
@@ -235,7 +248,8 @@ Stream audio data in chunks as the user speaks:
 **Audio Format Requirements:**
 - Encoding: Base64
 - Recommended chunk size: 1-5 seconds of audio
-- Format depends on server configuration (typically PCM, opus, etc.)
+- Format is agreed before sending audio (use `projectSettings.asrConfig.settings.audioFormat` from the auth response)
+- If `asrConfig` or `audioFormat` is missing, use the server default (currently `pcm_16000`)
 
 ### Phase 3: End Voice Input
 
@@ -318,6 +332,7 @@ The `voiceOutputId` identifies this specific voice output sequence.
   "conversationId": "conv-xyz789",
   "voiceOutputId": "voice-out-001",
   "audioData": "base64-encoded-audio-data...",
+  "audioFormat": "pcm_16000",
   "chunkId": "chunk-001",
   "ordinal": 0,
   "isFinal": false
@@ -814,7 +829,7 @@ class NexusWebSocketClient {
   }
 
   protected onAiVoiceChunk(message: any): void {
-    console.log('AI voice chunk received:', message.chunkId, 'ordinal:', message.ordinal);
+    console.log('AI voice chunk received:', message.chunkId, 'ordinal:', message.ordinal, 'format:', message.audioFormat);
     // Decode base64 audioData and play/buffer it
   }
 
@@ -946,5 +961,5 @@ async function main() {
 ---
 
 **Version:** 1.0  
-**Last Updated:** February 3, 2026  
+**Last Updated:** February 5, 2026  
 **Maintained By:** Nexus Backend Team

@@ -3,6 +3,7 @@ import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHand
 import type { AuthRequest, AuthResponse } from '../contracts/auth';
 import { ConnectionManager } from '../ConnectionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';
+import { ProjectService } from '../../services/ProjectService';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
@@ -18,7 +19,8 @@ export class AuthHandler implements WebSocketHandler<AuthRequest> {
 
   constructor(
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
-    @inject(ApiKeyService) private apiKeyService: ApiKeyService
+    @inject(ApiKeyService) private apiKeyService: ApiKeyService,
+    @inject(ProjectService) private projectService: ProjectService
   ) {}
 
   /**
@@ -39,7 +41,15 @@ export class AuthHandler implements WebSocketHandler<AuthRequest> {
       const sessionId = this.connectionManager.createSession(context.ws, apiKey.projectId);
       logger.info({ sessionId, projectId: apiKey.projectId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
 
-      const response: AuthResponse = { type: 'auth', success: true, sessionId, requestId: message.requestId };
+      const project = await this.projectService.getProjectById(apiKey.projectId);
+      const projectSettings = {
+        projectId: project.id,
+        acceptVoice: project.acceptVoice,
+        generateVoice: project.generateVoice,
+        asrConfig: project.asrConfig ?? null,
+      };
+
+      const response: AuthResponse = { type: 'auth', success: true, sessionId, projectSettings, requestId: message.requestId };
       context.send(context.ws, response);
     } catch (error) {
       logger.error({ error, requestId: message.requestId }, 'Authentication failed: error validating API key');
