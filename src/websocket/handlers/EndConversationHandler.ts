@@ -4,6 +4,7 @@ import type { EndConversationRequest, EndConversationResponse } from '../contrac
 import { ConnectionManager } from '../ConnectionManager';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { ConversationService } from '../../services/ConversationService';
 
 /**
  * Handles end conversation requests.
@@ -14,7 +15,8 @@ export class EndConversationHandler implements WebSocketHandler<EndConversationR
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
-  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager) {}
+  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager,
+    @inject(ConversationService) private conversationService: ConversationService) {}
 
   /**
    * Handles end conversation requests.
@@ -24,6 +26,7 @@ export class EndConversationHandler implements WebSocketHandler<EndConversationR
 
     try {
       this.connectionManager.detachConversationInSession(message.sessionId);
+      this.conversationService.finishConversation(message.conversationId);
 
       const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };
       context.send(context.connection!.ws, response);

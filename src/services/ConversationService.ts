@@ -247,6 +247,47 @@ export class ConversationService extends BaseService {
   }
 
   /**
+   * Marks a conversation as ended/completed
+   * @param id - The unique identifier of the conversation
+   * @param reason - Optional reason for finishing the conversation
+   */
+  async finishConversation(id: string, reason: string = ''): Promise<void> {
+    logger.info({ conversationId: id }, 'Ending conversation');
+
+    try {
+      const existingConversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+
+      if (!existingConversation) {
+        throw new NotFoundError(`Conversation with id ${id} not found`);
+      }
+
+      if (existingConversation.status === 'finished' || existingConversation.status === 'failed' || existingConversation.status === 'aborted') {
+        logger.info({ conversationId: id }, 'Conversation is already ended, skipping');
+        return;
+      }
+
+      // Register conversation end event
+      const eventData: ConversationEventData = {
+        reason,
+        stageId: existingConversation.stageId,
+      };
+      await this.saveConversationEvent(id, 'conversation_end', eventData);
+
+      await db.update(conversations)
+        .set({ 
+          status: 'finished',
+          updatedAt: new Date()
+        })
+        .where(eq(conversations.id, id));
+
+      logger.info({ conversationId: id }, 'Conversation ended successfully');
+    } catch (error) {
+      logger.error({ error, conversationId: id }, 'Failed to end conversation');
+      throw error;
+    }
+  }
+
+  /**
    * Marks a conversation as failed with a reason
    * @param id - The unique identifier of the conversation
    * @param reason - Human-readable description of why the conversation failed
@@ -260,6 +301,13 @@ export class ConversationService extends BaseService {
       if (!existingConversation) {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
+
+      // Register conversation failure event
+      const eventData: ConversationEventData = {
+        reason,
+        stageId: existingConversation.stageId,
+      };
+      await this.saveConversationEvent(id, 'conversation_failed', eventData);
 
       await db.update(conversations)
         .set({ 
