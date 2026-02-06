@@ -1,0 +1,1275 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus-backend.utter.one/schemas/websocket-contracts.json",
+  "title": "WebSocket Message Contracts",
+  "description": "JSON Schema definitions for all WebSocket message types in the Nexus Backend API",
+  "version": "1.0.0",
+  "definitions": {
+    "base-input-message": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "description": "Message type discriminator for the union type system"
+        }
+      },
+      "required": [
+        "requestId",
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "base-output-message": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "Message type discriminator for the union type system"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "session-input-message": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "description": "Message type discriminator for the union type system"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId"
+      ],
+      "additionalProperties": false
+    },
+    "session-output-message": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "Message type discriminator for the union type system"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId"
+      ],
+      "additionalProperties": false
+    },
+    "auth-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "auth",
+          "description": "Message type for authentication"
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API key for authentication"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "apiKey"
+      ],
+      "additionalProperties": false
+    },
+    "auth-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "auth",
+          "description": "Message type for authentication response"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether authentication was successful"
+        },
+        "sessionId": {
+          "description": "Unique identifier for the automatically created session",
+          "type": "string"
+        },
+        "projectSettings": {
+          "description": "Project settings available after authentication",
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Unique identifier of the project"
+            },
+            "acceptVoice": {
+              "type": "boolean",
+              "description": "Whether conversations can accept voice input"
+            },
+            "generateVoice": {
+              "type": "boolean",
+              "description": "Whether conversations generate voice output"
+            },
+            "asrConfig": {
+              "anyOf": [
+                {
+                  "description": "ASR configuration settings",
+                  "type": "object",
+                  "properties": {
+                    "asrProviderId": {
+                      "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")",
+                      "type": "string"
+                    },
+                    "settings": {
+                      "description": "ASR-specific settings including model, language preferences, etc.",
+                      "type": "object",
+                      "properties": {
+                        "language": {
+                          "description": "The language code for speech recognition (e.g., \"en-US\")",
+                          "type": "string"
+                        },
+                        "dictionaryPhrases": {
+                          "description": "The phrases to add to the speech recognition dictionary",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "audioFormat": {
+                          "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")",
+                          "type": "string",
+                          "enum": [
+                            "pcm_16000",
+                            "pcm_22050",
+                            "pcm_44100"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ASR configuration settings with full ASR settings"
+            }
+          },
+          "required": [
+            "projectId",
+            "acceptVoice",
+            "generateVoice"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "description": "Error message if authentication failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "project-settings": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "description": "Unique identifier of the project"
+        },
+        "acceptVoice": {
+          "type": "boolean",
+          "description": "Whether conversations can accept voice input"
+        },
+        "generateVoice": {
+          "type": "boolean",
+          "description": "Whether conversations generate voice output"
+        },
+        "asrConfig": {
+          "anyOf": [
+            {
+              "description": "ASR configuration settings",
+              "type": "object",
+              "properties": {
+                "asrProviderId": {
+                  "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")",
+                  "type": "string"
+                },
+                "settings": {
+                  "description": "ASR-specific settings including model, language preferences, etc.",
+                  "type": "object",
+                  "properties": {
+                    "language": {
+                      "description": "The language code for speech recognition (e.g., \"en-US\")",
+                      "type": "string"
+                    },
+                    "dictionaryPhrases": {
+                      "description": "The phrases to add to the speech recognition dictionary",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "audioFormat": {
+                      "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")",
+                      "type": "string",
+                      "enum": [
+                        "pcm_16000",
+                        "pcm_22050",
+                        "pcm_44100"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ASR configuration settings with full ASR settings"
+        }
+      },
+      "required": [
+        "projectId",
+        "acceptVoice",
+        "generateVoice"
+      ],
+      "additionalProperties": false
+    },
+    "start-conversation-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "start_conversation",
+          "description": "Message type for starting a new conversation"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session ID in which to start the conversation"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User ID initiating the conversation"
+        },
+        "personaId": {
+          "description": "Optional persona ID for the conversation",
+          "type": "string"
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Stage ID to initiate the conversation at a specific stage"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "userId",
+        "stageId"
+      ],
+      "additionalProperties": false
+    },
+    "start-conversation-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "start_conversation",
+          "description": "Message type for start conversation response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether conversation was successfully started"
+        },
+        "conversationId": {
+          "description": "Unique identifier for the created conversation",
+          "type": "string"
+        },
+        "error": {
+          "description": "Error message if conversation creation failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "resume-conversation-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "resume_conversation",
+          "description": "Message type for resuming a conversation"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session ID in which to resume the conversation"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation to resume"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId"
+      ],
+      "additionalProperties": false
+    },
+    "resume-conversation-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "resume_conversation",
+          "description": "Message type for resume conversation response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether conversation was successfully resumed"
+        },
+        "conversationId": {
+          "description": "Unique identifier of the resumed conversation",
+          "type": "string"
+        },
+        "error": {
+          "description": "Error message if conversation resumption failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "end-conversation-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "end_conversation",
+          "description": "Message type for ending a conversation"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session ID containing the conversation"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation to end"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId"
+      ],
+      "additionalProperties": false
+    },
+    "end-conversation-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "end_conversation",
+          "description": "Message type for end conversation response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether conversation was successfully ended"
+        },
+        "error": {
+          "description": "Error message if conversation termination failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "start-user-voice-input-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "start_user_voice_input",
+          "description": "Message type for starting user voice input"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId"
+      ],
+      "additionalProperties": false
+    },
+    "start-user-voice-input-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "start_user_voice_input",
+          "description": "Message type for start user voice input response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether voice input was successfully started"
+        },
+        "error": {
+          "description": "Error message if voice input start failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "send-user-voice-chunk-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "send_user_voice_chunk",
+          "description": "Message type for sending user voice chunk"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "audioData": {
+          "type": "string",
+          "description": "Base64-encoded audio chunk data"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "audioData"
+      ],
+      "additionalProperties": false
+    },
+    "send-user-voice-chunk-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "send_user_voice_chunk",
+          "description": "Message type for send user voice chunk response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether voice chunk was successfully received"
+        },
+        "error": {
+          "description": "Error message if voice chunk processing failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "end-user-voice-input-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "end_user_voice_input",
+          "description": "Message type for ending user voice input"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId"
+      ],
+      "additionalProperties": false
+    },
+    "end-user-voice-input-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "end_user_voice_input",
+          "description": "Message type for end user voice input response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether voice input was successfully ended"
+        },
+        "error": {
+          "description": "Error message if voice input ending failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "send-user-text-input-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "send_user_text_input",
+          "description": "Message type for sending user text input"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text content from the user"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "send-user-text-input-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "send_user_text_input",
+          "description": "Message type for send user text input response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether text input was successfully received"
+        },
+        "error": {
+          "description": "Error message if text input processing failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "go-to-stage-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "go_to_stage",
+          "description": "Message type for navigating to a stage"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Unique identifier of the target stage"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "stageId"
+      ],
+      "additionalProperties": false
+    },
+    "go-to-stage-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "go_to_stage",
+          "description": "Message type for go to stage response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether navigation to the stage was successful"
+        },
+        "error": {
+          "description": "Error message if navigation failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "set-var-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "set_var",
+          "description": "Message type for setting a variable"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Unique identifier of the stage"
+        },
+        "variableName": {
+          "type": "string",
+          "description": "Name of the variable to set"
+        },
+        "variableValue": {
+          "description": "Value to set for the variable (can be any JSON-serializable type)"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "stageId",
+        "variableName",
+        "variableValue"
+      ],
+      "additionalProperties": false
+    },
+    "set-var-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "set_var",
+          "description": "Message type for set variable response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the variable was successfully set"
+        },
+        "error": {
+          "description": "Error message if setting the variable failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "get-var-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "get_var",
+          "description": "Message type for getting a variable"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Unique identifier of the stage"
+        },
+        "variableName": {
+          "type": "string",
+          "description": "Name of the variable to retrieve"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "stageId",
+        "variableName"
+      ],
+      "additionalProperties": false
+    },
+    "get-var-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "get_var",
+          "description": "Message type for get variable response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the variable was successfully retrieved"
+        },
+        "variableName": {
+          "type": "string",
+          "description": "Name of the retrieved variable"
+        },
+        "variableValue": {
+          "description": "Value of the variable (undefined if not found)"
+        },
+        "error": {
+          "description": "Error message if retrieving the variable failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success",
+        "variableName"
+      ],
+      "additionalProperties": false
+    },
+    "get-all-vars-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "get_all_vars",
+          "description": "Message type for getting all variables"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Unique identifier of the stage"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "stageId"
+      ],
+      "additionalProperties": false
+    },
+    "get-all-vars-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "get_all_vars",
+          "description": "Message type for get all variables response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the variables were successfully retrieved"
+        },
+        "variables": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Map of variable names to their values"
+        },
+        "error": {
+          "description": "Error message if retrieving variables failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success",
+        "variables"
+      ],
+      "additionalProperties": false
+    },
+    "run-action-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "run_action",
+          "description": "Message type for running an action"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "actionName": {
+          "type": "string",
+          "description": "Name of the global action to execute"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {},
+          "description": "Array of parameters to pass to the action"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "actionName",
+        "parameters"
+      ],
+      "additionalProperties": false
+    },
+    "run-action-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "run_action",
+          "description": "Message type for run action response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action was successfully executed"
+        },
+        "result": {
+          "description": "Result returned by the action"
+        },
+        "error": {
+          "description": "Error message if action execution failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
+    "start-ai-voice-output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "start_ai_voice_output",
+          "description": "Message type for starting AI voice output"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "voiceOutputId": {
+          "type": "string",
+          "description": "Unique identifier for this voice output sequence for correlation"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "voiceOutputId"
+      ],
+      "additionalProperties": false
+    },
+    "send-ai-voice-chunk": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "send_ai_voice_chunk",
+          "description": "Message type for sending AI voice chunk"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "voiceOutputId": {
+          "type": "string",
+          "description": "Unique identifier for this voice output sequence for correlation"
+        },
+        "audioData": {
+          "type": "string",
+          "description": "Base64-encoded audio chunk data"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "pcm_16000",
+            "pcm_22050",
+            "pcm_44100"
+          ],
+          "description": "Audio format of the chunk data"
+        },
+        "chunkId": {
+          "type": "string",
+          "description": "Unique identifier for this specific audio chunk"
+        },
+        "ordinal": {
+          "type": "number",
+          "description": "Sequential order of this chunk in the voice output sequence"
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "Whether this is the final chunk in the voice output sequence"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "voiceOutputId",
+        "audioData",
+        "audioFormat",
+        "chunkId",
+        "ordinal",
+        "isFinal"
+      ],
+      "additionalProperties": false
+    },
+    "end-ai-voice-output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "end_ai_voice_output",
+          "description": "Message type for ending AI voice output"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "voiceOutputId": {
+          "type": "string",
+          "description": "Unique identifier for this voice output sequence for correlation"
+        },
+        "fullText": {
+          "type": "string",
+          "description": "The full text that was converted to speech, if available"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "voiceOutputId",
+        "fullText"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

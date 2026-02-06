@@ -4,7 +4,42 @@
 
 This guide provides comprehensive documentation for client developers to integrate with the Nexus Backend WebSocket API. The WebSocket server enables real-time, bidirectional communication for managing conversational AI interactions, including voice input/output, text messaging, and conversation state management.
 
-## 🔌 Connection Details
+## � JSON Schema Reference
+
+All WebSocket message contracts are available as **JSON Schema** for validation and code generation in any programming language.
+
+### Accessing the Schema
+
+**HTTP Endpoint:** `GET /websocket-contracts.json`
+- Unauthenticated endpoint serving the complete schema
+- Returns all message type definitions in JSON Schema format
+- Same content as the file below
+
+**File:** [`schemas/websocket-contracts.json`](../schemas/websocket-contracts.json)
+- Contains all 34+ message type definitions in one file
+- Each message type is available under the `definitions` property
+- Use this for client library generation, validation, or documentation
+- JSON Schema Draft 2020-12 format
+
+### Generating the Schema
+
+To regenerate the schema after contract changes:
+```bash
+npm run schemas:generate
+```
+
+This exports all Zod schemas from [`src/websocket/contracts/`](../src/websocket/contracts/) to JSON Schema format using Zod 4.x's built-in `.toJSONSchema()` method.
+
+### Usage Example
+
+Reference a specific message type:
+```json
+{
+  "$ref": "websocket-contracts.json#/definitions/auth-request"
+}
+```
+
+## �🔌 Connection Details
 
 ### WebSocket Endpoint
 ```
