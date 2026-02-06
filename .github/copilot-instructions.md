@@ -1,6 +1,7 @@
 ## Important Notes
 - Try to make changes in batches, not one-by-one (especially easy ones)
 - When changing HTTP contracts, use files in /src/http/contracts
+- When changing WebSocket contracts in /src/websocket/contracts, update src/scripts/generateWebSocketSchemas.ts (integrate into one schema) and run `npm run schemas:generate` to update the JSON Schema
 - Don't create example usages of newly created components
 - When creating database entities, don't forget to add models
 - Make all logger calls one-liners (even if very long) and do not use event field
@@ -10,7 +11,7 @@
 - Add new types of exceptions (extends Error) to /src/errors.ts
 - Always create and update JSDoc comments for functions, methods and classes if necessary
 - Use IoC container for classes with implicit registration by @singleton or @injectable decorator
-- Always verify changes by running `npm run build`
+- Always verify changes by running `npm run build` (this also regenerates WebSocket JSON Schema)
 - Place private methods AFTER the public ones
 - When modifying database entities (e.g. add, rename, remove fields), apply these changes to the corresponding contracts and services
 
@@ -186,4 +187,25 @@ export class ExampleController {
     ];
   }
   ```
+
+
+## WebSocket Contracts
+
+All WebSocket message contracts are defined in `/src/websocket/contracts/` using Zod schemas.
+
+**Key principles:**
+- Define all message types using Zod schemas with `.describe()` for field descriptions
+- WebSocket contracts are automatically exported to JSON Schema at `/schemas/websocket-contracts.json`
+- The schema is served via unauthenticated endpoint: `GET /websocket-contracts.json`
+- When modifying WebSocket contracts, always run `npm run schemas:generate` to update the JSON Schema
+- The build process (`npm run build`) automatically regenerates the schema
+- Ensure descriptions are comprehensive as they appear in the generated JSON Schema
+
+**Contract file structure:**
+- `common.ts` - Base message schemas (input/output, session-based)
+- `auth.ts` - Authentication messages
+- `session.ts` - Session lifecycle messages (start/resume/end conversation)
+- `userInput.ts` - User voice and text input messages
+- `command.ts` - Client commands (go to stage, variables, actions)
+- `aiResponse.ts` - AI voice output messages
 
