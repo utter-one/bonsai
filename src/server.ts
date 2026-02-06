@@ -81,6 +81,13 @@ export function createApp(): express.Application {
     res.send(JSON.stringify(swaggerSpec, null, 2));
   });
 
+  // WebSocket Contracts JSON Schema endpoint
+  app.get('/websocket-contracts.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    const schemaPath = new URL('../schemas/websocket-contracts.json', import.meta.url);
+    res.sendFile(schemaPath.pathname);
+  });
+
   // Authentication middleware (optional - sets req.user if token is valid)
   app.use(optionalAuthMiddleware);
   

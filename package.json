@@ -5,13 +5,14 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run schemas:generate && tsc",
     "start": "npm run db:push && tsx src/index.ts",
     "dev": "npm run db:push && tsx src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "schemas:generate": "tsx src/scripts/generateWebSocketSchemas.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "utter.one",
