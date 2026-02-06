@@ -203,7 +203,7 @@ export class ConversationRunner {
             await this.processUserInput(fullText, 'voice');
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
-            await this.processUserInput(this.stageData.project.asrConfig.unintelligiblePlaceholder ?? '???', 'voice');
+            await this.processUserInput(this.stageData.project.asrConfig.unintelligiblePlaceholder ?? '**inaudible**', 'voice');
           }
         });
 
