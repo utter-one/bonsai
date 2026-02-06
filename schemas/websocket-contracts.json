@@ -187,6 +187,14 @@
                         }
                       },
                       "additionalProperties": false
+                    },
+                    "unintelligiblePlaceholder": {
+                      "description": "Placeholder text to use when speech is unintelligible or cannot be transcribed",
+                      "type": "string"
+                    },
+                    "voiceActivityDetection": {
+                      "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence",
+                      "type": "boolean"
                     }
                   },
                   "additionalProperties": false
@@ -268,6 +276,14 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                "unintelligiblePlaceholder": {
+                  "description": "Placeholder text to use when speech is unintelligible or cannot be transcribed",
+                  "type": "string"
+                },
+                "voiceActivityDetection": {
+                  "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence",
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false

@@ -64,6 +64,7 @@ export const projects = pgTable('projects', {
     asrProviderId?: string;
     settings?: unknown;
     unintelligiblePlaceholder?: string;
+    voiceActivityDetection?: boolean;
   }>(),
   acceptVoice: boolean('accept_voice').notNull().default(true),
   generateVoice: boolean('generate_voice').notNull().default(true),
