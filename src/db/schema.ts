@@ -63,6 +63,7 @@ export const projects = pgTable('projects', {
   asrConfig: jsonb('asr_config').$type<{
     asrProviderId?: string;
     settings?: unknown;
+    unintelligiblePlaceholder?: string;
   }>(),
   acceptVoice: boolean('accept_voice').notNull().default(true),
   generateVoice: boolean('generate_voice').notNull().default(true),
