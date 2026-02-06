@@ -18,11 +18,6 @@ RUN npm ci
 COPY src/ ./src/
 COPY tsconfig.json ./
 COPY drizzle.config.ts ./
-
-# Build the application (this also generates WebSocket schema)
-RUN npm run build
-
-# Copy the generated schema file
 COPY schemas/ ./schemas/
 
 # Expose the application port
