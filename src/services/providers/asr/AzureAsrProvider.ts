@@ -107,6 +107,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     }
 
     this.bufferArray = [];
+    this.textChunks = [];
 
     // Set up event handlers
     this.speechRecognizer.sessionStopped = () => {
