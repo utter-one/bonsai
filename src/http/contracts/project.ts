@@ -21,6 +21,8 @@ export const asrSettingsSchema = z.object({
 export const asrConfigSchema = z.object({
   asrProviderId: z.string().optional().describe('ID of the ASR provider (e.g., "azure-speech", "openai-whisper")'),
   settings: asrSettingsSchema.optional().describe('ASR-specific settings including model, language preferences, etc.'),
+  unintelligiblePlaceholder: z.string().optional().describe('Placeholder text to use when speech is unintelligible or cannot be transcribed'),
+  voiceActivityDetection: z.boolean().optional().describe('Whether to enable voice activity detection to automatically start/stop recording based on speech presence'),
 }).openapi('AsrConfig').optional().describe('ASR configuration settings');
 
 export type AsrConfig = z.infer<typeof asrConfigSchema>;
