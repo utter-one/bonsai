@@ -24,6 +24,7 @@ import { ConversationContext, ConversationContextBuilder } from "./ConversationC
 import { eq } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
+import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -187,8 +188,47 @@ export class ConversationRunner {
         await asrProvider.init();
 
         let isRecognizing = false;
+        let chunkOrdinal = 0;
+        let chunkId = generateId(ID_PREFIXES.CHUNK);
         asrProvider.setOnRecognitionStarted(async () => {
           isRecognizing = true;
+          chunkId = generateId(ID_PREFIXES.CHUNK);
+          chunkOrdinal = 0;
+        });
+
+        asrProvider.setOnRecognizing(async (chunk) => {
+          logger.debug({ conversationId, chunkId }, `ASR recognizing chunk for conversation ${conversationId}: "${chunk}"`);
+
+          // Send interim recognition result to client through WebSocket
+          const message = {
+            type: 'user_transcribed_chunk',
+            conversationId,
+            chunkId,
+            chunkText: chunk,
+            ordinal: chunkOrdinal++,
+            inputTurnId: this.stageData.inputTurnId,
+            isFinal: false,
+          } as UserTranscribedChunkMessage;
+          this.ws.send(JSON.stringify(message));
+        });
+
+        asrProvider.setOnRecognized(async (chunk) => {
+          logger.info({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}: "${chunk}"`);
+
+          // Send final recognition result to client through WebSocket
+          const message = {
+            type: 'user_transcribed_chunk',
+            conversationId,
+            chunkId,
+            chunkText: chunk,
+            ordinal: chunkOrdinal++,
+            inputTurnId: this.stageData.inputTurnId,
+            isFinal: true,
+          } as UserTranscribedChunkMessage;
+          this.ws.send(JSON.stringify(message));
+
+          chunkId = generateId(ID_PREFIXES.CHUNK);
+          chunkOrdinal = 0;
         });
 
         asrProvider.setOnRecognitionStopped(async () => {

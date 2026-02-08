@@ -79,7 +79,7 @@ export const sendUserTextInputResponseSchema = sessionOutputMessageSchema.extend
 export type SendUserTextInputResponse = z.infer<typeof sendUserTextInputResponseSchema>;
 
 export const userTranscribedChunkMessageSchema = z.object({
-  type: z.literal('user_text_chunk').describe('Message type for user text chunk'),
+  type: z.literal('user_transcribed_chunk').describe('Message type for user text chunk'),
   conversationId: z.string().describe('Unique identifier of the conversation'),
   inputTurnId: z.string().describe('Unique identifier for the input turn this chunk belongs to'),
   chunkId: z.string().describe('Unique identifier for this text chunk'),
