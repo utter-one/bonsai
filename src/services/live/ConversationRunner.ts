@@ -208,6 +208,8 @@ export class ConversationRunner {
             ordinal: chunkOrdinal++,
             inputTurnId: this.stageData.inputTurnId,
             isFinal: false,
+            sessionId: this.session.id,
+            requestId: null
           } as UserTranscribedChunkMessage;
           this.ws.send(JSON.stringify(message));
         });
@@ -224,6 +226,8 @@ export class ConversationRunner {
             ordinal: chunkOrdinal++,
             inputTurnId: this.stageData.inputTurnId,
             isFinal: true,
+            sessionId: this.session.id,
+            requestId: null
           } as UserTranscribedChunkMessage;
           this.ws.send(JSON.stringify(message));
 
@@ -272,19 +276,17 @@ export class ConversationRunner {
 
         let firstTtsChunkGenerated = false;
         let isGenerating = false;
-        let outputTurnId: string = null;
 
         ttsProvider.setOnGenerationStarted(async () => {
           logger.info({ conversationId }, `TTS generation started for conversation ${conversationId}`);
           isGenerating = true;
           firstTtsChunkGenerated = false;
-          outputTurnId = `voice_${Math.random().toString(36).substr(2, 9)}`;
 
           // Send AI response start notification to client through WebSocket
           const message = {
             type: 'start_ai_voice_output',
             conversationId,
-            outputTurnId,
+            outputTurnId: this.stageData.outputTurnId,
             sessionId: this.session.id,
             requestId: null
           } as StartAiVoiceOutputMessage;
@@ -300,7 +302,7 @@ export class ConversationRunner {
           const message = {
             type: 'end_ai_voice_output',
             conversationId,
-            outputTurnId,
+            outputTurnId: this.stageData.outputTurnId,
             sessionId: this.session.id,
             requestId: null,
             fullText: this.stageData.lastCompletionResult?.content || ''
@@ -320,7 +322,7 @@ export class ConversationRunner {
           const message = {
             type: 'send_ai_voice_chunk',
             conversationId,
-            outputTurnId,
+            outputTurnId: this.stageData.outputTurnId,
             audioData: chunk.audio.toString('base64'),
             audioFormat: chunk.format,
             chunkId: chunk.chunkId,
@@ -355,6 +357,8 @@ export class ConversationRunner {
 
     // Initialize and wire up completion LLM provider
     if (completionLlmProvider) {
+      let aiTextChunkOrdinal = 0;
+
       completionLlmProvider.setOnChunk(async (chunk: LlmChunk) => {
         logger.debug({ conversationId, chunkLength: chunk.content.length }, `LLM completion chunk for conversation ${conversationId}: ${chunk.content.length} characters`);
         if (ttsProvider) {
@@ -365,9 +369,13 @@ export class ConversationRunner {
           const message = {
             type: 'ai_transcribed_chunk',
             conversationId,
+            outputTurnId: this.stageData.outputTurnId,
             chunkId: generateId(ID_PREFIXES.CHUNK),
             chunkText: chunk.content,
+            ordinal: aiTextChunkOrdinal++,
             isFinal: chunk.finishReason !== null,
+            sessionId: this.session.id,
+            requestId: null
           } as AiTranscribedChunkMessage;
           this.ws.send(JSON.stringify(message));
         }
@@ -918,6 +926,8 @@ export class ConversationRunner {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
     if (shouldGenerateResponse) {
       await this.changeState('generating_response');
+      // Generate outputTurnId for correlation of AI response chunks
+      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
       if (this.stageData.ttsProvider) {
         await this.stageData.ttsProvider.start();
       }

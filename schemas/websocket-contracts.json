@@ -809,10 +809,18 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
         "type": {
           "type": "string",
           "const": "user_transcribed_chunk",
           "description": "Message type for user text chunk"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         },
         "conversationId": {
           "type": "string",
@@ -841,6 +849,7 @@
       },
       "required": [
         "type",
+        "sessionId",
         "conversationId",
         "inputTurnId",
         "chunkId",
@@ -1371,14 +1380,26 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
         "type": {
           "type": "string",
           "const": "ai_transcribed_chunk",
           "description": "Message type for AI transcribed text chunk"
         },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
         "conversationId": {
           "type": "string",
           "description": "Unique identifier of the conversation"
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the output turn this chunk belongs to"
         },
         "chunkId": {
           "type": "string",
@@ -1388,6 +1409,10 @@
           "type": "string",
           "description": "Chunk of transcribed text output from the AI"
         },
+        "ordinal": {
+          "type": "number",
+          "description": "Sequential order of this chunk in the transcription sequence"
+        },
         "isFinal": {
           "type": "boolean",
           "description": "Whether this is the final chunk of text output"
@@ -1395,9 +1420,12 @@
       },
       "required": [
         "type",
+        "sessionId",
         "conversationId",
+        "outputTurnId",
         "chunkId",
         "chunkText",
+        "ordinal",
         "isFinal"
       ],
       "additionalProperties": false

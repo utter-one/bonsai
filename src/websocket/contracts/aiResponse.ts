@@ -35,11 +35,13 @@ export const endAiVoiceOutputMessageSchema = sessionOutputMessageSchema.extend({
 
 export type EndAiVoiceOutputMessage = z.infer<typeof endAiVoiceOutputMessageSchema>;
 
-export const aiTranscribedChunkMessageSchema = z.object({
+export const aiTranscribedChunkMessageSchema = sessionOutputMessageSchema.extend({
   type: z.literal('ai_transcribed_chunk').describe('Message type for AI transcribed text chunk'),
   conversationId: z.string().describe('Unique identifier of the conversation'),
+  outputTurnId: z.string().describe('Unique identifier for the output turn this chunk belongs to'),
   chunkId: z.string().describe('Unique identifier for this text chunk'),
   chunkText: z.string().describe('Chunk of transcribed text output from the AI'),
+  ordinal: z.number().describe('Sequential order of this chunk in the transcription sequence'),
   isFinal: z.boolean().describe('Whether this is the final chunk of text output'),
 });
 
