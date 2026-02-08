@@ -306,7 +306,7 @@ export class ConversationRunner {
             outputTurnId: this.stageData.outputTurnId,
             sessionId: this.session.id,
             requestId: null,
-            fullText: this.stageData.lastCompletionResult?.content || ''
+            fullText: this.stageData.lastCompletionResult?.content || '' // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
           } as EndAiVoiceOutputMessage;
           this.ws.send(JSON.stringify(message));
 
@@ -365,29 +365,29 @@ export class ConversationRunner {
         if (ttsProvider) {
           // Pass chunk text to TTS provider for speech synthesis
           await ttsProvider.sendText(chunk.content);
+        }
 
-          // Send completion chunk to client through WebSocket if enabled
-          if (this.session.sessionSettings.receiveTranscriptionUpdates) {
-            const message = {
-              type: 'ai_transcribed_chunk',
-              conversationId,
-              outputTurnId: this.stageData.outputTurnId,
-              chunkId: generateId(ID_PREFIXES.CHUNK),
-              chunkText: chunk.content,
-              ordinal: aiTextChunkOrdinal++,
-              isFinal: chunk.finishReason !== null,
-              sessionId: this.session.id,
-              requestId: null
-            } as AiTranscribedChunkMessage;
-            this.ws.send(JSON.stringify(message));
-          }
+        // Send completion chunk to client through WebSocket if enabled
+        if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+          const message = {
+            type: 'ai_transcribed_chunk',
+            conversationId,
+            outputTurnId: this.stageData.outputTurnId,
+            chunkId: generateId(ID_PREFIXES.CHUNK),
+            chunkText: chunk.content,
+            ordinal: aiTextChunkOrdinal++,
+            isFinal: chunk.finishReason !== null,
+            sessionId: this.session.id,
+            requestId: null
+          } as AiTranscribedChunkMessage;
+          this.ws.send(JSON.stringify(message));
         }
       });
 
       completionLlmProvider.setOnComplete(async (result) => {
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
-        
+
         // Save AI message event with usage info
         const messageEventData: MessageEventData = {
           text: result.content,
@@ -890,7 +890,7 @@ export class ConversationRunner {
         logger.warn({ conversationId: this.conversation.id, actionName: r.name }, `No matching action found for classification result ${r.name}`);
         return null;
       }
-      
+
       // inject action with parameters into context
       context.actions[stageAction.name] = {
         parameters: r.parameters,
