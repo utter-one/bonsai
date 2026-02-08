@@ -36,7 +36,7 @@ export const endAiVoiceOutputMessageSchema = sessionOutputMessageSchema.extend({
 export type EndAiVoiceOutputMessage = z.infer<typeof endAiVoiceOutputMessageSchema>;
 
 export const aiTranscribedChunkMessageSchema = z.object({
-  type: z.literal('ai_text_chunk').describe('Message type for AI transcribed text chunk'),
+  type: z.literal('ai_transcribed_chunk').describe('Message type for AI transcribed text chunk'),
   conversationId: z.string().describe('Unique identifier of the conversation'),
   chunkId: z.string().describe('Unique identifier for this text chunk'),
   chunkText: z.string().describe('Chunk of transcribed text output from the AI'),

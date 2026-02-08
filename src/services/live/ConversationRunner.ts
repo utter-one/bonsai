@@ -10,7 +10,7 @@ import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
 import { Connection } from "../../websocket/ConnectionManager";
-import { EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../websocket/contracts/aiResponse";
+import { AiTranscribedChunkMessage, EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../websocket/contracts/aiResponse";
 import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
@@ -360,6 +360,16 @@ export class ConversationRunner {
         if (ttsProvider) {
           // Pass chunk text to TTS provider for speech synthesis
           await ttsProvider.sendText(chunk.content);
+
+          // Send completion chunk to client through WebSocket (in case client wants to display partial text while TTS is generating audio)
+          const message = {
+            type: 'ai_transcribed_chunk',
+            conversationId,
+            chunkId: generateId(ID_PREFIXES.CHUNK),
+            chunkText: chunk.content,
+            isFinal: chunk.finishReason !== null,
+          } as AiTranscribedChunkMessage;
+          this.ws.send(JSON.stringify(message));
         }
       });
 
