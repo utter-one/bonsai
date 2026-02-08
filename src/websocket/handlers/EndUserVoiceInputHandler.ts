@@ -33,16 +33,29 @@ export class EndUserVoiceInputHandler implements WebSocketHandler<EndUserVoiceIn
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.connection.runner.stopUserVoiceInput();
+      await context.connection.runner.stopUserVoiceInput(message.inputTurnId);
 
-      const response: EndUserVoiceInputResponse = { type: 'end_user_voice_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      const response: EndUserVoiceInputResponse = { 
+        type: 'end_user_voice_input', 
+        sessionId: message.sessionId, 
+        success: true, 
+        requestId: message.requestId,
+        inputTurnId: message.inputTurnId
+      };
       context.send(context.connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input ended successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to end user voice input';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end user voice input');
-      const response: EndUserVoiceInputResponse = { type: 'end_user_voice_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
+      const response: EndUserVoiceInputResponse = { 
+        type: 'end_user_voice_input', 
+        sessionId: message.sessionId, 
+        success: false, 
+        error: errorMessage, 
+        requestId: message.requestId,
+        inputTurnId: message.inputTurnId
+      };
       context.send(context.connection!.ws, response);
     }
   }

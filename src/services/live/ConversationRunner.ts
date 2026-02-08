@@ -23,6 +23,7 @@ import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { eq } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
+import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -47,6 +48,8 @@ export type StageRuntimeData = {
   ttsProvider?: ITtsProvider;
   voiceConfig?: VoiceConfig;
   shouldEndConversation: boolean;
+  inputTurnId?: string;
+  outputTurnId?: string;
 }
 
 /** 
@@ -229,19 +232,19 @@ export class ConversationRunner {
 
         let firstTtsChunkGenerated = false;
         let isGenerating = false;
-        let voiceOutputId: string = null;
+        let outputTurnId: string = null;
 
         ttsProvider.setOnGenerationStarted(async () => {
           logger.info({ conversationId }, `TTS generation started for conversation ${conversationId}`);
           isGenerating = true;
           firstTtsChunkGenerated = false;
-          voiceOutputId = `voice_${Math.random().toString(36).substr(2, 9)}`;
+          outputTurnId = `voice_${Math.random().toString(36).substr(2, 9)}`;
 
           // Send AI response start notification to client through WebSocket
           const message = {
             type: 'start_ai_voice_output',
             conversationId,
-            voiceOutputId,
+            outputTurnId,
             sessionId: this.session.id,
             requestId: null
           } as StartAiVoiceOutputMessage;
@@ -257,7 +260,7 @@ export class ConversationRunner {
           const message = {
             type: 'end_ai_voice_output',
             conversationId,
-            voiceOutputId,
+            outputTurnId,
             sessionId: this.session.id,
             requestId: null,
             fullText: this.stageData.lastCompletionResult?.content || ''
@@ -277,7 +280,7 @@ export class ConversationRunner {
           const message = {
             type: 'send_ai_voice_chunk',
             conversationId,
-            voiceOutputId,
+            outputTurnId,
             audioData: chunk.audio.toString('base64'),
             audioFormat: chunk.format,
             chunkId: chunk.chunkId,
@@ -420,15 +423,17 @@ export class ConversationRunner {
     throw new Error("Method not implemented.");
   }
 
-  async receiveUserTextInput(userInput: string) {
+  async receiveUserTextInput(userInput: string): Promise<string> {
     if (this.conversation.status !== 'awaiting_user_input') {
       throw new Error(`Cannot receive user input in current state: ${this.conversation.status}`);
     }
 
+    this.stageData.inputTurnId = generateId(ID_PREFIXES.INPUT);
     await this.processUserInput(userInput, 'text');
+    return this.stageData.inputTurnId;
   }
 
-  async startUserVoiceInput() {
+  async startUserVoiceInput(): Promise<string> {
     if (this.conversation.status !== 'awaiting_user_input') {
       throw new Error(`Cannot start receiving user voice input in current state: ${this.conversation.status}`);
     }
@@ -440,9 +445,11 @@ export class ConversationRunner {
     }
 
     try {
+      this.stageData.inputTurnId = generateId(ID_PREFIXES.INPUT);
       await this.stageData.asrProvider.start();
       await this.changeState('receiving_user_voice');
       logger.info({ conversationId: this.stageData.conversation.id }, `Started voice input for conversation ${this.stageData.conversation.id}`);
+      return this.stageData.inputTurnId;
     } catch (error) {
       const errorMessage = `Failed to start voice input: ${error instanceof Error ? error.message : String(error)}`;
       await this.markAsFailed(errorMessage);
@@ -451,9 +458,13 @@ export class ConversationRunner {
     }
   }
 
-  async receiveUserVoiceData(voiceData: Buffer) {
+  async receiveUserVoiceData(inputTurnId: string, voiceData: Buffer) {
     if (this.conversation.status !== 'receiving_user_voice') {
       throw new Error(`Cannot receive user voice data in current state: ${this.conversation.status}`);
+    }
+
+    if (this.stageData.inputTurnId !== inputTurnId) {
+      throw new Error(`Input turn ID mismatch: expected ${this.stageData.inputTurnId}, got ${inputTurnId}`);
     }
 
     if (!this.stageData.asrProvider) {
@@ -473,9 +484,12 @@ export class ConversationRunner {
     }
   }
 
-  async stopUserVoiceInput() {
+  async stopUserVoiceInput(inputTurnId: string) {
     if (this.conversation.status !== 'receiving_user_voice') {
       throw new Error(`Cannot stop receiving user voice input in current state: ${this.conversation.status}`);
+    }
+    if (this.stageData.inputTurnId !== inputTurnId) {
+      throw new Error(`Input turn ID mismatch: expected ${this.stageData.inputTurnId}, got ${inputTurnId}`);
     }
 
     if (!this.stageData.asrProvider) {

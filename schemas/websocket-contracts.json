@@ -1171,7 +1171,7 @@
           "type": "string",
           "description": "Unique identifier of the conversation"
         },
-        "voiceOutputId": {
+        "outputTurnId": {
           "type": "string",
           "description": "Unique identifier for this voice output sequence for correlation"
         }
@@ -1180,7 +1180,7 @@
         "type",
         "sessionId",
         "conversationId",
-        "voiceOutputId"
+        "outputTurnId"
       ],
       "additionalProperties": false
     },
@@ -1205,7 +1205,7 @@
           "type": "string",
           "description": "Unique identifier of the conversation"
         },
-        "voiceOutputId": {
+        "outputTurnId": {
           "type": "string",
           "description": "Unique identifier for this voice output sequence for correlation"
         },
@@ -1239,7 +1239,7 @@
         "type",
         "sessionId",
         "conversationId",
-        "voiceOutputId",
+        "outputTurnId",
         "audioData",
         "audioFormat",
         "chunkId",
@@ -1269,7 +1269,7 @@
           "type": "string",
           "description": "Unique identifier of the conversation"
         },
-        "voiceOutputId": {
+        "outputTurnId": {
           "type": "string",
           "description": "Unique identifier for this voice output sequence for correlation"
         },
@@ -1282,7 +1282,7 @@
         "type",
         "sessionId",
         "conversationId",
-        "voiceOutputId",
+        "outputTurnId",
         "fullText"
       ],
       "additionalProperties": false

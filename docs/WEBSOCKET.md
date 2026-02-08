@@ -351,11 +351,11 @@ The AI response is delivered as streaming voice output with three phases: start,
   "type": "start_ai_voice_output",
   "sessionId": "session_abc123xyz",
   "conversationId": "conv-xyz789",
-  "voiceOutputId": "voice-out-001"
+  "outputTurnId": "voice-out-001"
 }
 ```
 
-The `voiceOutputId` identifies this specific voice output sequence.
+The `outputTurnId` identifies this specific voice output sequence.
 
 ### Phase 2: Receive Voice Chunks
 
@@ -365,7 +365,7 @@ The `voiceOutputId` identifies this specific voice output sequence.
   "type": "send_ai_voice_chunk",
   "sessionId": "session_abc123xyz",
   "conversationId": "conv-xyz789",
-  "voiceOutputId": "voice-out-001",
+  "outputTurnId": "voice-out-001",
   "audioData": "base64-encoded-audio-data...",
   "audioFormat": "pcm_16000",
   "chunkId": "chunk-001",
@@ -383,7 +383,7 @@ The `voiceOutputId` identifies this specific voice output sequence.
 **Client Implementation:**
 - Buffer or immediately play chunks based on `ordinal`
 - Use `isFinal` to detect when the output is complete
-- Correlate chunks using `voiceOutputId`
+- Correlate chunks using `outputTurnId`
 
 ### Phase 3: End AI Voice Output
 
@@ -393,7 +393,7 @@ The `voiceOutputId` identifies this specific voice output sequence.
   "type": "end_ai_voice_output",
   "sessionId": "session_abc123xyz",
   "conversationId": "conv-xyz789",
-  "voiceOutputId": "voice-out-001"
+  "outputTurnId": "voice-out-001"
 }
 ```
 
@@ -860,7 +860,7 @@ class NexusWebSocketClient {
 
   // Override these methods in your implementation
   protected onAiVoiceStart(message: any): void {
-    console.log('AI voice output started:', message.voiceOutputId);
+    console.log('AI voice output started:', message.outputTurnId);
   }
 
   protected onAiVoiceChunk(message: any): void {
@@ -869,7 +869,7 @@ class NexusWebSocketClient {
   }
 
   protected onAiVoiceEnd(message: any): void {
-    console.log('AI voice output ended:', message.voiceOutputId);
+    console.log('AI voice output ended:', message.outputTurnId);
   }
 
   protected onError(message: any): void {

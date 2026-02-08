@@ -34,14 +34,27 @@ export class SendUserVoiceChunkHandler implements WebSocketHandler<SendUserVoice
       }
 
       const audioBuffer = Buffer.from(message.audioData, 'base64');
-      await context.connection.runner.receiveUserVoiceData(audioBuffer);
+      await context.connection.runner.receiveUserVoiceData(message.inputTurnId, audioBuffer);
 
-      const response: SendUserVoiceChunkResponse = { type: 'send_user_voice_chunk', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      const response: SendUserVoiceChunkResponse = { 
+        type: 'send_user_voice_chunk', 
+        sessionId: message.sessionId, 
+        success: true, 
+        requestId: message.requestId,
+        inputTurnId: message.inputTurnId
+      };
       context.send(context.connection.ws, response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process voice chunk';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process voice chunk');
-      const response: SendUserVoiceChunkResponse = { type: 'send_user_voice_chunk', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
+      const response: SendUserVoiceChunkResponse = { 
+        type: 'send_user_voice_chunk', 
+        sessionId: message.sessionId, 
+        success: false, 
+        error: errorMessage, 
+        requestId: message.requestId, 
+        inputTurnId: message.inputTurnId 
+      };
       context.send(context.connection!.ws, response);
     }
   }

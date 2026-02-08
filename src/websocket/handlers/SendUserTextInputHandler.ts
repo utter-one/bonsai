@@ -20,6 +20,7 @@ export class SendUserTextInputHandler implements WebSocketHandler<SendUserTextIn
   async handle(context: WebSocketHandlerContext, message: SendUserTextInputRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user text input request received');
 
+    let inputTurnId = '';
     try {
       if (!context.connection) {
         throw new NotFoundError('Session not found');
@@ -33,16 +34,29 @@ export class SendUserTextInputHandler implements WebSocketHandler<SendUserTextIn
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.connection.runner.receiveUserTextInput(message.text);
+      inputTurnId = await context.connection.runner.receiveUserTextInput(message.text);
 
-      const response: SendUserTextInputResponse = { type: 'send_user_text_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      const response: SendUserTextInputResponse = { 
+        type: 'send_user_text_input', 
+        sessionId: message.sessionId, 
+        success: true, 
+        requestId: message.requestId,
+        inputTurnId: inputTurnId
+      };
       context.send(context.connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User text input received successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process text input';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process text input');
-      const response: SendUserTextInputResponse = { type: 'send_user_text_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
+      const response: SendUserTextInputResponse = { 
+        type: 'send_user_text_input', 
+        sessionId: message.sessionId, 
+        success: false, 
+        error: errorMessage, 
+        requestId: message.requestId,
+        inputTurnId
+      };
       context.send(context.connection!.ws, response);
     }
   }

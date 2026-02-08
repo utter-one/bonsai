@@ -21,6 +21,8 @@ export const ID_PREFIXES = {
   AUDIT: 'audt',
   EVENT: 'evnt',
   REQUEST: 'req',
+  INPUT: 'tinp',
+  OUTPUT: 'tout',
 } as const;
 
 type EntityPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];
