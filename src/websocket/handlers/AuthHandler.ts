@@ -38,7 +38,7 @@ export class AuthHandler implements WebSocketHandler<AuthRequest> {
         return;
       }
 
-      const sessionId = this.connectionManager.createSession(context.ws, apiKey.projectId);
+      const sessionId = this.connectionManager.createSession(context.ws, apiKey.projectId, message.sessionSettings);
       logger.info({ sessionId, projectId: apiKey.projectId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
 
       const project = await this.projectService.getProjectById(apiKey.projectId);

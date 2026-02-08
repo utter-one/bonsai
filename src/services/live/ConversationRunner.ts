@@ -151,13 +151,13 @@ export class ConversationRunner {
       stageData.transformers.push({ transformer, llmProvider });
     }
 
-    // Initialize TTS provider if configured
+    // Initialize TTS provider if configured and client wants voice output
     const persona = await this.personaService.getPersonaById(stageData.stage.personaId);
     if (!persona) {
       throw new NotFoundError(`Persona with ID ${stageData.stage.personaId} not found`);
     }
     const voiceConfig = persona.voiceConfig;
-    if (project.generateVoice && persona.ttsProviderId) {
+    if (project.generateVoice && persona.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
       const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, persona.ttsProviderId) });
       if (voiceProviderEntity) {
         stageData.ttsProvider = this.ttsProviderFactory.createProvider(voiceProviderEntity);
@@ -165,8 +165,8 @@ export class ConversationRunner {
       }
     }
 
-    // Initialize ASR provider if configured
-    if (project.acceptVoice && project.asrConfig?.asrProviderId && project.asrConfig.settings) {
+    // Initialize ASR provider if configured and client wants to send voice input
+    if (project.acceptVoice && project.asrConfig?.asrProviderId && project.asrConfig.settings && this.session.sessionSettings.sendVoiceInput) {
       const asrProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, project.asrConfig.asrProviderId) });
       if (asrProviderEntity) {
         stageData.asrProvider = this.asrProviderFactory.createProvider(asrProviderEntity, project.asrConfig.settings);
@@ -197,37 +197,41 @@ export class ConversationRunner {
         asrProvider.setOnRecognizing(async (chunkId, text) => {
           logger.debug({ conversationId, chunkId }, `ASR recognizing chunk for conversation ${conversationId}: "${text}"`);
 
-          // Send interim recognition result to client through WebSocket
-          const message = {
-            type: 'user_transcribed_chunk',
-            conversationId,
-            chunkId,
-            chunkText: text,
-            ordinal: chunkOrdinal++,
-            inputTurnId: this.stageData.inputTurnId,
-            isFinal: false,
-            sessionId: this.session.id,
-            requestId: null
-          } as UserTranscribedChunkMessage;
-          this.ws.send(JSON.stringify(message));
+          // Send interim recognition result to client through WebSocket if enabled
+          if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+            const message = {
+              type: 'user_transcribed_chunk',
+              conversationId,
+              chunkId,
+              chunkText: text,
+              ordinal: chunkOrdinal++,
+              inputTurnId: this.stageData.inputTurnId,
+              isFinal: false,
+              sessionId: this.session.id,
+              requestId: null
+            } as UserTranscribedChunkMessage;
+            this.ws.send(JSON.stringify(message));
+          }
         });
 
         asrProvider.setOnRecognized(async (chunkId, text) => {
           logger.info({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}: "${text}"`);
 
-          // Send final recognition result to client through WebSocket
-          const message = {
-            type: 'user_transcribed_chunk',
-            conversationId,
-            chunkId,
-            chunkText: text,
-            ordinal: chunkOrdinal++,
-            inputTurnId: this.stageData.inputTurnId,
-            isFinal: true,
-            sessionId: this.session.id,
-            requestId: null
-          } as UserTranscribedChunkMessage;
-          this.ws.send(JSON.stringify(message));
+          // Send final recognition result to client through WebSocket if enabled
+          if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+            const message = {
+              type: 'user_transcribed_chunk',
+              conversationId,
+              chunkId,
+              chunkText: text,
+              ordinal: chunkOrdinal++,
+              inputTurnId: this.stageData.inputTurnId,
+              isFinal: true,
+              sessionId: this.session.id,
+              requestId: null
+            } as UserTranscribedChunkMessage;
+            this.ws.send(JSON.stringify(message));
+          }
 
           chunkOrdinal = 0;
         });
@@ -362,19 +366,21 @@ export class ConversationRunner {
           // Pass chunk text to TTS provider for speech synthesis
           await ttsProvider.sendText(chunk.content);
 
-          // Send completion chunk to client through WebSocket (in case client wants to display partial text while TTS is generating audio)
-          const message = {
-            type: 'ai_transcribed_chunk',
-            conversationId,
-            outputTurnId: this.stageData.outputTurnId,
-            chunkId: generateId(ID_PREFIXES.CHUNK),
-            chunkText: chunk.content,
-            ordinal: aiTextChunkOrdinal++,
-            isFinal: chunk.finishReason !== null,
-            sessionId: this.session.id,
-            requestId: null
-          } as AiTranscribedChunkMessage;
-          this.ws.send(JSON.stringify(message));
+          // Send completion chunk to client through WebSocket if enabled
+          if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+            const message = {
+              type: 'ai_transcribed_chunk',
+              conversationId,
+              outputTurnId: this.stageData.outputTurnId,
+              chunkId: generateId(ID_PREFIXES.CHUNK),
+              chunkText: chunk.content,
+              ordinal: aiTextChunkOrdinal++,
+              isFinal: chunk.finishReason !== null,
+              sessionId: this.session.id,
+              requestId: null
+            } as AiTranscribedChunkMessage;
+            this.ws.send(JSON.stringify(message));
+          }
         }
       });
 

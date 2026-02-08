@@ -1,6 +1,7 @@
 import { singleton, container } from "tsyringe";
 import { ConversationRunner } from "../services/live/ConversationRunner";
 import { meta } from "zod/v4/core";
+import { SessionSettings } from "./contracts/auth";
 
 /** Session data associated with each WebSocket connection. */
 export type Connection =
@@ -15,6 +16,8 @@ export type Connection =
   runner: ConversationRunner;
   /** WebSocket connection associated with this session. */
   ws: WebSocket;
+  /** Session settings configured during authentication. */
+  sessionSettings: SessionSettings;
 };
 
 /**
@@ -34,9 +37,16 @@ export class ConnectionManager {
    * @param projectId - The project ID this session is authenticated for.
    * @returns The generated session ID.
    */
-  createSession(ws: WebSocket, projectId: string) {
+  createSession(ws: WebSocket, projectId: string, sessionSettings?: SessionSettings): string {
     const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
-    this.socketMap.set(ws, { id: sessionId, projectId, conversationId: null, runner: null, ws });
+    this.socketMap.set(ws, { 
+      id: sessionId, 
+      projectId, 
+      conversationId: null, 
+      runner: null, 
+      ws,
+      sessionSettings: sessionSettings ?? { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true }
+    });
     this.connectionMap.set(sessionId, ws);
     return sessionId;
   }

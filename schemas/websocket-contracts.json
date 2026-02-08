@@ -105,6 +105,39 @@
         "apiKey": {
           "type": "string",
           "description": "API key for authentication"
+        },
+        "sessionSettings": {
+          "description": "Session settings for the client",
+          "type": "object",
+          "properties": {
+            "sendVoiceInput": {
+              "default": true,
+              "description": "Whether the client can send voice input",
+              "type": "boolean"
+            },
+            "sendTextInput": {
+              "default": true,
+              "description": "Whether the client can send text input",
+              "type": "boolean"
+            },
+            "receiveVoiceOutput": {
+              "default": true,
+              "description": "Whether the client wants to receive voice output",
+              "type": "boolean"
+            },
+            "receiveTranscriptionUpdates": {
+              "default": true,
+              "description": "Whether the client wants to receive intermediate transcription updates for voice input and output",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "sendVoiceInput",
+            "sendTextInput",
+            "receiveVoiceOutput",
+            "receiveTranscriptionUpdates"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
