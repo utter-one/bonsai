@@ -26,6 +26,10 @@ export class SendUserTextInputHandler implements WebSocketHandler<SendUserTextIn
         throw new NotFoundError('Session not found');
       }
 
+      if (!context.connection.sessionSettings.sendTextInput) {
+        throw new InvalidOperationError('Text input is disabled for this session');
+      }
+
       if (!context.connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }

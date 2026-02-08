@@ -25,6 +25,10 @@ export class EndUserVoiceInputHandler implements WebSocketHandler<EndUserVoiceIn
         throw new NotFoundError('Session not found');
       }
 
+      if (!context.connection.sessionSettings.sendVoiceInput) {
+        throw new InvalidOperationError('Voice input is disabled for this session');
+      }
+
       if (!context.connection.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
