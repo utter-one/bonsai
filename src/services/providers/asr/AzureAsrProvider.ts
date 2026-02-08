@@ -6,6 +6,7 @@ import { AsrProviderBase } from './AsrProviderBase';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { audioFormatValues } from '../../../types/audio';
+import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
 
 extendZodWithOpenApi(z);
 
@@ -42,6 +43,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
   private speechRecognizer?: azureSDK.SpeechRecognizer;
   private recognising = false;
   private audioFormat: AudioFormat = 'pcm_16000';
+  private chunkId: string;
 
   /**
    * Creates a new Azure ASR provider instance
@@ -68,6 +70,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
     this.bufferArray = [];
     this.recognising = false;
     this.audioFormat = this.resolveAudioFormat(this.settings?.audioFormat);
+    this.chunkId = generateId(ID_PREFIXES.CHUNK);
 
     // Check if the required configuration is present
     if (!this.config.subscriptionKey || !this.config.region) {
@@ -108,6 +111,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
 
     this.bufferArray = [];
     this.textChunks = [];
+    this.chunkId = generateId(ID_PREFIXES.CHUNK);
 
     // Set up event handlers
     this.speechRecognizer.sessionStopped = () => {
@@ -138,12 +142,13 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
 
     this.speechRecognizer.recognizing = (_, e) => {
       if (!e?.result?.text) return;
-      this.handleRecognizing(e.result.resultId, e.result.text);
+      this.handleRecognizing(this.chunkId, e.result.text);
     };
 
     this.speechRecognizer.recognized = (_, e) => {
       if (!e?.result?.text) return;
-      this.handleRecognized(e.result.resultId, e.result.text);
+      this.handleRecognized(this.chunkId, e.result.text);
+      this.chunkId = generateId(ID_PREFIXES.CHUNK);
     };
 
     // Start continuous recognition
