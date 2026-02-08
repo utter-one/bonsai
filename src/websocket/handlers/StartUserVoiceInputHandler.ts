@@ -33,16 +33,29 @@ export class StartUserVoiceInputHandler implements WebSocketHandler<StartUserVoi
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.connection.runner.startUserVoiceInput();
+      const inputTurnId = await context.connection.runner.startUserVoiceInput();
 
-      const response: StartUserVoiceInputResponse = { type: 'start_user_voice_input', sessionId: message.sessionId, success: true, requestId: message.requestId };
+      const response: StartUserVoiceInputResponse = { 
+        type: 'start_user_voice_input', 
+        sessionId: message.sessionId, 
+        success: true, 
+        requestId: message.requestId,
+        inputTurnId
+      };
       context.send(context.connection.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input started successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start user voice input';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to start user voice input');
-      const response: StartUserVoiceInputResponse = { type: 'start_user_voice_input', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
+      const response: StartUserVoiceInputResponse = { 
+        type: 'start_user_voice_input', 
+        sessionId: message.sessionId, 
+        success: false, 
+        error: errorMessage, 
+        requestId: message.requestId,
+        inputTurnId: '' // Return empty inputTurnId on failure
+      };
       context.send(context.connection!.ws, response);
     }
   }

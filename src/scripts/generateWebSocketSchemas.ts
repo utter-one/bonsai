@@ -33,6 +33,7 @@ import {
   endUserVoiceInputResponseSchema,
   sendUserTextInputRequestSchema,
   sendUserTextInputResponseSchema,
+  userTranscribedChunkMessageSchema
 } from '../websocket/contracts/userInput';
 
 import {
@@ -52,6 +53,7 @@ import {
   startAiVoiceOutputMessageSchema,
   sendAiVoiceChunkMessageSchema,
   endAiVoiceOutputMessageSchema,
+  aiTranscribedChunkMessageSchema
 } from '../websocket/contracts/aiResponse';
 
 /**
@@ -94,6 +96,7 @@ function generateWebSocketSchemas(): void {
     'end-user-voice-input-response': endUserVoiceInputResponseSchema,
     'send-user-text-input-request': sendUserTextInputRequestSchema,
     'send-user-text-input-response': sendUserTextInputResponseSchema,
+    'user-transcribed-chunk': userTranscribedChunkMessageSchema,
 
     // Commands
     'go-to-stage-request': goToStageRequestSchema,
@@ -111,6 +114,7 @@ function generateWebSocketSchemas(): void {
     'start-ai-voice-output': startAiVoiceOutputMessageSchema,
     'send-ai-voice-chunk': sendAiVoiceChunkMessageSchema,
     'end-ai-voice-output': endAiVoiceOutputMessageSchema,
+    'ai-transcribed-chunk': aiTranscribedChunkMessageSchema
   };
 
   // Generate all schemas into a single file

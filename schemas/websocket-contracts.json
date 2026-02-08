@@ -562,12 +562,17 @@
         "error": {
           "description": "Error message if voice input start failed",
           "type": "string"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the input turn"
         }
       },
       "required": [
         "type",
         "sessionId",
-        "success"
+        "success",
+        "inputTurnId"
       ],
       "additionalProperties": false
     },
@@ -595,6 +600,14 @@
         "audioData": {
           "type": "string",
           "description": "Base64-encoded audio chunk data"
+        },
+        "ordinal": {
+          "type": "number",
+          "description": "Sequential order of this chunk in the voice input sequence"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the input turn"
         }
       },
       "required": [
@@ -602,7 +615,9 @@
         "type",
         "sessionId",
         "conversationId",
-        "audioData"
+        "audioData",
+        "ordinal",
+        "inputTurnId"
       ],
       "additionalProperties": false
     },
@@ -630,12 +645,17 @@
         "error": {
           "description": "Error message if voice chunk processing failed",
           "type": "string"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the input turn"
         }
       },
       "required": [
         "type",
         "sessionId",
-        "success"
+        "success",
+        "inputTurnId"
       ],
       "additionalProperties": false
     },
@@ -659,13 +679,18 @@
         "conversationId": {
           "type": "string",
           "description": "Unique identifier of the conversation"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the input turn"
         }
       },
       "required": [
         "requestId",
         "type",
         "sessionId",
-        "conversationId"
+        "conversationId",
+        "inputTurnId"
       ],
       "additionalProperties": false
     },
@@ -693,12 +718,17 @@
         "error": {
           "description": "Error message if voice input ending failed",
           "type": "string"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the input turn"
         }
       },
       "required": [
         "type",
         "sessionId",
-        "success"
+        "success",
+        "inputTurnId"
       ],
       "additionalProperties": false
     },
@@ -761,12 +791,71 @@
         "error": {
           "description": "Error message if text input processing failed",
           "type": "string"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the input turn, can be used to correlate with voice input if applicable"
         }
       },
       "required": [
         "type",
         "sessionId",
-        "success"
+        "success",
+        "inputTurnId"
+      ],
+      "additionalProperties": false
+    },
+    "user-transcribed-chunk": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "user_transcribed_chunk",
+          "description": "Message type for user text chunk"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the input turn this chunk belongs to"
+        },
+        "chunkId": {
+          "type": "string",
+          "description": "Unique identifier for this text chunk"
+        },
+        "chunkText": {
+          "type": "string",
+          "description": "Chunk of transcribed text input from the user"
+        },
+        "ordinal": {
+          "type": "number",
+          "description": "Sequential order of this chunk in the transcription sequence"
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "Whether this is the final version of the chunk of text input"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "inputTurnId",
+        "chunkId",
+        "chunkText",
+        "ordinal",
+        "isFinal"
       ],
       "additionalProperties": false
     },
@@ -1171,7 +1260,7 @@
           "type": "string",
           "description": "Unique identifier of the conversation"
         },
-        "voiceOutputId": {
+        "outputTurnId": {
           "type": "string",
           "description": "Unique identifier for this voice output sequence for correlation"
         }
@@ -1180,7 +1269,7 @@
         "type",
         "sessionId",
         "conversationId",
-        "voiceOutputId"
+        "outputTurnId"
       ],
       "additionalProperties": false
     },
@@ -1205,7 +1294,7 @@
           "type": "string",
           "description": "Unique identifier of the conversation"
         },
-        "voiceOutputId": {
+        "outputTurnId": {
           "type": "string",
           "description": "Unique identifier for this voice output sequence for correlation"
         },
@@ -1239,7 +1328,7 @@
         "type",
         "sessionId",
         "conversationId",
-        "voiceOutputId",
+        "outputTurnId",
         "audioData",
         "audioFormat",
         "chunkId",
@@ -1269,7 +1358,7 @@
           "type": "string",
           "description": "Unique identifier of the conversation"
         },
-        "voiceOutputId": {
+        "outputTurnId": {
           "type": "string",
           "description": "Unique identifier for this voice output sequence for correlation"
         },
@@ -1282,8 +1371,62 @@
         "type",
         "sessionId",
         "conversationId",
-        "voiceOutputId",
+        "outputTurnId",
         "fullText"
+      ],
+      "additionalProperties": false
+    },
+    "ai-transcribed-chunk": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "ai_transcribed_chunk",
+          "description": "Message type for AI transcribed text chunk"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for the output turn this chunk belongs to"
+        },
+        "chunkId": {
+          "type": "string",
+          "description": "Unique identifier for this text chunk"
+        },
+        "chunkText": {
+          "type": "string",
+          "description": "Chunk of transcribed text output from the AI"
+        },
+        "ordinal": {
+          "type": "number",
+          "description": "Sequential order of this chunk in the transcription sequence"
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "Whether this is the final chunk of text output"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "outputTurnId",
+        "chunkId",
+        "chunkText",
+        "ordinal",
+        "isFinal"
       ],
       "additionalProperties": false
     }
