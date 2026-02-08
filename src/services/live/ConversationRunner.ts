@@ -189,22 +189,20 @@ export class ConversationRunner {
 
         let isRecognizing = false;
         let chunkOrdinal = 0;
-        let chunkId = generateId(ID_PREFIXES.CHUNK);
         asrProvider.setOnRecognitionStarted(async () => {
           isRecognizing = true;
-          chunkId = generateId(ID_PREFIXES.CHUNK);
           chunkOrdinal = 0;
         });
 
-        asrProvider.setOnRecognizing(async (chunk) => {
-          logger.debug({ conversationId, chunkId }, `ASR recognizing chunk for conversation ${conversationId}: "${chunk}"`);
+        asrProvider.setOnRecognizing(async (chunkId, text) => {
+          logger.debug({ conversationId, chunkId }, `ASR recognizing chunk for conversation ${conversationId}: "${text}"`);
 
           // Send interim recognition result to client through WebSocket
           const message = {
             type: 'user_transcribed_chunk',
             conversationId,
             chunkId,
-            chunkText: chunk,
+            chunkText: text,
             ordinal: chunkOrdinal++,
             inputTurnId: this.stageData.inputTurnId,
             isFinal: false,
@@ -214,15 +212,15 @@ export class ConversationRunner {
           this.ws.send(JSON.stringify(message));
         });
 
-        asrProvider.setOnRecognized(async (chunk) => {
-          logger.info({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}: "${chunk}"`);
+        asrProvider.setOnRecognized(async (chunkId, text) => {
+          logger.info({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}: "${text}"`);
 
           // Send final recognition result to client through WebSocket
           const message = {
             type: 'user_transcribed_chunk',
             conversationId,
             chunkId,
-            chunkText: chunk,
+            chunkText: text,
             ordinal: chunkOrdinal++,
             inputTurnId: this.stageData.inputTurnId,
             isFinal: true,
@@ -231,7 +229,6 @@ export class ConversationRunner {
           } as UserTranscribedChunkMessage;
           this.ws.send(JSON.stringify(message));
 
-          chunkId = generateId(ID_PREFIXES.CHUNK);
           chunkOrdinal = 0;
         });
 
