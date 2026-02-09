@@ -59,7 +59,7 @@ export type {
 /**
  * Schema for creating a new global action
  * Required fields: id, name, triggerOnUserInput, triggerOnClientCommand
- * Optional fields: condition, classificationTrigger, overrideClassifierId, effects, template, examples, metadata
+ * Optional fields: condition, classificationTrigger, overrideClassifierId, effects, examples, metadata
  */
 export const createGlobalActionSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the global action (auto-generated if not provided)'),
@@ -71,7 +71,6 @@ export const createGlobalActionSchema = z.object({
   classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID - if set, this action is only enumerated for that specific classifier'),
   effects: z.array(effectSchema).optional().describe('Array of effects to execute when action is triggered'),
-  template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional action-specific metadata'),
 });
@@ -88,7 +87,6 @@ export const updateGlobalActionBodySchema = z.object({
   classificationTrigger: z.string().nullable().optional().describe('Updated classification trigger label'),
   overrideClassifierId: z.string().nullable().optional().describe('Updated override classifier ID'),
   effects: z.array(effectSchema).optional().describe('Updated effects array'),
-  template: z.string().nullable().optional().describe('Updated message template'),
   examples: z.array(z.string()).optional().describe('Updated example phrases'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
@@ -116,7 +114,6 @@ export const globalActionResponseSchema = z.object({
   classificationTrigger: z.string().nullable().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().describe('Optional classifier ID - if set, this action is only enumerated for that specific classifier'),
   effects: z.array(effectSchema).describe('Array of effects to execute'),
-  template: z.string().nullable().describe('Message template for the action'),
   examples: z.array(z.string()).nullable().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
