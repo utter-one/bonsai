@@ -16,6 +16,9 @@ export type ConversationContext = {
   /** User profile data */
   userProfile: Record<string, any>;
 
+  /** Persona prompt that defines AI personality and behavior */
+  persona?: string;
+
   /** Conversation history as an array of messages */
   history: Array<{
     role: 'user' | 'assistant';
@@ -106,27 +109,16 @@ export class ConversationContextBuilder {
     };
   }
 
-  async buildContextForClassifier(conversation: Conversation, stage: Stage): Promise<ConversationContext> {
-    const context: ConversationContext = {
-      conversationId: conversation.id,
-      vars: conversation.stageVars[conversation.stageId] || {},
-      userProfile: {},
-      history: [],
-      actions: {},
-      results: {
-        webhooks: {},
-        tools: {},
-      },
-      stage: this.buildStageContext(stage),
-    };
-
-    return context;
-  }
-
   async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: eq(users.id, conversation.userId),
+    });
+
+    // Load stage with persona
+    const stage = await db.query.stages.findFirst({
+      where: eq(stages.id, conversation.stageId),
+      with: { persona: true },
     });
 
     const context = {
@@ -135,6 +127,7 @@ export class ConversationContextBuilder {
       stageId: conversation.stageId,
       vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: user?.profile || {},
+      persona: stage?.persona?.prompt,
       history: [],
       command: action,
       actions: {
@@ -167,10 +160,17 @@ export class ConversationContextBuilder {
 
 
   async buildContextForConversationStart(conversation: Conversation): Promise<ConversationContext> {
+    // Load stage with persona
+    const stage = await db.query.stages.findFirst({
+      where: eq(stages.id, conversation.stageId),
+      with: { persona: true },
+    });
+
     const context: ConversationContext = {
       conversationId: conversation.id,
       vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: {},
+      persona: stage?.persona?.prompt,
       history: [],
       actions: {},
       results: {
@@ -192,6 +192,7 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: user?.profile || {},
+      persona: (stage as any).persona?.prompt,
       history: [],
       actions: {}, // Convert classification results to actions later
       userInput,

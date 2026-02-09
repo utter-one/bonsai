@@ -99,8 +99,8 @@ export class ConversationRunner {
   }
 
   private async buildStageData(conversation: Conversation): Promise<StageRuntimeData> {
-    // Load current stage data
-    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, conversation.stageId) });
+    // Load current stage data with persona relation
+    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, conversation.stageId), with: { persona: true } });
     if (!stage) {
       throw new NotFoundError(`Stage with ID ${conversation.stageId} not found`);
     }

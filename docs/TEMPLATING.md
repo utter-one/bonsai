@@ -16,6 +16,11 @@ Templates have access to the following context fields:
 
 ### Data Fields
 
+- **`persona`** (string, optional): Persona prompt that defines AI personality and behavior
+  ```handlebars
+  {{persona}}
+  ```
+
 - **`vars`** (object): Stage variables - custom data stored per stage
   ```handlebars
   {{vars.customerName}}
