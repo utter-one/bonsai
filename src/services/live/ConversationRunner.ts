@@ -584,7 +584,7 @@ export class ConversationRunner {
   async goToStage(stageId: string): Promise<void> {
     logger.info({ conversationId: this.conversation.id, currentStageId: this.stageData.id, targetStageId: stageId }, `Navigating to stage ${stageId}`);
 
-    if (this.conversation.status !== 'awaiting_user_input') {
+    if (this.conversation.status !== 'awaiting_user_input' && this.conversation.status !== 'processing_user_input') {
       throw new Error(`Cannot navigate to stage in current state: ${this.conversation.status}`);
     }
 
@@ -598,8 +598,6 @@ export class ConversationRunner {
     this.conversation.stageId = stageId;
 
     // Update conversation in database
-    const { conversations } = await import('../../db/schema');
-    const { eq } = await import('drizzle-orm');
     await db.update(conversations)
       .set({ stageId, updatedAt: new Date() })
       .where(eq(conversations.id, this.conversation.id));
@@ -612,6 +610,22 @@ export class ConversationRunner {
       toStageId: stageId,
     };
     await this.conversationService.saveConversationEvent(this.conversation.id, 'jump_to_stage', eventData);
+
+    // TODO: not sure if this is a good place
+    if (this.stageData.stage.enterBehavior === 'generate_response') {
+      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, '-', '-');
+      const executionOutcome: ActionsExecutionOutcome = {
+        hasModifiedUserInput: false,
+        hasModifiedUserProfile: false,
+        hasModifiedVars: false,
+        success: true,
+        shouldAbortConversation: false,
+        shouldEndConversation: false
+      };
+      this.generateResponse(context, executionOutcome);
+    } else {
+      await this.changeState('awaiting_user_input');
+    }
 
     logger.info({ conversationId: this.conversation.id, stageId }, `Successfully navigated to stage ${stageId}`);
   }
@@ -788,8 +802,10 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
     const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionToExecute, parameters);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
-    await this.applyActionOutcome(context, outcome);
-    await this.generateResponse(context, outcome);
+    if (await this.applyActionOutcome(context, outcome)) {
+      // TODO: this needs more thought
+      await this.generateResponse(context, outcome);
+    }
 
     logger.info({ conversationId: this.conversation.id, actionName }, `Action ${actionName} executed`);
     return { status: 'completed', message: 'Action execution not yet implemented' };
