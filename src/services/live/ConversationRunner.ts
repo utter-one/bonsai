@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, Project, Stage } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, GlobalAction, Project, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
@@ -45,6 +45,7 @@ export type StageRuntimeData = {
   lastCompletionResult?: LlmGenerationResult;
   classifiers: ClassifierRuntimeData[];
   transformers: TransformerRuntimeData[];
+  globalActions: GlobalAction[];
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   voiceConfig?: VoiceConfig;
@@ -116,6 +117,7 @@ export class ConversationRunner {
       lastCompletionResult: null,
       classifiers: [],
       transformers: [],
+      globalActions: [],
       asrProvider: undefined,
       ttsProvider: undefined,
       shouldEndConversation: false,
@@ -149,6 +151,29 @@ export class ConversationRunner {
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, transformer.llmProviderId) });
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, transformer.llmSettings);
       stageData.transformers.push({ transformer, llmProvider });
+    }
+
+    // Load global actions for the stage if enabled
+    if (stage.useGlobalActions) {
+      const { globalActions: globalActionsTable } = await import('../../db/schema');
+      const { inArray } = await import('drizzle-orm');
+      
+      // If stage.globalActions is empty, load all global actions for the project
+      // Otherwise, load only the specified global actions
+      if (stage.globalActions.length === 0) {
+        const allGlobalActions = await db.query.globalActions.findMany({
+          where: (globalActions, { eq }) => eq(globalActions.projectId, project.id)
+        });
+        stageData.globalActions = allGlobalActions;
+      } else {
+        const selectedGlobalActions = await db.query.globalActions.findMany({
+          where: (globalActions, { and, eq }) => and(
+            eq(globalActions.projectId, project.id),
+            inArray(globalActions.id, stage.globalActions)
+          )
+        });
+        stageData.globalActions = selectedGlobalActions;
+      }
     }
 
     // Initialize TTS provider if configured and client wants voice output
@@ -901,19 +926,41 @@ export class ConversationRunner {
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, context);
 
     const stageActions = this.stageData.stage.actions;
+    const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
+    
+    // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
+    const seenActionNames = new Set<string>();
     const actions = classificationResults.map(r => {
-      const stageAction = stageActions[r.name];
-      if (!stageAction) {
-        logger.warn({ conversationId: this.conversation.id, actionName: r.name }, `No matching action found for classification result ${r.name}`);
+      // Skip if we've already processed this action
+      if (seenActionNames.has(r.name)) {
+        logger.debug({ conversationId: this.conversation.id, actionName: r.name }, `Skipping duplicate action ${r.name} detected by multiple classifiers`);
         return null;
       }
-
-      // inject action with parameters into context
-      context.actions[stageAction.name] = {
-        parameters: r.parameters,
-      };
-      return stageAction;
-    }).filter(a => a !== null) as StageAction[];
+      seenActionNames.add(r.name);
+      
+      // First check stage actions
+      const stageAction = stageActions[r.name];
+      if (stageAction) {
+        // inject action with parameters into context
+        context.actions[stageAction.name] = {
+          parameters: r.parameters,
+        };
+        return stageAction;
+      }
+      
+      // Then check global actions
+      const globalAction = globalActionsMap.get(r.name);
+      if (globalAction) {
+        // inject action with parameters into context
+        context.actions[globalAction.name] = {
+          parameters: r.parameters,
+        };
+        return globalAction;
+      }
+      
+      logger.warn({ conversationId: this.conversation.id, actionName: r.name }, `No matching action found for classification result ${r.name}`);
+      return null;
+    }).filter(a => a !== null) as (StageAction | GlobalAction)[];
 
     const executionOutcome = await this.actionsExecutor.executeActions(actions, context)
 

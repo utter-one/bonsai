@@ -2,7 +2,7 @@ import { inject, singleton } from "tsyringe";
 import { Connection } from "../../websocket/ConnectionManager";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
-import { ConversationContext } from "./ConversationContextBuilder";
+import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
 import { ClassificationEventData } from "../../types/conversationEvents";
@@ -17,6 +17,7 @@ import { classificationResultSchema, ActionClassificationResult, ClassificationR
 export class UserInputProcessor {
   constructor(
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
+    @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private conversationService: ConversationService
   ) {}
 
@@ -28,13 +29,26 @@ export class UserInputProcessor {
   async processTextInput(session: Connection, context: ConversationContext): Promise<ActionClassificationResult[]> {
     // How to process:
     // - Get all classifiers for the current stage.
-    // - For each classifier, run the text through it to determine actions. Do this in parallel.
+    // - For each classifier, run the text through it to determine actions with filtered actions based on overrideClassifierId. Do this in parallel.
     // - Collect and return all detected actions from classifiers.
 
     try {
       const classifiers = session.runner.getRuntimeData().classifiers;
+      const stage = session.runner.getRuntimeData().stage;
+      const conversation = session.runner.getRuntimeData().conversation;
+      const globalActions = session.runner.getRuntimeData().globalActions;
+      
       const actionPromises = classifiers.map(async (classifier) => {
-        return this.classifyTextInput(session, classifier, context);
+        // Build context specific to this classifier with filtered actions
+        const classifierContext = await this.contextBuilder.buildContextForClassifier(
+          conversation,
+          stage,
+          globalActions,
+          classifier.classifier.id,
+          context.userInput,
+          context.originalUserInput
+        );
+        return this.classifyTextInput(session, classifier, classifierContext);
       });
 
       const classificationResultsWithClassifiers = await Promise.all(actionPromises);
