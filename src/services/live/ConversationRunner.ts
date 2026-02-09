@@ -10,7 +10,7 @@ import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
 import { Connection } from "../../websocket/ConnectionManager";
-import { AiTranscribedChunkMessage, EndAiVoiceOutputMessage, SendAiVoiceChunkMessage, StartAiVoiceOutputMessage } from "../../websocket/contracts/aiResponse";
+import { AiTranscribedChunkMessage, EndAiGenerationOutputMessage, SendAiVoiceChunkMessage, StartAiGenerationOutputMessage } from "../../websocket/contracts/aiResponse";
 import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
@@ -282,16 +282,6 @@ export class ConversationRunner {
           logger.info({ conversationId }, `TTS generation started for conversation ${conversationId}`);
           isGenerating = true;
           firstTtsChunkGenerated = false;
-
-          // Send AI response start notification to client through WebSocket
-          const message = {
-            type: 'start_ai_voice_output',
-            conversationId,
-            outputTurnId: this.stageData.outputTurnId,
-            sessionId: this.session.id,
-            requestId: null
-          } as StartAiVoiceOutputMessage;
-          this.ws.send(JSON.stringify(message));
         });
 
         ttsProvider.setOnGenerationEnded(async () => {
@@ -301,13 +291,13 @@ export class ConversationRunner {
 
           // Send AI response end notification to client through WebSocket
           const message = {
-            type: 'end_ai_voice_output',
+            type: 'end_ai_generation_output',
             conversationId,
             outputTurnId: this.stageData.outputTurnId,
             sessionId: this.session.id,
             requestId: null,
-            fullText: this.stageData.lastCompletionResult?.content || ''
-          } as EndAiVoiceOutputMessage;
+            fullText: this.stageData.lastCompletionResult?.content || '' // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
+          } as EndAiGenerationOutputMessage;
           this.ws.send(JSON.stringify(message));
 
           this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
@@ -365,29 +355,29 @@ export class ConversationRunner {
         if (ttsProvider) {
           // Pass chunk text to TTS provider for speech synthesis
           await ttsProvider.sendText(chunk.content);
+        }
 
-          // Send completion chunk to client through WebSocket if enabled
-          if (this.session.sessionSettings.receiveTranscriptionUpdates) {
-            const message = {
-              type: 'ai_transcribed_chunk',
-              conversationId,
-              outputTurnId: this.stageData.outputTurnId,
-              chunkId: generateId(ID_PREFIXES.CHUNK),
-              chunkText: chunk.content,
-              ordinal: aiTextChunkOrdinal++,
-              isFinal: chunk.finishReason !== null,
-              sessionId: this.session.id,
-              requestId: null
-            } as AiTranscribedChunkMessage;
-            this.ws.send(JSON.stringify(message));
-          }
+        // Send completion chunk to client through WebSocket if enabled
+        if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+          const message = {
+            type: 'ai_transcribed_chunk',
+            conversationId,
+            outputTurnId: this.stageData.outputTurnId,
+            chunkId: generateId(ID_PREFIXES.CHUNK),
+            chunkText: chunk.content,
+            ordinal: aiTextChunkOrdinal++,
+            isFinal: chunk.finishReason !== null,
+            sessionId: this.session.id,
+            requestId: null
+          } as AiTranscribedChunkMessage;
+          this.ws.send(JSON.stringify(message));
         }
       });
 
       completionLlmProvider.setOnComplete(async (result) => {
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
-        
+
         // Save AI message event with usage info
         const messageEventData: MessageEventData = {
           text: result.content,
@@ -398,6 +388,17 @@ export class ConversationRunner {
         await this.conversationService.saveConversationEvent(this.stageData.conversation.id, 'message', messageEventData);
 
         if (!ttsProvider) {
+          // send end generation message to client to signal that response is complete and change state to awaiting user input
+          const message = {
+            type: 'end_ai_generation_output',
+            conversationId,
+            outputTurnId: this.stageData.outputTurnId,
+            sessionId: this.session.id,
+            requestId: null,
+            fullText: result.content
+          } as EndAiGenerationOutputMessage;
+          this.ws.send(JSON.stringify(message));
+
           await this.changeState('awaiting_user_input'); // In case of no TTS provider, change state to awaiting user input
         } else {
           await ttsProvider.end(); // Signal TTS provider that generation is complete so it can finalize audio output and notify client
@@ -890,7 +891,7 @@ export class ConversationRunner {
         logger.warn({ conversationId: this.conversation.id, actionName: r.name }, `No matching action found for classification result ${r.name}`);
         return null;
       }
-      
+
       // inject action with parameters into context
       context.actions[stageAction.name] = {
         parameters: r.parameters,
@@ -928,9 +929,19 @@ export class ConversationRunner {
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
     if (shouldGenerateResponse) {
+      // Send AI response start notification to client through WebSocket
+      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);      
+      const message = {
+        type: 'start_ai_generation_output',
+        conversationId: this.conversation.id,
+        outputTurnId: this.stageData.outputTurnId,
+        sessionId: this.session.id,
+        requestId: null,
+        expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null
+      } as StartAiGenerationOutputMessage;
+      this.ws.send(JSON.stringify(message));
+
       await this.changeState('generating_response');
-      // Generate outputTurnId for correlation of AI response chunks
-      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
       if (this.stageData.ttsProvider) {
         await this.stageData.ttsProvider.start();
       }

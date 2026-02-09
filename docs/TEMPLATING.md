@@ -13,8 +13,6 @@ Templates have access to the following context fields:
 ### Core Fields
 
 - **`conversationId`** (string): Unique identifier for the conversation
-- **`projectId`** (string): Project the conversation belongs to
-- **`stageId`** (string): Current stage identifier
 
 ### Data Fields
 
@@ -294,8 +292,8 @@ Available Actions:
 {{/if}}
 
 {{#gt history.length 0}}
-Recent Conversation History (last 3 messages):
-{{#each (slice history -3)}}
+Recent Conversation History:
+{{#each history}}
 {{role}}: {{content}}
 {{/each}}
 {{/gt}}
@@ -359,12 +357,21 @@ If a template doesn't render as expected:
 
 ## Two-Pass Rendering
 
-The templating engine performs two-pass rendering, allowing you to generate dynamic template expressions:
+The templating engine performs two-pass rendering, allowing you to generate dynamic template expressions. This is useful when you need to dynamically construct template expressions based on context values.
 
+**How it works:**
+1. First pass: The template is rendered with the context
+2. If the result still contains `{{}}` expressions, a second pass is performed
+3. After two passes, any remaining `{{}}` expressions trigger a warning and are left as-is
+
+**Example:**
 ```handlebars
-{{!-- First pass: Generate the variable name --}}
-{{!-- Second pass: Resolve the generated expression --}}
+{{!-- First pass: Resolves vars.currentLanguage to "en" --}}
+{{!-- Result after first pass: {{vars.en_greeting}} --}}
+{{!-- Second pass: Resolves vars.en_greeting to "Hello" --}}
 {{vars.{{vars.currentLanguage}}_greeting}}
 ```
 
-**Note**: After two passes, any remaining `{{}}` expressions are left as-is with a warning logged.
+If `vars.currentLanguage = "en"` and `vars.en_greeting = "Hello"`, the result would be "Hello".
+
+**Note**: This feature should be used sparingly as it adds complexity. Consider restructuring your data if you find yourself relying on it heavily.

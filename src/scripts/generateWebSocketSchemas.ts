@@ -50,9 +50,9 @@ import {
 } from '../websocket/contracts/command';
 
 import {
-  startAiVoiceOutputMessageSchema,
+  startAiGenerationOutputMessageSchema,
   sendAiVoiceChunkMessageSchema,
-  endAiVoiceOutputMessageSchema,
+  endAiGenerationOutputMessageSchema,
   aiTranscribedChunkMessageSchema
 } from '../websocket/contracts/aiResponse';
 
@@ -111,9 +111,9 @@ function generateWebSocketSchemas(): void {
     'run-action-response': runActionResponseSchema,
 
     // AI responses
-    'start-ai-voice-output': startAiVoiceOutputMessageSchema,
+    'start-ai-generation-output': startAiGenerationOutputMessageSchema,
     'send-ai-voice-chunk': sendAiVoiceChunkMessageSchema,
-    'end-ai-voice-output': endAiVoiceOutputMessageSchema,
+    'end-ai-generation-output': endAiGenerationOutputMessageSchema,
     'ai-transcribed-chunk': aiTranscribedChunkMessageSchema
   };
 
