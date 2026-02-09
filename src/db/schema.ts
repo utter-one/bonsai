@@ -212,7 +212,6 @@ export const globalActions = pgTable('global_actions', {
   classificationTrigger: text('classification_trigger'),
   overrideClassifierId: text('override_classifier_id'),
   effects: jsonb('effects').notNull().default([]).$type<Effect[]>(),
-  template: text('template'),
   examples: jsonb('examples').$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),

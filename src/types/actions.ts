@@ -176,7 +176,6 @@ export const stageActionSchema = z.object({
   overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID - if set, this action is only enumerated for that specific classifier'),
   parameters: z.array(stageActionParameterSchema).describe('Optional array of parameters to extract from user input'),
   effects: z.array(effectSchema).describe('Array of effects to execute when action is triggered'),
-  template: z.string().nullable().optional().describe('Optional message template for the action'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
 }).openapi('StageAction');
