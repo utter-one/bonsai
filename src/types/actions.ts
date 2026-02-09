@@ -173,7 +173,7 @@ export const stageActionSchema = z.object({
   triggerOnUserInput: z.boolean().describe('Whether this action should be triggered on user input'),
   triggerOnClientCommand: z.boolean().describe('Whether this action should be triggered on client commands'),
   classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
-  overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID to override the stage classifier for this action'),
+  overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID - if set, this action is only enumerated for that specific classifier'),
   parameters: z.array(stageActionParameterSchema).describe('Optional array of parameters to extract from user input'),
   effects: z.array(effectSchema).describe('Array of effects to execute when action is triggered'),
   template: z.string().nullable().optional().describe('Optional message template for the action'),

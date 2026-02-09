@@ -109,6 +109,54 @@ export class ConversationContextBuilder {
     };
   }
 
+  /**
+   * Transforms Stage entity into simplified stage context for a specific classifier.
+   * Filters actions to only include those that can be triggered by user input and are assigned to this classifier or have no classifier assignment.
+   * @param stage - Stage entity
+   * @param globalActions - Array of global actions for the stage
+   * @param classifierId - ID of the classifier to filter actions for
+   */
+  private buildStageContextForClassifier(stage: Stage, globalActions: GlobalAction[], classifierId: string) {
+    // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId)
+    const stageActions = Object.entries(stage.actions || {})
+      .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId))
+      .map(([id, action]) => ({
+        id,
+        name: action.name,
+        trigger: action.classificationTrigger,
+        examples: action.examples || undefined,
+        parameters: action.parameters?.map(p => ({
+          name: p.name,
+          type: p.type,
+          description: p.description,
+          required: p.required,
+        })),
+      }));
+
+    // Filter global actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId)
+    const filteredGlobalActions = globalActions
+      .filter(action => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId))
+      .map(action => ({
+        id: action.id,
+        name: action.name,
+        trigger: action.classificationTrigger,
+        examples: action.examples || undefined,
+        parameters: undefined, // Global actions don't have parameters array like stage actions
+      }));
+
+    // Combine stage actions and global actions
+    const availableActions = [...stageActions, ...filteredGlobalActions];
+
+    return {
+      id: stage.id,
+      name: stage.name,
+      availableActions,
+      useKnowledge: stage.useKnowledge,
+      enterBehavior: stage.enterBehavior,
+      metadata: stage.metadata || undefined,
+    };
+  }
+
   async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
@@ -182,6 +230,57 @@ export class ConversationContextBuilder {
     return context;
   }
   
+  /**
+   * Builds context specifically for a classifier with filtered actions.
+   * Only includes actions that are either not assigned to any classifier or assigned to the specific classifier.
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity with persona relation
+   * @param globalActions - Array of global actions for the stage
+   * @param classifierId - ID of the classifier to build context for
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   */
+  async buildContextForClassifier(conversation: Conversation, stage: Stage, globalActions: GlobalAction[], classifierId: string, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+    // Load user data
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, conversation.userId),
+    });
+
+    const context = {
+      conversationId: conversation.id,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      userProfile: user?.profile || {},
+      persona: (stage as any).persona?.prompt,
+      history: [],
+      actions: {}, // Convert classification results to actions later
+      userInput,
+      originalUserInput,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      stage: this.buildStageContextForClassifier(stage, globalActions, classifierId),
+    };
+
+    // Get history from database
+    const messages = await db.query.conversationEvents.findMany({
+      where: and(
+        eq(conversationEvents.conversationId, conversation.id),
+        eq(conversationEvents.eventType, 'message')
+      ),
+      orderBy: asc(conversationEvents.timestamp),
+    });
+    context.history = messages.map(msg => {
+      const eventData = msg.eventData as MessageEventData;
+      return {
+        role: eventData.role,
+        content: eventData.text,
+      };
+    });
+
+    return context;
+  }
+
   async buildContextForUserInput(conversation: Conversation, stage: Stage, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
