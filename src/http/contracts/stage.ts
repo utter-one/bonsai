@@ -94,6 +94,24 @@ export const variablesSchema = z.record(z.string(), z.unknown()).describe('Varia
 /**
  * Schema for action definitions
  * Defines a map of actions available in this conversation stage
+ * 
+ * **Reserved Lifecycle Action Keys:**
+ * Actions with double-underscore prefixes are reserved for lifecycle hooks:
+ * 
+ * - `__on_enter`: Executed when entering the stage (after providers are initialized, before enterBehavior).
+ *   Effects ignored: end_conversation, abort_conversation, go_to_stage.
+ *   Use cases: Initialize variables, fetch data, set up context.
+ * 
+ * - `__on_leave`: Executed when leaving the stage (before loading new stage).
+ *   Effects ignored: go_to_stage, generate_response.
+ *   Use cases: Cleanup, validation, persist data before transition.
+ * 
+ * - `__on_fallback`: Executed when no user action matches after classification.
+ *   No effect restrictions - can do anything.
+ *   Use cases: Help messages, clarification requests, error handling.
+ * 
+ * Lifecycle actions are optional and provide hooks for stage-specific behavior.
+ * Regular actions (without __ prefix) are matched via classification from user input.
  */
 export const actionsSchema = z.record(z.string(), stageActionSchema).describe('Action definitions for this stage (map of action ID to action definition)');
 
