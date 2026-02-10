@@ -18,6 +18,7 @@ RUN npm ci
 COPY src/ ./src/
 COPY tsconfig.json ./
 COPY drizzle.config.ts ./
+COPY drizzle/ ./drizzle/
 COPY schemas/ ./schemas/
 
 # Expose the application port
