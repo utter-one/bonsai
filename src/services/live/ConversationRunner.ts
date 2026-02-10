@@ -490,7 +490,8 @@ export class ConversationRunner {
         hasModifiedVars: false,
         success: true,
         shouldAbortConversation: false,
-        shouldEndConversation: false
+        shouldEndConversation: false,
+        shouldGenerateResponse: true
       }
       await this.generateResponse(context, outcome)
     } else {
@@ -645,7 +646,8 @@ export class ConversationRunner {
         hasModifiedVars: false,
         success: true,
         shouldAbortConversation: false,
-        shouldEndConversation: false
+        shouldEndConversation: false,
+        shouldGenerateResponse: true
       };
       this.generateResponse(context, executionOutcome);
     } else {
@@ -990,7 +992,7 @@ export class ConversationRunner {
   }
 
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
-    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation;
+    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
     if (shouldGenerateResponse) {
       // Send AI response start notification to client through WebSocket
       this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);      
@@ -1024,7 +1026,8 @@ export class ConversationRunner {
       await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_aborted', eventData);
       await this.changeState('finished');
     } else {
-      await this.changeState('finished');
+      // If no response generation, go back to awaiting user input
+      await this.changeState('awaiting_user_input');
     }
   }
 
