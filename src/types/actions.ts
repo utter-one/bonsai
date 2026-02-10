@@ -110,6 +110,14 @@ export const callWebhookEffectSchema = z.object({
 }).openapi('CallWebhookEffect');
 
 /**
+ * Effect type: Generate Response
+ * Triggers AI response generation (must be explicitly added to actions)
+ */
+export const generateResponseEffectSchema = z.object({
+  type: z.literal('generate_response').describe('Effect type'),
+}).openapi('GenerateResponseEffect');
+
+/**
  * Discriminated union of all effect types
  * Defines the possible effects that can be executed in stage actions or global actions
  */
@@ -123,6 +131,7 @@ export const effectSchema = z.discriminatedUnion('type', [
   modifyUserProfileEffectSchema,
   callToolEffectSchema,
   callWebhookEffectSchema,
+  generateResponseEffectSchema,
 ]).openapi('Effect');
 
 // Infer types from schemas
@@ -137,6 +146,7 @@ export type ModifyVariablesEffect = z.infer<typeof modifyVariablesEffectSchema>;
 export type ModifyUserProfileEffect = z.infer<typeof modifyUserProfileEffectSchema>;
 export type CallToolEffect = z.infer<typeof callToolEffectSchema>;
 export type CallWebhookEffect = z.infer<typeof callWebhookEffectSchema>;
+export type GenerateResponseEffect = z.infer<typeof generateResponseEffectSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 
 /**

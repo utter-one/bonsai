@@ -4,7 +4,7 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
-import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GoToStageEffect, ModifyUserInputEffect, ModifyUserProfileEffect, ModifyVariablesEffect, Effect, RunScriptEffect, StageAction } from '../../types/actions';
+import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, ModifyUserProfileEffect, ModifyVariablesEffect, Effect, RunScriptEffect, StageAction } from '../../types/actions';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 
@@ -17,6 +17,7 @@ export type ActionsExecutionOutcome = {
   endReason?: string;
   shouldAbortConversation: boolean;
   abortReason?: string;
+  shouldGenerateResponse: boolean;
   hasModifiedVars: boolean;
   hasModifiedUserInput: boolean;
   hasModifiedUserProfile: boolean;
@@ -32,6 +33,7 @@ export type EffectOutcome = {
     endReason?: string;
     shouldAbortConversation: boolean;
     abortReason?: string;
+    shouldGenerateResponse?: boolean;
     hasModifiedVars?: boolean;
     hasModifiedUserInput?: boolean;
     hasModifiedUserProfile?: boolean;
@@ -93,12 +95,14 @@ export class ActionsExecutor {
         return 5;
       case 'run_script':
         return 6;
-      case 'end_conversation':
+      case 'generate_response':
         return 7;
-      case 'abort_conversation':
+      case 'end_conversation':
         return 8;
-      case 'go_to_stage':
+      case 'abort_conversation':
         return 9;
+      case 'go_to_stage':
+        return 10;
       default:
         return 999; // Unknown effects execute last
     }
@@ -202,6 +206,20 @@ export class ActionsExecutor {
   ): Promise<ActionsExecutionOutcome> {
     logger.info({ conversationId: context.conversationId, actionCount: actions.length }, `Executing ${actions.length} action(s)`);
 
+    // If no actions, return early and generate response
+    if (actions.length === 0) {
+      logger.info({ conversationId: context.conversationId }, `No actions to execute`);
+      return {
+        success: true,
+        shouldEndConversation: false,
+        shouldAbortConversation: false,
+        shouldGenerateResponse: true,
+        hasModifiedVars: false,
+        hasModifiedUserInput: false,
+        hasModifiedUserProfile: false,
+      };
+    }
+
     // Gather all effects from all actions with their source information
     const allEffects: EffectWithSource[] = [];
     for (let i = 0; i < actions.length; i++) {
@@ -234,6 +252,7 @@ export class ActionsExecutor {
       success: true,
       shouldEndConversation: false,
       shouldAbortConversation: false,
+      shouldGenerateResponse: false,
       hasModifiedVars: false,
       hasModifiedUserInput: false,
       hasModifiedUserProfile: false,
@@ -281,6 +300,11 @@ export class ActionsExecutor {
           outcome.endReason = effectResult.endReason;
           shouldStop = true;
           logger.info({ conversationId: context.conversationId, actionName, endReason: effectResult.endReason }, `Conversation will end gracefully - skipping remaining effects`);
+        }
+
+        if (effectResult.shouldGenerateResponse) {
+          outcome.shouldGenerateResponse = true;
+          logger.info({ conversationId: context.conversationId, actionName }, `AI response generation triggered by effect`);
         }
 
         if (effectResult.shouldAbortConversation) {
@@ -339,6 +363,9 @@ export class ActionsExecutor {
 
       case 'call_webhook':
         return await this.executeCallWebhook(effect, context);
+
+      case 'generate_response':
+        return await this.executeGenerateResponse(effect, context);
 
       default:
         throw new Error(`Unknown effect`);
@@ -706,6 +733,23 @@ export class ActionsExecutor {
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,
+    };
+  }
+
+  /**
+   * Executes generate_response effect
+   * Sets flag to trigger AI response generation
+   */
+  private async executeGenerateResponse(
+    effect: GenerateResponseEffect,
+    context: ConversationContext,
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId }, `Setting flag to generate AI response`);
+
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+      shouldGenerateResponse: true,
     };
   }
 }

@@ -24,7 +24,7 @@ import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyR
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { voiceConfigSchema } from './http/contracts/persona';
 import { asrConfigSchema } from './http/contracts/project';
-import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, runScriptEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, callWebhookEffectSchema, stageActionSchema, stageActionParameterSchema } from './types/actions';
+import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, runScriptEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, callWebhookEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema } from './types/actions';
 import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmSettingsSchema } from './services/providers/llm/AnthropicLlmProvider';
@@ -86,6 +86,7 @@ export function getOpenAPISpec(): any {
   registry.register('UserProfileOperation', userProfileOperationSchema);
   registry.register('CallToolEffect', callToolEffectSchema);
   registry.register('CallWebhookEffect', callWebhookEffectSchema);
+  registry.register('GenerateResponseEffect', generateResponseEffectSchema);
   registry.register('Effect', effectSchema);
   registry.register('StageActionParameter', stageActionParameterSchema);
   registry.register('StageAction', stageActionSchema);
