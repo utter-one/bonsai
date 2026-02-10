@@ -21,7 +21,6 @@ export const auditLogResponseSchema = z.object({
   newEntity: z.record(z.string(), z.unknown()).nullable().describe('Entity state after the change'),
   version: z.number().int().describe('Version number for the audit log'),
   createdAt: z.coerce.date().describe('Timestamp when the audit log was created'),
-  updatedAt: z.coerce.date().describe('Timestamp when the audit log was last updated'),
 });
 
 /**

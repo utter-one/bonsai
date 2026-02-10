@@ -217,7 +217,6 @@ export class AuditService {
         entityType: auditLogs.entityType,
         version: auditLogs.version,
         createdAt: auditLogs.createdAt,
-        updatedAt: auditLogs.updatedAt,
       };
 
       // Apply filters

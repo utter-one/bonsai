@@ -291,7 +291,6 @@ export const auditLogs = pgTable('audit_logs', {
   newEntity: jsonb('new_entity').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 // ConversationAsset table

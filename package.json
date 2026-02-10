@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "npm run schemas:generate && tsc",
-    "start": "npm run db:push && tsx src/index.ts",
-    "dev": "npm run db:push && tsx src/index.ts",
+    "start": "npm run db:migrate && tsx src/index.ts",
+    "dev": "npm run db:migrate && tsx src/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push",

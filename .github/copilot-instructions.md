@@ -15,6 +15,34 @@
 - Place private methods AFTER the public ones
 - When modifying database entities (e.g. add, rename, remove fields), apply these changes to the corresponding contracts and services
 
+## Database Migrations
+
+The project uses Drizzle ORM with migrations for database schema changes.
+
+**Key principles:**
+- **Always use migrations** for schema changes (never use `db:push` in production)
+- Schema changes flow: Update `/src/db/schema.ts` → Generate migration → Apply migration
+- All migrations are stored in `/drizzle/` folder and version controlled
+
+**Workflow for schema changes:**
+1. Update the schema in `/src/db/schema.ts`
+2. Update corresponding contracts in `/src/http/contracts/` (remove/add fields in Zod schemas)
+3. Update services that reference the changed columns (column maps, queries, etc.)
+4. Generate migration: `npm run db:generate`
+5. Review the generated SQL in `/drizzle/XXXX_*.sql`
+6. Apply migration: `npm run db:migrate`
+7. Verify with `npm run build` to ensure TypeScript types align
+
+**Important commands:**
+- `npm run db:generate` - Generate a new migration based on schema changes
+- `npm run db:migrate` - Apply pending migrations to the database
+- `npm run db:studio` - Open Drizzle Studio to browse database
+
+**Docker deployment:**
+- Migrations run automatically on container startup before the application starts
+- Migration files in `/drizzle/` are copied to the Docker image
+- Connection uses `DB_CONNECTION_STRING` environment variable
+
 ## Controller Architecture
 
 All controllers use plain Express with explicit route registration. Follow this pattern:
