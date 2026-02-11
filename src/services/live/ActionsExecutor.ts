@@ -278,7 +278,7 @@ export class ActionsExecutor {
       hasModifiedUserProfile: false,
     };
 
-    let currentContext = { ...context };
+    let currentContext = context;
     let shouldStop = false;
 
     // Execute all effects in priority order
@@ -475,6 +475,7 @@ export class ActionsExecutor {
       const modifiedInput = await this.templatingEngine.render(effect.template, context);
 
       logger.info({ conversationId: context.conversationId, originalInput: context.userInput, modifiedInput }, `User input modified`);
+      context.userInput = modifiedInput;
 
       return {
         shouldEndConversation: false,
