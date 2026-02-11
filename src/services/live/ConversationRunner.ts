@@ -488,6 +488,10 @@ export class ConversationRunner {
       logger.debug({ conversationId: this.conversation.id, stageId: this.stageData.id }, 'Executing __on_enter lifecycle action');
       const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
+      if (!enterOutcome.success) {
+        this.markAsFailed(`Failed to execute on_enter action`);
+        return;
+      }
       await this.applyActionOutcome(context, enterOutcome);
       
       // If on_enter ended or aborted conversation, don't proceed
@@ -945,12 +949,6 @@ export class ConversationRunner {
     this.conversation.statusDetails = reason;
     await this.conversationService.saveConversationState(this.conversation.id, 'failed', reason);
     logger.error({ conversationId: this.stageData.conversation.id, reason }, `Conversation ${this.stageData.conversation.id} marked as failed: ${reason}`);
-
-    const eventData: ConversationFailedEventData = {
-      error: reason,
-      stageId: this.stageData.id,
-    };
-    await this.conversationService.saveConversationEvent(this.conversation.id, 'conversation_failed', eventData);
 
     // Update conversation status via ConversationService
     try {

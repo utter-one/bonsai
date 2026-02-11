@@ -109,7 +109,7 @@ export const conversationAbortedEventDataSchema = z.object({
 export type ConversationAbortedEventData = z.infer<typeof conversationAbortedEventDataSchema>;
 
 export const conversationFailedEventDataSchema = z.object({
-  error: z.string(),
+  reason: z.string(),
   stageId: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });

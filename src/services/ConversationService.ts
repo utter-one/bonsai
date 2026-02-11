@@ -304,7 +304,7 @@ export class ConversationService extends BaseService {
 
       // Register conversation failure event
       const eventData: ConversationEventData = {
-        reason,
+        reason: reason,
         stageId: existingConversation.stageId,
       };
       await this.saveConversationEvent(id, 'conversation_failed', eventData);
@@ -418,12 +418,12 @@ export class ConversationService extends BaseService {
         offset,
       });
 
-      return conversationEventListResponseSchema.parse({
+      return {
         items: eventList,
         total,
         offset,
         limit,
-      });
+      };
     } catch (error) {
       logger.error({ error, conversationId, params }, 'Failed to fetch conversation events');
       throw error;
