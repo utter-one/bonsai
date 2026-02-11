@@ -104,6 +104,8 @@ export interface LlmGenerationOptions {
   presencePenalty?: number;
   /** Custom metadata to attach to the request */
   metadata?: Record<string, any>;
+  /** Output format for the generation */
+  outputFormat?: 'text' | 'json' | 'image';
 }
 
 /**

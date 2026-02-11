@@ -15,6 +15,13 @@
       "when": 1770708948687,
       "tag": "0001_keen_kronos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770819149955,
+      "tag": "0002_stale_lockjaw",
+      "breakpoints": true
     }
   ]
 }

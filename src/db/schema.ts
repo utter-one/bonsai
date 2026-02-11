@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { StageAction, Effect } from '../types/actions';
+import { StageAction, Effect, ToolParameter } from '../types/actions';
 import { ConversationState } from '../types/conversationEvents';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
@@ -135,6 +135,7 @@ export const tools = pgTable('tools', {
   llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
   inputType: text('input_type').$type<ToolInputType>().notNull(),
   outputType: text('output_type').$type<ToolOutputType>().notNull(),
+  parameters: jsonb('parameters').notNull().default([]).$type<ToolParameter[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

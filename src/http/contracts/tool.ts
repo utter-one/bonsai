@@ -2,10 +2,13 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
+import { toolParameterSchema } from '../../types/actions';
+import type { ToolParameter } from '../../types/actions';
 
 extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
+export { toolParameterSchema, type ToolParameter };
 
 /**
  * Schema for tool input types
@@ -43,6 +46,7 @@ export const createToolSchema = z.object({
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this tool'),
   inputType: toolInputTypeSchema.describe('Expected input format for the tool'),
   outputType: toolOutputTypeSchema.describe('Expected output format from the tool'),
+  parameters: z.array(toolParameterSchema).optional().default([]).describe('Parameters that this tool expects to receive'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional tool-specific metadata'),
 });
 
@@ -58,6 +62,7 @@ export const updateToolBodySchema = z.object({
   llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
   inputType: toolInputTypeSchema.optional().describe('Updated input format'),
   outputType: toolOutputTypeSchema.optional().describe('Updated output format'),
+  parameters: z.array(toolParameterSchema).optional().describe('Updated parameters for the tool'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -84,6 +89,7 @@ export const toolResponseSchema = z.object({
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
   inputType: toolInputTypeSchema.describe('Expected input format'),
   outputType: toolOutputTypeSchema.describe('Expected output format'),
+  parameters: z.array(toolParameterSchema).describe('Parameters that this tool expects to receive'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the tool was created'),

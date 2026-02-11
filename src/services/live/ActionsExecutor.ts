@@ -4,10 +4,12 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
+import { ToolExecutor } from './ToolExecutor';
 import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, ModifyUserProfileEffect, ModifyVariablesEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
+import { NotFoundError } from '../../errors';
 
 /**
  * Execution result for an action
@@ -60,6 +62,7 @@ export class ActionsExecutor {
   constructor(
     @inject(IsolatedScriptExecutor) private readonly scriptRunner: IsolatedScriptExecutor,
     @inject(ToolService) private readonly toolService: ToolService,
+    @inject(ToolExecutor) private readonly toolExecutor: ToolExecutor,
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
   ) {}
@@ -651,19 +654,83 @@ export class ActionsExecutor {
     logger.info({ conversationId: context.conversationId, toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
 
     try {
-      // Load the tool
+      // 1. Load the tool
       const tool = await this.toolService.getToolById(effect.toolId);
+      if (!tool) {
+        throw new NotFoundError(`Tool with ID ${effect.toolId} not found`);
+      }
 
-      // TODO: Implement actual tool execution logic
-      // This would involve:
-      // 1. Validating input parameters against tool.inputType
-      // 2. Executing the tool (likely calling an LLM with the tool's prompt)
-      // 3. Storing the result in context or variables
-      // 4. Validating output against tool.outputType
+      logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, inputType: tool.inputType, outputType: tool.outputType }, `Tool loaded: ${tool.name}`);
 
-      logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool execution not yet fully implemented`);
+      // 2. Validate input parameters against tool.inputType
+      // The inputType tells us what format we expect:
+      // - 'text': parameters should be simple string values
+      // - 'image': parameters might contain image data/URLs
+      // - 'multi-modal': parameters can be mixed
+      // For now, we'll do basic validation that parameters exist and match expectations
+      if (tool.inputType === 'text') {
+        // For text input, ensure all parameters can be serialized to text
+        for (const [key, value] of Object.entries(effect.parameters)) {
+          if (value !== null && value !== undefined && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId, parameterName: key, parameterType: typeof value }, `Parameter ${key} is not a simple type for text-based tool`);
+          }
+        }
+      }
 
-      logger.info({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool called successfully: ${tool.name}`);
+      logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, parameters: effect.parameters }, `Input parameters validated for tool`);
+
+      // 3. Execute the tool using ToolExecutor
+      // ToolExecutor will:
+      // - Load the LLM provider
+      // - Render the tool prompt with context and parameters
+      // - Call the LLM
+      // - Return the result
+      const executionResult = await this.toolExecutor.executeTool(tool as any, context, effect.parameters);
+
+      if (!executionResult.success) {
+        throw new Error(executionResult.failureReason || 'Tool execution failed');
+      }
+
+      logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, hasResult: !!executionResult.result }, `Tool executed successfully`);
+
+      // 4. Validate output against tool.outputType
+      // Check that the result format matches what we expect
+      if (executionResult.result !== undefined && executionResult.result !== null) {
+        const resultType = typeof executionResult.result;
+        
+        if (tool.outputType === 'text') {
+          // For text output, result should be a string or easily convertible
+          if (resultType !== 'string') {
+            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId, resultType }, `Tool output type is '${tool.outputType}' but result is ${resultType}, will convert to string`);
+            executionResult.result = String(executionResult.result);
+          }
+        } else if (tool.outputType === 'image') {
+          // For image output, we'd expect specific format (URL, base64, etc.)
+          // This is a placeholder for future image validation
+          logger.debug({ conversationId: context.conversationId, toolId: effect.toolId }, `Image output type - result format not strictly validated`);
+        }
+        // For 'multi-modal', we accept any format
+      }
+
+      // 5. Store the result in context.results.tools
+      if (!context.results) {
+        context.results = { webhooks: {}, tools: {} };
+      }
+      if (!context.results.tools) {
+        context.results.tools = {};
+      }
+
+      context.results.tools[tool.id] = {
+        toolId: tool.id,
+        toolName: tool.name,
+        inputType: tool.inputType,
+        outputType: tool.outputType,
+        parameters: effect.parameters,
+        result: executionResult.result,
+        executedAt: new Date().toISOString(),
+      };
+
+      logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name }, `Tool called successfully and result stored: ${tool.name}`);
     } catch (error) {
       logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
       throw error;
