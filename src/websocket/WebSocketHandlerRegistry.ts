@@ -62,7 +62,7 @@ export class WebSocketHandlerRegistry {
  */
 export function WebSocketMessageHandler(messageType: string, requiresAuth: boolean = true) {
   return function <T extends new (...args: any[]) => WebSocketHandler>(constructor: T): T {
-    logger.info({ messageType, requiresAuth }, `Registering message handler for type "${messageType}"`);
+    logger.debug({ messageType, requiresAuth }, `Registering message handler for type "${messageType}"`);
     // Register the handler class
     WebSocketHandlerRegistry.register(messageType, () => container.resolve(constructor), requiresAuth);
 

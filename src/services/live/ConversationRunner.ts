@@ -157,7 +157,7 @@ export class ConversationRunner {
     if (stage.useGlobalActions) {
       const { globalActions: globalActionsTable } = await import('../../db/schema');
       const { inArray } = await import('drizzle-orm');
-      
+
       // If stage.globalActions is empty, load all global actions for the project
       // Otherwise, load only the specified global actions
       if (stage.globalActions.length === 0) {
@@ -487,10 +487,7 @@ export class ConversationRunner {
     if (onEnterAction) {
       const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
-      if (!enterOutcome.success) {
-        this.markAsFailed(`Failed to execute on_enter action`);
-        return;
-      }
+      await this.applyActionOutcome(context, enterOutcome);
 
       // Register action event
       const actionEventData: ActionEventData = {
@@ -500,8 +497,6 @@ export class ConversationRunner {
       };
       await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
 
-      await this.applyActionOutcome(context, enterOutcome);
-      
       // If on_enter ended or aborted conversation, don't proceed
       if (enterOutcome.shouldEndConversation || enterOutcome.shouldAbortConversation) {
         return;
@@ -650,6 +645,8 @@ export class ConversationRunner {
       const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, '-', '-');
       const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
 
+      await this.applyActionOutcome(context, leaveOutcome);
+
       // Register action event
       const actionEventData: ActionEventData = {
         actionName: onLeaveAction.name || '',
@@ -658,8 +655,6 @@ export class ConversationRunner {
       };
       await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
 
-      await this.applyActionOutcome(context, leaveOutcome);
-      
       // If on_leave ended or aborted conversation, don't proceed
       if (leaveOutcome.shouldEndConversation || leaveOutcome.shouldAbortConversation) {
         return;
@@ -694,6 +689,8 @@ export class ConversationRunner {
       const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, '-', '-');
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
 
+      await this.applyActionOutcome(context, enterOutcome);
+
       // Register action event
       const actionEventData: ActionEventData = {
         actionName: onEnterAction.name || '',
@@ -702,8 +699,6 @@ export class ConversationRunner {
       };
       await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
 
-      await this.applyActionOutcome(context, enterOutcome);
-      
       // If on_enter ended or aborted conversation, don't proceed
       if (enterOutcome.shouldEndConversation || enterOutcome.shouldAbortConversation) {
         return;
@@ -1001,7 +996,7 @@ export class ConversationRunner {
         .filter(([name]) => !lifecycleActionNames.includes(name))
     );
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
-    
+
     // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
     const seenActionNames = new Set<string>();
     const actions = classificationResults.map(r => {
@@ -1011,7 +1006,7 @@ export class ConversationRunner {
         return null;
       }
       seenActionNames.add(r.name);
-      
+
       // First check stage actions
       const stageAction = stageActions[r.name];
       if (stageAction) {
@@ -1021,7 +1016,7 @@ export class ConversationRunner {
         };
         return stageAction;
       }
-      
+
       // Then check global actions
       const globalAction = globalActionsMap.get(r.name);
       if (globalAction) {
@@ -1031,31 +1026,29 @@ export class ConversationRunner {
         };
         return globalAction;
       }
-      
+
       logger.warn({ conversationId: this.conversation.id, actionName: r.name }, `No matching action found for classification result ${r.name}`);
       return null;
     }).filter(a => a !== null) as (StageAction | GlobalAction)[];
 
     // If no actions matched and __on_fallback is defined, execute it
     let executionOutcome: ActionsExecutionOutcome;
-    if (actions.length === 0) {
-      const onFallbackAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_FALLBACK];
-      if (onFallbackAction) {
-        logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
-        executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
+    const onFallbackAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_FALLBACK];
+    if (actions.length === 0 && onFallbackAction) {
+      logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
+      executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
+      await this.applyActionOutcome(context, executionOutcome);
 
-        // Register action event for __on_fallback
-        const actionEventData: ActionEventData = {
-          actionName: onFallbackAction.name || '',
-          stageId: this.stageData.id,
-          effects: onFallbackAction.effects,
-        };
-        await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
-      } else {
-        executionOutcome = await this.actionsExecutor.executeActions(actions, context);
-      }
+      // Register action event for __on_fallback
+      const actionEventData: ActionEventData = {
+        actionName: onFallbackAction.name || '',
+        stageId: this.stageData.id,
+        effects: onFallbackAction.effects,
+      };
+      await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
     } else {
       executionOutcome = await this.actionsExecutor.executeActions(actions, context);
+      await this.applyActionOutcome(context, executionOutcome);
     }
 
     // Register action events after execution
@@ -1067,8 +1060,6 @@ export class ConversationRunner {
       };
       await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
     }
-
-    await this.applyActionOutcome(context, executionOutcome);
 
     // Save event for user message
     const messageEventData: MessageEventData = {
@@ -1087,7 +1078,7 @@ export class ConversationRunner {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
     if (shouldGenerateResponse) {
       // Send AI response start notification to client through WebSocket
-      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);      
+      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
       const message = {
         type: 'start_ai_generation_output',
         conversationId: this.conversation.id,
