@@ -98,3 +98,23 @@ export const runActionResponseSchema = sessionOutputMessageSchema.extend({
 });
 
 export type RunActionResponse = z.infer<typeof runActionResponseSchema>;
+
+/** Request to call a tool with parameters. */
+export const callToolRequestSchema = sessionInputMessageSchema.extend({
+  type: z.literal('call_tool').describe('Message type for calling a tool'),
+  conversationId: z.string().describe('Unique identifier of the conversation'),
+  toolId: z.string().describe('Unique identifier of the tool to execute'),
+  parameters: z.record(z.string(), z.any()).describe('Map of parameter names to their values'),
+});
+
+export type CallToolRequest = z.infer<typeof callToolRequestSchema>;
+
+/** Response to call tool request. */
+export const callToolResponseSchema = sessionOutputMessageSchema.extend({
+  type: z.literal('call_tool').describe('Message type for call tool response'),
+  success: z.boolean().describe('Whether the tool was successfully executed'),
+  result: z.any().optional().describe('Result returned by the tool execution'),
+  error: z.string().optional().describe('Error message if tool execution failed'),
+});
+
+export type CallToolResponse = z.infer<typeof callToolResponseSchema>;

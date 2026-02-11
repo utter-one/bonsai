@@ -1272,6 +1272,86 @@
       ],
       "additionalProperties": false
     },
+    "call-tool-request": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "type": {
+          "type": "string",
+          "const": "call_tool",
+          "description": "Message type for calling a tool"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "toolId": {
+          "type": "string",
+          "description": "Unique identifier of the tool to execute"
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Map of parameter names to their values"
+        }
+      },
+      "required": [
+        "requestId",
+        "type",
+        "sessionId",
+        "conversationId",
+        "toolId",
+        "parameters"
+      ],
+      "additionalProperties": false
+    },
+    "call-tool-response": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "call_tool",
+          "description": "Message type for call tool response"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the tool was successfully executed"
+        },
+        "result": {
+          "description": "Result returned by the tool execution"
+        },
+        "error": {
+          "description": "Error message if tool execution failed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "success"
+      ],
+      "additionalProperties": false
+    },
     "start-ai-generation-output": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

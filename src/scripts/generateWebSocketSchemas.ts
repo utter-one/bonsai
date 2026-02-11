@@ -47,6 +47,8 @@ import {
   getAllVarsResponseSchema,
   runActionRequestSchema,
   runActionResponseSchema,
+  callToolRequestSchema,
+  callToolResponseSchema,
 } from '../websocket/contracts/command';
 
 import {
@@ -109,6 +111,8 @@ function generateWebSocketSchemas(): void {
     'get-all-vars-response': getAllVarsResponseSchema,
     'run-action-request': runActionRequestSchema,
     'run-action-response': runActionResponseSchema,
+    'call-tool-request': callToolRequestSchema,
+    'call-tool-response': callToolResponseSchema,
 
     // AI responses
     'start-ai-generation-output': startAiGenerationOutputMessageSchema,

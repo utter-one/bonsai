@@ -1,4 +1,5 @@
 export { AuthHandler } from './AuthHandler';
+export { CallToolHandler } from './CallToolHandler';
 export { EndConversationHandler } from './EndConversationHandler';
 export { EndUserVoiceInputHandler } from './EndUserVoiceInputHandler';
 export { GetAllVarsHandler } from './GetAllVarsHandler';
