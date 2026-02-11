@@ -27,6 +27,7 @@ export const openAILlmSettingsSchema = z.object({
   defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
   defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
   defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
+  
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
 }).openapi('OpenAILlmSettings');
 
@@ -133,7 +134,6 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       throw new Error('OpenAI client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const input = this.convertMessagesToInput(messages);
     const systemMessage = messages.find((m) => m.role === 'system');
 
@@ -146,11 +146,11 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
         model: this.settings.model,
         input,
         instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
-        max_output_tokens: mergedOptions.maxTokens,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
+        max_output_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.defaultTemperature,
+        top_p: this.settings.defaultTopP,
         stream: false,
-        metadata: mergedOptions.metadata,
+        metadata: options?.metadata,
       });
 
       if (response.status === 'failed') {
@@ -206,7 +206,6 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       throw new Error('OpenAI client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const input = this.convertMessagesToInput(messages);
     const systemMessage = messages.find((m) => m.role === 'system');
 
@@ -217,11 +216,11 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
         model: this.settings.model,
         input,
         instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
-        max_output_tokens: mergedOptions.maxTokens,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
+        max_output_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.defaultTemperature,
+        top_p: this.settings.defaultTopP,
         stream: true,
-        metadata: mergedOptions.metadata,
+        metadata: options?.metadata,
       });
 
       let fullContent = '';

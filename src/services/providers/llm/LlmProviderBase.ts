@@ -153,12 +153,8 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   protected applyDefaultOptions(options?: LlmGenerationOptions): LlmGenerationOptions {
     return {
       maxTokens: options?.maxTokens ?? 1024,
-      temperature: options?.temperature ?? 0.7,
-      topP: options?.topP ?? 1.0,
-      stopSequences: options?.stopSequences,
-      frequencyPenalty: options?.frequencyPenalty,
-      presencePenalty: options?.presencePenalty,
       metadata: options?.metadata,
+      outputFormat: options?.outputFormat ?? 'text',
     };
   }
 

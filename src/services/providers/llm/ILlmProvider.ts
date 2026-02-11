@@ -92,16 +92,6 @@ export interface LlmGenerationResult {
 export interface LlmGenerationOptions {
   /** Maximum number of tokens to generate */
   maxTokens?: number;
-  /** Temperature for sampling (0.0 to 2.0, higher = more random) */
-  temperature?: number;
-  /** Top-p sampling parameter */
-  topP?: number;
-  /** Stop sequences to end generation */
-  stopSequences?: string[];
-  /** Frequency penalty (-2.0 to 2.0) */
-  frequencyPenalty?: number;
-  /** Presence penalty (-2.0 to 2.0) */
-  presencePenalty?: number;
   /** Custom metadata to attach to the request */
   metadata?: Record<string, any>;
   /** Output format for the generation */

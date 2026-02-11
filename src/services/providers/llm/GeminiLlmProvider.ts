@@ -68,7 +68,6 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       throw new Error('Gemini client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
 
     await this.notifyStarted();
@@ -81,11 +80,11 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
         contents,
         config: {
           systemInstruction,
-          maxOutputTokens: mergedOptions.maxTokens,
-          temperature: mergedOptions.temperature,
-          topP: mergedOptions.topP,
+          maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+          temperature: this.settings.defaultTemperature,
+          topP: this.settings.defaultTopP,
           topK: this.settings.defaultTopK,
-          stopSequences: mergedOptions.stopSequences,
+          //stopSequences: this.settings.stopSequences,
           safetySettings: this.settings.safetySettings,
         },
       });
@@ -130,7 +129,6 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       throw new Error('Gemini client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
 
     try {
@@ -141,11 +139,11 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
         contents,
         config: {
           systemInstruction,
-          maxOutputTokens: mergedOptions.maxTokens,
-          temperature: mergedOptions.temperature,
-          topP: mergedOptions.topP,
+          maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+          temperature: this.settings.defaultTemperature,
+          topP: this.settings.defaultTopP,
           topK: this.settings.defaultTopK,
-          stopSequences: mergedOptions.stopSequences,
+          //stopSequences: this.settings.stopSequences,
           safetySettings: this.settings.safetySettings,
         },
       });

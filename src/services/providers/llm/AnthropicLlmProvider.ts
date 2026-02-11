@@ -72,7 +72,6 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
       throw new Error('Anthropic client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const { system, messages: anthropicMessages } = this.convertToAnthropicMessages(messages);
 
     await this.notifyStarted();
@@ -82,14 +81,14 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
 
       const response = await this.client.messages.create({
         model: this.settings.model,
-        max_tokens: mergedOptions.maxTokens || this.settings.defaultMaxTokens,
+        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
         messages: anthropicMessages,
         system: system || undefined,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
-        stop_sequences: mergedOptions.stopSequences,
+        temperature: this.settings.defaultTemperature,
+        top_p: this.settings.defaultTopP,
+        //stop_sequences: this.settings.stopSequences,
         stream: false,
-        metadata: mergedOptions.metadata,
+        metadata: options?.metadata,
       });
 
       // Extract text from content blocks
@@ -138,7 +137,6 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
       throw new Error('Anthropic client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const { system, messages: anthropicMessages } = this.convertToAnthropicMessages(messages);
 
     try {
@@ -146,14 +144,14 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
 
       const stream = await this.client.messages.create({
         model: this.settings.model,
-        max_tokens: mergedOptions.maxTokens || this.settings.defaultMaxTokens,
+        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
         messages: anthropicMessages,
         system: system || undefined,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
-        stop_sequences: mergedOptions.stopSequences,
+        temperature: this.settings.defaultTemperature,
+        top_p: this.settings.defaultTopP,
+        //stop_sequences: this.settings.stopSequences,
         stream: true,
-        metadata: mergedOptions.metadata,
+        metadata: options?.metadata,
       });
 
       let fullContent = '';
