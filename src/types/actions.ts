@@ -193,3 +193,45 @@ export const stageActionSchema = z.object({
 export type StageActionParameterType = z.infer<typeof stageActionParameterTypeSchema>;
 export type StageActionParameter = z.infer<typeof stageActionParameterSchema>;
 export type StageAction = z.infer<typeof stageActionSchema>;
+
+/**
+ * Reserved lifecycle action names that trigger at specific points in the stage lifecycle
+ * These actions use a double-underscore prefix to avoid conflicts with user-defined actions
+ */
+export const LIFECYCLE_ACTION_NAMES = {
+  /** Executed when entering a stage (before enterBehavior logic) */
+  ON_ENTER: '__on_enter',
+  /** Executed when leaving a stage (before loading new stage) */
+  ON_LEAVE: '__on_leave',
+  /** Executed when no user action matches after classification */
+  ON_FALLBACK: '__on_fallback',
+} as const;
+
+/**
+ * Type for lifecycle action context - indicates which lifecycle hook is being executed
+ */
+export type LifecycleContext = 'on_enter' | 'on_leave' | 'on_fallback' | null;
+
+/**
+ * Mapping of lifecycle contexts to effects that should be ignored
+ * Effects not in this map are allowed for that lifecycle context
+ */
+export const LIFECYCLE_EFFECT_RESTRICTIONS: Record<string, Set<Effect['type']>> = {
+  /**
+   * __on_enter: Cannot end/abort conversation during entry or change stage
+   * These would interfere with the stage initialization flow
+   */
+  on_enter: new Set<Effect['type']>(['end_conversation', 'abort_conversation', 'go_to_stage']),
+  
+  /**
+   * __on_leave: Cannot change stage or generate response during exit
+   * go_to_stage would create infinite loops, generate_response is handled by destination stage
+   */
+  on_leave: new Set<Effect['type']>(['go_to_stage', 'generate_response']),
+  
+  /**
+   * __on_fallback: No restrictions - fallback can do anything
+   * This is the last chance to handle unmatched input
+   */
+  on_fallback: new Set<Effect['type']>(),
+};

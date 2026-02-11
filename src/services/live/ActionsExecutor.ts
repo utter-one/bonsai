@@ -4,7 +4,8 @@ import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
-import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, ModifyUserProfileEffect, ModifyVariablesEffect, Effect, RunScriptEffect, StageAction } from '../../types/actions';
+import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, ModifyUserProfileEffect, ModifyVariablesEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
+import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 
@@ -196,15 +197,16 @@ export class ActionsExecutor {
    * Executes all effects for a list of actions
    * Gathers all effects from all actions, sorts by priority, resolves conflicts, and executes in order
    * @param actions - Array of actions to execute (can be stage actions or global actions)
-   * @param runner - The conversation runner instance
    * @param context - Execution context
+   * @param lifecycleContext - Optional lifecycle context for effect filtering (on_enter, on_leave, on_fallback)
    * @returns Array of execution results for each action
    */
   async executeActions(
     actions: (StageAction | GlobalAction)[],
-    context: ConversationContext
+    context: ConversationContext,
+    lifecycleContext: LifecycleContext = null
   ): Promise<ActionsExecutionOutcome> {
-    logger.info({ conversationId: context.conversationId, actionCount: actions.length }, `Executing ${actions.length} action(s)`);
+    logger.info({ conversationId: context.conversationId, actionCount: actions.length, lifecycleContext }, `Executing ${actions.length} action(s)`);
 
     // If no actions, return early and generate response
     if (actions.length === 0) {
@@ -237,8 +239,26 @@ export class ActionsExecutor {
 
     logger.info({ conversationId: context.conversationId, totalEffects: allEffects.length }, `Gathered ${allEffects.length} effect(s) from ${actions.length} action(s)`);
 
+    // Filter out effects that are restricted in this lifecycle context
+    let filteredEffects = allEffects;
+    if (lifecycleContext && LIFECYCLE_EFFECT_RESTRICTIONS[lifecycleContext]) {
+      const restrictedEffects = LIFECYCLE_EFFECT_RESTRICTIONS[lifecycleContext];
+      const beforeFilterCount = allEffects.length;
+      filteredEffects = allEffects.filter(({ effect, actionName }) => {
+        if (restrictedEffects.has(effect.type)) {
+          logger.debug({ conversationId: context.conversationId, lifecycleContext, effectType: effect.type, actionName }, `Ignoring unsupported effect ${effect.type} in lifecycle context ${lifecycleContext}`);
+          return false;
+        }
+        return true;
+      });
+      const filteredCount = beforeFilterCount - filteredEffects.length;
+      if (filteredCount > 0) {
+        logger.info({ conversationId: context.conversationId, lifecycleContext, filteredCount }, `Filtered ${filteredCount} unsupported effect(s) for lifecycle context ${lifecycleContext}`);
+      }
+    }
+
     // Sort all effects by priority (lower numbers execute first)
-    let sortedEffects = allEffects.sort(
+    let sortedEffects = filteredEffects.sort(
       (a, b) => this.getEffectPriority(a.effect) - this.getEffectPriority(b.effect)
     );
 
@@ -431,6 +451,7 @@ export class ActionsExecutor {
     effect: RunScriptEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
+    logger.info({ effect, context }, `Executing run_script effect`);
     await this.scriptRunner.executeScript(effect.code, context);
 
     return {
