@@ -5,7 +5,7 @@ import { Classifier, ContextTransformer, Conversation, GlobalAction, Project, St
 import { StageAction, LIFECYCLE_ACTION_NAMES } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
@@ -938,6 +938,17 @@ export class ConversationRunner {
     
     // Execute the tool
     const result = await this.toolExecutor.executeTool(tool, context, parameters);
+
+    // Save tool call event
+    const eventData: ToolCallEventData = {
+      toolId: tool.id,
+      toolName: tool.name,
+      parameters,
+      success: result.success,
+      result: result.result,
+      error: result.failureReason,
+    };
+    await this.conversationService.saveConversationEvent(this.conversation.id, 'tool_call', eventData);
 
     logger.info({ conversationId: this.conversation.id, toolId, success: result.success }, `Tool ${tool.name} executed`);
     

@@ -22,6 +22,7 @@ export const conversationEventTypeSchema = z.enum([
   'classification',
   'action',
   'command',
+  'tool_call',
   'conversation_start',
   'conversation_resume',
   'conversation_end',
@@ -67,6 +68,18 @@ export const commandEventDataSchema = z.object({
 });
 
 export type CommandEventData = z.infer<typeof commandEventDataSchema>;
+
+export const toolCallEventDataSchema = z.object({
+  toolId: z.string(),
+  toolName: z.string(),
+  parameters: z.record(z.string(), z.any()),
+  success: z.boolean(),
+  result: z.any().optional(),
+  error: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type ToolCallEventData = z.infer<typeof toolCallEventDataSchema>;
 
 export const conversationStartEventDataSchema = z.object({
   stageId: z.string(),
@@ -121,6 +134,7 @@ export const conversationEventDataSchema = z.union([
   classificationEventDataSchema,
   actionEventDataSchema,
   commandEventDataSchema,
+  toolCallEventDataSchema,
   conversationStartEventDataSchema,
   conversationResumeEventDataSchema,
   conversationEndEventDataSchema,
