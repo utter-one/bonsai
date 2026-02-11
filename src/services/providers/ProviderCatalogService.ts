@@ -102,6 +102,8 @@ export const llmProviderInfoSchema = z.object({
   supportsJsonOutput: z.boolean().describe('Whether structured JSON output is supported'),
   supportsStreaming: z.boolean().describe('Whether streaming responses are supported'),
   supportsVision: z.boolean().describe('Whether vision/image input is supported'),
+  supportsReasoning: z.boolean().optional().describe('Whether provider supports reasoning/thinking modes for deeper analysis'),
+  reasoningModels: z.array(z.string()).optional().describe('List of model IDs that support reasoning/thinking capabilities'),
   contextWindows: z.record(z.string(), z.number()).optional().describe('Context window size (in tokens) for each model'),
   description: z.string().optional().describe('Additional information'),
 });
@@ -320,6 +322,8 @@ export class ProviderCatalogService {
         supportsJsonOutput: true,
         supportsStreaming: true,
         supportsVision: true,
+        supportsReasoning: true,
+        reasoningModels: ['gpt-5.2', 'gpt-5-mini', 'gpt-5-nano', 'o1', 'o1-mini', 'o3', 'o3-mini'],
         contextWindows: {
           'gpt-5.2': 128000,
           'gpt-5-mini': 128000,
@@ -405,6 +409,8 @@ export class ProviderCatalogService {
         supportsJsonOutput: true,
         supportsStreaming: true,
         supportsVision: true,
+        supportsReasoning: true,
+        reasoningModels: ['claude-opus-4-6', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-opus-4-5'],
         contextWindows: {
           'claude-sonnet-4-5': 200000,
           'claude-haiku-4-5': 200000,
@@ -447,6 +453,8 @@ export class ProviderCatalogService {
         supportsJsonOutput: true,
         supportsStreaming: true,
         supportsVision: true,
+        supportsReasoning: true,
+        reasoningModels: ['gemini-3-pro', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
         contextWindows: {
           'gemini-3-pro': 2000000,
           'gemini-3-flash': 1000000,
@@ -530,6 +538,8 @@ export class ProviderCatalogService {
         supportsJsonOutput: true,
         supportsStreaming: true,
         supportsVision: true,
+        supportsReasoning: true,
+        reasoningModels: ['gemini-3-pro', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
         contextWindows: {
           'gemini-3-pro': 2000000,
           'gemini-3-flash': 1000000,

@@ -22,10 +22,14 @@ export type AnthropicLlmProviderConfig = z.infer<typeof anthropicLlmProviderConf
  * Used with Claude models
  */
 export const anthropicLlmSettingsSchema = z.object({
-  model: z.string().min(1).describe('Model name (e.g., claude-3-5-sonnet-20241022, claude-3-opus-20240229)'),
-  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
-  defaultTemperature: z.number().min(0).max(1).optional().describe('Default temperature for generation (0-1)'),
-  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
+  model: z.string().min(1).describe('Model name (e.g., claude-sonnet-4-5, claude-opus-4-5, claude-haiku-4-5)'),
+  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation (includes thinking tokens when extended thinking is enabled)'),
+  defaultTemperature: z.number().min(0).max(1).optional().describe('Default temperature for generation (0-1). Not compatible with extended thinking.'),
+  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1). Limited to 0.95-1 when thinking is enabled.'),
+  
+  thinkingMode: z.enum(['enabled', 'adaptive']).optional().describe('Enable extended thinking. Use "adaptive" for Claude Opus 4.6+, "enabled" for earlier models. Allows Claude to reason internally before responding.'),
+  thinkingBudgetTokens: z.number().int().min(1024).optional().describe('Maximum tokens for internal reasoning (min: 1024). Only used with thinkingMode="enabled". Higher budgets enable deeper reasoning but increase latency.'),
+  
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
   anthropicVersion: z.string().optional().describe('Anthropic API version'),
 }).openapi('AnthropicLlmSettings');
@@ -84,12 +88,13 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
         max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
         messages: anthropicMessages,
         system: system || undefined,
-        temperature: this.settings.defaultTemperature,
-        top_p: this.settings.defaultTopP,
+        temperature: this.settings.thinkingMode ? undefined : this.settings.defaultTemperature,
+        top_p: this.settings.thinkingMode ? undefined : this.settings.defaultTopP,
+        thinking: this.settings.thinkingMode ? { type: this.settings.thinkingMode, budget_tokens: this.settings.thinkingBudgetTokens } : undefined,
         //stop_sequences: this.settings.stopSequences,
         stream: false,
         metadata: options?.metadata,
-      });
+      } as any);
 
       // Extract text from content blocks
       let content = '';
@@ -142,17 +147,17 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
     try {
       logger.info(`Starting Anthropic streaming completion with model: ${this.settings.model}`);
 
-      const stream = await this.client.messages.create({
+      const stream = this.client.messages.stream({
         model: this.settings.model,
         max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
         messages: anthropicMessages,
         system: system || undefined,
-        temperature: this.settings.defaultTemperature,
-        top_p: this.settings.defaultTopP,
+        temperature: this.settings.thinkingMode ? undefined : this.settings.defaultTemperature,
+        top_p: this.settings.thinkingMode ? undefined : this.settings.defaultTopP,
+        thinking: this.settings.thinkingMode ? { type: this.settings.thinkingMode, budget_tokens: this.settings.thinkingBudgetTokens } : undefined,
         //stop_sequences: this.settings.stopSequences,
-        stream: true,
         metadata: options?.metadata,
-      });
+      } as any);
 
       let fullContent = '';
       let messageId = '';
