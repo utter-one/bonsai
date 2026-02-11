@@ -485,13 +485,21 @@ export class ConversationRunner {
     // Execute __on_enter lifecycle action if defined
     const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
     if (onEnterAction) {
-      logger.debug({ conversationId: this.conversation.id, stageId: this.stageData.id }, 'Executing __on_enter lifecycle action');
       const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
       if (!enterOutcome.success) {
         this.markAsFailed(`Failed to execute on_enter action`);
         return;
       }
+
+      // Register action event
+      const actionEventData: ActionEventData = {
+        actionName: onEnterAction.name || '',
+        stageId: this.stageData.id,
+        effects: onEnterAction.effects,
+      };
+      await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
+
       await this.applyActionOutcome(context, enterOutcome);
       
       // If on_enter ended or aborted conversation, don't proceed
@@ -641,6 +649,15 @@ export class ConversationRunner {
       logger.debug({ conversationId: this.conversation.id, stageId: fromStageId }, 'Executing __on_leave lifecycle action');
       const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, '-', '-');
       const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
+
+      // Register action event
+      const actionEventData: ActionEventData = {
+        actionName: onLeaveAction.name || '',
+        stageId: oldStageData.id,
+        effects: onLeaveAction.effects,
+      };
+      await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
+
       await this.applyActionOutcome(context, leaveOutcome);
       
       // If on_leave ended or aborted conversation, don't proceed
@@ -676,6 +693,15 @@ export class ConversationRunner {
       logger.debug({ conversationId: this.conversation.id, stageId }, 'Executing __on_enter lifecycle action');
       const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, '-', '-');
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
+
+      // Register action event
+      const actionEventData: ActionEventData = {
+        actionName: onEnterAction.name || '',
+        stageId: this.stageData.id,
+        effects: onEnterAction.effects,
+      };
+      await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
+
       await this.applyActionOutcome(context, enterOutcome);
       
       // If on_enter ended or aborted conversation, don't proceed
@@ -1017,6 +1043,14 @@ export class ConversationRunner {
       if (onFallbackAction) {
         logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
         executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
+
+        // Register action event for __on_fallback
+        const actionEventData: ActionEventData = {
+          actionName: onFallbackAction.name || '',
+          stageId: this.stageData.id,
+          effects: onFallbackAction.effects,
+        };
+        await this.conversationService.saveConversationEvent(this.conversation.id, 'action', actionEventData);
       } else {
         executionOutcome = await this.actionsExecutor.executeActions(actions, context);
       }

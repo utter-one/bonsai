@@ -225,6 +225,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
+      stage: this.buildStageContext(stage!),
     };
 
     return context;
