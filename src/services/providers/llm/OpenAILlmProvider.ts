@@ -137,6 +137,8 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
     const input = this.convertMessagesToInput(messages);
     const systemMessage = messages.find((m) => m.role === 'system');
 
+    await this.notifyStarted();
+
     try {
       logger.info(`Generating OpenAI response with model: ${this.settings.model}`);
 

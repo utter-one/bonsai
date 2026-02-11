@@ -401,7 +401,7 @@ export class ConversationRunner {
         }
       });
 
-      completionLlmProvider.setOnComplete(async (result) => {
+      completionLlmProvider.setOnGenerationCompleted(async (result) => {
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
 

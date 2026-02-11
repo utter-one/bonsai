@@ -77,6 +77,8 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
     const mergedOptions = this.applyDefaultOptions(options);
     const openAIMessages = this.convertToOpenAIMessages(messages);
 
+    await this.notifyStarted();
+
     try {
       logger.info(`Generating OpenAI Chat Completion with model: ${this.settings.model}`);
 

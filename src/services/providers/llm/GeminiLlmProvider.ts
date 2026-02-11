@@ -71,6 +71,8 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     const mergedOptions = this.applyDefaultOptions(options);
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
 
+    await this.notifyStarted();
+
     try {
       logger.info(`Generating Gemini completion with model: ${this.settings.model}`);
 

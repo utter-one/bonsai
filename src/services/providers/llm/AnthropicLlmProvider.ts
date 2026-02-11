@@ -75,6 +75,8 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
     const mergedOptions = this.applyDefaultOptions(options);
     const { system, messages: anthropicMessages } = this.convertToAnthropicMessages(messages);
 
+    await this.notifyStarted();
+
     try {
       logger.info(`Generating Anthropic completion with model: ${this.settings.model}`);
 

@@ -166,16 +166,16 @@ export interface ILlmProvider {
   setOnChunk(callback: LlmChunkCallback): void;
 
   /**
+   * Set callback for when provider is ready
+   * @param callback Function to call when provider is initialized and ready
+   */
+  setOnGenerationStarted(callback: SimpleCallback): void;
+
+  /**
    * Set callback for generation completion
    * @param callback Function to call when generation completes
    */
-  setOnComplete(callback: LlmCompleteCallback): void;
-
-  /**
-   * Set callback for when provider is ready
-   * @param callback Function to call when ready
-   */
-  setOnReady(callback: SimpleCallback): void;
+  setOnGenerationCompleted(callback: LlmCompleteCallback): void;
 
   /**
    * Set callback for fatal errors
