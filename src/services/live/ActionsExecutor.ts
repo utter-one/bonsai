@@ -769,7 +769,7 @@ export class ActionsExecutor {
           success: executionResult.success,
           result: executionResult.result,
           error: executionResult.failureReason,
-          systemPrompt: executionResult.systemPrompt,
+          systemPrompt: executionResult.renderedPrompt,
           llmSettings: executionResult.llmSettings
         }
       };

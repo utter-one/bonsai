@@ -64,7 +64,7 @@ export class UserInputProcessor {
           metadata: {
             classifierName: result.classifierName,
             actionCount: result.actions.length,
-            systemPrompt: classifier?.classifier.prompt,
+            systemPrompt: result.renderedPrompt,
             llmSettings: classifier?.classifier.llmSettings
           },
         };
@@ -79,17 +79,18 @@ export class UserInputProcessor {
     } 
   }
 
-  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier> {
+  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string }> {
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
       const llmProvider = classifierData.llmProvider;
       const classifier = classifierData.classifier;
       const text = context.userInput || '';
+      const renderedPrompt = await this.templatingEngine.render(classifier.prompt, context);
 
       const messages = [
         {
           role: 'system' as const,
-          content: await this.templatingEngine.render(classifier.prompt, context)
+          content: renderedPrompt
         },
         {
           role: 'user' as const,
@@ -111,6 +112,7 @@ export class UserInputProcessor {
         classifierId: classifier.id,
         classifierName: classifier.name,
         actions,
+        renderedPrompt,
       };
     } catch (error) {
       logger.error({ error, sessionId: session.id, classifierId: classifierData.classifier.id }, 'Error classifying text input');
@@ -118,6 +120,7 @@ export class UserInputProcessor {
         classifierId: classifierData.classifier.id,
         classifierName: classifierData.classifier.name,
         actions: [],
+        renderedPrompt: null,
       };
     }
   }

@@ -44,6 +44,7 @@ export type StageRuntimeData = {
   stage: Stage;
   completionLlmProvider?: ILlmProvider;
   lastCompletionResult?: LlmGenerationResult;
+  lastCompletionPrompt?: string;
   classifiers: ClassifierRuntimeData[];
   transformers: TransformerRuntimeData[];
   globalActions: GlobalAction[];
@@ -413,7 +414,7 @@ export class ConversationRunner {
           originalText: result.content,
           metadata: { 
             llmUsage: result.usage || {},
-            systemPrompt: this.stageData.stage.prompt,
+            systemPrompt: this.stageData.lastCompletionPrompt,
             llmSettings: this.stageData.stage.llmSettings
           },
         }
@@ -966,7 +967,7 @@ export class ConversationRunner {
       result: result.result,
       error: result.failureReason,
       metadata: {
-        systemPrompt: result.systemPrompt,
+        systemPrompt: result.renderedPrompt,
         llmSettings: result.llmSettings
       }
     };
@@ -1174,7 +1175,8 @@ export class ConversationRunner {
       if (this.stageData.ttsProvider) {
         await this.stageData.ttsProvider.start();
       }
-      await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.completionLlmProvider);
+      const { renderedPrompt } = await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.completionLlmProvider);
+      this.stageData.lastCompletionPrompt = renderedPrompt;
     } else if (executionOutcome.shouldEndConversation) { // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
