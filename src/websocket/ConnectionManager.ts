@@ -1,7 +1,9 @@
 import { singleton, container } from "tsyringe";
-import { ConversationRunner } from "../services/live/ConversationRunner";
+import type { ConversationRunner } from "../services/live/ConversationRunner";
 import { meta } from "zod/v4/core";
 import { SessionSettings } from "./contracts/auth";
+import { logger } from "../utils/logger";
+import { ConversationEventData, ConversationEventType } from "../types/conversationEvents";
 
 /** Session data associated with each WebSocket connection. */
 export type Connection =
@@ -45,7 +47,7 @@ export class ConnectionManager {
       conversationId: null, 
       runner: null, 
       ws,
-      sessionSettings: sessionSettings ?? { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true }
+      sessionSettings: sessionSettings ?? { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true }
     });
     this.connectionMap.set(sessionId, ws);
     return sessionId;
@@ -84,6 +86,7 @@ export class ConnectionManager {
     const session = this.socketMap.get(socket);
     if (session) {
       session.conversationId = conversationId;
+      const { ConversationRunner } = await import('../services/live/ConversationRunner.js');
       session.runner = container.resolve(ConversationRunner);
       await session.runner.prepareConversation(conversationId, session, this.socketMap.get(socket).ws);
       this.socketMap.set(socket, session);
@@ -118,6 +121,27 @@ export class ConnectionManager {
     if (socket) {
       this.socketMap.delete(socket);
       this.connectionMap.delete(sessionId);
+    }
+  }
+
+  /**
+   * Sends a conversation event message to a connected WebSocket client if the client has enabled receiveEvents.
+   * @param conversationId - The conversation ID to send the event for.
+   * @param eventType - The type of conversation event.
+   * @param eventData - The event data.
+   * @param inputTurnId - Optional input turn ID.
+   * @param outputTurnId - Optional output turn ID.
+   */
+  sendConversationEvent(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, inputTurnId?: string, outputTurnId?: string): void {
+    for (const [ws, connection] of this.socketMap.entries()) {
+      if (connection.conversationId === conversationId && connection.sessionSettings.receiveEvents) {
+        const message = { type: 'conversation_event', sessionId: connection.id, conversationId, eventType, eventData, inputTurnId, outputTurnId };
+        try {
+          ws.send(JSON.stringify(message));
+        } catch (error) {
+          logger.error({ error, conversationId, sessionId: connection.id }, 'Failed to send conversation event message');
+        }
+      }
     }
   }
 }

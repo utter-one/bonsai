@@ -22,6 +22,7 @@ import {
   resumeConversationResponseSchema,
   endConversationRequestSchema,
   endConversationResponseSchema,
+  conversationEventMessageSchema,
 } from '../websocket/contracts/session';
 
 import {
@@ -88,6 +89,7 @@ function generateWebSocketSchemas(): void {
     'resume-conversation-response': resumeConversationResponseSchema,
     'end-conversation-request': endConversationRequestSchema,
     'end-conversation-response': endConversationResponseSchema,
+    'conversation-event': conversationEventMessageSchema,
 
     // User input
     'start-user-voice-input-request': startUserVoiceInputRequestSchema,

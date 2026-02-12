@@ -36,7 +36,9 @@ export type CreateConversationInput = {
  */
 @injectable()
 export class ConversationService extends BaseService {
-  constructor(@inject(AuditService) private readonly auditService: AuditService) {
+  constructor(
+    @inject(AuditService) private readonly auditService: AuditService
+  ) {
     super();
   }
 
@@ -266,13 +268,6 @@ export class ConversationService extends BaseService {
         return;
       }
 
-      // Register conversation end event
-      const eventData: ConversationEventData = {
-        reason,
-        stageId: existingConversation.stageId,
-      };
-      await this.saveConversationEvent(id, 'conversation_end', eventData);
-
       await db.update(conversations)
         .set({ 
           status: 'finished',
@@ -301,13 +296,6 @@ export class ConversationService extends BaseService {
       if (!existingConversation) {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
-
-      // Register conversation failure event
-      const eventData: ConversationEventData = {
-        reason: reason,
-        stageId: existingConversation.stageId,
-      };
-      await this.saveConversationEvent(id, 'conversation_failed', eventData);
 
       await db.update(conversations)
         .set({ 

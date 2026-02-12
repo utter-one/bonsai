@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { sessionInputMessageSchema, sessionOutputMessageSchema } from './common';
+import { conversationEventDataSchema, conversationEventTypeSchema } from '../../types/conversationEvents';
 
 /** Request to start a new conversation within a session. */
 export const startConversationRequestSchema = sessionInputMessageSchema.extend({
@@ -58,3 +59,16 @@ export const endConversationResponseSchema = sessionOutputMessageSchema.extend({
 });
 
 export type EndConversationResponse = z.infer<typeof endConversationResponseSchema>;
+
+/** Message sent when a conversation event occurs. */
+export const conversationEventMessageSchema = sessionOutputMessageSchema.extend({
+  type: z.literal('conversation_event').describe('Message type for conversation events'),
+  sessionId: z.string().describe('Session ID containing the conversation'),
+  conversationId: z.string().describe('Unique identifier of the conversation'),
+  inputTurnId: z.string().optional().describe('Identifier of the input turn associated with the event, if applicable'),
+  outputTurnId: z.string().optional().describe('Identifier of the output turn associated with the event, if applicable'),
+  eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
+  eventData: conversationEventDataSchema.describe('Data associated with the conversation event'),
+});
+
+export type ConversationEventMessage = z.infer<typeof conversationEventMessageSchema>;  

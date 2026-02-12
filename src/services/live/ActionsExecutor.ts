@@ -26,6 +26,16 @@ export type ActionsExecutionOutcome = {
   hasModifiedUserProfile: boolean;
   goToStageId?: string;
   error?: string;
+  toolCallEvents?: Array<{
+    toolId: string;
+    toolName: string;
+    parameters: Record<string, any>;
+    success: boolean;
+    result?: any;
+    error?: string;
+    systemPrompt?: string;
+    llmSettings?: any;
+  }>;
 };
 
 /**
@@ -41,6 +51,16 @@ export type EffectOutcome = {
     hasModifiedUserInput?: boolean;
     hasModifiedUserProfile?: boolean;
     newStageId?: string;
+    toolCallEvent?: {
+      toolId: string;
+      toolName: string;
+      parameters: Record<string, any>;
+      success: boolean;
+      result?: any;
+      error?: string;
+      systemPrompt?: string;
+      llmSettings?: any;
+    };
   };
 
 /**
@@ -279,6 +299,7 @@ export class ActionsExecutor {
       hasModifiedVars: false,
       hasModifiedUserInput: false,
       hasModifiedUserProfile: false,
+      toolCallEvents: [],
     };
 
     let currentContext = context;
@@ -309,6 +330,11 @@ export class ActionsExecutor {
         // Update modified user profile in context if applicable
         if (effectResult.hasModifiedUserProfile) {
           outcome.hasModifiedUserProfile = true;
+        }
+        
+        // Add tool call event if present
+        if (effectResult.toolCallEvent) {
+          outcome.toolCallEvents.push(effectResult.toolCallEvent);
         }
 
         // Check if effect resulted in stage change
@@ -731,15 +757,26 @@ export class ActionsExecutor {
       };
 
       logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name }, `Tool called successfully and result stored: ${tool.name}`);
+      
+      // Return tool call event data so caller can save/send it
+      return {
+        shouldEndConversation: false,
+        shouldAbortConversation: false,
+        toolCallEvent: {
+          toolId: tool.id,
+          toolName: tool.name,
+          parameters: effect.parameters,
+          success: executionResult.success,
+          result: executionResult.result,
+          error: executionResult.failureReason,
+          systemPrompt: executionResult.systemPrompt,
+          llmSettings: executionResult.llmSettings
+        }
+      };
     } catch (error) {
       logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
       throw error;
     }
-
-    return {
-      shouldEndConversation: false,
-      shouldAbortConversation: false,
-    };
   }
 
   /**
