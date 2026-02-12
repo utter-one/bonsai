@@ -18,7 +18,7 @@ import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { UserInputProcessor } from "./UserInputProcessor";
-import { VoiceConfig } from "../../http/contracts/persona";
+import { TtsSettings } from "../providers/tts/TtsProviderFactory";
 import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { eq } from "drizzle-orm";
@@ -51,7 +51,6 @@ export type StageRuntimeData = {
   globalActions: GlobalAction[];
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
-  voiceConfig?: VoiceConfig;
   shouldEndConversation: boolean;
   inputTurnId?: string;
   outputTurnId?: string;
@@ -187,12 +186,11 @@ export class ConversationRunner {
     if (!persona) {
       throw new NotFoundError(`Persona with ID ${stageData.stage.personaId} not found`);
     }
-    const voiceConfig = persona.voiceConfig;
+    const ttsSettings = persona.ttsSettings;
     if (project.generateVoice && persona.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
       const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, persona.ttsProviderId) });
-      if (voiceProviderEntity) {
-        stageData.ttsProvider = this.ttsProviderFactory.createProvider(voiceProviderEntity);
-        stageData.voiceConfig = voiceConfig;
+      if (voiceProviderEntity && ttsSettings) {
+        stageData.ttsProvider = this.ttsProviderFactory.createProvider(voiceProviderEntity, ttsSettings);
       }
     }
 
@@ -304,7 +302,7 @@ export class ConversationRunner {
     // Initialize and wire up TTS provider
     if (ttsProvider) {
       try {
-        await ttsProvider.init(this.stageData.voiceConfig);
+        await ttsProvider.init();
 
         let firstTtsChunkGenerated = false;
         let isGenerating = false;
@@ -414,7 +412,7 @@ export class ConversationRunner {
           text: result.content,
           role: 'assistant',
           originalText: result.content,
-          metadata: { 
+          metadata: {
             llmUsage: result.usage || {},
             systemPrompt: this.stageData.lastCompletionPrompt,
             llmSettings: this.stageData.stage.llmSettings
@@ -498,7 +496,7 @@ export class ConversationRunner {
       const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
       await this.applyActionOutcome(context, enterOutcome);
-      
+
       // Save/send tool call events from action execution
       await this.saveAndSendOutcomeEvents(enterOutcome);
 
@@ -659,7 +657,7 @@ export class ConversationRunner {
       const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
 
       await this.applyActionOutcome(context, leaveOutcome);
-      
+
       // Save/send tool call events from action execution
       await this.saveAndSendOutcomeEvents(leaveOutcome);
 
@@ -706,7 +704,7 @@ export class ConversationRunner {
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
 
       await this.applyActionOutcome(context, enterOutcome);
-      
+
       // Save/send tool call events from action execution
       await this.saveAndSendOutcomeEvents(enterOutcome);
 
@@ -916,10 +914,10 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
     const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionToExecute, parameters);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
-    
+
     // Save/send tool call events from action execution
     await this.saveAndSendOutcomeEvents(outcome);
-    
+
     if (await this.applyActionOutcome(context, outcome)) {
       // TODO: this needs more thought
       await this.generateResponse(context, outcome);
@@ -953,10 +951,10 @@ export class ConversationRunner {
     }
 
     logger.info({ conversationId: this.conversation.id, toolId, toolName: tool.name }, `Executing tool ${tool.name}`);
-    
+
     // Build conversation context for tool execution
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage);
-    
+
     // Execute the tool
     const result = await this.toolExecutor.executeTool(tool, context, parameters);
 
@@ -976,7 +974,7 @@ export class ConversationRunner {
     await this.saveAndSendEvent('tool_call', eventData);
 
     logger.info({ conversationId: this.conversation.id, toolId, success: result.success }, `Tool ${tool.name} executed`);
-    
+
     return result;
   }
 
@@ -1048,7 +1046,7 @@ export class ConversationRunner {
     // Save event and send WebSocket message
     const eventData = { reason, stageId: this.stageData.id };
     await this.saveAndSendEvent('conversation_failed', eventData);
-    
+
     // Update conversation status via ConversationService
     try {
       await this.conversationService.failConversation(this.stageData.conversation.id, reason);
@@ -1066,7 +1064,7 @@ export class ConversationRunner {
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, userInput, userInput);
     context.userInputSource = userInputSource;
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, context);
-    
+
     // Filter out lifecycle actions from classification matching
     const lifecycleActionNames = Object.values(LIFECYCLE_ACTION_NAMES) as string[];
     const stageActions = Object.fromEntries(
@@ -1116,7 +1114,7 @@ export class ConversationRunner {
       logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
       executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
       await this.applyActionOutcome(context, executionOutcome);
-      
+
       // Save/send tool call events from action execution
       await this.saveAndSendOutcomeEvents(executionOutcome);
 
@@ -1130,7 +1128,7 @@ export class ConversationRunner {
     } else {
       executionOutcome = await this.actionsExecutor.executeActions(actions, context);
       await this.applyActionOutcome(context, executionOutcome);
-      
+
       // Save/send tool call events from action execution
       await this.saveAndSendOutcomeEvents(executionOutcome);
     }
@@ -1225,7 +1223,7 @@ export class ConversationRunner {
     await this.conversationService.saveConversationEvent(this.conversation.id, eventType, eventData, metadata);
     this.connectionManager.sendConversationEvent(this.conversation.id, eventType, eventData, metadata?.inputTurnId, metadata?.outputTurnId);
   }
-  
+
   /**
    * Helper method to save/send tool events from action execution outcomes
    */

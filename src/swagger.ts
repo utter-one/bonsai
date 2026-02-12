@@ -18,17 +18,18 @@ import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolRespo
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
-import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema } from './http/contracts/providerCatalog';
+import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, modelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
-import { voiceConfigSchema } from './http/contracts/persona';
 import { asrConfigSchema } from './http/contracts/project';
 import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, runScriptEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, callWebhookEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema } from './types/actions';
 import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmSettingsSchema } from './services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmSettingsSchema } from './services/providers/llm/GeminiLlmProvider';
+import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabsTtsProvider';
+import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -59,21 +60,24 @@ export function getOpenAPISpec(): any {
 
   // Register common/reusable sub-schemas first (these will be referenced by other schemas)
   // This prevents them from being inlined and makes them reusable across the API
-  
+
   // Common schemas
   registry.register('ListParams', listParamsSchema);
-  
+
   // LLM settings schemas (provider-specific)
   registry.register('OpenAILlmSettings', openAILlmSettingsSchema);
   registry.register('OpenAILegacyLlmSettings', openAILegacyLlmSettingsSchema);
   registry.register('AnthropicLlmSettings', anthropicLlmSettingsSchema);
   registry.register('GeminiLlmSettings', geminiLlmSettingsSchema);
   registry.register('LlmSettings', llmSettingsSchema);
-  
+
+  // TTS settings schemas (provider-specific)
+  registry.register('ElevenLabsTtsSettings', elevenLabsTtsSettingsSchema);
+  registry.register('OpenAiTtsSettings', openAiTtsSettingsSchema);
+
   // Voice and ASR configuration schemas
-  registry.register('VoiceConfig', voiceConfigSchema);
   registry.register('AsrConfig', asrConfigSchema);
-  
+
   // Effect schemas (for stages and global actions)
   registry.register('EndConversationEffect', endConversationEffectSchema);
   registry.register('AbortConversationEffect', abortConversationEffectSchema);
@@ -177,6 +181,12 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteProviderRequest', deleteProviderBodySchema);
   registry.register('ProviderResponse', providerResponseSchema);
   registry.register('ProviderListResponse', providerListResponseSchema);
+  // Register reusable sub-schemas first for proper $ref resolution
+  registry.register('ModelInfo', modelInfoSchema);
+  registry.register('VoiceInfo', voiceInfoSchema);
+  registry.register('LanguageInfo', languageInfoSchema);
+  registry.register('TtsModelInfo', ttsModelInfoSchema);
+
   registry.register('ProviderCatalog', providerCatalogSchema);
   registry.register('AsrProvidersResponse', asrProvidersResponseSchema);
   registry.register('TtsProvidersResponse', ttsProvidersResponseSchema);

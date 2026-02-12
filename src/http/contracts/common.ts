@@ -4,6 +4,8 @@ import { openAILlmSettingsSchema } from '../../services/providers/llm/OpenAILlmP
 import { openAILegacyLlmSettingsSchema } from '../../services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmSettingsSchema } from '../../services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmSettingsSchema } from '../../services/providers/llm/GeminiLlmProvider';
+import { elevenLabsTtsSettingsSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
+import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 
 extendZodWithOpenApi(z);
 
@@ -84,3 +86,19 @@ export const llmSettingsSchema = z.union([
   anthropicLlmSettingsSchema,
   geminiLlmSettingsSchema,
 ]).openapi('LlmSettings').nullable().optional().describe('LLM provider-specific settings for this stage');
+
+// ====================
+// TTS Settings Schemas
+// ====================
+
+/**
+ * Discriminated union of all TTS settings types
+ * Each settings object contains provider-specific configuration for TTS generation
+ * Individual schemas are defined in their respective provider files
+ */
+export const ttsSettingsSchema = z.union([
+  elevenLabsTtsSettingsSchema,
+  openAiTtsSettingsSchema,
+]).openapi('TtsSettings').nullable().optional().describe('TTS provider-specific settings');
+
+export type TtsSettings = z.infer<typeof ttsSettingsSchema>;

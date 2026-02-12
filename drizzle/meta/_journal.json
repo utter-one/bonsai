@@ -22,6 +22,13 @@
       "when": 1770819149955,
       "tag": "0002_stale_lockjaw",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770897879187,
+      "tag": "0003_pink_the_anarchist",
+      "breakpoints": true
     }
   ]
 }

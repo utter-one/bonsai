@@ -1,4 +1,3 @@
-import { VoiceConfig } from '../../../http/contracts/persona';
 import type { AudioFormat } from '../../../types/audio';
 import type { SimpleCallback, ErrorCallback } from '../../../types/callbacks';
 
@@ -56,13 +55,13 @@ export interface ITtsProvider {
    * @returns Array of supported audio format identifiers
    */
   getSupportedFormats(): AudioFormat[];
+
   /**
-   * Initializes the speech generation session for the given voice configuration
-   * Prepares the TTS provider with the specified voice settings
-   * @param voiceConfig Configuration settings for the TTS voice synthesis
+   * Initializes the speech generation session
+   * Prepares the TTS provider for text-to-speech synthesis
    * @returns Promise that resolves when initialization is complete
    */
-  init(voiceConfig: VoiceConfig): Promise<void>;
+  init(): Promise<void>;
 
   /**
    * Starts the speech generation session for the given context
