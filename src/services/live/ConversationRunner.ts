@@ -411,7 +411,11 @@ export class ConversationRunner {
           text: result.content,
           role: 'assistant',
           originalText: result.content,
-          metadata: { llmUsage: result.usage || {} },
+          metadata: { 
+            llmUsage: result.usage || {},
+            systemPrompt: this.stageData.stage.prompt,
+            llmSettings: this.stageData.stage.llmSettings
+          },
         }
         await this.saveAndSendEvent('message', messageEventData);
 
@@ -491,6 +495,9 @@ export class ConversationRunner {
       const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
       await this.applyActionOutcome(context, enterOutcome);
+      
+      // Save/send tool call events from action execution
+      await this.saveAndSendOutcomeEvents(enterOutcome);
 
       // Register action event
       const actionEventData: ActionEventData = {
@@ -649,6 +656,9 @@ export class ConversationRunner {
       const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
 
       await this.applyActionOutcome(context, leaveOutcome);
+      
+      // Save/send tool call events from action execution
+      await this.saveAndSendOutcomeEvents(leaveOutcome);
 
       // Register action event
       const actionEventData: ActionEventData = {
@@ -693,6 +703,9 @@ export class ConversationRunner {
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
 
       await this.applyActionOutcome(context, enterOutcome);
+      
+      // Save/send tool call events from action execution
+      await this.saveAndSendOutcomeEvents(enterOutcome);
 
       // Register action event
       const actionEventData: ActionEventData = {
@@ -900,6 +913,10 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
     const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionToExecute, parameters);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
+    
+    // Save/send tool call events from action execution
+    await this.saveAndSendOutcomeEvents(outcome);
+    
     if (await this.applyActionOutcome(context, outcome)) {
       // TODO: this needs more thought
       await this.generateResponse(context, outcome);
@@ -948,6 +965,10 @@ export class ConversationRunner {
       success: result.success,
       result: result.result,
       error: result.failureReason,
+      metadata: {
+        systemPrompt: result.systemPrompt,
+        llmSettings: result.llmSettings
+      }
     };
     await this.saveAndSendEvent('tool_call', eventData);
 
@@ -1092,6 +1113,9 @@ export class ConversationRunner {
       logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
       executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
       await this.applyActionOutcome(context, executionOutcome);
+      
+      // Save/send tool call events from action execution
+      await this.saveAndSendOutcomeEvents(executionOutcome);
 
       // Register action event for __on_fallback
       const actionEventData: ActionEventData = {
@@ -1103,6 +1127,9 @@ export class ConversationRunner {
     } else {
       executionOutcome = await this.actionsExecutor.executeActions(actions, context);
       await this.applyActionOutcome(context, executionOutcome);
+      
+      // Save/send tool call events from action execution
+      await this.saveAndSendOutcomeEvents(executionOutcome);
     }
 
     // Register action events after execution
@@ -1193,5 +1220,28 @@ export class ConversationRunner {
   private async saveAndSendEvent(eventType: any, eventData: any, metadata?: Record<string, any>): Promise<void> {
     await this.conversationService.saveConversationEvent(this.conversation.id, eventType, eventData, metadata);
     this.connectionManager.sendConversationEvent(this.conversation.id, eventType, eventData, metadata?.inputTurnId, metadata?.outputTurnId);
+  }
+  
+  /**
+   * Helper method to save/send tool events from action execution outcomes
+   */
+  private async saveAndSendOutcomeEvents(outcome: ActionsExecutionOutcome): Promise<void> {
+    if (outcome.toolCallEvents && outcome.toolCallEvents.length > 0) {
+      for (const toolCallEvent of outcome.toolCallEvents) {
+        const eventData = {
+          toolId: toolCallEvent.toolId,
+          toolName: toolCallEvent.toolName,
+          parameters: toolCallEvent.parameters,
+          success: toolCallEvent.success,
+          result: toolCallEvent.result,
+          error: toolCallEvent.error,
+          metadata: {
+            systemPrompt: toolCallEvent.systemPrompt,
+            llmSettings: toolCallEvent.llmSettings
+          }
+        };
+        await this.saveAndSendEvent('tool_call', eventData);
+      }
+    }
   }
 }

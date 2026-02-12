@@ -15,6 +15,8 @@ export type ToolExecutionResult = {
   parameters: Record<string, any>;
   outputFormat?: 'text' | 'json' | 'image';
   result?: any; // Optional field for tool output
+  systemPrompt?: string;
+  llmSettings?: any;
 }
 
 @singleton()
@@ -50,7 +52,7 @@ export class ToolExecutor {
       ];
 
       const result = await llmProvider.generate(messages);
-      return { success: true, toolId: tool.id, parameters, result: result.content };
+      return { success: true, toolId: tool.id, parameters, result: result.content, systemPrompt: tool.prompt, llmSettings: tool.llmSettings };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
       return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution' };

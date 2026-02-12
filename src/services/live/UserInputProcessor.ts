@@ -56,6 +56,7 @@ export class UserInputProcessor {
       
       // Register classification events for each classifier
       for (const result of classificationResultsWithClassifiers) {
+        const classifier = classifiers.find(c => c.classifier.id === result.classifierId);
         const eventData: ClassificationEventData = {
           classifierId: result.classifierId,
           input: context.userInput || '',
@@ -63,6 +64,8 @@ export class UserInputProcessor {
           metadata: {
             classifierName: result.classifierName,
             actionCount: result.actions.length,
+            systemPrompt: classifier?.classifier.prompt,
+            llmSettings: classifier?.classifier.llmSettings
           },
         };
         await this.conversationService.saveConversationEvent(context.conversationId, 'classification', eventData);
