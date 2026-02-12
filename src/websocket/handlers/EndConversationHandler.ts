@@ -27,14 +27,15 @@ export class EndConversationHandler implements WebSocketHandler<EndConversationR
     try {
       const connection = context.connection;
       const stageId = connection?.runner?.getRuntimeData()?.stage?.id || '';
-           
-      this.connectionManager.detachConversationInSession(message.sessionId);
-      await this.conversationService.finishConversation(message.conversationId);
 
-      // Save event and send WebSocket message before updating conversation status
+      // Save event and send WebSocket message BEFORE detaching conversation
       const eventData = { reason: '', stageId };
       await this.conversationService.saveConversationEvent(message.conversationId, 'conversation_end', eventData);
       this.connectionManager.sendConversationEvent(message.conversationId, 'conversation_end', eventData);
+      
+      // Now detach and finish the conversation
+      this.connectionManager.detachConversationInSession(message.sessionId);
+      await this.conversationService.finishConversation(message.conversationId);
 
       const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };
       context.send(context.connection!.ws, response);
