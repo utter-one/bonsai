@@ -26,6 +26,7 @@ import { ResponseGenerator } from "./ResponseGenerator";
 import { ToolExecutor } from "./ToolExecutor";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
 import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput";
+import { TemplatingEngine } from "./TemplatingEngine";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -78,6 +79,7 @@ export class ConversationRunner {
     @inject(ResponseGenerator) private responseGenerator: ResponseGenerator,
     @inject(ToolExecutor) private toolExecutor: ToolExecutor,
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
+    @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -1175,8 +1177,8 @@ export class ConversationRunner {
       if (this.stageData.ttsProvider) {
         await this.stageData.ttsProvider.start();
       }
-      const { renderedPrompt } = await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.completionLlmProvider);
-      this.stageData.lastCompletionPrompt = renderedPrompt;
+      this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+      await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
     } else if (executionOutcome.shouldEndConversation) { // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
