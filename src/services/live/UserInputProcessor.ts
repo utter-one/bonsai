@@ -1,5 +1,5 @@
 import { inject, singleton } from "tsyringe";
-import { Connection } from "../../websocket/ConnectionManager";
+import { Connection, ConnectionManager } from "../../websocket/ConnectionManager";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
@@ -18,7 +18,8 @@ export class UserInputProcessor {
   constructor(
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
-    @inject(ConversationService) private conversationService: ConversationService
+    @inject(ConversationService) private conversationService: ConversationService,
+    @inject(ConnectionManager) private connectionManager: ConnectionManager
   ) {}
 
   /** Processes text input from the user within a session.
@@ -65,6 +66,7 @@ export class UserInputProcessor {
           },
         };
         await this.conversationService.saveConversationEvent(context.conversationId, 'classification', eventData);
+        this.connectionManager.sendConversationEvent(context.conversationId, 'classification', eventData);
       }
 
       return classificationResultsWithClassifiers.map(x => x.actions).flat();

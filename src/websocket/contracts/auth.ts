@@ -7,6 +7,7 @@ export const sessionSettingsSchema = z.object({
   sendTextInput: z.boolean().optional().default(true).describe('Whether the client can send text input'),
   receiveVoiceOutput: z.boolean().optional().default(true).describe('Whether the client wants to receive voice output'),
   receiveTranscriptionUpdates: z.boolean().optional().default(true).describe('Whether the client wants to receive intermediate transcription updates for voice input and output'),
+  receiveEvents: z.boolean().optional().default(true).describe('Whether the client wants to receive all conversation events (e.g. turn start/end, agent actions)'),
 });
 
 export type SessionSettings = z.infer<typeof sessionSettingsSchema>;

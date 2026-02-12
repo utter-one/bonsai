@@ -129,13 +129,19 @@
               "default": true,
               "description": "Whether the client wants to receive intermediate transcription updates for voice input and output",
               "type": "boolean"
+            },
+            "receiveEvents": {
+              "default": true,
+              "description": "Whether the client wants to receive all conversation events (e.g. turn start/end, agent actions)",
+              "type": "boolean"
             }
           },
           "required": [
             "sendVoiceInput",
             "sendTextInput",
             "receiveVoiceOutput",
-            "receiveTranscriptionUpdates"
+            "receiveTranscriptionUpdates",
+            "receiveEvents"
           ],
           "additionalProperties": false
         }
@@ -538,6 +544,699 @@
         "type",
         "sessionId",
         "success"
+      ],
+      "additionalProperties": false
+    },
+    "conversation-event": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "conversation_event",
+          "description": "Message type for conversation events"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session ID containing the conversation"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "inputTurnId": {
+          "description": "Identifier of the input turn associated with the event, if applicable",
+          "type": "string"
+        },
+        "outputTurnId": {
+          "description": "Identifier of the output turn associated with the event, if applicable",
+          "type": "string"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": [
+            "message",
+            "classification",
+            "action",
+            "command",
+            "tool_call",
+            "conversation_start",
+            "conversation_resume",
+            "conversation_end",
+            "conversation_aborted",
+            "conversation_failed",
+            "jump_to_stage"
+          ],
+          "description": "Type of the conversation event"
+        },
+        "eventData": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "originalText": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "role",
+                "text",
+                "originalText"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "classifierId": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "string"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "classifierId": {
+                        "type": "string"
+                      },
+                      "classifierName": {
+                        "type": "string"
+                      },
+                      "actions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "parameters": {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {}
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "parameters"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "classifierId",
+                      "classifierName",
+                      "actions"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "classifierId",
+                "input",
+                "actions"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "actionName": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "end_conversation",
+                            "description": "Effect type"
+                          },
+                          "reason": {
+                            "description": "Optional reason for ending the conversation",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "abort_conversation",
+                            "description": "Effect type"
+                          },
+                          "reason": {
+                            "description": "Optional reason for aborting the conversation",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "go_to_stage",
+                            "description": "Effect type"
+                          },
+                          "stageId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "ID of the stage to switch to"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "stageId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "run_script",
+                            "description": "Effect type"
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "JavaScript code to execute in isolated context"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "code"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "modify_user_input",
+                            "description": "Effect type"
+                          },
+                          "template": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Template to render and replace user input with"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "template"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "modify_variables",
+                            "description": "Effect type"
+                          },
+                          "modifications": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "variableName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "description": "Name of the variable to modify"
+                                },
+                                "operation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "set",
+                                    "reset",
+                                    "add",
+                                    "remove"
+                                  ],
+                                  "description": "Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)"
+                                },
+                                "value": {
+                                  "description": "Value for the operation (not used for reset operation)"
+                                }
+                              },
+                              "required": [
+                                "variableName",
+                                "operation",
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Array of variable modifications to apply"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "modifications"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "modify_user_profile",
+                            "description": "Effect type"
+                          },
+                          "modifications": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fieldName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "description": "Name of the profile field to modify"
+                                },
+                                "operation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "set",
+                                    "reset",
+                                    "add",
+                                    "remove"
+                                  ],
+                                  "description": "Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)"
+                                },
+                                "value": {
+                                  "description": "Value for the operation (not used for reset operation)"
+                                }
+                              },
+                              "required": [
+                                "fieldName",
+                                "operation",
+                                "value"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Array of user profile field modifications to apply"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "modifications"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "call_tool",
+                            "description": "Effect type"
+                          },
+                          "toolId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "ID of the tool to call"
+                          },
+                          "parameters": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {},
+                            "description": "Parameters to pass to the tool"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "toolId",
+                          "parameters"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "call_webhook",
+                            "description": "Effect type"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "HTTP(S) URL to call"
+                          },
+                          "method": {
+                            "default": "GET",
+                            "description": "HTTP method to use",
+                            "type": "string",
+                            "enum": [
+                              "GET",
+                              "POST",
+                              "PUT",
+                              "PATCH",
+                              "DELETE"
+                            ]
+                          },
+                          "headers": {
+                            "description": "HTTP headers to send with the request",
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "body": {
+                            "description": "Request body for POST/PUT/PATCH requests"
+                          },
+                          "resultKey": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Key name to store the webhook result under in context.results.webhooks"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "url",
+                          "method",
+                          "resultKey"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "const": "generate_response",
+                            "description": "Effect type"
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "actionName",
+                "stageId",
+                "effects"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "command"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "toolId": {
+                  "type": "string"
+                },
+                "toolName": {
+                  "type": "string"
+                },
+                "parameters": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "success": {
+                  "type": "boolean"
+                },
+                "result": {},
+                "error": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "toolId",
+                "toolName",
+                "parameters",
+                "success"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "stageId": {
+                  "type": "string"
+                },
+                "initialVariables": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "stageId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "previousStatus": {
+                  "type": "string",
+                  "enum": [
+                    "initialized",
+                    "awaiting_user_input",
+                    "receiving_user_voice",
+                    "processing_user_input",
+                    "generating_response",
+                    "finished",
+                    "aborted",
+                    "failed"
+                  ]
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "previousStatus",
+                "stageId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "stageId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "reason",
+                "stageId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "fromStageId": {
+                  "type": "string"
+                },
+                "toStageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "fromStageId",
+                "toStageId"
+              ],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Data associated with the conversation event"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "eventType",
+        "eventData"
       ],
       "additionalProperties": false
     },
