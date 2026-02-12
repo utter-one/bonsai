@@ -15,7 +15,7 @@ export type ToolExecutionResult = {
   parameters: Record<string, any>;
   outputFormat?: 'text' | 'json' | 'image';
   result?: any; // Optional field for tool output
-  systemPrompt?: string;
+  renderedPrompt?: string;
   llmSettings?: any;
 }
 
@@ -39,11 +39,12 @@ export class ToolExecutor {
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, tool.llmSettings);
       const actualContext = { ...context, tool: { parameters } };
       await llmProvider.init();
+      const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);
 
       const messages = [
         {
           role: 'system' as const,
-          content: await this.templatingEngine.render(tool.prompt, actualContext)
+          content: renderedPrompt
         },
         {
           role: 'user' as const,
@@ -52,7 +53,7 @@ export class ToolExecutor {
       ];
 
       const result = await llmProvider.generate(messages);
-      return { success: true, toolId: tool.id, parameters, result: result.content, systemPrompt: tool.prompt, llmSettings: tool.llmSettings };
+      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
       return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution' };
