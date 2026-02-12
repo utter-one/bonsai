@@ -150,10 +150,10 @@ export type GenerateResponseEffect = z.infer<typeof generateResponseEffectSchema
 export type Effect = z.infer<typeof effectSchema>;
 
 /**
- * Schema for parameter types supported in stage actions
- * Defines the valid parameter types that can be extracted from user input
+ * Schema for parameter types supported in stage actions and tools
+ * Defines the valid parameter types that can be extracted from user input or passed to tools
  */
-export const stageActionParameterTypeSchema = z.enum([
+export const parameterTypeSchema = z.enum([
   'string',
   'number',
   'boolean',
@@ -168,10 +168,21 @@ export const stageActionParameterTypeSchema = z.enum([
  */
 export const stageActionParameterSchema = z.object({
   name: z.string().min(1).describe('Name of the parameter (used as key when passing to effects)'),
-  type: stageActionParameterTypeSchema.describe('Expected type of the parameter value'),
+  type: parameterTypeSchema.describe('Expected type of the parameter value'),
   description: z.string().min(1).describe('Description of what the parameter represents (helps with extraction)'),
   required: z.boolean().describe('Whether this parameter must be present in the user input'),
 }).openapi('StageActionParameter');
+
+/**
+ * Schema for a single tool parameter
+ * Defines a parameter that the tool expects to receive when invoked
+ */
+export const toolParameterSchema = z.object({
+  name: z.string().min(1).describe('Name of the parameter (used as key when passing to tool)'),
+  type: parameterTypeSchema.describe('Expected type of the parameter value'),
+  description: z.string().min(1).describe('Description of what the parameter represents'),
+  required: z.boolean().describe('Whether this parameter must be provided when invoking the tool'),
+}).openapi('ToolParameter');
 
 /**
  * Schema for a single stage action
@@ -190,8 +201,9 @@ export const stageActionSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
 }).openapi('StageAction');
 
-export type StageActionParameterType = z.infer<typeof stageActionParameterTypeSchema>;
+export type ParameterType = z.infer<typeof parameterTypeSchema>;
 export type StageActionParameter = z.infer<typeof stageActionParameterSchema>;
+export type ToolParameter = z.infer<typeof toolParameterSchema>;
 export type StageAction = z.infer<typeof stageActionSchema>;
 
 /**

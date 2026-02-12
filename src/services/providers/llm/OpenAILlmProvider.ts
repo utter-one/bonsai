@@ -23,10 +23,14 @@ export type OpenAILlmProviderConfig = z.infer<typeof openAILlmProviderConfigSche
  * Used with OpenAI provider using the new Responses API
  */
 export const openAILlmSettingsSchema = z.object({
-  model: z.string().min(1).describe('Model name (e.g., gpt-4, gpt-3.5-turbo)'),
-  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
-  defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
-  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
+  model: z.string().min(1).describe('Model name (e.g., gpt-4, gpt-3.5-turbo, gpt-5, o1)'),
+  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum output tokens for generation (includes reasoning and output tokens for reasoning models)'),
+  defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2). Not used with reasoning models - use reasoningEffort instead.'),
+  defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1). Not used with reasoning models - use reasoningEffort instead.'),
+  
+  reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).optional().describe('Reasoning effort for reasoning models (gpt-5, o-series). Controls how many reasoning tokens to generate. low=fast/economical, high=more complete reasoning. Default: medium. gpt-5.1 defaults to none.'),
+  reasoningSummary: z.enum(['auto', 'concise', 'detailed']).optional().describe('Generate a summary of reasoning performed by the model. Useful for debugging. Only for reasoning models.'),
+  
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
 }).openapi('OpenAILlmSettings');
 
@@ -133,9 +137,10 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       throw new Error('OpenAI client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const input = this.convertMessagesToInput(messages);
     const systemMessage = messages.find((m) => m.role === 'system');
+
+    await this.notifyStarted();
 
     try {
       logger.info(`Generating OpenAI response with model: ${this.settings.model}`);
@@ -144,11 +149,12 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
         model: this.settings.model,
         input,
         instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
-        max_output_tokens: mergedOptions.maxTokens,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
+        max_output_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.reasoningEffort ? undefined : this.settings.defaultTemperature,
+        top_p: this.settings.reasoningEffort ? undefined : this.settings.defaultTopP,
+        reasoning: this.settings.reasoningEffort || this.settings.reasoningSummary ? { effort: this.settings.reasoningEffort, summary: this.settings.reasoningSummary } : undefined,
         stream: false,
-        metadata: mergedOptions.metadata,
+        metadata: options?.metadata,
       });
 
       if (response.status === 'failed') {
@@ -204,7 +210,6 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       throw new Error('OpenAI client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const input = this.convertMessagesToInput(messages);
     const systemMessage = messages.find((m) => m.role === 'system');
 
@@ -215,11 +220,12 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
         model: this.settings.model,
         input,
         instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
-        max_output_tokens: mergedOptions.maxTokens,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
+        max_output_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.reasoningEffort ? undefined : this.settings.defaultTemperature,
+        top_p: this.settings.reasoningEffort ? undefined : this.settings.defaultTopP,
+        reasoning: this.settings.reasoningEffort || this.settings.reasoningSummary ? { effort: this.settings.reasoningEffort, summary: this.settings.reasoningSummary } : undefined,
         stream: true,
-        metadata: mergedOptions.metadata,
+        metadata: options?.metadata,
       });
 
       let fullContent = '';

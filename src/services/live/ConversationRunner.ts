@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, GlobalAction, Project, Stage } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, GlobalAction, Project, Stage, Tool } from "../../types/models";
 import { StageAction, LIFECYCLE_ACTION_NAMES } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { PersonaService } from "../PersonaService";
@@ -23,6 +23,7 @@ import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { eq } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
+import { ToolExecutor } from "./ToolExecutor";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
 import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput";
 
@@ -74,6 +75,7 @@ export class ConversationRunner {
     @inject(UserInputProcessor) private userInputProcessor: UserInputProcessor,
     @inject(ActionsExecutor) private actionsExecutor: ActionsExecutor,
     @inject(ResponseGenerator) private responseGenerator: ResponseGenerator,
+    @inject(ToolExecutor) private toolExecutor: ToolExecutor,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -399,7 +401,7 @@ export class ConversationRunner {
         }
       });
 
-      completionLlmProvider.setOnComplete(async (result) => {
+      completionLlmProvider.setOnGenerationCompleted(async (result) => {
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
 
@@ -904,6 +906,53 @@ export class ConversationRunner {
 
     logger.info({ conversationId: this.conversation.id, actionName }, `Action ${actionName} executed`);
     return { status: 'completed', message: 'Action execution not yet implemented' };
+  }
+
+  /**
+   * Execute a tool
+   * @param toolId - ID of the tool to execute
+   * @param parameters - Map of parameter names to their values
+   * @returns Result of the tool execution
+   */
+  async callTool(toolId: string, parameters: Record<string, any>): Promise<any> {
+    logger.info({ conversationId: this.conversation.id, toolId, parameterCount: Object.keys(parameters).length }, `Calling tool ${toolId}`);
+
+    // Load the tool from the database
+    const tool = await db.query.tools.findFirst({
+      where: (tools, { eq }) => eq(tools.id, toolId)
+    });
+
+    if (!tool) {
+      throw new NotFoundError(`Tool with id ${toolId} not found`);
+    }
+
+    // Verify tool belongs to the same project
+    if (tool.projectId !== this.stageData.project.id) {
+      throw new Error(`Tool ${toolId} does not belong to project ${this.stageData.project.id}`);
+    }
+
+    logger.info({ conversationId: this.conversation.id, toolId, toolName: tool.name }, `Executing tool ${tool.name}`);
+    
+    // Build conversation context for tool execution
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage);
+    
+    // Execute the tool
+    const result = await this.toolExecutor.executeTool(tool, context, parameters);
+
+    // Save tool call event
+    const eventData: ToolCallEventData = {
+      toolId: tool.id,
+      toolName: tool.name,
+      parameters,
+      success: result.success,
+      result: result.result,
+      error: result.failureReason,
+    };
+    await this.conversationService.saveConversationEvent(this.conversation.id, 'tool_call', eventData);
+
+    logger.info({ conversationId: this.conversation.id, toolId, success: result.success }, `Tool ${tool.name} executed`);
+    
+    return result;
   }
 
   /**

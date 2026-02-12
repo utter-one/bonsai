@@ -11,8 +11,8 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   protected config?: TConfig;
   protected initialized: boolean = false;
   protected onChunkCallback?: LlmChunkCallback;
-  protected onCompleteCallback?: LlmCompleteCallback;
-  protected onReadyCallback?: SimpleCallback;
+  protected onGenerationCompletedCallback?: LlmCompleteCallback;
+  protected onGenerationStartedCallback?: SimpleCallback;
   protected onErrorCallback?: ErrorCallback;
 
   constructor(config: TConfig) {
@@ -26,7 +26,6 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   async init(): Promise<void> {
     logger.info('Initializing LLM provider...');
     this.initialized = true;
-    await this.notifyReady();
   }
 
   /**
@@ -51,15 +50,15 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   /**
    * Set callback for generation completion
    */
-  setOnComplete(callback: LlmCompleteCallback): void {
-    this.onCompleteCallback = callback;
+  setOnGenerationCompleted(callback: LlmCompleteCallback): void {
+    this.onGenerationCompletedCallback = callback;
   }
 
   /**
    * Set callback for when provider is ready
    */
-  setOnReady(callback: SimpleCallback): void {
-    this.onReadyCallback = callback;
+  setOnGenerationStarted(callback: SimpleCallback): void {
+    this.onGenerationStartedCallback = callback;
   }
 
   /**
@@ -89,12 +88,12 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   /**
    * Notify that provider is ready
    */
-  protected async notifyReady(): Promise<void> {
-    if (this.onReadyCallback) {
+  protected async notifyStarted(): Promise<void> {
+    if (this.onGenerationStartedCallback) {
       try {
-        await this.onReadyCallback();
+        await this.onGenerationStartedCallback();
       } catch (error) {
-        logger.error(`Error in ready callback: ${error}`);
+        logger.error(`Error in generation started callback: ${error}`);
       }
     }
   }
@@ -116,11 +115,11 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
    * Notify about generation completion
    */
   protected async notifyComplete(result: LlmGenerationResult): Promise<void> {
-    if (this.onCompleteCallback) {
+    if (this.onGenerationCompletedCallback) {
       try {
-        await this.onCompleteCallback(result);
+        await this.onGenerationCompletedCallback(result);
       } catch (error) {
-        logger.error(`Error in complete callback: ${error}`);
+        logger.error(`Error in generation completed callback: ${error}`);
       }
     }
   }
@@ -154,12 +153,8 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   protected applyDefaultOptions(options?: LlmGenerationOptions): LlmGenerationOptions {
     return {
       maxTokens: options?.maxTokens ?? 1024,
-      temperature: options?.temperature ?? 0.7,
-      topP: options?.topP ?? 1.0,
-      stopSequences: options?.stopSequences,
-      frequencyPenalty: options?.frequencyPenalty,
-      presencePenalty: options?.presencePenalty,
       metadata: options?.metadata,
+      outputFormat: options?.outputFormat ?? 'text',
     };
   }
 

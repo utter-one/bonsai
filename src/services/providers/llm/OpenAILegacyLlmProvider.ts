@@ -74,8 +74,9 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
       throw new Error('OpenAI client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const openAIMessages = this.convertToOpenAIMessages(messages);
+
+    await this.notifyStarted();
 
     try {
       logger.info(`Generating OpenAI Chat Completion with model: ${this.settings.model}`);
@@ -83,12 +84,12 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
       const completion = await this.client.chat.completions.create({
         model: this.settings.model,
         messages: openAIMessages,
-        max_tokens: mergedOptions.maxTokens,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
-        stop: mergedOptions.stopSequences,
-        frequency_penalty: mergedOptions.frequencyPenalty,
-        presence_penalty: mergedOptions.presencePenalty,
+        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.defaultTemperature,
+        top_p: this.settings.defaultTopP,
+        //stop: this.settings.stopSequences,
+        //frequency_penalty: this.settings.frequencyPenalty,
+        //presence_penalty: this.settings.presencePenalty,
         stream: false,
       });
 
@@ -134,7 +135,6 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
       throw new Error('OpenAI client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const openAIMessages = this.convertToOpenAIMessages(messages);
 
     try {
@@ -143,12 +143,12 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
       const stream = await this.client.chat.completions.create({
         model: this.settings.model,
         messages: openAIMessages,
-        max_tokens: mergedOptions.maxTokens,
-        temperature: mergedOptions.temperature,
-        top_p: mergedOptions.topP,
-        stop: mergedOptions.stopSequences,
-        frequency_penalty: mergedOptions.frequencyPenalty,
-        presence_penalty: mergedOptions.presencePenalty,
+        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.defaultTemperature,
+        top_p: this.settings.defaultTopP,
+        //stop: options?.stopSequences ?? this.settings.stopSequences,
+        //frequency_penalty: options?.frequencyPenalty ?? this.settings.frequencyPenalty,
+        //presence_penalty: options?.presencePenalty ?? this.settings.presencePenalty,
         stream: true,
         stream_options: { include_usage: true },
       });

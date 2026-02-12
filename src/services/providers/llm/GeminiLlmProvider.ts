@@ -21,11 +21,16 @@ export type GeminiLlmProviderConfig = z.infer<typeof geminiLlmProviderConfigSche
  * Used with Gemini models and Vertex AI
  */
 export const geminiLlmSettingsSchema = z.object({
-  model: z.string().min(1).describe('Model name (e.g., gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash)'),
-  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation'),
+  model: z.string().min(1).describe('Model name (e.g., gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash, gemini-3-pro)'),
+  defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation (includes thinking tokens for thinking models)'),
   defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
   defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
   defaultTopK: z.number().int().positive().optional().describe('Default top-k for generation'),
+  
+  thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high']).optional().describe('Thinking level for Gemini 3 models. Controls reasoning depth: minimal=chat/high-throughput, low=simple tasks, medium=balanced, high=max reasoning depth.'),
+  thinkingBudget: z.number().int().optional().describe('Thinking budget (tokens) for Gemini 2.5 models. Set to -1 for dynamic thinking (default), 0 to disable, or specific token count (128-32768). Use thinkingLevel for Gemini 3.'),
+  includeThoughts: z.boolean().optional().describe('Include thought summaries in response. Provides insight into model\'s reasoning process for debugging. Available for all thinking models.'),
+  
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
   safetySettings: z.array(z.unknown()).optional().describe('Safety settings configuration'),
 }).openapi('GeminiLlmSettings');
@@ -68,8 +73,9 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       throw new Error('Gemini client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
+
+    await this.notifyStarted();
 
     try {
       logger.info(`Generating Gemini completion with model: ${this.settings.model}`);
@@ -79,14 +85,19 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
         contents,
         config: {
           systemInstruction,
-          maxOutputTokens: mergedOptions.maxTokens,
-          temperature: mergedOptions.temperature,
-          topP: mergedOptions.topP,
+          maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+          temperature: this.settings.defaultTemperature,
+          topP: this.settings.defaultTopP,
           topK: this.settings.defaultTopK,
-          stopSequences: mergedOptions.stopSequences,
+          thinkingConfig: this.settings.thinkingLevel || this.settings.thinkingBudget !== undefined || this.settings.includeThoughts ? {
+            thinkingLevel: this.settings.thinkingLevel,
+            thinkingBudget: this.settings.thinkingBudget,
+            includeThoughts: this.settings.includeThoughts,
+          } : undefined,
+          //stopSequences: this.settings.stopSequences,
           safetySettings: this.settings.safetySettings,
         },
-      });
+      } as any);
 
       const text = result.text || '';
       
@@ -128,7 +139,6 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       throw new Error('Gemini client not initialized');
     }
 
-    const mergedOptions = this.applyDefaultOptions(options);
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
 
     try {
@@ -139,14 +149,19 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
         contents,
         config: {
           systemInstruction,
-          maxOutputTokens: mergedOptions.maxTokens,
-          temperature: mergedOptions.temperature,
-          topP: mergedOptions.topP,
+          maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+          temperature: this.settings.defaultTemperature,
+          topP: this.settings.defaultTopP,
           topK: this.settings.defaultTopK,
-          stopSequences: mergedOptions.stopSequences,
+          thinkingConfig: this.settings.thinkingLevel || this.settings.thinkingBudget !== undefined || this.settings.includeThoughts ? {
+            thinkingLevel: this.settings.thinkingLevel,
+            thinkingBudget: this.settings.thinkingBudget,
+            includeThoughts: this.settings.includeThoughts,
+          } : undefined,
+          //stopSequences: this.settings.stopSequences,
           safetySettings: this.settings.safetySettings,
         },
-      });
+      } as any);
 
       let fullContent = '';
       let finalFinishReason: string | undefined;

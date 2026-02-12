@@ -1,0 +1,1 @@
+ALTER TABLE "tools" ADD COLUMN "parameters" jsonb DEFAULT '[]'::jsonb NOT NULL;

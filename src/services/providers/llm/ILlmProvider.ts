@@ -92,18 +92,10 @@ export interface LlmGenerationResult {
 export interface LlmGenerationOptions {
   /** Maximum number of tokens to generate */
   maxTokens?: number;
-  /** Temperature for sampling (0.0 to 2.0, higher = more random) */
-  temperature?: number;
-  /** Top-p sampling parameter */
-  topP?: number;
-  /** Stop sequences to end generation */
-  stopSequences?: string[];
-  /** Frequency penalty (-2.0 to 2.0) */
-  frequencyPenalty?: number;
-  /** Presence penalty (-2.0 to 2.0) */
-  presencePenalty?: number;
   /** Custom metadata to attach to the request */
   metadata?: Record<string, any>;
+  /** Output format for the generation */
+  outputFormat?: 'text' | 'json' | 'image';
 }
 
 /**
@@ -164,16 +156,16 @@ export interface ILlmProvider {
   setOnChunk(callback: LlmChunkCallback): void;
 
   /**
+   * Set callback for when provider is ready
+   * @param callback Function to call when provider is initialized and ready
+   */
+  setOnGenerationStarted(callback: SimpleCallback): void;
+
+  /**
    * Set callback for generation completion
    * @param callback Function to call when generation completes
    */
-  setOnComplete(callback: LlmCompleteCallback): void;
-
-  /**
-   * Set callback for when provider is ready
-   * @param callback Function to call when ready
-   */
-  setOnReady(callback: SimpleCallback): void;
+  setOnGenerationCompleted(callback: LlmCompleteCallback): void;
 
   /**
    * Set callback for fatal errors
