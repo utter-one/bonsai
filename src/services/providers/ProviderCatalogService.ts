@@ -32,7 +32,7 @@ export const modelInfoSchema = z.object({
   displayName: z.string().describe('Human-readable display name'),
   description: z.string().optional().describe('Description of the model\'s capabilities and use cases'),
   recommended: z.boolean().optional().describe('Whether this is a recommended or default model'),
-});
+}).openapi('ModelInfo');
 
 export type ModelInfo = z.infer<typeof modelInfoSchema>;
 
@@ -45,9 +45,20 @@ export const voiceInfoSchema = z.object({
   description: z.string().optional().describe('Description of voice characteristics'),
   gender: z.enum(['male', 'female', 'neutral']).optional().describe('Gender of the voice (if applicable)'),
   languages: z.array(z.string()).optional().describe('Languages supported by this voice'),
-});
+  recommended: z.boolean().optional().describe('Whether this is a recommended or default voice'),
+}).openapi('VoiceInfo');
 
 export type VoiceInfo = z.infer<typeof voiceInfoSchema>;
+
+/**
+ * Schema for TTS-specific model information with optional voice overrides.
+ * Extends base ModelInfo with voices array that can override provider-level voices.
+ */
+export const ttsModelInfoSchema = modelInfoSchema.extend({
+  voices: z.array(voiceInfoSchema).optional().describe('Model-specific voices that override provider-level voices'),
+}).openapi('TtsModelInfo');
+
+export type TtsModelInfo = z.infer<typeof ttsModelInfoSchema>;
 
 /**
  * Schema for language support information
@@ -55,7 +66,7 @@ export type VoiceInfo = z.infer<typeof voiceInfoSchema>;
 export const languageInfoSchema = z.object({
   code: z.string().describe('ISO language code (e.g., \'en-US\', \'es-ES\')'),
   displayName: z.string().describe('Human-readable language name'),
-});
+}).openapi('LanguageInfo');
 
 export type LanguageInfo = z.infer<typeof languageInfoSchema>;
 
@@ -80,7 +91,7 @@ export type AsrProviderInfo = z.infer<typeof asrProviderInfoSchema>;
 export const ttsProviderInfoSchema = z.object({
   apiType: z.string().describe('Provider API type'),
   displayName: z.string().describe('Human-readable provider name'),
-  models: z.array(modelInfoSchema).describe('Models available for this provider'),
+  models: z.array(ttsModelInfoSchema).describe('Models available for this provider'),
   voices: z.array(voiceInfoSchema).describe('Voices available (can be provider-specific or model-specific)'),
   languages: z.array(languageInfoSchema).describe('Languages supported'),
   supportedAudioFormats: z.array(z.string()).describe('Audio output formats supported by this provider'),
@@ -270,6 +281,253 @@ export class ProviderCatalogService {
           { code: 'ru', displayName: 'Russian' },
         ],
         supportedAudioFormats: ['pcm_16000', 'pcm_22050', 'pcm_44100'],
+        supportsFullStreaming: true,
+        supportsVoiceSettings: true,
+      },
+      {
+        apiType: 'openai',
+        displayName: 'OpenAI Text-to-Speech',
+        description: 'OpenAI TTS with gpt-4o-mini-tts (promptable voice control), tts-1 (low latency), and tts-1-hd (high quality) models',
+        models: [
+          {
+            id: 'gpt-4o-mini-tts',
+            displayName: 'GPT-4o Mini TTS',
+            description: 'Newest promptable model with voice control for accent, tone, emotion, and more',
+            recommended: true,
+            voices: [
+              {
+                id: 'coral',
+                displayName: 'Coral',
+                description: 'Warm voice',
+                gender: 'neutral',
+                languages: ['en'],
+                recommended: true,
+              },
+              {
+                id: 'verse',
+                displayName: 'Verse',
+                description: 'Poetic voice',
+                gender: 'neutral',
+                languages: ['en'],
+                recommended: true,
+              },
+              {
+                id: 'marin',
+                displayName: 'Marin',
+                description: 'High quality voice optimized for gpt-4o-mini-tts',
+                gender: 'neutral',
+                languages: ['en'],
+                recommended: true,
+              },
+              {
+                id: 'cedar',
+                displayName: 'Cedar',
+                description: 'High quality voice optimized for gpt-4o-mini-tts',
+                gender: 'neutral',
+                languages: ['en'],
+                recommended: true,
+              },
+              {
+                id: 'alloy',
+                displayName: 'Alloy',
+                description: 'Neutral voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'ash',
+                displayName: 'Ash',
+                description: 'Clear voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'ballad',
+                displayName: 'Ballad',
+                description: 'Expressive voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'echo',
+                displayName: 'Echo',
+                description: 'Resonant voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'fable',
+                displayName: 'Fable',
+                description: 'Storytelling voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'nova',
+                displayName: 'Nova',
+                description: 'Bright voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'onyx',
+                displayName: 'Onyx',
+                description: 'Deep voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'sage',
+                displayName: 'Sage',
+                description: 'Wise voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+              {
+                id: 'shimmer',
+                displayName: 'Shimmer',
+                description: 'Bright and clear voice',
+                gender: 'neutral',
+                languages: ['en'],
+              },
+            ],
+          },
+          {
+            id: 'tts-1',
+            displayName: 'TTS-1',
+            description: 'Low latency model for real-time applications',
+          },
+          {
+            id: 'tts-1-hd',
+            displayName: 'TTS-1 HD',
+            description: 'Higher quality model with improved audio fidelity',
+          },
+        ],
+        voices: [
+          {
+            id: 'alloy',
+            displayName: 'Alloy',
+            description: 'Neutral voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'ash',
+            displayName: 'Ash',
+            description: 'Clear voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'ballad',
+            displayName: 'Ballad',
+            description: 'Expressive voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'echo',
+            displayName: 'Echo',
+            description: 'Resonant voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'fable',
+            displayName: 'Fable',
+            description: 'Storytelling voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'nova',
+            displayName: 'Nova',
+            description: 'Bright voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'onyx',
+            displayName: 'Onyx',
+            description: 'Deep voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'sage',
+            displayName: 'Sage',
+            description: 'Wise voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+          {
+            id: 'shimmer',
+            displayName: 'Shimmer',
+            description: 'Bright and clear voice',
+            gender: 'neutral',
+            languages: ['en'],
+          },
+        ],
+        languages: [
+          { code: 'af', displayName: 'Afrikaans' },
+          { code: 'ar', displayName: 'Arabic' },
+          { code: 'hy', displayName: 'Armenian' },
+          { code: 'az', displayName: 'Azerbaijani' },
+          { code: 'be', displayName: 'Belarusian' },
+          { code: 'bs', displayName: 'Bosnian' },
+          { code: 'bg', displayName: 'Bulgarian' },
+          { code: 'ca', displayName: 'Catalan' },
+          { code: 'zh', displayName: 'Chinese' },
+          { code: 'hr', displayName: 'Croatian' },
+          { code: 'cs', displayName: 'Czech' },
+          { code: 'da', displayName: 'Danish' },
+          { code: 'nl', displayName: 'Dutch' },
+          { code: 'en', displayName: 'English' },
+          { code: 'et', displayName: 'Estonian' },
+          { code: 'fi', displayName: 'Finnish' },
+          { code: 'fr', displayName: 'French' },
+          { code: 'gl', displayName: 'Galician' },
+          { code: 'de', displayName: 'German' },
+          { code: 'el', displayName: 'Greek' },
+          { code: 'he', displayName: 'Hebrew' },
+          { code: 'hi', displayName: 'Hindi' },
+          { code: 'hu', displayName: 'Hungarian' },
+          { code: 'is', displayName: 'Icelandic' },
+          { code: 'id', displayName: 'Indonesian' },
+          { code: 'it', displayName: 'Italian' },
+          { code: 'ja', displayName: 'Japanese' },
+          { code: 'kn', displayName: 'Kannada' },
+          { code: 'kk', displayName: 'Kazakh' },
+          { code: 'ko', displayName: 'Korean' },
+          { code: 'lv', displayName: 'Latvian' },
+          { code: 'lt', displayName: 'Lithuanian' },
+          { code: 'mk', displayName: 'Macedonian' },
+          { code: 'ms', displayName: 'Malay' },
+          { code: 'mr', displayName: 'Marathi' },
+          { code: 'mi', displayName: 'Maori' },
+          { code: 'ne', displayName: 'Nepali' },
+          { code: 'no', displayName: 'Norwegian' },
+          { code: 'fa', displayName: 'Persian' },
+          { code: 'pl', displayName: 'Polish' },
+          { code: 'pt', displayName: 'Portuguese' },
+          { code: 'ro', displayName: 'Romanian' },
+          { code: 'ru', displayName: 'Russian' },
+          { code: 'sr', displayName: 'Serbian' },
+          { code: 'sk', displayName: 'Slovak' },
+          { code: 'sl', displayName: 'Slovenian' },
+          { code: 'es', displayName: 'Spanish' },
+          { code: 'sw', displayName: 'Swahili' },
+          { code: 'sv', displayName: 'Swedish' },
+          { code: 'tl', displayName: 'Tagalog' },
+          { code: 'ta', displayName: 'Tamil' },
+          { code: 'th', displayName: 'Thai' },
+          { code: 'tr', displayName: 'Turkish' },
+          { code: 'uk', displayName: 'Ukrainian' },
+          { code: 'ur', displayName: 'Urdu' },
+          { code: 'vi', displayName: 'Vietnamese' },
+          { code: 'cy', displayName: 'Welsh' },
+        ],
+        supportedAudioFormats: ['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm_24000'],
         supportsFullStreaming: true,
         supportsVoiceSettings: true,
       },

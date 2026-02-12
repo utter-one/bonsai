@@ -219,8 +219,14 @@
                           "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")",
                           "type": "string",
                           "enum": [
+                            "mp3",
+                            "opus",
+                            "aac",
+                            "flac",
+                            "wav",
                             "pcm_16000",
                             "pcm_22050",
+                            "pcm_24000",
                             "pcm_44100"
                           ]
                         }
@@ -308,8 +314,14 @@
                       "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")",
                       "type": "string",
                       "enum": [
+                        "mp3",
+                        "opus",
+                        "aac",
+                        "flac",
+                        "wav",
                         "pcm_16000",
                         "pcm_22050",
+                        "pcm_24000",
                         "pcm_44100"
                       ]
                     }
@@ -2122,8 +2134,14 @@
         "audioFormat": {
           "type": "string",
           "enum": [
+            "mp3",
+            "opus",
+            "aac",
+            "flac",
+            "wav",
             "pcm_16000",
             "pcm_22050",
+            "pcm_24000",
             "pcm_44100"
           ],
           "description": "Audio format of the chunk data"

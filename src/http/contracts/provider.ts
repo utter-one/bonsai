@@ -9,6 +9,7 @@ import { openAILegacyLlmProviderConfigSchema } from '../../services/providers/ll
 import { anthropicLlmProviderConfigSchema } from '../../services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmProviderConfigSchema } from '../../services/providers/llm/GeminiLlmProvider';
 import { elevenLabsTtsProviderConfigSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
+import { openAiTtsProviderConfigSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { azureAsrProviderConfigSchema } from '../../services/providers/asr/AzureAsrProvider';
 
 extendZodWithOpenApi(z);
@@ -28,7 +29,10 @@ export const llmProviderConfigSchema = z.union([
 /**
  * Union schema for all TTS provider configurations
  */
-export const ttsProviderConfigSchema = elevenLabsTtsProviderConfigSchema.describe('TTS provider configuration');
+export const ttsProviderConfigSchema = z.union([
+  elevenLabsTtsProviderConfigSchema,
+  openAiTtsProviderConfigSchema,
+]).describe('TTS provider configuration');
 
 /**
  * Union schema for all ASR provider configurations
