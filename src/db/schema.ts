@@ -161,7 +161,7 @@ export const stages = pgTable('stages', {
   globalActions: jsonb('global_actions').notNull().default([]).$type<string[]>(),
   variables: jsonb('variables').notNull().default({}).$type<Record<string, any>>(),
   actions: jsonb('actions').notNull().default({}).$type<Record<string, StageAction>>(),
-  classifierIds: jsonb('classifier_ids').notNull().default([]).$type<string[]>(),
+  defaultClassifierId: text('default_classifier_id').references(() => classifiers.id),
   transformerIds: jsonb('transformer_ids').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
