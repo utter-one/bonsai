@@ -1,7 +1,6 @@
 import { injectable } from 'tsyringe';
 import ivm from 'isolated-vm';
 import { logger } from '../../utils/logger';
-import type { ConversationRunner } from './ConversationRunner';
 import { ConversationContext } from './ConversationContextBuilder';
 
 /**
@@ -36,7 +35,7 @@ export class IsolatedScriptExecutor {
    * @param context - Execution context containing conversation and stage information
    * @throws Error if script execution fails or times out
    */
-  async executeScript(code: string, context: ConversationContext): Promise<void> {
+  async executeScript(code: string, context: ConversationContext): Promise<any> {
     logger.info({ conversationId: context.conversationId, stageId: context.stage.id, codeLength: code.length }, `Running script in isolated VM`);
 
     // Create isolated VM instance with memory limit (16MB)
@@ -88,7 +87,7 @@ export class IsolatedScriptExecutor {
       const script = await isolate.compileScript(code);
 
       // Run the script with a 5-second timeout
-      await script.run(ivmContext, { timeout: 5000 });
+      const result = await script.run(ivmContext, { timeout: 5000 });
 
       // Extract modified values back from the isolate
       // Get vars as a Reference, then copy it back
@@ -128,11 +127,13 @@ export class IsolatedScriptExecutor {
       }
 
       logger.info({ conversationId: context.conversationId, stageId: context.stage.id }, `Script executed successfully in isolated VM`);
+      return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ conversationId: context.conversationId, stageId: context.stage.id, error: errorMessage }, `Failed to execute script in isolated VM`);
       // Swallow errors to prevent crashing the conversation runner
       // Scripts should not be able to crash the system
+      return undefined;
     } finally {
       // Dispose the isolate to free resources
       // This invalidates all references obtained from it

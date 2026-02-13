@@ -1,10 +1,12 @@
 import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
-import { singleton } from "tsyringe";
+import { inject, singleton } from "tsyringe";
 import { Conversation, GlobalAction, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
 import { MessageEventData } from "../../types/conversationEvents";
+import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
+import { isActionActive } from "../../utils/actions";
 
 export type ConversationContext = {
   /** ID of the conversation */
@@ -79,13 +81,15 @@ export type ConversationContext = {
  */
 @singleton()
 export class ConversationContextBuilder {
+  constructor(@inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor) {}
+
   /**
    * Transforms Stage entity into simplified stage context for use in prompts.
    * Filters actions to only include those that can be triggered by user input.
    */
-  private buildStageContext(stage: Stage) {
+  private async buildStageContext(stage: Stage, rawContext: ConversationContext): Promise<ConversationContext['stage']> {
     const availableActions = Object.entries(stage.actions || {})
-      .filter(([_, action]) => action.triggerOnUserInput)
+      .filter(async ([_, action]) => action.triggerOnUserInput && await isActionActive(action, rawContext, this.scriptExecutor))
       .map(([id, action]) => ({
         id,
         name: action.name,
@@ -225,7 +229,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: this.buildStageContext(stage!),
+      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!)),
     };
 
     return context;
@@ -301,7 +305,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: this.buildStageContext(stage),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage)),
     };
 
     // Get history from database
@@ -321,5 +325,46 @@ export class ConversationContextBuilder {
     });
 
     return context;
+  }
+
+  /**
+   * Builds a minimal context with only raw data for use in action condition evaluation.
+   * No filtering is applied here. Use for evaluating condition statements in actions.
+   * 
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity
+   * @returns ConversationContext with only raw data and no filtering for actions or stage context.
+   */
+  public buildRawContext(conversation: Conversation, stage: Stage): ConversationContext {
+    return {
+      conversationId: conversation.id,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      userProfile: {}, // Not loaded in raw context
+      history: [], // Not loaded in raw context
+      actions: {}, // Not loaded in raw context
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      stage: {
+          id: conversation.stageId,
+          name: stage.name,
+          availableActions: stage.actions ? Object.entries(stage.actions).map(([id, action]) => ({
+            id,
+            name: action.name,
+            trigger: action.classificationTrigger,
+            examples: action.examples || undefined,
+            parameters: action.parameters?.map(p => ({
+              name: p.name,
+              type: p.type,
+              description: p.description,
+              required: p.required,
+            })),
+          })) : [],
+          useKnowledge: stage.useKnowledge,
+          enterBehavior: stage.enterBehavior,
+          metadata: stage.metadata || undefined,          
+      }
+    };
   }
 }

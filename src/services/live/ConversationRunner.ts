@@ -1177,7 +1177,8 @@ export class ConversationRunner {
       }
       this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
       await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
-    } else if (executionOutcome.shouldEndConversation) { // TODO: this should generate response and end conversation afterwards
+    } else if (executionOutcome.shouldEndConversation) { 
+      // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
         reason: executionOutcome.endReason || 'Action execution completed conversation',
@@ -1185,6 +1186,7 @@ export class ConversationRunner {
       await this.saveAndSendEvent('conversation_end', eventData);
       await this.changeState('finished');
     } else if (executionOutcome.shouldAbortConversation) {
+      // Abort conversation without generating response
       const eventData: ConversationAbortedEventData = {
         stageId: this.stageData.id,
         reason: executionOutcome.abortReason || 'Conversation aborted by action',
