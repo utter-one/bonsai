@@ -1,10 +1,13 @@
 import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
-import { singleton } from "tsyringe";
+import { inject, singleton } from "tsyringe";
 import { Conversation, GlobalAction, Stage } from "../../types/models";
 import { StageAction } from "../../types/actions";
 import { MessageEventData } from "../../types/conversationEvents";
+import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
+import { isActionActive } from "../../utils/actions";
+import { ActionClassificationResult } from "../../types/classification";
 
 export type ConversationContext = {
   /** ID of the conversation */
@@ -79,13 +82,15 @@ export type ConversationContext = {
  */
 @singleton()
 export class ConversationContextBuilder {
+  constructor(@inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor) {}
+
   /**
    * Transforms Stage entity into simplified stage context for use in prompts.
    * Filters actions to only include those that can be triggered by user input.
    */
-  private buildStageContext(stage: Stage) {
+  private async buildStageContext(stage: Stage, rawContext: ConversationContext): Promise<ConversationContext['stage']> {
     const availableActions = Object.entries(stage.actions || {})
-      .filter(([_, action]) => action.triggerOnUserInput)
+      .filter(async ([_, action]) => action.triggerOnUserInput && await isActionActive(action, rawContext, this.scriptExecutor))
       .map(([id, action]) => ({
         id,
         name: action.name,
@@ -111,16 +116,22 @@ export class ConversationContextBuilder {
 
   /**
    * Transforms Stage entity into simplified stage context for a specific classifier.
-   * Filters actions to only include those that can be triggered by user input and are assigned to this classifier or have no classifier assignment.
+   * Filters actions to only include those that can be triggered by user input, are assigned to this classifier or have no classifier assignment, and have truthy conditions.
    * @param stage - Stage entity
    * @param globalActions - Array of global actions for the stage
    * @param classifierId - ID of the classifier to filter actions for
+   * @param rawContext - The conversation context to use for condition evaluation
    */
-  private buildStageContextForClassifier(stage: Stage, globalActions: GlobalAction[], classifierId: string) {
-    // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId)
-    const stageActions = Object.entries(stage.actions || {})
-      .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId))
-      .map(([id, action]) => ({
+  private async buildStageContextForClassifier(stage: Stage, globalActions: GlobalAction[], classifierId: string, rawContext: ConversationContext) {
+    // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId) AND condition is met
+    const stageActionEntries = Object.entries(stage.actions || {})
+      .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId));
+    
+    const stageActionsPromises = stageActionEntries.map(async ([id, action]) => {
+      const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
+      if (!isActive) return null;
+      
+      return {
         id,
         name: action.name,
         trigger: action.classificationTrigger,
@@ -131,18 +142,34 @@ export class ConversationContextBuilder {
           description: p.description,
           required: p.required,
         })),
-      }));
+      };
+    });
 
-    // Filter global actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId)
-    const filteredGlobalActions = globalActions
+    // Filter global actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId) AND condition is met
+    const filteredGlobalActionsPromises = globalActions
       .filter(action => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId))
-      .map(action => ({
-        id: action.id,
-        name: action.name,
-        trigger: action.classificationTrigger,
-        examples: action.examples || undefined,
-        parameters: undefined, // Global actions don't have parameters array like stage actions
-      }));
+      .map(async action => {
+        const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
+        if (!isActive) return null;
+        
+        return {
+          id: action.id,
+          name: action.name,
+          trigger: action.classificationTrigger,
+          examples: action.examples || undefined,
+          parameters: undefined, // Global actions don't have parameters array like stage actions
+        };
+      });
+
+    // Wait for all condition checks to complete
+    const [stageActionsWithNulls, globalActionsWithNulls] = await Promise.all([
+      Promise.all(stageActionsPromises),
+      Promise.all(filteredGlobalActionsPromises)
+    ]);
+
+    // Filter out null values from actions that failed condition checks
+    const stageActions = stageActionsWithNulls.filter(a => a !== null);
+    const filteredGlobalActions = globalActionsWithNulls.filter(a => a !== null);
 
     // Combine stage actions and global actions
     const availableActions = [...stageActions, ...filteredGlobalActions];
@@ -157,6 +184,13 @@ export class ConversationContextBuilder {
     };
   }
 
+  /**
+   * Builds the conversation context for a specific action being triggered, including only the relevant action in the context.
+   *
+   * @param conversation - Conversation entity
+   * @param action - The action being triggered
+   * @param parameters - Parameters for the triggered action
+   */
   async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
@@ -206,7 +240,12 @@ export class ConversationContextBuilder {
     return context;
   }
 
-
+  /**
+   * Builds the initial conversation context when a conversation starts, without any user input.
+   * This context will not include any actions or history, but will include stage variables, user profile, and persona.
+   * 
+   * @param conversation - Conversation entity
+   */
   async buildContextForConversationStart(conversation: Conversation): Promise<ConversationContext> {
     // Load stage with persona
     const stage = await db.query.stages.findFirst({
@@ -214,10 +253,15 @@ export class ConversationContextBuilder {
       with: { persona: true },
     });
 
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, conversation.userId),
+    });
+
+
     const context: ConversationContext = {
       conversationId: conversation.id,
       vars: conversation.stageVars[conversation.stageId] || {},
-      userProfile: {},
+      userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
       history: [],
       actions: {},
@@ -225,7 +269,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: this.buildStageContext(stage!),
+      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!, user?.profile || {})),
     };
 
     return context;
@@ -247,6 +291,11 @@ export class ConversationContextBuilder {
       where: eq(users.id, conversation.userId),
     });
 
+    // Build raw context for condition evaluation
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {});
+    rawContext.userInput = userInput;
+    rawContext.originalUserInput = originalUserInput;
+
     const context = {
       conversationId: conversation.id,
       vars: conversation.stageVars[conversation.stageId] || {},
@@ -260,7 +309,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: this.buildStageContextForClassifier(stage, globalActions, classifierId),
+      stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext),
     };
 
     // Get history from database
@@ -282,7 +331,17 @@ export class ConversationContextBuilder {
     return context;
   }
 
-  async buildContextForUserInput(conversation: Conversation, stage: Stage, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+  /**
+   * Builds a full conversation context for main completion processing, including all actions and history.
+   * This is used when processing user input for generating assistant responses, where all available information should be included in the context.
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity with persona relation
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   * @param actions - Array of action classification results
+   * @returns ConversationContext with all relevant data for processing user input and generating responses, including all actions that can be triggered by user input.
+   */
+  async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: eq(users.id, conversation.userId),
@@ -294,14 +353,17 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
-      actions: {}, // Convert classification results to actions later
+      actions: actions.reduce((acc, action) => {
+        acc[action.name] = { parameters: action.parameters };
+        return acc;
+      }, {} as Record<string, { parameters: Record<string, any> }>),
       userInput,
       originalUserInput,
       results: {
         webhooks: {},
         tools: {},
       },
-      stage: this.buildStageContext(stage),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {})),
     };
 
     // Get history from database
@@ -321,5 +383,46 @@ export class ConversationContextBuilder {
     });
 
     return context;
+  }
+
+  /**
+   * Builds a minimal context with only raw data for use in action condition evaluation.
+   * No filtering is applied here. Use for evaluating condition statements in actions.
+   * 
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity
+   * @returns ConversationContext with only raw data and no filtering for actions or stage context.
+   */
+  public buildRawContext(conversation: Conversation, stage: Stage, userProfile: Record<string, any>): ConversationContext {
+    return {
+      conversationId: conversation.id,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      userProfile: userProfile || {}, // Not loaded in raw context
+      history: [], // Not loaded in raw context
+      actions: {}, // Not loaded in raw context
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      stage: {
+          id: conversation.stageId,
+          name: stage.name,
+          availableActions: stage.actions ? Object.entries(stage.actions).map(([id, action]) => ({
+            id,
+            name: action.name,
+            trigger: action.classificationTrigger,
+            examples: action.examples || undefined,
+            parameters: action.parameters?.map(p => ({
+              name: p.name,
+              type: p.type,
+              description: p.description,
+              required: p.required,
+            })),
+          })) : [],
+          useKnowledge: stage.useKnowledge,
+          enterBehavior: stage.enterBehavior,
+          metadata: stage.metadata || undefined,          
+      }
+    };
   }
 }

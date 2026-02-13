@@ -275,7 +275,7 @@ export class ConversationRunner {
 
           if (fullText) {
             logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
-            const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, fullText, fullText);
+            const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [/** TODO */], fullText, fullText);
             context.userInputSource = 'voice';
             await this.processUserInput(fullText, 'voice');
           } else {
@@ -653,7 +653,7 @@ export class ConversationRunner {
     const onLeaveAction = oldStageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_LEAVE];
     if (onLeaveAction) {
       logger.debug({ conversationId: this.conversation.id, stageId: fromStageId }, 'Executing __on_leave lifecycle action');
-      const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, '-', '-');
+      const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, [/** TODO */], '-', '-');
       const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
 
       await this.applyActionOutcome(context, leaveOutcome);
@@ -700,7 +700,7 @@ export class ConversationRunner {
     const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
     if (onEnterAction) {
       logger.debug({ conversationId: this.conversation.id, stageId }, 'Executing __on_enter lifecycle action');
-      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, '-', '-');
+      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */ ], '-', '-');
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
 
       await this.applyActionOutcome(context, enterOutcome);
@@ -724,7 +724,7 @@ export class ConversationRunner {
 
     // TODO: not sure if this is a good place
     if (this.stageData.stage.enterBehavior === 'generate_response') {
-      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, '-', '-');
+      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */ ], '-', '-');
       const executionOutcome: ActionsExecutionOutcome = {
         hasModifiedUserInput: false,
         hasModifiedUserProfile: false,
@@ -953,7 +953,7 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, toolId, toolName: tool.name }, `Executing tool ${tool.name}`);
 
     // Build conversation context for tool execution
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage);
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], '', '');
 
     // Execute the tool
     const result = await this.toolExecutor.executeTool(tool, context, parameters);
@@ -1061,9 +1061,7 @@ export class ConversationRunner {
    */
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
     await this.changeState('processing_user_input');
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, userInput, userInput);
-    context.userInputSource = userInputSource;
-    const classificationResults = await this.userInputProcessor.processTextInput(this.session, context);
+    const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
 
     // Filter out lifecycle actions from classification matching
     const lifecycleActionNames = Object.values(LIFECYCLE_ACTION_NAMES) as string[];
@@ -1072,6 +1070,8 @@ export class ConversationRunner {
         .filter(([name]) => !lifecycleActionNames.includes(name))
     );
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
+
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, classificationResults, userInput, userInputSource);
 
     // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
     const seenActionNames = new Set<string>();
@@ -1177,7 +1177,8 @@ export class ConversationRunner {
       }
       this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
       await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
-    } else if (executionOutcome.shouldEndConversation) { // TODO: this should generate response and end conversation afterwards
+    } else if (executionOutcome.shouldEndConversation) { 
+      // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
         reason: executionOutcome.endReason || 'Action execution completed conversation',
@@ -1185,6 +1186,7 @@ export class ConversationRunner {
       await this.saveAndSendEvent('conversation_end', eventData);
       await this.changeState('finished');
     } else if (executionOutcome.shouldAbortConversation) {
+      // Abort conversation without generating response
       const eventData: ConversationAbortedEventData = {
         stageId: this.stageData.id,
         reason: executionOutcome.abortReason || 'Conversation aborted by action',

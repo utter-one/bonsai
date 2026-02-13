@@ -606,7 +606,10 @@ export class ActionsExecutor {
 
     try {
       for (const modification of effect.modifications) {
-        const { fieldName, value } = modification;
+        let { fieldName, value } = modification;
+        if (typeof value === 'string') {
+          value = await this.templatingEngine.render(value, context);
+        }
 
         switch (modification.operation) {
           case 'set': {
