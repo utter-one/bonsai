@@ -7,6 +7,7 @@ import { StageAction } from "../../types/actions";
 import { MessageEventData } from "../../types/conversationEvents";
 import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
 import { isActionActive } from "../../utils/actions";
+import { ActionClassificationResult } from "../../types/classification";
 
 export type ConversationContext = {
   /** ID of the conversation */
@@ -183,6 +184,13 @@ export class ConversationContextBuilder {
     };
   }
 
+  /**
+   * Builds the conversation context for a specific action being triggered, including only the relevant action in the context.
+   *
+   * @param conversation - Conversation entity
+   * @param action - The action being triggered
+   * @param parameters - Parameters for the triggered action
+   */
   async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
@@ -232,7 +240,12 @@ export class ConversationContextBuilder {
     return context;
   }
 
-
+  /**
+   * Builds the initial conversation context when a conversation starts, without any user input.
+   * This context will not include any actions or history, but will include stage variables, user profile, and persona.
+   * 
+   * @param conversation - Conversation entity
+   */
   async buildContextForConversationStart(conversation: Conversation): Promise<ConversationContext> {
     // Load stage with persona
     const stage = await db.query.stages.findFirst({
@@ -318,7 +331,17 @@ export class ConversationContextBuilder {
     return context;
   }
 
-  async buildContextForUserInput(conversation: Conversation, stage: Stage, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+  /**
+   * Builds a full conversation context for main completion processing, including all actions and history.
+   * This is used when processing user input for generating assistant responses, where all available information should be included in the context.
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity with persona relation
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   * @param actions - Array of action classification results
+   * @returns ConversationContext with all relevant data for processing user input and generating responses, including all actions that can be triggered by user input.
+   */
+  async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: eq(users.id, conversation.userId),
@@ -330,7 +353,10 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
-      actions: {}, // Convert classification results to actions later
+      actions: actions.reduce((acc, action) => {
+        acc[action.name] = { parameters: action.parameters };
+        return acc;
+      }, {} as Record<string, { parameters: Record<string, any> }>),
       userInput,
       originalUserInput,
       results: {

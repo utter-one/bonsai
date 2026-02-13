@@ -8,6 +8,7 @@ import { ConversationService } from "../ConversationService";
 import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
+import { Conversation } from "../../types/models";
 
 
 /**
@@ -27,7 +28,7 @@ export class UserInputProcessor {
    * @param text - The text input from the user.
    * @returns A promise that resolves to an array of stage actions resulting from processing the input.
    */
-  async processTextInput(session: Connection, context: ConversationContext): Promise<ActionClassificationResult[]> {
+  async processTextInput(session: Connection, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
     // How to process:
     // - Get all classifiers for the current stage.
     // - For each classifier, run the text through it to determine actions with filtered actions based on overrideClassifierId. Do this in parallel.
@@ -46,8 +47,8 @@ export class UserInputProcessor {
           stage,
           globalActions,
           classifier.classifier.id,
-          context.userInput,
-          context.originalUserInput
+          userInput,
+          originalUserInput
         );
         return this.classifyTextInput(session, classifier, classifierContext);
       });
@@ -59,7 +60,7 @@ export class UserInputProcessor {
         const classifier = classifiers.find(c => c.classifier.id === result.classifierId);
         const eventData: ClassificationEventData = {
           classifierId: result.classifierId,
-          input: context.userInput || '',
+          input: userInput || '',
           actions: [result],
           metadata: {
             classifierName: result.classifierName,
@@ -68,8 +69,8 @@ export class UserInputProcessor {
             llmSettings: classifier?.classifier.llmSettings
           },
         };
-        await this.conversationService.saveConversationEvent(context.conversationId, 'classification', eventData);
-        this.connectionManager.sendConversationEvent(context.conversationId, 'classification', eventData);
+        await this.conversationService.saveConversationEvent(conversation.id, 'classification', eventData);
+        this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
       }
 
       return classificationResultsWithClassifiers.map(x => x.actions).flat();
