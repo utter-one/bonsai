@@ -27,13 +27,13 @@ export class StageService extends BaseService {
   /**
    * Validates that all referenced entities exist
    * @param personaId - Persona ID to validate
-   * @param classifierIds - Classifier IDs to validate
+   * @param defaultClassifierId - Default classifier ID to validate (optional)
    * @param transformerIds - Transformer IDs to validate
    * @param knowledgeSectionIds - Knowledge section IDs to validate
    * @param globalActionIds - Global action IDs to validate
    * @throws {NotFoundError} When any referenced entity does not exist
    */
-  private async validateReferencedEntities(personaId: string, classifierIds?: string[], transformerIds?: string[], knowledgeSectionIds?: string[], globalActionIds?: string[]): Promise<void> {
+  private async validateReferencedEntities(personaId: string, defaultClassifierId?: string | null, transformerIds?: string[], knowledgeSectionIds?: string[], globalActionIds?: string[]): Promise<void> {
     const errors: string[] = [];
 
     // Validate persona exists
@@ -42,13 +42,11 @@ export class StageService extends BaseService {
       errors.push(`Persona with id ${personaId} not found`);
     }
 
-    // Validate classifiers exist
-    if (classifierIds && classifierIds.length > 0) {
-      const existingClassifiers = await db.query.classifiers.findMany({ where: inArray(classifiers.id, classifierIds) });
-      const existingIds = new Set(existingClassifiers.map(c => c.id));
-      const missingIds = classifierIds.filter(id => !existingIds.has(id));
-      if (missingIds.length > 0) {
-        errors.push(`Classifiers not found: ${missingIds.join(', ')}`);
+    // Validate default classifier exists if provided
+    if (defaultClassifierId) {
+      const classifier = await db.query.classifiers.findFirst({ where: eq(classifiers.id, defaultClassifierId) });
+      if (!classifier) {
+        errors.push(`Default classifier with id ${defaultClassifierId} not found`);
       }
     }
 
@@ -100,13 +98,13 @@ export class StageService extends BaseService {
 
     try {
       // Validate referenced entities exist
-      await this.validateReferencedEntities(input.personaId, input.classifierIds, input.transformerIds, input.knowledgeSections, input.globalActions);
+      await this.validateReferencedEntities(input.personaId, input.defaultClassifierId, input.transformerIds, input.knowledgeSections, input.globalActions);
 
-      const stage = await db.insert(stages).values({ id: stageId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, classifierIds: input.classifierIds ?? [], transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const stage = await db.insert(stages).values({ id: stageId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeSections: input.knowledgeSections ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variables: input.variables ?? {}, actions: input.actions ?? {}, defaultClassifierId: input.defaultClassifierId ?? null, transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdStage = stage[0];
 
-      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, llmSettings: createdStage.llmSettings, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeSections: createdStage.knowledgeSections, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variables: createdStage.variables, actions: createdStage.actions, classifierIds: createdStage.classifierIds, transformerIds: createdStage.transformerIds, metadata: createdStage.metadata }, context?.adminId);
+      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, llmSettings: createdStage.llmSettings, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeSections: createdStage.knowledgeSections, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variables: createdStage.variables, actions: createdStage.actions, defaultClassifierId: createdStage.defaultClassifierId, transformerIds: createdStage.transformerIds, metadata: createdStage.metadata }, context?.adminId);
 
       logger.info({ id: createdStage.id }, 'Stage created successfully');
 
@@ -239,12 +237,12 @@ export class StageService extends BaseService {
 
       // Validate referenced entities if they are being updated
       const personaIdToValidate = updateData.personaId ?? existingStage.personaId;
-      const classifierIdsToValidate = updateData.classifierIds !== undefined ? updateData.classifierIds : existingStage.classifierIds;
+      const defaultClassifierIdToValidate = updateData.defaultClassifierId !== undefined ? updateData.defaultClassifierId : existingStage.defaultClassifierId;
       const transformerIdsToValidate = updateData.transformerIds !== undefined ? updateData.transformerIds : existingStage.transformerIds;
       const knowledgeSectionsToValidate = updateData.knowledgeSections !== undefined ? updateData.knowledgeSections : existingStage.knowledgeSections;
       const globalActionsToValidate = updateData.globalActions !== undefined ? updateData.globalActions : existingStage.globalActions;
 
-      await this.validateReferencedEntities(personaIdToValidate, classifierIdsToValidate, transformerIdsToValidate, knowledgeSectionsToValidate, globalActionsToValidate);
+      await this.validateReferencedEntities(personaIdToValidate, defaultClassifierIdToValidate, transformerIdsToValidate, knowledgeSectionsToValidate, globalActionsToValidate);
 
       const updatePayload: any = { version: existingStage.version + 1, updatedAt: new Date() };
       if (updateData.name !== undefined) updatePayload.name = updateData.name;
@@ -260,7 +258,7 @@ export class StageService extends BaseService {
       if (updateData.globalActions !== undefined) updatePayload.globalActions = updateData.globalActions;
       if (updateData.variables !== undefined) updatePayload.variables = updateData.variables;
       if (updateData.actions !== undefined) updatePayload.actions = updateData.actions;
-      if (updateData.classifierIds !== undefined) updatePayload.classifierIds = updateData.classifierIds;
+      if (updateData.defaultClassifierId !== undefined) updatePayload.defaultClassifierId = updateData.defaultClassifierId;
       if (updateData.transformerIds !== undefined) updatePayload.transformerIds = updateData.transformerIds;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
@@ -272,7 +270,7 @@ export class StageService extends BaseService {
 
       const stage = updatedStage[0];
 
-      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, classifierIds: existingStage.classifierIds, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, llmSettings: stage.llmSettings, personaId: stage.personaId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeSections: stage.knowledgeSections, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variables: stage.variables, actions: stage.actions, classifierIds: stage.classifierIds, transformerIds: stage.transformerIds, metadata: stage.metadata }, context?.adminId);
+      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, llmSettings: stage.llmSettings, personaId: stage.personaId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeSections: stage.knowledgeSections, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variables: stage.variables, actions: stage.actions, defaultClassifierId: stage.defaultClassifierId, transformerIds: stage.transformerIds, metadata: stage.metadata }, context?.adminId);
 
       logger.info({ id: stage.id, newVersion: stage.version }, 'Stage updated successfully');
 
@@ -312,7 +310,7 @@ export class StageService extends BaseService {
         throw new OptimisticLockError(`Failed to delete stage due to version conflict`);
       }
 
-      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, classifierIds: existingStage.classifierIds, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, context?.adminId);
+      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variables: existingStage.variables, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, context?.adminId);
 
       logger.info({ id }, 'Stage deleted successfully');
     } catch (error) {

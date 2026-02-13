@@ -202,7 +202,7 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 | `globalActions` | JSON Array | Not Null, Default: `[]` | Which global actions to use ([] for all) |
 | `variables` | JSON Object | Not Null, Default: `{}` | Variable definitions for this stage |
 | `actions` | JSON Object | Not Null, Default: `{}` | Action definitions for this stage |
-| `classifierIds` | JSON Array | Not Null, Default: `[]` | Array of classifier IDs for user input analysis |
+| `defaultClassifierId` | String | Foreign Key (Classifier), Nullable | Default classifier for user input analysis (actions can override with `overrideClassifierId`) |
 | `transformerIds` | JSON Array | Not Null, Default: `[]` | Array of context transformer IDs for data transformation |
 | `metadata` | JSON Object | Nullable | Additional stage-specific data |
 | `version` | Integer | Not Null | Version number for optimistic locking |
@@ -211,9 +211,10 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 
 ### Relationships
 - **Many-to-One** with Persona (`personaId`)
-- References multiple Classifiers via `classifierIds` array
+- **Many-to-One** with Classifier (`defaultClassifierId`) - Optional default classifier
 - References multiple ContextTransformers via `transformerIds` array
 - Referenced by Conversation (`stageId`)
+- Actions and GlobalActions can override the classifier using `overrideClassifierId`
 
 ### Indexes
 - Primary key on `id`
@@ -246,7 +247,8 @@ Represents a reusable classifier for user input analysis that can be shared acro
 | `updatedAt` | Timestamp | Auto-managed | Record last update timestamp |
 
 ### Relationships
-- Referenced by Stage via `classifierIds` array
+- Referenced by Stage via `defaultClassifierId` (optional default)
+- Can be referenced by StageAction and GlobalAction via `overrideClassifierId`
 
 ### Indexes
 - Primary key on `id`

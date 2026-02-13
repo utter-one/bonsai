@@ -136,8 +136,31 @@ export class ConversationRunner {
       }
     }
 
-    // Load classifiers for the stage
-    for (const classifierId of stage.classifierIds) {
+    // Build classifier list dynamically:
+    // 1. Collect all unique classifier IDs from defaultClassifierId and action overrides
+    const classifierIds = new Set<string>();
+    if (stage.defaultClassifierId) {
+      classifierIds.add(stage.defaultClassifierId);
+    }
+
+    // Collect classifierIds from action overrides
+    for (const [actionKey, action] of Object.entries(stage.actions)) {
+      if (action.overrideClassifierId) {
+        classifierIds.add(action.overrideClassifierId);
+      }
+    }
+
+    // Also check global actions for classifier overrides
+    if (stage.useGlobalActions) {
+      for (const globalAction of stageData.globalActions) {
+        if (globalAction.overrideClassifierId) {
+          classifierIds.add(globalAction.overrideClassifierId);
+        }
+      }
+    }
+
+    // 2. Load all unique classifiers
+    for (const classifierId of classifierIds) {
       const classifier = await db.query.classifiers.findFirst({ where: (classifiers, { eq }) => eq(classifiers.id, classifierId) });
       if (!classifier) {
         throw new NotFoundError(`Classifier with ID ${classifierId} not found`);
@@ -700,7 +723,7 @@ export class ConversationRunner {
     const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
     if (onEnterAction) {
       logger.debug({ conversationId: this.conversation.id, stageId }, 'Executing __on_enter lifecycle action');
-      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */ ], '-', '-');
+      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */], '-', '-');
       const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
 
       await this.applyActionOutcome(context, enterOutcome);
@@ -724,7 +747,7 @@ export class ConversationRunner {
 
     // TODO: not sure if this is a good place
     if (this.stageData.stage.enterBehavior === 'generate_response') {
-      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */ ], '-', '-');
+      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */], '-', '-');
       const executionOutcome: ActionsExecutionOutcome = {
         hasModifiedUserInput: false,
         hasModifiedUserProfile: false,
@@ -1177,7 +1200,7 @@ export class ConversationRunner {
       }
       this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
       await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
-    } else if (executionOutcome.shouldEndConversation) { 
+    } else if (executionOutcome.shouldEndConversation) {
       // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
