@@ -115,16 +115,22 @@ export class ConversationContextBuilder {
 
   /**
    * Transforms Stage entity into simplified stage context for a specific classifier.
-   * Filters actions to only include those that can be triggered by user input and are assigned to this classifier or have no classifier assignment.
+   * Filters actions to only include those that can be triggered by user input, are assigned to this classifier or have no classifier assignment, and have truthy conditions.
    * @param stage - Stage entity
    * @param globalActions - Array of global actions for the stage
    * @param classifierId - ID of the classifier to filter actions for
+   * @param rawContext - The conversation context to use for condition evaluation
    */
-  private buildStageContextForClassifier(stage: Stage, globalActions: GlobalAction[], classifierId: string) {
-    // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId)
-    const stageActions = Object.entries(stage.actions || {})
-      .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId))
-      .map(([id, action]) => ({
+  private async buildStageContextForClassifier(stage: Stage, globalActions: GlobalAction[], classifierId: string, rawContext: ConversationContext) {
+    // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId) AND condition is met
+    const stageActionEntries = Object.entries(stage.actions || {})
+      .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId));
+    
+    const stageActionsPromises = stageActionEntries.map(async ([id, action]) => {
+      const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
+      if (!isActive) return null;
+      
+      return {
         id,
         name: action.name,
         trigger: action.classificationTrigger,
@@ -135,18 +141,34 @@ export class ConversationContextBuilder {
           description: p.description,
           required: p.required,
         })),
-      }));
+      };
+    });
 
-    // Filter global actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId)
-    const filteredGlobalActions = globalActions
+    // Filter global actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId) AND condition is met
+    const filteredGlobalActionsPromises = globalActions
       .filter(action => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId))
-      .map(action => ({
-        id: action.id,
-        name: action.name,
-        trigger: action.classificationTrigger,
-        examples: action.examples || undefined,
-        parameters: undefined, // Global actions don't have parameters array like stage actions
-      }));
+      .map(async action => {
+        const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
+        if (!isActive) return null;
+        
+        return {
+          id: action.id,
+          name: action.name,
+          trigger: action.classificationTrigger,
+          examples: action.examples || undefined,
+          parameters: undefined, // Global actions don't have parameters array like stage actions
+        };
+      });
+
+    // Wait for all condition checks to complete
+    const [stageActionsWithNulls, globalActionsWithNulls] = await Promise.all([
+      Promise.all(stageActionsPromises),
+      Promise.all(filteredGlobalActionsPromises)
+    ]);
+
+    // Filter out null values from actions that failed condition checks
+    const stageActions = stageActionsWithNulls.filter(a => a !== null);
+    const filteredGlobalActions = globalActionsWithNulls.filter(a => a !== null);
 
     // Combine stage actions and global actions
     const availableActions = [...stageActions, ...filteredGlobalActions];
@@ -218,10 +240,15 @@ export class ConversationContextBuilder {
       with: { persona: true },
     });
 
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, conversation.userId),
+    });
+
+
     const context: ConversationContext = {
       conversationId: conversation.id,
       vars: conversation.stageVars[conversation.stageId] || {},
-      userProfile: {},
+      userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
       history: [],
       actions: {},
@@ -229,7 +256,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!)),
+      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!, user?.profile || {})),
     };
 
     return context;
@@ -251,6 +278,11 @@ export class ConversationContextBuilder {
       where: eq(users.id, conversation.userId),
     });
 
+    // Build raw context for condition evaluation
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {});
+    rawContext.userInput = userInput;
+    rawContext.originalUserInput = originalUserInput;
+
     const context = {
       conversationId: conversation.id,
       vars: conversation.stageVars[conversation.stageId] || {},
@@ -264,7 +296,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: this.buildStageContextForClassifier(stage, globalActions, classifierId),
+      stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext),
     };
 
     // Get history from database
@@ -305,7 +337,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage)),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {})),
     };
 
     // Get history from database
@@ -335,11 +367,11 @@ export class ConversationContextBuilder {
    * @param stage - Stage entity
    * @returns ConversationContext with only raw data and no filtering for actions or stage context.
    */
-  public buildRawContext(conversation: Conversation, stage: Stage): ConversationContext {
+  public buildRawContext(conversation: Conversation, stage: Stage, userProfile: Record<string, any>): ConversationContext {
     return {
       conversationId: conversation.id,
       vars: conversation.stageVars[conversation.stageId] || {},
-      userProfile: {}, // Not loaded in raw context
+      userProfile: userProfile || {}, // Not loaded in raw context
       history: [], // Not loaded in raw context
       actions: {}, // Not loaded in raw context
       results: {
