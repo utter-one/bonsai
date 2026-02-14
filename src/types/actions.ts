@@ -157,10 +157,12 @@ export const parameterTypeSchema = z.enum([
   'string',
   'number',
   'boolean',
+  'object',
   'string[]',
   'number[]',
   'boolean[]',
-]).describe('Type of the parameter: string, number, boolean, or arrays of these');
+  'object[]',
+]).describe('Type of the parameter: string, number, boolean, object (free-form JSON), or arrays of these');
 
 /**
  * Schema for a single stage action parameter

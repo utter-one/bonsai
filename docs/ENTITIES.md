@@ -224,7 +224,14 @@ Represents a stage in the conversation flow with prompts, variable extraction, a
 Defines variables to extract from user input with definitions and examples.
 
 ### Actions Structure
-Defines actions recognizable in this stage with trigger descriptions and target stages.
+Defines actions recognizable in this stage with trigger descriptions, parameters, and effects.
+
+Each action can define parameters to extract from user input:
+- **Parameter Types**: `string`, `number`, `boolean`, `object`, `string[]`, `number[]`, `boolean[]`, `object[]`
+- **object**: Free-form JSON object that can contain any structure
+- **object[]**: Array of free-form JSON objects
+- Parameters are extracted by the LLM based on their `name`, `type`, `description`, and `required` flag
+- Extracted parameters are available in templates as `actions.[actionName].parameters.[parameterName]`
 
 ---
 
@@ -294,6 +301,7 @@ Represents a reusable tool that can be invoked during conversation stages for LL
 | `name` | String | Not Null | Display name of the tool |
 | `description` | String | Nullable | Detailed description of the tool's purpose |
 | `prompt` | Text | Not Null | Handlebars template for tool invocation |
+| `parameters` | JSON Array | Not Null, Default: `[]` | Array of parameter definitions for the tool |
 | `llmProviderId` | String | Nullable | ID of the LLM provider for tool execution |
 | `inputType` | String | Not Null | Expected input format ('text', 'json', 'image') |
 | `outputType` | String | Not Null | Expected output format ('text', 'json', 'image') |
@@ -307,6 +315,15 @@ None (Tools can be referenced by pipeline nodes in Stage)
 
 ### Indexes
 - Primary key on `id`
+
+### Parameters Structure
+Tools can define parameters they expect to receive when invoked:
+- **Parameter Types**: `string`, `number`, `boolean`, `object`, `string[]`, `number[]`, `boolean[]`, `object[]`
+- **object**: Free-form JSON object that can contain any structure
+- **object[]**: Array of free-form JSON objects
+- Each parameter has: `name` (string), `type` (from list above), `description` (string), `required` (boolean)
+- Parameters are passed to the tool when invoked via the `call_tool` effect
+- Parameters are accessible in the tool's prompt template
 
 ---
 
