@@ -256,6 +256,53 @@ Customer Data Retrieved:
 {{/exists}}
 ```
 
+### Working with Object Parameters
+
+Action and tool parameters support various types including `object` and `object[]` for complex data structures.
+
+**Accessing object properties:**
+```handlebars
+{{! object parameter - use dot notation }}
+{{#if actions.book_appointment}}
+Appointment Details:
+- Date: {{actions.book_appointment.parameters.appointment.date}}
+- Time: {{actions.book_appointment.parameters.appointment.time}}
+- Location: {{actions.book_appointment.parameters.appointment.location}}
+{{/if}}
+
+{{! Alternative: use bracket notation }}
+{{actions.configure_settings.parameters.config.[theme]}}
+```
+
+**Working with object arrays:**
+```handlebars
+{{! object[] parameter - iterate over array of objects }}
+{{#if actions.add_items}}
+Items Added:
+{{#each actions.add_items.parameters.items}}
+- {{this.name}} (Qty: {{this.quantity}}, Price: ${{this.price}})
+{{/each}}
+{{/if}}
+
+{{! Accessing nested arrays within objects }}
+{{#with actions.submit_order.parameters.order}}
+Order Total: ${{total}}
+Items:
+{{#each items}}
+  - {{name}}: ${{price}}
+{{/each}}
+{{/with}}
+```
+
+**Serializing objects as JSON:**
+```handlebars
+{{! Convert object to JSON string for logging or display }}
+{{json actions.update_profile.parameters.settings}}
+
+{{! Pretty-print with indentation }}
+{{json actions.update_profile.parameters.settings true}}
+```
+
 ### Knowledge Base Context
 
 ```handlebars
