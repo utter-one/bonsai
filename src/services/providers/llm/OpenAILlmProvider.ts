@@ -27,14 +27,14 @@ export const openAILlmSettingsSchema = z.object({
   defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum output tokens for generation (includes reasoning and output tokens for reasoning models)'),
   defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2). Not used with reasoning models - use reasoningEffort instead.'),
   defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1). Not used with reasoning models - use reasoningEffort instead.'),
-  
+
   reasoningEffort: z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']).optional().describe('Reasoning effort for reasoning models (gpt-5, o-series). Controls how many reasoning tokens to generate. low=fast/economical, high=more complete reasoning. Default: medium. gpt-5.1 defaults to none.'),
   reasoningSummary: z.enum(['auto', 'concise', 'detailed']).optional().describe('Generate a summary of reasoning performed by the model. Useful for debugging. Only for reasoning models.'),
-  
+
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
 }).openapi('OpenAILlmSettings');
 
-export type OpenAILlmSettings = z.infer<typeof openAILlmSettingsSchema>;  
+export type OpenAILlmSettings = z.infer<typeof openAILlmSettingsSchema>;
 
 /**
  * OpenAI LLM provider implementation using the new Responses API
@@ -145,49 +145,19 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
     try {
       logger.info(`Generating OpenAI response with model: ${this.settings.model}`);
 
-      const response = await this.client.responses.create({
-        model: this.settings.model,
-        input,
-        instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
-        max_output_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
-        temperature: this.settings.reasoningEffort ? undefined : this.settings.defaultTemperature,
-        top_p: this.settings.reasoningEffort ? undefined : this.settings.defaultTopP,
-        reasoning: this.settings.reasoningEffort || this.settings.reasoningSummary ? { effort: this.settings.reasoningEffort, summary: this.settings.reasoningSummary } : undefined,
-        stream: false,
-        metadata: options?.metadata,
-      });
+      const outputFormat = options?.outputFormat || 'text';
 
-      if (response.status === 'failed') {
-        throw new Error(response.error?.message || 'Response generation failed');
+      let result: LlmGenerationResult;
+      if (outputFormat === 'text' || outputFormat === 'json') {
+        // Handle text or JSON output formats
+        result = await this.generateTextBasedResponse(input, systemMessage, options);
+      } else if (outputFormat === 'image') {
+        result = await this.generateImageBasedResponse(input, systemMessage, options);
+      } else if (outputFormat === 'audio') {
+        result = await this.generateAudioBasedResponse(input, systemMessage, options);
+      } else {
+        throw new Error(`Unsupported output format: ${outputFormat}`);
       }
-
-      // Extract text from output items
-      let content = '';
-      for (const item of response.output || []) {
-        if (item.type === 'message' && item.role === 'assistant') {
-          for (const contentItem of item.content || []) {
-            if (contentItem.type === 'output_text') {
-              content += contentItem.text;
-            }
-          }
-        }
-      }
-
-      const result: LlmGenerationResult = {
-        id: response.id,
-        content,
-        role: 'assistant',
-        finishReason: response.status === 'completed' ? 'stop' : 'length',
-        usage: response.usage ? {
-          promptTokens: response.usage.input_tokens,
-          completionTokens: response.usage.output_tokens,
-          totalTokens: response.usage.total_tokens,
-        } : undefined,
-        metadata: {
-          model: response.model,
-          status: response.status,
-        },
-      };
 
       await this.notifyComplete(result);
       return result;
@@ -200,6 +170,91 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
   }
 
   /**
+   * Generate an image-based response.
+   */
+  private async generateImageBasedResponse(input: string, systemMessage: LlmMessage | undefined, options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    // Placeholder for image-based response generation logic
+    // This would involve calling the OpenAI API with appropriate parameters to generate an image and returning the result in the expected format
+    throw new Error('Image-based response generation not supported');
+  }
+
+  /**
+   * Generate an audio-based response.
+   */
+  private async generateAudioBasedResponse(input: string, systemMessage: LlmMessage | undefined, options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    // Placeholder for audio-based response generation logic
+    // This would involve calling the OpenAI API with appropriate parameters to generate audio and returning the result in the expected format
+    throw new Error('Audio-based response generation not supported');
+  }
+
+  /**
+   * Generate a text-based response and handle JSON output verification for JSON output format.
+   * This is done by OpenAI's Responses API.
+   */
+  private async generateTextBasedResponse(input: string, systemMessage: LlmMessage | undefined, options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    if (!this.client) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const response = await this.client.responses.create({
+      model: this.settings.model,
+      input,
+      instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
+      max_output_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+      temperature: this.settings.reasoningEffort ? undefined : this.settings.defaultTemperature,
+      top_p: this.settings.reasoningEffort ? undefined : this.settings.defaultTopP,
+      reasoning: this.settings.reasoningEffort || this.settings.reasoningSummary ? { effort: this.settings.reasoningEffort, summary: this.settings.reasoningSummary } : undefined,
+      stream: false,
+      metadata: options?.metadata,
+    });
+
+    if (response.status === 'failed') {
+      throw new Error(response.error?.message || 'Response generation failed');
+    }
+
+    // Extract text from output items
+    let content = '';
+    for (const item of response.output || []) {
+      if (item.type === 'message' && item.role === 'assistant') {
+        for (const contentItem of item.content || []) {
+          if (contentItem.type === 'output_text') {
+            content += contentItem.text;
+          }
+        }
+      }
+    }
+
+    // Check if output format is JSON and attempt to parse it, throwing an error if parsing fails
+    if (options?.outputFormat === 'json') {
+      try {
+        JSON.parse(content);
+      } catch (error) {
+        logger.error(`Failed to parse JSON output: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error('Failed to parse JSON output from model response');
+      }
+    }
+
+    // Construct the generation result
+    const result: LlmGenerationResult = {
+      id: response.id,
+      content,
+      role: 'assistant',
+      finishReason: response.status === 'completed' ? 'stop' : 'length',
+      usage: response.usage ? {
+        promptTokens: response.usage.input_tokens,
+        completionTokens: response.usage.output_tokens,
+        totalTokens: response.usage.total_tokens,
+      } : undefined,
+      metadata: {
+        model: response.model,
+        status: response.status,
+      },
+    };
+
+    return result;
+  }
+
+  /**
    * Generate a streaming response using the Responses API
    */
   async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
@@ -208,6 +263,10 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
 
     if (!this.client) {
       throw new Error('OpenAI client not initialized');
+    }
+
+    if (options?.outputFormat && options.outputFormat !== 'text') {
+      throw new Error(`Output format ${options.outputFormat} not supported for streaming generation`);
     }
 
     const input = this.convertMessagesToInput(messages);

@@ -81,38 +81,19 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
     try {
       logger.info(`Generating OpenAI Chat Completion with model: ${this.settings.model}`);
 
-      const completion = await this.client.chat.completions.create({
-        model: this.settings.model,
-        messages: openAIMessages,
-        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
-        temperature: this.settings.defaultTemperature,
-        top_p: this.settings.defaultTopP,
-        //stop: this.settings.stopSequences,
-        //frequency_penalty: this.settings.frequencyPenalty,
-        //presence_penalty: this.settings.presencePenalty,
-        stream: false,
-      });
+      const outputFormat = options?.outputFormat || 'text';
 
-      const choice = completion.choices[0];
-      if (!choice || !choice.message) {
-        throw new Error('No completion choice returned from OpenAI');
+      let result: LlmGenerationResult;
+      if (outputFormat === 'text' || outputFormat === 'json') {
+        // Handle text or JSON output formats
+        result = await this.generateTextBasedResponse(openAIMessages, options);
+      } else if (outputFormat === 'image') {
+        result = await this.generateImageBasedResponse(openAIMessages, options);
+      } else if (outputFormat === 'audio') {
+        result = await this.generateAudioBasedResponse(openAIMessages, options);
+      } else {
+        throw new Error(`Unsupported output format: ${outputFormat}`);
       }
-
-      const result: LlmGenerationResult = {
-        id: completion.id,
-        content: choice.message.content || '',
-        role: 'assistant',
-        finishReason: this.mapFinishReason(choice.finish_reason),
-        usage: completion.usage ? {
-          promptTokens: completion.usage.prompt_tokens,
-          completionTokens: completion.usage.completion_tokens,
-          totalTokens: completion.usage.total_tokens,
-        } : undefined,
-        metadata: {
-          model: completion.model,
-          systemFingerprint: completion.system_fingerprint,
-        },
-      };
 
       await this.notifyComplete(result);
       return result;
@@ -125,6 +106,80 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   }
 
   /**
+   * Generate an image-based response.
+   */
+  private async generateImageBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    // Placeholder for image-based response generation logic
+    // This would involve calling the OpenAI API with appropriate parameters to generate an image and returning the result in the expected format
+    throw new Error('Image-based response generation not supported');
+  }
+
+  /**
+   * Generate an audio-based response.
+   */
+  private async generateAudioBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    // Placeholder for audio-based response generation logic
+    // This would involve calling the OpenAI API with appropriate parameters to generate audio and returning the result in the expected format
+    throw new Error('Audio-based response generation not supported');
+  }
+
+  /**
+   * Generate a text-based response and handle JSON output verification for JSON output format.
+   */
+  private async generateTextBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    if (!this.client) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const completion = await this.client.chat.completions.create({
+      model: this.settings.model,
+      messages: openAIMessages,
+      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+      temperature: this.settings.defaultTemperature,
+      top_p: this.settings.defaultTopP,
+      //stop: this.settings.stopSequences,
+      //frequency_penalty: this.settings.frequencyPenalty,
+      //presence_penalty: this.settings.presencePenalty,
+      stream: false,
+    });
+
+    const choice = completion.choices[0];
+    if (!choice || !choice.message) {
+      throw new Error('No completion choice returned from OpenAI');
+    }
+
+    const content = choice.message.content || '';
+
+    // Check if output format is JSON and attempt to parse it, throwing an error if parsing fails
+    if (options?.outputFormat === 'json') {
+      try {
+        JSON.parse(content);
+      } catch (error) {
+        logger.error(`Failed to parse JSON output: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error('Failed to parse JSON output from model response');
+      }
+    }
+
+    const result: LlmGenerationResult = {
+      id: completion.id,
+      content,
+      role: 'assistant',
+      finishReason: this.mapFinishReason(choice.finish_reason),
+      usage: completion.usage ? {
+        promptTokens: completion.usage.prompt_tokens,
+        completionTokens: completion.usage.completion_tokens,
+        totalTokens: completion.usage.total_tokens,
+      } : undefined,
+      metadata: {
+        model: completion.model,
+        systemFingerprint: completion.system_fingerprint,
+      },
+    };
+
+    return result;
+  }
+
+  /**
    * Generate a streaming response using Chat Completions API
    */
   async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
@@ -133,6 +188,10 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
 
     if (!this.client) {
       throw new Error('OpenAI client not initialized');
+    }
+
+    if (options?.outputFormat && options.outputFormat !== 'text') {
+      throw new Error(`Output format ${options.outputFormat} not supported for streaming generation`);
     }
 
     const openAIMessages = this.convertToOpenAIMessages(messages);
