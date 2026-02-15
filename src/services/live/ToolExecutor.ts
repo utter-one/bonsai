@@ -1,24 +1,26 @@
 import { inject, singleton } from "tsyringe";
+import { z } from "zod";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { Tool } from "../../types/models";
 import { db } from "../../db";
 import { NotFoundError } from "../../errors";
-import { LlmContent, LlmGenerationOptions } from "../providers/llm/ILlmProvider";
+import { llmContentSchema, LlmGenerationOptions } from "../providers/llm/ILlmProvider";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
 import { extractTextFromContent } from "../../utils/llm";
 
-export type ToolExecutionResult = {
-  success: boolean;
-  failureReason?: string;
-  toolId: string;
-  parameters: Record<string, any>;
-  outputFormat?: 'text' | 'json' | 'image';
-  result?: LlmContent[]; // Optional field for tool output
-  renderedPrompt?: string;
-  llmSettings?: any;
-}
+export const toolExecutionResultSchema = z.object({
+  success: z.boolean(),
+  failureReason: z.string().optional(),
+  toolId: z.string(),
+  parameters: z.record(z.string(), z.any()),
+  result: z.array(llmContentSchema).optional().describe('Optional field for tool output'),
+  renderedPrompt: z.string().optional(),
+  llmSettings: z.any().optional(),
+});
+
+export type ToolExecutionResult = z.infer<typeof toolExecutionResultSchema>;
 
 @singleton()
 export class ToolExecutor {

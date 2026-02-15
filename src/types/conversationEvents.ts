@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { classificationResultWithClassifierSchema } from "./classification";
 import { effectSchema } from "./actions";
+import { llmContentSchema } from '../services/providers/llm/ILlmProvider';
 
 // Conversation State Schema
 export const conversationStateSchema = z.enum([
@@ -74,7 +75,7 @@ export const toolCallEventDataSchema = z.object({
   toolName: z.string(),
   parameters: z.record(z.string(), z.any()),
   success: z.boolean(),
-  result: z.any().optional(),
+  result: z.array(llmContentSchema).optional(),
   error: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });

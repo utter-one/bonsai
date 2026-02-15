@@ -1070,7 +1070,114 @@
                 "success": {
                   "type": "boolean"
                 },
-                "result": {},
+                "result": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "contentType": {
+                            "type": "string",
+                            "const": "text"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "contentType",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "contentType": {
+                            "type": "string",
+                            "const": "image"
+                          },
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded image data"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type (e.g., image/png, image/jpeg)"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "contentType",
+                          "data",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "contentType": {
+                            "type": "string",
+                            "const": "audio"
+                          },
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded audio data"
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pcm",
+                              "mp3",
+                              "wav",
+                              "opus"
+                            ],
+                            "description": "Audio format"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type (e.g., audio/pcm, audio/mpeg)"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "sampleRate": {
+                                "type": "number"
+                              },
+                              "channels": {
+                                "type": "number"
+                              },
+                              "bitDepth": {
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "contentType",
+                          "data",
+                          "format",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
                 "error": {
                   "type": "string"
                 },
