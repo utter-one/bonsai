@@ -983,26 +983,28 @@ export class ConversationRunner {
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], '', '');
 
     // Execute the tool
-    const result = await this.toolExecutor.executeTool(tool, context, parameters);
+    const executeResult = await this.toolExecutor.executeTool(tool, context, parameters);
+
+    // TODO: save binary outputs in object storage once that's implemented
 
     // Save tool call event
     const eventData: ToolCallEventData = {
       toolId: tool.id,
       toolName: tool.name,
       parameters,
-      success: result.success,
-      result: result.result,
-      error: result.failureReason,
+      success: executeResult.success,
+      result: extractTextFromContent(executeResult.result) ?? '(no text result)',
+      error: executeResult.failureReason,
       metadata: {
-        systemPrompt: result.renderedPrompt,
-        llmSettings: result.llmSettings
+        systemPrompt: executeResult.renderedPrompt,
+        llmSettings: executeResult.llmSettings
       }
     };
     await this.saveAndSendEvent('tool_call', eventData);
 
-    logger.info({ conversationId: this.conversation.id, toolId, success: result.success }, `Tool ${tool.name} executed`);
+    logger.info({ conversationId: this.conversation.id, toolId, success: executeResult.success }, `Tool ${tool.name} executed`);
 
-    return result;
+    return executeResult;
   }
 
   /**

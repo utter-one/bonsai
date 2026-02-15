@@ -1,6 +1,5 @@
 import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
-import { ConversationRunner } from './ConversationRunner';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
@@ -725,18 +724,16 @@ export class ActionsExecutor {
       // 4. Validate output against tool.outputType
       // Check that the result format matches what we expect
       if (executionResult.result !== undefined && executionResult.result !== null) {
-        const resultType = typeof executionResult.result;
         
         if (tool.outputType === 'text') {
           // For text output, result should be a string or easily convertible
-          if (resultType !== 'string') {
-            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId, resultType }, `Tool output type is '${tool.outputType}' but result is ${resultType}, will convert to string`);
-            executionResult.result = String(executionResult.result);
+          if (!executionResult.result.every(x => x.contentType === 'text')) {
+            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool output type is '${tool.outputType}' but result contains non-text content, will convert to string`);
           }
         } else if (tool.outputType === 'image') {
-          // For image output, we'd expect specific format (URL, base64, etc.)
-          // This is a placeholder for future image validation
-          logger.debug({ conversationId: context.conversationId, toolId: effect.toolId }, `Image output type - result format not strictly validated`);
+          if (!executionResult.result.every(x => x.contentType === 'image')) {
+            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool output type is '${tool.outputType}' but result contains non-image content`);
+          }
         }
         // For 'multi-modal', we accept any format
       }
