@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
+import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
 extendZodWithOpenApi(z);
@@ -208,10 +208,18 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       throw new Error('No image data returned from image generation');
     }
 
-    // Return the base64-encoded image data as content
+    // Return the base64-encoded image data as LlmImageContent
+    const content: LlmContent[] = [
+      {
+        contentType: 'image',
+        data: imageData,
+        mimeType: 'image/png', // OpenAI image generation returns PNG
+      },
+    ];
+
     const result: LlmGenerationResult = {
       id: response.id,
-      content: imageData,
+      content,
       role: 'assistant',
       finishReason: response.status === 'completed' ? 'stop' : 'length',
       usage: response.usage ? {
@@ -286,10 +294,17 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       }
     }
 
-    // Construct the generation result
+    // Construct the generation result with text content as LlmTextContent
+    const contentArray: LlmContent[] = [
+      {
+        contentType: 'text',
+        text: content,
+      },
+    ];
+
     const result: LlmGenerationResult = {
       id: response.id,
-      content,
+      content: contentArray,
       role: 'assistant',
       finishReason: response.status === 'completed' ? 'stop' : 'length',
       usage: response.usage ? {
@@ -365,10 +380,17 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
         }
       }
 
-      // Notify completion
+      // Notify completion with text content as LlmTextContent
+      const contentArray: LlmContent[] = [
+        {
+          contentType: 'text',
+          text: fullContent,
+        },
+      ];
+
       const result: LlmGenerationResult = {
         id: responseId,
-        content: fullContent,
+        content: contentArray,
         role: 'assistant',
         finishReason: finalStatus === 'completed' ? 'stop' : finalStatus === 'incomplete' ? 'length' : 'stop',
         usage: finalUsage ? {

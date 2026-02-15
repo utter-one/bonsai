@@ -27,6 +27,7 @@ import { ToolExecutor } from "./ToolExecutor";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
 import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput";
 import { TemplatingEngine } from "./TemplatingEngine";
+import { extractTextFromContent, getContentSize } from "../../utils/llm";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -427,14 +428,17 @@ export class ConversationRunner {
       });
 
       completionLlmProvider.setOnGenerationCompleted(async (result) => {
-        logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
+        const textContent = extractTextFromContent(result.content);
+        const contentSize = getContentSize(result.content);
+        
+        logger.info({ conversationId, totalTokens: result.usage?.totalTokens, contentBlocks: result.content.length }, `LLM completion finished for conversation ${conversationId}: ${contentSize} bytes in ${result.content.length} content blocks, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
 
         // Save AI message event with usage info
         const messageEventData: MessageEventData = {
-          text: result.content,
+          text: textContent,
           role: 'assistant',
-          originalText: result.content,
+          originalText: textContent,
           metadata: {
             llmUsage: result.usage || {},
             systemPrompt: this.stageData.lastCompletionPrompt,
@@ -451,7 +455,7 @@ export class ConversationRunner {
             outputTurnId: this.stageData.outputTurnId,
             sessionId: this.session.id,
             requestId: null,
-            fullText: result.content
+            fullText: textContent
           } as EndAiGenerationOutputMessage;
           this.ws.send(JSON.stringify(message));
 

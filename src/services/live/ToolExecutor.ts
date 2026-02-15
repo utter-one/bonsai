@@ -7,6 +7,7 @@ import { LlmGenerationOptions } from "../providers/llm/ILlmProvider";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
+import { extractTextFromContent } from "../../utils/llm";
 
 export type ToolExecutionResult = {
   success: boolean;
@@ -53,7 +54,9 @@ export class ToolExecutor {
       ];
 
       const result = await llmProvider.generate(messages);
-      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings };
+      const textContent = extractTextFromContent(result.content);
+      
+      return { success: true, toolId: tool.id, parameters, result: textContent, renderedPrompt, llmSettings: tool.llmSettings };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
       return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution' };

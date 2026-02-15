@@ -2,7 +2,7 @@ import { GoogleGenAI, Content, Part, HarmCategory, HarmBlockThreshold, SafetySet
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
+import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
 extendZodWithOpenApi(z);
@@ -128,26 +128,33 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       },
     } as any);
 
-    // Extract base64-encoded image from inline_data parts
-    let imageData = '';
+    // Extract base64-encoded image and text from response parts
+    const contentArray: LlmContent[] = [];
     for (const candidate of result.candidates || []) {
       for (const part of candidate.content?.parts || []) {
         if ((part as any).inlineData?.mimeType?.startsWith('image/') && (part as any).inlineData?.data) {
-          imageData = (part as any).inlineData.data;
-          break;
+          contentArray.push({
+            contentType: 'image',
+            data: (part as any).inlineData.data,
+            mimeType: (part as any).inlineData.mimeType,
+          });
+        } else if ((part as any).text) {
+          contentArray.push({
+            contentType: 'text',
+            text: (part as any).text,
+          });
         }
       }
-      if (imageData) break;
     }
 
-    if (!imageData) {
-      throw new Error('No image data returned from Gemini image generation');
+    if (contentArray.length === 0) {
+      throw new Error('No content returned from Gemini image generation');
     }
 
-    // Return the base64-encoded image data as content
+    // Return multi-modal content array
     const llmResult: LlmGenerationResult = {
       id: `gemini-img-${Date.now()}`,
-      content: imageData,
+      content: contentArray,
       role: 'assistant',
       finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
       usage: result.usageMetadata ? {
@@ -196,9 +203,11 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
 
     // Extract base64-encoded audio from inline_data parts
     let audioData = '';
+    let mimeType = 'audio/pcm';
     for (const part of result.candidates?.[0]?.content?.parts || []) {
       if ((part as any).inlineData?.mimeType?.startsWith('audio/') && (part as any).inlineData?.data) {
         audioData = (part as any).inlineData.data;
+        mimeType = (part as any).inlineData.mimeType;
         break;
       }
     }
@@ -207,10 +216,24 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       throw new Error('No audio data returned from Gemini TTS');
     }
 
-    // Return the base64-encoded audio data as content
+    // Return the base64-encoded audio data as LlmAudioContent
+    const contentArray: LlmContent[] = [
+      {
+        contentType: 'audio',
+        data: audioData,
+        format: 'pcm',
+        mimeType,
+        metadata: {
+          sampleRate: 24000,
+          channels: 2,
+          bitDepth: 16,
+        },
+      },
+    ];
+
     const llmResult: LlmGenerationResult = {
       id: `gemini-audio-${Date.now()}`,
-      content: audioData,
+      content: contentArray,
       role: 'assistant',
       finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
       usage: result.usageMetadata ? {
@@ -268,9 +291,16 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       }
     }
     
+    const contentArray: LlmContent[] = [
+      {
+        contentType: 'text',
+        text,
+      },
+    ];
+    
     const llmResult: LlmGenerationResult = {
       id: `gemini-${Date.now()}`,
-      content: text,
+      content: contentArray,
       role: 'assistant',
       finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
       usage: result.usageMetadata ? {
@@ -354,10 +384,17 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
         }
       }
 
-      // Notify completion
+      // Notify completion with text content as LlmTextContent
+      const contentArray: LlmContent[] = [
+        {
+          contentType: 'text',
+          text: fullContent,
+        },
+      ];
+
       const llmResult: LlmGenerationResult = {
         id: generationId || `gemini-${Date.now()}`,
-        content: fullContent,
+        content: contentArray,
         role: 'assistant',
         finishReason: this.mapFinishReason(finalFinishReason),
         usage: {

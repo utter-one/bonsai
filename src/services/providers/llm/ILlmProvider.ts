@@ -64,7 +64,50 @@ export interface TokenUsage {
 }
 
 /**
- * Streaming chunk from LLM provider
+ * Text content in LLM output
+ */
+export interface LlmTextContent {
+  contentType: 'text';
+  text: string;
+}
+
+/**
+ * Image content in LLM output
+ */
+export interface LlmImageContent {
+  contentType: 'image';
+  data: string; // base64-encoded image data
+  mimeType: string; // e.g., 'image/png', 'image/jpeg'
+  metadata?: {
+    width?: number;
+    height?: number;
+    [key: string]: any;
+  };
+}
+
+/**
+ * Audio content in LLM output
+ */
+export interface LlmAudioContent {
+  contentType: 'audio';
+  data: string; // base64-encoded audio data
+  format: 'pcm' | 'mp3' | 'wav' | 'opus'; // Audio format
+  mimeType: string; // e.g., 'audio/pcm', 'audio/mpeg'
+  metadata?: {
+    sampleRate?: number;
+    channels?: number;
+    bitDepth?: number;
+    [key: string]: any;
+  };
+}
+
+/**
+ * Multi-modal content block in LLM output
+ */
+export type LlmContent = LlmTextContent | LlmImageContent | LlmAudioContent;
+
+/**
+ * Streaming chunk from LLM provider (text-only)
  */
 export interface LlmChunk {
   id: string;
@@ -75,11 +118,11 @@ export interface LlmChunk {
 }
 
 /**
- * Complete generation result
+ * Complete generation result with multi-modal support
  */
 export interface LlmGenerationResult {
   id: string;
-  content: string;
+  content: LlmContent[]; // Array of content blocks supporting multiple modalities
   role: MessageRole;
   finishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter';
   usage?: TokenUsage;

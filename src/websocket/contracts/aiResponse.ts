@@ -47,3 +47,33 @@ export const aiTranscribedChunkMessageSchema = sessionOutputMessageSchema.extend
 });
 
 export type AiTranscribedChunkMessage = z.infer<typeof aiTranscribedChunkMessageSchema>;
+
+/** Message containing AI-generated image output. */
+export const sendAiImageOutputMessageSchema = sessionOutputMessageSchema.extend({
+  type: z.literal('send_ai_image_output').describe('Message type for sending AI-generated image'),
+  conversationId: z.string().describe('Unique identifier of the conversation'),
+  outputTurnId: z.string().describe('Unique identifier for this output sequence for correlation'),
+  imageData: z.string().describe('Base64-encoded image data'),
+  mimeType: z.string().describe('MIME type of the image (e.g., image/png, image/jpeg)'),
+  sequenceNumber: z.number().describe('Sequence number if multiple images in response'),
+});
+
+export type SendAiImageOutputMessage = z.infer<typeof sendAiImageOutputMessageSchema>;
+
+/** Message containing AI-generated audio output (non-TTS). */
+export const sendAiAudioOutputMessageSchema = sessionOutputMessageSchema.extend({
+  type: z.literal('send_ai_audio_output').describe('Message type for sending AI-generated audio'),
+  conversationId: z.string().describe('Unique identifier of the conversation'),
+  outputTurnId: z.string().describe('Unique identifier for this output sequence for correlation'),
+  audioData: z.string().describe('Base64-encoded audio data'),
+  audioFormat: z.enum(['pcm', 'mp3', 'wav', 'opus']).describe('Audio format identifier'),
+  mimeType: z.string().describe('MIME type of the audio (e.g., audio/pcm, audio/mpeg)'),
+  sequenceNumber: z.number().describe('Sequence number if multiple audio blocks in response'),
+  metadata: z.object({
+    sampleRate: z.number().optional().describe('Sample rate in Hz'),
+    channels: z.number().optional().describe('Number of audio channels'),
+    bitDepth: z.number().optional().describe('Bit depth per sample'),
+  }).optional().describe('Audio metadata'),
+});
+
+export type SendAiAudioOutputMessage = z.infer<typeof sendAiAudioOutputMessageSchema>;

@@ -3,7 +3,7 @@ import type { ChatCompletionMessageParam, ChatCompletionContentPart } from 'open
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
+import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
 extendZodWithOpenApi(z);
@@ -160,9 +160,16 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
       }
     }
 
+    const contentArray: LlmContent[] = [
+      {
+        contentType: 'text',
+        text: content,
+      },
+    ];
+
     const result: LlmGenerationResult = {
       id: completion.id,
-      content,
+      content: contentArray,
       role: 'assistant',
       finishReason: this.mapFinishReason(choice.finish_reason),
       usage: completion.usage ? {
@@ -245,10 +252,17 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
         }
       }
 
-      // Notify completion
+      // Notify completion with text content as LlmTextContent
+      const contentArray: LlmContent[] = [
+        {
+          contentType: 'text',
+          text: fullContent,
+        },
+      ];
+
       const result: LlmGenerationResult = {
         id: completionId,
-        content: fullContent,
+        content: contentArray,
         role: 'assistant',
         finishReason: this.mapFinishReason(finalFinishReason),
         usage: finalUsage ? {
