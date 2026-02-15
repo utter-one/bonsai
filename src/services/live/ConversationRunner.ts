@@ -985,15 +985,13 @@ export class ConversationRunner {
     // Execute the tool
     const executeResult = await this.toolExecutor.executeTool(tool, context, parameters);
 
-    // TODO: save binary outputs in object storage once that's implemented
-
     // Save tool call event
     const eventData: ToolCallEventData = {
       toolId: tool.id,
       toolName: tool.name,
       parameters,
       success: executeResult.success,
-      result: extractTextFromContent(executeResult.result) ?? '(no text result)',
+      result: executeResult.result,
       error: executeResult.failureReason,
       metadata: {
         systemPrompt: executeResult.renderedPrompt,
