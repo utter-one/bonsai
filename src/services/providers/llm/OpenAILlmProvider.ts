@@ -170,21 +170,73 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
   }
 
   /**
-   * Generate an image-based response.
+   * Generate an image-based response using the image_generation tool.
+   * The image is returned as base64-encoded data in the result field.
    */
   private async generateImageBasedResponse(input: string, systemMessage: LlmMessage | undefined, options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
-    // Placeholder for image-based response generation logic
-    // This would involve calling the OpenAI API with appropriate parameters to generate an image and returning the result in the expected format
-    throw new Error('Image-based response generation not supported');
+    if (!this.client) {
+      throw new Error('OpenAI client not initialized');
+    }
+
+    const response = await this.client.responses.create({
+      model: this.settings.model,
+      input,
+      instructions: systemMessage ? (typeof systemMessage.content === 'string' ? systemMessage.content : this.extractTextContent([systemMessage])) : undefined,
+      max_output_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+      temperature: this.settings.reasoningEffort ? undefined : this.settings.defaultTemperature,
+      top_p: this.settings.reasoningEffort ? undefined : this.settings.defaultTopP,
+      reasoning: this.settings.reasoningEffort || this.settings.reasoningSummary ? { effort: this.settings.reasoningEffort, summary: this.settings.reasoningSummary } : undefined,
+      tools: [{ type: 'image_generation' }],
+      stream: false,
+      metadata: options?.metadata,
+    });
+
+    if (response.status === 'failed') {
+      throw new Error(response.error?.message || 'Image generation failed');
+    }
+
+    // Extract base64-encoded image from image_generation_call output items
+    let imageData = '';
+    for (const item of response.output || []) {
+      if ((item as any).type === 'image_generation_call' && (item as any).result) {
+        imageData = (item as any).result;
+        break;
+      }
+    }
+
+    if (!imageData) {
+      throw new Error('No image data returned from image generation');
+    }
+
+    // Return the base64-encoded image data as content
+    const result: LlmGenerationResult = {
+      id: response.id,
+      content: imageData,
+      role: 'assistant',
+      finishReason: response.status === 'completed' ? 'stop' : 'length',
+      usage: response.usage ? {
+        promptTokens: response.usage.input_tokens,
+        completionTokens: response.usage.output_tokens,
+        totalTokens: response.usage.total_tokens,
+      } : undefined,
+      metadata: {
+        model: response.model,
+        status: response.status,
+        outputFormat: 'image',
+      },
+    };
+
+    return result;
   }
 
   /**
    * Generate an audio-based response.
+   * Audio generation is not yet supported in the Responses API.
    */
   private async generateAudioBasedResponse(input: string, systemMessage: LlmMessage | undefined, options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
-    // Placeholder for audio-based response generation logic
-    // This would involve calling the OpenAI API with appropriate parameters to generate audio and returning the result in the expected format
-    throw new Error('Audio-based response generation not supported');
+    // Audio generation is not yet supported in the OpenAI Responses API
+    // According to the documentation: "Audio is not yet supported in the Responses API"
+    throw new Error('Audio-based response generation not supported in Responses API');
   }
 
   /**
