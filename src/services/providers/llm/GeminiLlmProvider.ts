@@ -105,21 +105,128 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
   }
 
   /**
-   * Generate an image-based response.
+   * Generate an image-based response using Gemini's native Nano Banana image generation.
+   * Uses gemini-2.5-flash-image or gemini-3-pro-image-preview models.
+   * The image is returned as base64-encoded data in inline_data parts.
    */
   private async generateImageBasedResponse(systemInstruction: string | undefined, contents: Content[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
-    // Placeholder for image-based response generation logic
-    // This would involve calling the Gemini API with appropriate parameters to generate an image and returning the result in the expected format
-    throw new Error('Image-based response generation not supported');
+    if (!this.client) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    // Use a Nano Banana model for image generation
+    const result = await this.client.models.generateContent({
+      model: this.settings.model,
+      contents,
+      config: {
+        systemInstruction,
+        maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.defaultTemperature,
+        topP: this.settings.defaultTopP,
+        topK: this.settings.defaultTopK,
+        responseModalities: ['IMAGE', 'TEXT'],
+      },
+    } as any);
+
+    // Extract base64-encoded image from inline_data parts
+    let imageData = '';
+    for (const candidate of result.candidates || []) {
+      for (const part of candidate.content?.parts || []) {
+        if ((part as any).inlineData?.mimeType?.startsWith('image/') && (part as any).inlineData?.data) {
+          imageData = (part as any).inlineData.data;
+          break;
+        }
+      }
+      if (imageData) break;
+    }
+
+    if (!imageData) {
+      throw new Error('No image data returned from Gemini image generation');
+    }
+
+    // Return the base64-encoded image data as content
+    const llmResult: LlmGenerationResult = {
+      id: `gemini-img-${Date.now()}`,
+      content: imageData,
+      role: 'assistant',
+      finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
+      usage: result.usageMetadata ? {
+        promptTokens: result.usageMetadata.promptTokenCount || 0,
+        completionTokens: result.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: result.usageMetadata.totalTokenCount || 0,
+      } : undefined,
+      metadata: {
+        model: this.settings.model,
+        outputFormat: 'image',
+        finishReason: result.candidates?.[0]?.finishReason,
+      },
+    };
+
+    return llmResult;
   }
 
   /**
-   * Generate an audio-based response.
+   * Generate an audio-based response using Gemini's TTS (text-to-speech) capabilities.
+   * Uses gemini-2.5-flash-preview-tts model.
+   * The audio is returned as base64-encoded PCM data (16-bit, 24kHz, stereo) in inline_data parts.
    */
   private async generateAudioBasedResponse(systemInstruction: string | undefined, contents: Content[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
-    // Placeholder for audio-based response generation logic
-    // This would involve calling the Gemini API with appropriate parameters to generate audio and returning the result in the expected format
-    throw new Error('Audio-based response generation not supported');
+    if (!this.client) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    // Use a TTS model for audio generation
+    const ttsModel = 'gemini-2.5-flash-preview-tts';
+
+    const result = await this.client.models.generateContent({
+      model: ttsModel,
+      contents,
+      config: {
+        systemInstruction,
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: 'Kore', // Default voice, can be made configurable
+            },
+          },
+        },
+      },
+    } as any);
+
+    // Extract base64-encoded audio from inline_data parts
+    let audioData = '';
+    for (const part of result.candidates?.[0]?.content?.parts || []) {
+      if ((part as any).inlineData?.mimeType?.startsWith('audio/') && (part as any).inlineData?.data) {
+        audioData = (part as any).inlineData.data;
+        break;
+      }
+    }
+
+    if (!audioData) {
+      throw new Error('No audio data returned from Gemini TTS');
+    }
+
+    // Return the base64-encoded audio data as content
+    const llmResult: LlmGenerationResult = {
+      id: `gemini-audio-${Date.now()}`,
+      content: audioData,
+      role: 'assistant',
+      finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
+      usage: result.usageMetadata ? {
+        promptTokens: result.usageMetadata.promptTokenCount || 0,
+        completionTokens: result.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: result.usageMetadata.totalTokenCount || 0,
+      } : undefined,
+      metadata: {
+        model: ttsModel,
+        outputFormat: 'audio',
+        audioFormat: 'pcm16-24khz-stereo',
+        finishReason: result.candidates?.[0]?.finishReason,
+      },
+    };
+
+    return llmResult;
   }
 
   /**
