@@ -8,7 +8,6 @@ import { llmContentSchema, LlmGenerationOptions } from "../providers/llm/ILlmPro
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
-import { extractTextFromContent } from "../../utils/llm";
 
 export const toolExecutionResultSchema = z.object({
   success: z.boolean(),
@@ -51,6 +50,7 @@ export class ToolExecutor {
       const actualContext = { ...context, tool: { parameters } };
       await llmProvider.init();
       const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);
+      logger.info({ toolId: tool.id, renderedPrompt, actualContext }, `Rendered prompt for tool "${tool.name}"`);
 
       const messages = [
         {
@@ -63,12 +63,28 @@ export class ToolExecutor {
         }
       ];
 
-      const result = await llmProvider.generate(messages);
+      const result = await llmProvider.generate(messages, { outputFormat: this.getOutputFormat(tool) });
       
       return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
       return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution' };
     }
+  }
+
+  private getOutputFormat(tool: Tool): LlmGenerationOptions['outputFormat'] {
+    // Determine output format based on tool configuration or default to text
+    if (tool.outputType === 'text') {
+      return 'text';
+    }
+    if (tool.outputType === 'image') {
+      return 'image';
+    }
+    if (tool.outputType === 'multi-modal') {
+      return 'image';
+    }
+
+    // Add more formats as needed
+    return 'text';
   }
 }
