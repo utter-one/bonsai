@@ -367,11 +367,9 @@ export class ConversationRunner {
             type: 'send_ai_voice_chunk',
             conversationId,
             outputTurnId: this.stageData.outputTurnId,
+            ...chunk,
+            audio: undefined, // don't send raw audio buffer through WebSocket message, instead convert to base64 string
             audioData: chunk.audio.toString('base64'),
-            audioFormat: chunk.format,
-            chunkId: chunk.chunkId,
-            ordinal: chunk.ordinal,
-            isFinal: chunk.isFinal,
             sessionId: this.session.id,
             requestId: null
           } as SendAiVoiceChunkMessage;

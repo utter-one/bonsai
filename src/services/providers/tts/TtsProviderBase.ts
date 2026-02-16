@@ -7,8 +7,9 @@ import type { AudioFormat } from '../../../types/audio';
  * Abstract base class for TTS provider implementations
  * Provides common functionality and callback management for text-to-speech providers
  * @template TConfig The type of provider-specific configuration
+ * @template TChunk The type of audio chunk this provider generates
  */
-export abstract class TtsProviderBase<TConfig = Record<string, any>> implements ITtsProvider {
+export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk extends GeneratedAudioChunk = GeneratedAudioChunk> implements ITtsProvider<TChunk> {
   /** Counter for generating sequential ordinals for audio chunks */
   protected chunkOrdinal: number = 0;
 
@@ -22,7 +23,7 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
   protected onErrorCallback?: ErrorCallback;
 
   /** Callback for generated audio chunks */
-  protected onSpeechGeneratingCallback?: SpeechGenerationCallback;
+  protected onSpeechGeneratingCallback?: SpeechGenerationCallback<TChunk>;
 
   /** Provider-specific configuration */
   protected config: TConfig;
@@ -94,7 +95,7 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
    * Registers a callback for receiving generated audio chunks
    * @param cb Callback function that receives and processes each generated audio chunk
    */
-  setOnSpeechGenerating(cb: SpeechGenerationCallback): void {
+  setOnSpeechGenerating(cb: SpeechGenerationCallback<TChunk>): void {
     this.onSpeechGeneratingCallback = cb;
   }
 
@@ -138,7 +139,7 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>> implements 
    * Called by subclasses when audio chunks are generated
    * @param chunk The generated audio chunk
    */
-  protected async handleSpeechGenerating(chunk: GeneratedAudioChunk): Promise<void> {
+  protected async handleSpeechGenerating(chunk: TChunk): Promise<void> {
     logger.debug(`TTS generating: chunkId=${chunk.chunkId}, ordinal=${chunk.ordinal}, isFinal=${chunk.isFinal}`);
     if (this.onSpeechGeneratingCallback) {
       await this.onSpeechGeneratingCallback(chunk);

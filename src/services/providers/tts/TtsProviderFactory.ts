@@ -4,21 +4,22 @@ import type { Provider } from '../../../types/models';
 import type { ITtsProvider } from './ITtsProvider';
 import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProviderConfigSchema, ElevenLabsTtsSettings } from './ElevenLabsTtsProvider';
 import { OpenAiTtsProvider, OpenAiTtsProviderConfig, openAiTtsProviderConfigSchema, OpenAiTtsSettings } from './OpenAiTtsProvider';
+import { DeepgramTtsProvider, DeepgramTtsProviderConfig, deepgramTtsProviderConfigSchema, DeepgramTtsSettings } from './DeepgramTtsProvider';
 
 /**
  * Supported TTS provider API types
  */
-export type TtsProviderApiType = 'elevenlabs' | 'openai';
+export type TtsProviderApiType = 'elevenlabs' | 'openai' | 'deepgram';
 
 /**
  * Union type for all TTS voice settings
  */
-export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings;
+export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings | DeepgramTtsSettings;
 
 /**
  * Union type for all TTS provider configurations
  */
-export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig;
+export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig | DeepgramTtsProviderConfig;
 
 /**
  * Factory service for creating TTS provider instances based on provider entity configuration
@@ -49,8 +50,11 @@ export class TtsProviderFactory {
       case 'openai':
         return this.createOpenAiProvider(provider, settings as OpenAiTtsSettings);
 
+      case 'deepgram':
+        return this.createDeepgramProvider(provider, settings as DeepgramTtsSettings);
+
       default:
-        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai`;
+        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -85,6 +89,20 @@ export class TtsProviderFactory {
   }
 
   /**
+   * Creates a Deepgram TTS provider instance from provider entity
+   * @param provider - Provider entity with Deepgram-specific configuration
+   * @param settings - Deepgram-specific TTS settings
+   * @returns Configured Deepgram TTS provider
+   * @throws {Error} When required Deepgram configuration fields are missing
+   */
+  private createDeepgramProvider(provider: Provider, settings: DeepgramTtsSettings): DeepgramTtsProvider {
+    const config = deepgramTtsProviderConfigSchema.parse(provider.config);
+
+    logger.info(`Creating Deepgram TTS provider for provider ${provider.id}`);
+    return new DeepgramTtsProvider(config, settings);
+  }
+
+  /**
    * Validates if a provider can be used for TTS
    * @param provider - Provider entity to validate
    * @returns True if provider is valid for TTS, false otherwise
@@ -94,7 +112,7 @@ export class TtsProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: TtsProviderApiType[] = ['elevenlabs', 'openai'];
+    const supportedApiTypes: TtsProviderApiType[] = ['elevenlabs', 'openai', 'deepgram'];
     return supportedApiTypes.includes(provider.apiType as TtsProviderApiType);
   }
 
@@ -103,6 +121,6 @@ export class TtsProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): TtsProviderApiType[] {
-    return ['elevenlabs', 'openai'];
+    return ['elevenlabs', 'openai', 'deepgram'];
   }
 }

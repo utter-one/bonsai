@@ -30,6 +30,7 @@ import { anthropicLlmSettingsSchema } from './services/providers/llm/AnthropicLl
 import { geminiLlmSettingsSchema } from './services/providers/llm/GeminiLlmProvider';
 import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
+import { deepgramTtsSettingsSchema } from './services/providers/tts/DeepgramTtsProvider';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -74,6 +75,7 @@ export function getOpenAPISpec(): any {
   // TTS settings schemas (provider-specific)
   registry.register('ElevenLabsTtsSettings', elevenLabsTtsSettingsSchema);
   registry.register('OpenAiTtsSettings', openAiTtsSettingsSchema);
+  registry.register('DeepgramTtsSettings', deepgramTtsSettingsSchema);
 
   // Voice and ASR configuration schemas
   registry.register('AsrConfig', asrConfigSchema);

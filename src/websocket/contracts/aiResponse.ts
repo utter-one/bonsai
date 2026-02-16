@@ -22,6 +22,8 @@ export const sendAiVoiceChunkMessageSchema = sessionOutputMessageSchema.extend({
   chunkId: z.string().describe('Unique identifier for this specific audio chunk'),
   ordinal: z.number().describe('Sequential order of this chunk in the voice output sequence'),
   isFinal: z.boolean().describe('Whether this is the final chunk in the voice output sequence'),
+  sampleRate: z.number().optional().describe('Sample rate of the audio chunk (e.g., 24000)'),
+  bitRate: z.number().optional().describe('Bit rate of the audio chunk in bits per second (e.g., 64000)'),
 });
 
 export type SendAiVoiceChunkMessage = z.infer<typeof sendAiVoiceChunkMessageSchema>;

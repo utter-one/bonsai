@@ -7,7 +7,7 @@ import type { SimpleCallback, ErrorCallback } from '../../../types/callbacks';
  * @param chunk The generated audio chunk with metadata
  * @returns Promise that resolves when the chunk has been processed
  */
-export type SpeechGenerationCallback = (chunk: GeneratedAudioChunk) => Promise<void>;
+export type SpeechGenerationCallback<T extends GeneratedAudioChunk = GeneratedAudioChunk> = (chunk: T) => Promise<void>;
 
 /**
  * Represents a chunk of generated audio from text-to-speech synthesis
@@ -20,7 +20,7 @@ export type GeneratedAudioChunk = {
   /** Binary audio data buffer containing the synthesized speech */
   audio: Buffer;
   /** Audio format for this chunk */
-  format: AudioFormat;
+  audioFormat: AudioFormat;
   /** Original text that was converted to speech for this chunk (not all TTS providers provide this) */
   text?: string;
   /** Duration of this audio chunk in milliseconds (may be undefined if not provided by the TTS provider) */
@@ -48,8 +48,9 @@ export type NoSpeechMarker = {
  * Interface for Text-to-Speech (TTS) providers
  * Enables real-time streaming of text to speech synthesis services
  * and provides callbacks for receiving generated audio chunks as they become available
+ * @template TChunk The type of audio chunk this provider generates (extends GeneratedAudioChunk)
  */
-export interface ITtsProvider {
+export interface ITtsProvider<TChunk extends GeneratedAudioChunk = GeneratedAudioChunk> {
   /**
    * Gets the list of supported audio output formats for this provider
    * @returns Array of supported audio format identifiers
@@ -112,5 +113,5 @@ export interface ITtsProvider {
    * Chunks are delivered in sequential order and can be played or processed immediately
    * @param cb Callback function that receives and processes each generated audio chunk
    */
-  setOnSpeechGenerating(cb: SpeechGenerationCallback): void;
+  setOnSpeechGenerating(cb: SpeechGenerationCallback<TChunk>): void;
 }
