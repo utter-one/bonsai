@@ -8,8 +8,6 @@ import { llmContentSchema, LlmGenerationOptions } from "../providers/llm/ILlmPro
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
-import { extractTextFromContent } from "../../utils/llm";
-import { get } from "http";
 
 export const toolExecutionResultSchema = z.object({
   success: z.boolean(),
