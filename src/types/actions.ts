@@ -162,7 +162,55 @@ export const parameterTypeSchema = z.enum([
   'number[]',
   'boolean[]',
   'object[]',
-]).describe('Type of the parameter: string, number, boolean, object (free-form JSON), or arrays of these');
+  'image',
+  'image[]',
+  'audio',
+  'audio[]',
+]).describe('Type of the parameter: string, number, boolean, object (free-form JSON), arrays of these, image (multimodal image with metadata), image[] (array of images), audio (multimodal audio with metadata), audio[] (array of audio)');
+
+/**
+ * Image parameter value structure for multimodal parameters
+ * Contains base64-encoded image data with metadata for interpretation
+ */
+export type ImageParameterValue = {
+  /** Base64-encoded image data */
+  data: string;
+  /** MIME type of the image (e.g., image/png, image/jpeg, image/webp) */
+  mimeType: string;
+  /** Optional metadata about the image */
+  metadata?: {
+    /** Image width in pixels */
+    width?: number;
+    /** Image height in pixels */
+    height?: number;
+    /** Additional provider-specific or custom metadata */
+    [key: string]: any;
+  };
+};
+
+/**
+ * Audio parameter value structure for multimodal parameters
+ * Contains base64-encoded audio data with metadata for interpretation
+ */
+export type AudioParameterValue = {
+  /** Base64-encoded audio data */
+  data: string;
+  /** Audio format identifier (pcm, mp3, wav, opus) */
+  format: 'pcm' | 'mp3' | 'wav' | 'opus';
+  /** MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav) */
+  mimeType: string;
+  /** Optional metadata about the audio */
+  metadata?: {
+    /** Sample rate in Hz (e.g., 44100, 48000) */
+    sampleRate?: number;
+    /** Number of audio channels (1 for mono, 2 for stereo) */
+    channels?: number;
+    /** Bit depth per sample (e.g., 16, 24) */
+    bitDepth?: number;
+    /** Additional provider-specific or custom metadata */
+    [key: string]: any;
+  };
+};
 
 /**
  * Schema for a single stage action parameter
