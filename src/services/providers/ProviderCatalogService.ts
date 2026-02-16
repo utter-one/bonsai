@@ -714,6 +714,10 @@ export class ProviderCatalogService {
               { id: 'ebisu-ja', displayName: 'Ebisu (Japanese)', description: 'Calm, deep, natural, patient, sincere', gender: 'male', languages: ['ja-jp'] },
               { id: 'ama-ja', displayName: 'Ama (Japanese)', description: 'Casual, comfortable, confident, knowledgeable, natural', gender: 'female', languages: ['ja-jp'] },
             ],
+            languages: ['en', 'es', 'nl', 'de', 'fr', 'it', 'ja'],
+            supportedAudioFormats: ['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac'],
+            supportsFullStreaming: true,
+            supportsVoiceSettings: false,
           },
           {
             id: 'aura-1',
@@ -733,6 +737,10 @@ export class ProviderCatalogService {
               { id: 'helios-en', displayName: 'Helios (English)', description: 'Professional, clear, confident', gender: 'male', languages: ['en-gb'] },
               { id: 'zeus-en', displayName: 'Zeus (English)', description: 'Deep, trustworthy, smooth', gender: 'male', languages: ['en-us'] },
             ],
+            languages: ['en'],
+            supportedAudioFormats: ['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac'],
+            supportsFullStreaming: true,
+            supportsVoiceSettings: false,
           },
         ],
         voices: [],
@@ -745,9 +753,6 @@ export class ProviderCatalogService {
           { code: 'it', displayName: 'Italian' },
           { code: 'ja', displayName: 'Japanese' },
         ],
-        supportedAudioFormats: ['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac'],
-        supportsFullStreaming: true,
-        supportsVoiceSettings: false,
       },
     ];
   }
