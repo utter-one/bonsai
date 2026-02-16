@@ -74,6 +74,9 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   /** Sentence splitter for processing streaming text */
   private sentenceSplitter: SentenceSplitter | null = null;
 
+  /** Buffer for accumulating text when sentence splitter is disabled */
+  private textBuffer: string = '';
+
   /** Current no-speech marker being processed */
   private inNoSpeechSection?: NoSpeechMarker;
 
@@ -135,6 +138,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     this.flushTimestamps = [];
     this.generationEnded = false;
     this.firstChunkBuffer = null;
+    this.textBuffer = '';
 
     // Construct full model string from model version and voice ID
     const modelVersion = this.settings.model ?? 'aura-2';
@@ -221,6 +225,12 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     // Finalize any remaining text in the sentence splitter
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.finalize();
+    } else if (this.textBuffer.trim()) {
+      // Send buffered text when sentence splitter is disabled
+      logger.info(`[Deepgram] Sending buffered text: "${this.textBuffer}"`);
+      await this.sendTextToSocket(this.textBuffer);
+      await this.flushAudio();
+      this.textBuffer = '';
     }
 
     logger.info(`[Deepgram] Ending speech generation`);
@@ -242,10 +252,9 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
       // Add text to sentence splitter - it will automatically call sendTextToSocket for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
-      logger.info(`[Deepgram] Sending text directly: "${text}"`);
-      // Send text directly without sentence splitting
-      await this.sendTextToSocket(text);
-      await this.flushAudio();
+      logger.debug(`[Deepgram] Buffering text: "${text}"`);
+      // Buffer text until end() is called to allow TTS provider to handle complete text
+      this.textBuffer += text;
     }
   }
 
@@ -628,6 +637,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     this.generationEnded = false;
     this.bitRate = undefined;
     this.container = undefined;
+    this.textBuffer = '';
 
     await super.cleanup();
   }

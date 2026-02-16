@@ -159,7 +159,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
 
     logger.info(`[ElevenLabs] Ending speech generation`);
 
-    // Send end-of-stream message
+    // Send end-of-stream message (empty text with implicit flush triggers audio generation)
     const eosMessage = { text: '' };
     if (this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(eosMessage));
@@ -176,9 +176,9 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       // Add text to sentence splitter - it will automatically call sendTextToSocket for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
-      logger.info(`[ElevenLabs] Sending text directly: "${text}"`);
-      // Send text directly without sentence splitting
-      await this.sendTextToSocket(text);
+      logger.info(`[ElevenLabs] Streaming text without flush: "${text}"`);
+      // Stream text to ElevenLabs without flushing - audio generation will be triggered on end()
+      await this.sendTextToSocket(text, false);
     }
   }
 
@@ -315,8 +315,9 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /**
    * Sends text to the WebSocket after applying no-speech filtering
    * @param text The text to send (can be a complete sentence or partial text)
+   * @param flush Whether to flush and generate audio immediately (default: true)
    */
-  private async sendTextToSocket(text: string): Promise<void> {
+  private async sendTextToSocket(text: string, flush: boolean = true): Promise<void> {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket is not open');
     }
@@ -342,11 +343,11 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       text = text.replace(/!/g, '.');
     }
 
-    logger.info(`[ElevenLabs] Sending sentence: "${text}"`);
+    logger.info(`[ElevenLabs] Sending${flush ? ' and flushing' : ''} text: "${text}"`);
 
     const textMessage = {
       text: text,
-      flush: true,
+      ...(flush ? { flush: true } : { try_trigger_generation: true }), // Use flush for immediate generation, try_trigger_generation for non-flush streaming
     };
 
     this.socket.send(JSON.stringify(textMessage), async (error?: Error) => {
