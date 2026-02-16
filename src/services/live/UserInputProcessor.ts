@@ -9,7 +9,7 @@ import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
 import { Conversation } from "../../types/models";
-
+import { extractTextFromContent } from "../../utils/llm";
 
 /**
  * Service responsible for processing user input during live sessions.
@@ -100,8 +100,10 @@ export class UserInputProcessor {
       ];
 
       const result = await llmProvider.generate(messages);
-      logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received classification result from LLM provider: ${result.content}`);
-      const classificationResult = classificationResultSchema.parse(parseJsonFromMarkdown(result.content));
+      const textContent = extractTextFromContent(result.content);
+      
+      logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received classification result from LLM provider: ${textContent}`);
+      const classificationResult = classificationResultSchema.parse(parseJsonFromMarkdown(textContent));
       
       // Convert actions object to array format
       const actions: ActionClassificationResult[] = Object.entries(classificationResult.actions).map(([name, parameters]) => ({

@@ -56,7 +56,9 @@ import {
   startAiGenerationOutputMessageSchema,
   sendAiVoiceChunkMessageSchema,
   endAiGenerationOutputMessageSchema,
-  aiTranscribedChunkMessageSchema
+  aiTranscribedChunkMessageSchema,
+  sendAiImageOutputMessageSchema,
+  sendAiAudioOutputMessageSchema,
 } from '../websocket/contracts/aiResponse';
 
 /**
@@ -120,7 +122,9 @@ function generateWebSocketSchemas(): void {
     'start-ai-generation-output': startAiGenerationOutputMessageSchema,
     'send-ai-voice-chunk': sendAiVoiceChunkMessageSchema,
     'end-ai-generation-output': endAiGenerationOutputMessageSchema,
-    'ai-transcribed-chunk': aiTranscribedChunkMessageSchema
+    'ai-transcribed-chunk': aiTranscribedChunkMessageSchema,
+    'send-ai-image-output': sendAiImageOutputMessageSchema,
+    'send-ai-audio-output': sendAiAudioOutputMessageSchema,
   };
 
   // Generate all schemas into a single file

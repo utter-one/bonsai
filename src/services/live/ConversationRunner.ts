@@ -27,6 +27,7 @@ import { ToolExecutor } from "./ToolExecutor";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
 import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput";
 import { TemplatingEngine } from "./TemplatingEngine";
+import { extractTextFromContent, getContentSize } from "../../utils/llm";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -427,14 +428,17 @@ export class ConversationRunner {
       });
 
       completionLlmProvider.setOnGenerationCompleted(async (result) => {
-        logger.info({ conversationId, totalTokens: result.usage?.totalTokens }, `LLM completion finished for conversation ${conversationId}: ${result.content.length} characters, ${result.usage?.totalTokens} tokens used`);
+        const textContent = extractTextFromContent(result.content);
+        const contentSize = getContentSize(result.content);
+        
+        logger.info({ conversationId, totalTokens: result.usage?.totalTokens, contentBlocks: result.content.length }, `LLM completion finished for conversation ${conversationId}: ${contentSize} bytes in ${result.content.length} content blocks, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
 
         // Save AI message event with usage info
         const messageEventData: MessageEventData = {
-          text: result.content,
+          text: textContent,
           role: 'assistant',
-          originalText: result.content,
+          originalText: textContent,
           metadata: {
             llmUsage: result.usage || {},
             systemPrompt: this.stageData.lastCompletionPrompt,
@@ -451,7 +455,7 @@ export class ConversationRunner {
             outputTurnId: this.stageData.outputTurnId,
             sessionId: this.session.id,
             requestId: null,
-            fullText: result.content
+            fullText: textContent
           } as EndAiGenerationOutputMessage;
           this.ws.send(JSON.stringify(message));
 
@@ -979,26 +983,26 @@ export class ConversationRunner {
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], '', '');
 
     // Execute the tool
-    const result = await this.toolExecutor.executeTool(tool, context, parameters);
+    const executeResult = await this.toolExecutor.executeTool(tool, context, parameters);
 
     // Save tool call event
     const eventData: ToolCallEventData = {
       toolId: tool.id,
       toolName: tool.name,
       parameters,
-      success: result.success,
-      result: result.result,
-      error: result.failureReason,
+      success: executeResult.success,
+      result: executeResult.result,
+      error: executeResult.failureReason,
       metadata: {
-        systemPrompt: result.renderedPrompt,
-        llmSettings: result.llmSettings
+        systemPrompt: executeResult.renderedPrompt,
+        llmSettings: executeResult.llmSettings
       }
     };
     await this.saveAndSendEvent('tool_call', eventData);
 
-    logger.info({ conversationId: this.conversation.id, toolId, success: result.success }, `Tool ${tool.name} executed`);
+    logger.info({ conversationId: this.conversation.id, toolId, success: executeResult.success }, `Tool ${tool.name} executed`);
 
-    return result;
+    return executeResult;
   }
 
   /**

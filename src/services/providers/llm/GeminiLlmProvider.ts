@@ -2,7 +2,7 @@ import { GoogleGenAI, Content, Part, HarmCategory, HarmBlockThreshold, SafetySet
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
+import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
 extendZodWithOpenApi(z);
@@ -80,52 +80,242 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
     try {
       logger.info(`Generating Gemini completion with model: ${this.settings.model}`);
 
-      const result = await this.client.models.generateContent({
-        model: this.settings.model,
-        contents,
-        config: {
-          systemInstruction,
-          maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
-          temperature: this.settings.defaultTemperature,
-          topP: this.settings.defaultTopP,
-          topK: this.settings.defaultTopK,
-          thinkingConfig: this.settings.thinkingLevel || this.settings.thinkingBudget !== undefined || this.settings.includeThoughts ? {
-            thinkingLevel: this.settings.thinkingLevel,
-            thinkingBudget: this.settings.thinkingBudget,
-            includeThoughts: this.settings.includeThoughts,
-          } : undefined,
-          //stopSequences: this.settings.stopSequences,
-          safetySettings: this.settings.safetySettings,
-        },
-      } as any);
+      const outputFormat = options?.outputFormat || 'text';
 
-      const text = result.text || '';
-      
-      const llmResult: LlmGenerationResult = {
-        id: `gemini-${Date.now()}`,
-        content: text,
-        role: 'assistant',
-        finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
-        usage: result.usageMetadata ? {
-          promptTokens: result.usageMetadata.promptTokenCount || 0,
-          completionTokens: result.usageMetadata.candidatesTokenCount || 0,
-          totalTokens: result.usageMetadata.totalTokenCount || 0,
-        } : undefined,
-        metadata: {
-          model: this.settings.model,
-          finishReason: result.candidates?.[0]?.finishReason,
-          safetyRatings: result.candidates?.[0]?.safetyRatings,
-        },
-      };
+      let result: LlmGenerationResult;
+      if (outputFormat === 'text' || outputFormat === 'json') {
+        // Handle text or JSON output formats
+        result = await this.generateTextBasedResponse(systemInstruction, contents, options);
+      } else if (outputFormat === 'image') {
+        result = await this.generateImageBasedResponse(systemInstruction, contents, options);
+      } else if (outputFormat === 'audio') {
+        result = await this.generateAudioBasedResponse(systemInstruction, contents, options);
+      } else {
+        throw new Error(`Unsupported output format: ${outputFormat}`);
+      }
 
-      await this.notifyComplete(llmResult);
-      return llmResult;
+      await this.notifyComplete(result);
+      return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`Gemini generation error: ${errorMessage}`);
       await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
       throw error;
     }
+  }
+
+  /**
+   * Generate an image-based response using Gemini's native Nano Banana image generation.
+   * Uses gemini-2.5-flash-image or gemini-3-pro-image-preview models.
+   * The image is returned as base64-encoded data in inline_data parts.
+   */
+  private async generateImageBasedResponse(systemInstruction: string | undefined, contents: Content[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    if (!this.client) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    // Use a Nano Banana model for image generation
+    const result = await this.client.models.generateContent({
+      model: this.settings.model,
+      contents,
+      config: {
+        systemInstruction,
+        maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.defaultTemperature,
+        topP: this.settings.defaultTopP,
+        topK: this.settings.defaultTopK,
+        responseModalities: ['IMAGE', 'TEXT'],
+      },
+    } as any);
+
+    // Extract base64-encoded image and text from response parts
+    const contentArray: LlmContent[] = [];
+    for (const candidate of result.candidates || []) {
+      for (const part of candidate.content?.parts || []) {
+        if ((part as any).inlineData?.mimeType?.startsWith('image/') && (part as any).inlineData?.data) {
+          contentArray.push({
+            contentType: 'image',
+            data: (part as any).inlineData.data,
+            mimeType: (part as any).inlineData.mimeType,
+          });
+        } else if ((part as any).text) {
+          contentArray.push({
+            contentType: 'text',
+            text: (part as any).text,
+          });
+        }
+      }
+    }
+
+    if (contentArray.length === 0) {
+      throw new Error('No content returned from Gemini image generation');
+    }
+
+    // Return multi-modal content array
+    const llmResult: LlmGenerationResult = {
+      id: `gemini-img-${Date.now()}`,
+      content: contentArray,
+      role: 'assistant',
+      finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
+      usage: result.usageMetadata ? {
+        promptTokens: result.usageMetadata.promptTokenCount || 0,
+        completionTokens: result.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: result.usageMetadata.totalTokenCount || 0,
+      } : undefined,
+      metadata: {
+        model: this.settings.model,
+        outputFormat: 'image',
+        finishReason: result.candidates?.[0]?.finishReason,
+      },
+    };
+
+    return llmResult;
+  }
+
+  /**
+   * Generate an audio-based response using Gemini's TTS (text-to-speech) capabilities.
+   * Uses gemini-2.5-flash-preview-tts model.
+   * The audio is returned as base64-encoded PCM data (16-bit, 24kHz, stereo) in inline_data parts.
+   */
+  private async generateAudioBasedResponse(systemInstruction: string | undefined, contents: Content[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    if (!this.client) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    // Use a TTS model for audio generation
+    const ttsModel = 'gemini-2.5-flash-preview-tts';
+
+    const result = await this.client.models.generateContent({
+      model: ttsModel,
+      contents,
+      config: {
+        systemInstruction,
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: 'Kore', // Default voice, can be made configurable
+            },
+          },
+        },
+      },
+    } as any);
+
+    // Extract base64-encoded audio from inline_data parts
+    let audioData = '';
+    let mimeType = 'audio/pcm';
+    for (const part of result.candidates?.[0]?.content?.parts || []) {
+      if ((part as any).inlineData?.mimeType?.startsWith('audio/') && (part as any).inlineData?.data) {
+        audioData = (part as any).inlineData.data;
+        mimeType = (part as any).inlineData.mimeType;
+        break;
+      }
+    }
+
+    if (!audioData) {
+      throw new Error('No audio data returned from Gemini TTS');
+    }
+
+    // Return the base64-encoded audio data as LlmAudioContent
+    const contentArray: LlmContent[] = [
+      {
+        contentType: 'audio',
+        data: audioData,
+        format: 'pcm',
+        mimeType,
+        metadata: {
+          sampleRate: 24000,
+          channels: 2,
+          bitDepth: 16,
+        },
+      },
+    ];
+
+    const llmResult: LlmGenerationResult = {
+      id: `gemini-audio-${Date.now()}`,
+      content: contentArray,
+      role: 'assistant',
+      finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
+      usage: result.usageMetadata ? {
+        promptTokens: result.usageMetadata.promptTokenCount || 0,
+        completionTokens: result.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: result.usageMetadata.totalTokenCount || 0,
+      } : undefined,
+      metadata: {
+        model: ttsModel,
+        outputFormat: 'audio',
+        audioFormat: 'pcm16-24khz-stereo',
+        finishReason: result.candidates?.[0]?.finishReason,
+      },
+    };
+
+    return llmResult;
+  }
+
+  /**
+   * Generate a text-based response and handle JSON output verification for JSON output format.
+   */
+  private async generateTextBasedResponse(systemInstruction: string | undefined, contents: Content[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    if (!this.client) {
+      throw new Error('Gemini client not initialized');
+    }
+
+    const result = await this.client.models.generateContent({
+      model: this.settings.model,
+      contents,
+      config: {
+        systemInstruction,
+        maxOutputTokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        temperature: this.settings.defaultTemperature,
+        topP: this.settings.defaultTopP,
+        topK: this.settings.defaultTopK,
+        thinkingConfig: this.settings.thinkingLevel || this.settings.thinkingBudget !== undefined || this.settings.includeThoughts ? {
+          thinkingLevel: this.settings.thinkingLevel,
+          thinkingBudget: this.settings.thinkingBudget,
+          includeThoughts: this.settings.includeThoughts,
+        } : undefined,
+        //stopSequences: this.settings.stopSequences,
+        safetySettings: this.settings.safetySettings,
+      },
+    } as any);
+
+    const text = result.text || '';
+
+    // Check if output format is JSON and attempt to parse it, throwing an error if parsing fails
+    if (options?.outputFormat === 'json') {
+      try {
+        JSON.parse(text);
+      } catch (error) {
+        logger.error(`Failed to parse JSON output: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error('Failed to parse JSON output from model response');
+      }
+    }
+    
+    const contentArray: LlmContent[] = [
+      {
+        contentType: 'text',
+        text,
+      },
+    ];
+    
+    const llmResult: LlmGenerationResult = {
+      id: `gemini-${Date.now()}`,
+      content: contentArray,
+      role: 'assistant',
+      finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
+      usage: result.usageMetadata ? {
+        promptTokens: result.usageMetadata.promptTokenCount || 0,
+        completionTokens: result.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: result.usageMetadata.totalTokenCount || 0,
+      } : undefined,
+      metadata: {
+        model: this.settings.model,
+        finishReason: result.candidates?.[0]?.finishReason,
+        safetyRatings: result.candidates?.[0]?.safetyRatings,
+      },
+    };
+
+    return llmResult;
   }
 
   /**
@@ -137,6 +327,10 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
 
     if (!this.client) {
       throw new Error('Gemini client not initialized');
+    }
+
+    if (options?.outputFormat && options.outputFormat !== 'text') {
+      throw new Error(`Output format ${options.outputFormat} not supported for streaming generation`);
     }
 
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
@@ -190,10 +384,17 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
         }
       }
 
-      // Notify completion
+      // Notify completion with text content as LlmTextContent
+      const contentArray: LlmContent[] = [
+        {
+          contentType: 'text',
+          text: fullContent,
+        },
+      ];
+
       const llmResult: LlmGenerationResult = {
         id: generationId || `gemini-${Date.now()}`,
-        content: fullContent,
+        content: contentArray,
         role: 'assistant',
         finishReason: this.mapFinishReason(finalFinishReason),
         usage: {

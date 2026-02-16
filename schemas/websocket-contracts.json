@@ -1070,7 +1070,114 @@
                 "success": {
                   "type": "boolean"
                 },
-                "result": {},
+                "result": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "contentType": {
+                            "type": "string",
+                            "const": "text"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "contentType",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "contentType": {
+                            "type": "string",
+                            "const": "image"
+                          },
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded image data"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type (e.g., image/png, image/jpeg)"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "contentType",
+                          "data",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "contentType": {
+                            "type": "string",
+                            "const": "audio"
+                          },
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded audio data"
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pcm",
+                              "mp3",
+                              "wav",
+                              "opus"
+                            ],
+                            "description": "Audio format"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type (e.g., audio/pcm, audio/mpeg)"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "sampleRate": {
+                                "type": "number"
+                              },
+                              "channels": {
+                                "type": "number"
+                              },
+                              "bitDepth": {
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "contentType",
+                          "data",
+                          "format",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
                 "error": {
                   "type": "string"
                 },
@@ -2262,6 +2369,134 @@
         "chunkText",
         "ordinal",
         "isFinal"
+      ],
+      "additionalProperties": false
+    },
+    "send-ai-image-output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "send_ai_image_output",
+          "description": "Message type for sending AI-generated image"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for this output sequence for correlation"
+        },
+        "imageData": {
+          "type": "string",
+          "description": "Base64-encoded image data"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the image (e.g., image/png, image/jpeg)"
+        },
+        "sequenceNumber": {
+          "type": "number",
+          "description": "Sequence number if multiple images in response"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "outputTurnId",
+        "imageData",
+        "mimeType",
+        "sequenceNumber"
+      ],
+      "additionalProperties": false
+    },
+    "send-ai-audio-output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "Optional request ID for correlating responses with requests",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "send_ai_audio_output",
+          "description": "Message type for sending AI-generated audio"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for this output sequence for correlation"
+        },
+        "audioData": {
+          "type": "string",
+          "description": "Base64-encoded audio data"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "pcm",
+            "mp3",
+            "wav",
+            "opus"
+          ],
+          "description": "Audio format identifier"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg)"
+        },
+        "sequenceNumber": {
+          "type": "number",
+          "description": "Sequence number if multiple audio blocks in response"
+        },
+        "metadata": {
+          "description": "Audio metadata",
+          "type": "object",
+          "properties": {
+            "sampleRate": {
+              "description": "Sample rate in Hz",
+              "type": "number"
+            },
+            "channels": {
+              "description": "Number of audio channels",
+              "type": "number"
+            },
+            "bitDepth": {
+              "description": "Bit depth per sample",
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "outputTurnId",
+        "audioData",
+        "audioFormat",
+        "mimeType",
+        "sequenceNumber"
       ],
       "additionalProperties": false
     }

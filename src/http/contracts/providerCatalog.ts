@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { modelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, providerCatalogSchema } from '../../services/providers/ProviderCatalogService';
+import { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, providerCatalogSchema } from '../../services/providers/ProviderCatalogService';
 
 extendZodWithOpenApi(z);
 
 /**
  * Export schemas from ProviderCatalogService for use in API contracts
  */
-export { modelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, providerCatalogSchema };
-export type { ModelInfo, VoiceInfo, LanguageInfo, TtsModelInfo, AsrProviderInfo, TtsProviderInfo, LlmProviderInfo, ProviderCatalog } from '../../services/providers/ProviderCatalogService';
+export { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, providerCatalogSchema };
+export type { AsrModelInfo, LlmModelInfo, VoiceInfo, LanguageInfo, TtsModelInfo, AsrProviderInfo, TtsProviderInfo, LlmProviderInfo, ProviderCatalog } from '../../services/providers/ProviderCatalogService';
 
 /**
  * Schema for provider type route parameter

@@ -18,7 +18,7 @@ import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolRespo
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
-import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, modelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema } from './http/contracts/providerCatalog';
+import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
@@ -182,7 +182,8 @@ export function getOpenAPISpec(): any {
   registry.register('ProviderResponse', providerResponseSchema);
   registry.register('ProviderListResponse', providerListResponseSchema);
   // Register reusable sub-schemas first for proper $ref resolution
-  registry.register('ModelInfo', modelInfoSchema);
+  registry.register('AsrModelInfo', asrModelInfoSchema);
+  registry.register('LlmModelInfo', llmModelInfoSchema);
   registry.register('VoiceInfo', voiceInfoSchema);
   registry.register('LanguageInfo', languageInfoSchema);
   registry.register('TtsModelInfo', ttsModelInfoSchema);

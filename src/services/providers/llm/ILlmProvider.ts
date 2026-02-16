@@ -1,102 +1,164 @@
+import { z } from 'zod';
 import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
 
 /**
  * Represents the role of a message in a conversation
  */
-export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
+export const messageRoleSchema = z.enum(['system', 'user', 'assistant', 'tool']);
+export type MessageRole = z.infer<typeof messageRoleSchema>;
 
 /**
  * Content type for multi-modal messages
  */
-export type MessageContentType = 'text' | 'image' | 'json';
+export const messageContentTypeSchema = z.enum(['text', 'image', 'json']);
+export type MessageContentType = z.infer<typeof messageContentTypeSchema>;
 
 /**
  * Text content block
  */
-export interface TextContent {
-  type: 'text';
-  text: string;
-}
+export const textContentSchema = z.object({
+  type: z.literal('text'),
+  text: z.string(),
+});
+export type TextContent = z.infer<typeof textContentSchema>;
 
 /**
  * Image content block with support for URLs or base64 data
  */
-export interface ImageContent {
-  type: 'image';
-  source: {
-    type: 'url' | 'base64';
-    url?: string;
-    data?: string;
-    mimeType?: string;
-  };
-}
+export const imageContentSchema = z.object({
+  type: z.literal('image'),
+  source: z.object({
+    type: z.enum(['url', 'base64']),
+    url: z.string().optional(),
+    data: z.string().optional(),
+    mimeType: z.string().optional(),
+  }),
+});
+export type ImageContent = z.infer<typeof imageContentSchema>;
 
 /**
  * JSON content block for structured data
  */
-export interface JsonContent {
-  type: 'json';
-  data: Record<string, any>;
-}
+export const jsonContentSchema = z.object({
+  type: z.literal('json'),
+  data: z.record(z.string(), z.any()),
+});
+export type JsonContent = z.infer<typeof jsonContentSchema>;
 
 /**
  * Multi-modal message content
  */
-export type MessageContent = TextContent | ImageContent | JsonContent;
+export const messageContentSchema = z.discriminatedUnion('type', [
+  textContentSchema,
+  imageContentSchema,
+  jsonContentSchema,
+]);
+export type MessageContent = z.infer<typeof messageContentSchema>;
 
 /**
  * Message in conversation history
  */
-export interface LlmMessage {
-  role: MessageRole;
-  content: string | MessageContent[];
-  name?: string;
-  toolCallId?: string;
-}
+export const llmMessageSchema = z.object({
+  role: messageRoleSchema,
+  content: z.union([z.string(), z.array(messageContentSchema)]),
+  name: z.string().optional(),
+  toolCallId: z.string().optional(),
+});
+export type LlmMessage = z.infer<typeof llmMessageSchema>;
 
 /**
  * Token usage information for generation
  */
-export interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-}
+export const tokenUsageSchema = z.object({
+  promptTokens: z.number(),
+  completionTokens: z.number(),
+  totalTokens: z.number(),
+});
+export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
 /**
- * Streaming chunk from LLM provider
+ * Text content in LLM output
  */
-export interface LlmChunk {
-  id: string;
-  content: string;
-  role?: MessageRole;
-  finishReason?: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null;
-  usage?: Partial<TokenUsage>;
-}
+export const llmTextContentSchema = z.object({
+  contentType: z.literal('text'),
+  text: z.string(),
+});
+export type LlmTextContent = z.infer<typeof llmTextContentSchema>;
 
 /**
- * Complete generation result
+ * Image content in LLM output
  */
-export interface LlmGenerationResult {
-  id: string;
-  content: string;
-  role: MessageRole;
-  finishReason: 'stop' | 'length' | 'tool_calls' | 'content_filter';
-  usage?: TokenUsage;
-  metadata?: Record<string, any>;
-}
+export const llmImageContentSchema = z.object({
+  contentType: z.literal('image'),
+  data: z.string().describe('Base64-encoded image data'),
+  mimeType: z.string().describe('MIME type (e.g., image/png, image/jpeg)'),
+  metadata: z.object({
+    width: z.number().optional(),
+    height: z.number().optional(),
+  }).catchall(z.any()).optional(),
+});
+export type LlmImageContent = z.infer<typeof llmImageContentSchema>;
+
+/**
+ * Audio content in LLM output
+ */
+export const llmAudioContentSchema = z.object({
+  contentType: z.literal('audio'),
+  data: z.string().describe('Base64-encoded audio data'),
+  format: z.enum(['pcm', 'mp3', 'wav', 'opus']).describe('Audio format'),
+  mimeType: z.string().describe('MIME type (e.g., audio/pcm, audio/mpeg)'),
+  metadata: z.object({
+    sampleRate: z.number().optional(),
+    channels: z.number().optional(),
+    bitDepth: z.number().optional(),
+  }).catchall(z.any()).optional(),
+});
+export type LlmAudioContent = z.infer<typeof llmAudioContentSchema>;
+
+/**
+ * Multi-modal content block in LLM output
+ */
+export const llmContentSchema = z.discriminatedUnion('contentType', [
+  llmTextContentSchema,
+  llmImageContentSchema,
+  llmAudioContentSchema,
+]);
+export type LlmContent = z.infer<typeof llmContentSchema>;
+
+/**
+ * Streaming chunk from LLM provider (text-only)
+ */
+export const llmChunkSchema = z.object({
+  id: z.string(),
+  content: z.string(),
+  role: messageRoleSchema.optional(),
+  finishReason: z.enum(['stop', 'length', 'tool_calls', 'content_filter']).nullable().optional(),
+  usage: tokenUsageSchema.partial().optional(),
+});
+export type LlmChunk = z.infer<typeof llmChunkSchema>;
+
+/**
+ * Complete generation result with multi-modal support
+ */
+export const llmGenerationResultSchema = z.object({
+  id: z.string(),
+  content: z.array(llmContentSchema).describe('Array of content blocks supporting multiple modalities'),
+  role: messageRoleSchema,
+  finishReason: z.enum(['stop', 'length', 'tool_calls', 'content_filter']),
+  usage: tokenUsageSchema.optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+export type LlmGenerationResult = z.infer<typeof llmGenerationResultSchema>;
 
 /**
  * Generation options for LLM requests
  */
-export interface LlmGenerationOptions {
-  /** Maximum number of tokens to generate */
-  maxTokens?: number;
-  /** Custom metadata to attach to the request */
-  metadata?: Record<string, any>;
-  /** Output format for the generation */
-  outputFormat?: 'text' | 'json' | 'image';
-}
+export const llmGenerationOptionsSchema = z.object({
+  maxTokens: z.number().describe('Maximum number of tokens to generate').optional(),
+  metadata: z.record(z.string(), z.any()).describe('Custom metadata to attach to the request').optional(),
+  outputFormat: z.enum(['text', 'json', 'image', 'audio']).describe('Output format for the generation').optional(),
+});
+export type LlmGenerationOptions = z.infer<typeof llmGenerationOptionsSchema>;
 
 /**
  * Callback for streaming chunks

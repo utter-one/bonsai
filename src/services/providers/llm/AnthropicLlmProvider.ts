@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
-import { ImageContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
+import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 
 extendZodWithOpenApi(z);
@@ -83,43 +83,19 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
     try {
       logger.info(`Generating Anthropic completion with model: ${this.settings.model}`);
 
-      const response = await this.client.messages.create({
-        model: this.settings.model,
-        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
-        messages: anthropicMessages,
-        system: system || undefined,
-        temperature: this.settings.thinkingMode ? undefined : this.settings.defaultTemperature,
-        top_p: this.settings.thinkingMode ? undefined : this.settings.defaultTopP,
-        thinking: this.settings.thinkingMode ? { type: this.settings.thinkingMode, budget_tokens: this.settings.thinkingBudgetTokens } : undefined,
-        //stop_sequences: this.settings.stopSequences,
-        stream: false,
-        metadata: options?.metadata,
-      } as any);
+      const outputFormat = options?.outputFormat || 'text';
 
-      // Extract text from content blocks
-      let content = '';
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          content += block.text;
-        }
+      let result: LlmGenerationResult;
+      if (outputFormat === 'text' || outputFormat === 'json') {
+        // Handle text or JSON output formats
+        result = await this.generateTextBasedResponse(system, anthropicMessages, options);
+      } else if (outputFormat === 'image') {
+        result = await this.generateImageBasedResponse(system, anthropicMessages, options);
+      } else if (outputFormat === 'audio') {
+        result = await this.generateAudioBasedResponse(system, anthropicMessages, options);
+      } else {
+        throw new Error(`Unsupported output format: ${outputFormat}`);
       }
-
-      const result: LlmGenerationResult = {
-        id: response.id,
-        content,
-        role: 'assistant',
-        finishReason: this.mapStopReason(response.stop_reason),
-        usage: {
-          promptTokens: response.usage.input_tokens,
-          completionTokens: response.usage.output_tokens,
-          totalTokens: response.usage.input_tokens + response.usage.output_tokens,
-        },
-        metadata: {
-          model: response.model,
-          stopReason: response.stop_reason,
-          stopSequence: response.stop_sequence,
-        },
-      };
 
       await this.notifyComplete(result);
       return result;
@@ -132,6 +108,90 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
   }
 
   /**
+   * Generate an image-based response.
+   */
+  private async generateImageBasedResponse(system: string | null, anthropicMessages: Anthropic.MessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    // Placeholder for image-based response generation logic
+    // This would involve calling the Anthropic API with appropriate parameters to generate an image and returning the result in the expected format
+    throw new Error('Image-based response generation not supported');
+  }
+
+  /**
+   * Generate an audio-based response.
+   */
+  private async generateAudioBasedResponse(system: string | null, anthropicMessages: Anthropic.MessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    // Placeholder for audio-based response generation logic
+    // This would involve calling the Anthropic API with appropriate parameters to generate audio and returning the result in the expected format
+    throw new Error('Audio-based response generation not supported');
+  }
+
+  /**
+   * Generate a text-based response and handle JSON output verification for JSON output format.
+   */
+  private async generateTextBasedResponse(system: string | null, anthropicMessages: Anthropic.MessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    if (!this.client) {
+      throw new Error('Anthropic client not initialized');
+    }
+
+    const response = await this.client.messages.create({
+      model: this.settings.model,
+      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+      messages: anthropicMessages,
+      system: system || undefined,
+      temperature: this.settings.thinkingMode ? undefined : this.settings.defaultTemperature,
+      top_p: this.settings.thinkingMode ? undefined : this.settings.defaultTopP,
+      thinking: this.settings.thinkingMode ? { type: this.settings.thinkingMode, budget_tokens: this.settings.thinkingBudgetTokens } : undefined,
+      //stop_sequences: this.settings.stopSequences,
+      stream: false,
+      metadata: options?.metadata,
+    } as any);
+
+    // Extract text from content blocks
+    let content = '';
+    for (const block of response.content) {
+      if (block.type === 'text') {
+        content += block.text;
+      }
+    }
+
+    // Check if output format is JSON and attempt to parse it, throwing an error if parsing fails
+    if (options?.outputFormat === 'json') {
+      try {
+        JSON.parse(content);
+      } catch (error) {
+        logger.error(`Failed to parse JSON output: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error('Failed to parse JSON output from model response');
+      }
+    }
+
+    const contentArray: LlmContent[] = [
+      {
+        contentType: 'text',
+        text: content,
+      },
+    ];
+
+    const result: LlmGenerationResult = {
+      id: response.id,
+      content: contentArray,
+      role: 'assistant',
+      finishReason: this.mapStopReason(response.stop_reason),
+      usage: {
+        promptTokens: response.usage.input_tokens,
+        completionTokens: response.usage.output_tokens,
+        totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+      },
+      metadata: {
+        model: response.model,
+        stopReason: response.stop_reason,
+        stopSequence: response.stop_sequence,
+      },
+    };
+
+    return result;
+  }
+
+  /**
    * Generate a streaming response
    */
   async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
@@ -140,6 +200,10 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
 
     if (!this.client) {
       throw new Error('Anthropic client not initialized');
+    }
+
+    if (options?.outputFormat && options.outputFormat !== 'text') {
+      throw new Error(`Output format ${options.outputFormat} not supported for streaming generation`);
     }
 
     const { system, messages: anthropicMessages } = this.convertToAnthropicMessages(messages);
@@ -181,10 +245,17 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
         }
       }
 
-      // Notify completion
+      // Notify completion with text content as LlmTextContent
+      const contentArray: LlmContent[] = [
+        {
+          contentType: 'text',
+          text: fullContent,
+        },
+      ];
+
       const result: LlmGenerationResult = {
         id: messageId,
-        content: fullContent,
+        content: contentArray,
         role: 'assistant',
         finishReason: this.mapStopReason(finalStopReason),
         usage: {
