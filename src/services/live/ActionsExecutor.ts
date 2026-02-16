@@ -679,7 +679,7 @@ export class ActionsExecutor {
     effect: CallToolEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
-    logger.info({ conversationId: context.conversationId, toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
+    logger.info({ context, toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
 
     try {
       // 1. Load the tool
@@ -700,6 +700,8 @@ export class ActionsExecutor {
         // For text input, ensure all parameters can be serialized to text
         for (const [key, value] of Object.entries(effect.parameters)) {
           if (value !== null && value !== undefined && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+            const renderedValue = await this.templatingEngine.render(String(value), context);
+            effect.parameters[key] = renderedValue;
             logger.warn({ conversationId: context.conversationId, toolId: effect.toolId, parameterName: key, parameterType: typeof value }, `Parameter ${key} is not a simple type for text-based tool`);
           }
         }
