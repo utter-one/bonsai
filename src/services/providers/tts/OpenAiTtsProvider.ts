@@ -272,7 +272,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
       chunkId: this.generateChunkId(),
       ordinal: this.getNextOrdinal(),
       audio: audioBuffer,
-      format: this.audioFormat,
+      audioFormat: this.audioFormat,
       text: text,
       isFinal: false,
     };

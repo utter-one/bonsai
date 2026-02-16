@@ -6,6 +6,7 @@ import { anthropicLlmSettingsSchema } from '../../services/providers/llm/Anthrop
 import { geminiLlmSettingsSchema } from '../../services/providers/llm/GeminiLlmProvider';
 import { elevenLabsTtsSettingsSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsProvider';
+import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
 
 extendZodWithOpenApi(z);
 
@@ -99,6 +100,7 @@ export const llmSettingsSchema = z.union([
 export const ttsSettingsSchema = z.union([
   elevenLabsTtsSettingsSchema,
   openAiTtsSettingsSchema,
+  deepgramTtsSettingsSchema,
 ]).openapi('TtsSettings').nullable().optional().describe('TTS provider-specific settings');
 
 export type TtsSettings = z.infer<typeof ttsSettingsSchema>;
