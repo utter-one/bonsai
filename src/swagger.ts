@@ -31,6 +31,10 @@ import { geminiLlmSettingsSchema } from './services/providers/llm/GeminiLlmProvi
 import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from './services/providers/tts/DeepgramTtsProvider';
+import { s3StorageProviderConfigSchema, s3StorageSettingsSchema } from './services/providers/storage/S3StorageProvider';
+import { azureBlobStorageProviderConfigSchema, azureBlobStorageSettingsSchema } from './services/providers/storage/AzureBlobStorageProvider';
+import { gcsStorageProviderConfigSchema, gcsStorageSettingsSchema } from './services/providers/storage/GcsStorageProvider';
+import { localStorageProviderConfigSchema, localStorageSettingsSchema } from './services/providers/storage/LocalStorageProvider';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -79,6 +83,16 @@ export function getOpenAPISpec(): any {
 
   // Voice and ASR configuration schemas
   registry.register('AsrConfig', asrConfigSchema);
+
+  // Storage provider schemas
+  registry.register('S3StorageConfig', s3StorageProviderConfigSchema);
+  registry.register('S3StorageSettings', s3StorageSettingsSchema);
+  registry.register('AzureBlobStorageConfig', azureBlobStorageProviderConfigSchema);
+  registry.register('AzureBlobStorageSettings', azureBlobStorageSettingsSchema);
+  registry.register('GcsStorageConfig', gcsStorageProviderConfigSchema);
+  registry.register('GcsStorageSettings', gcsStorageSettingsSchema);
+  registry.register('LocalStorageConfig', localStorageProviderConfigSchema);
+  registry.register('LocalStorageSettings', localStorageSettingsSchema);
 
   // Effect schemas (for stages and global actions)
   registry.register('EndConversationEffect', endConversationEffectSchema);

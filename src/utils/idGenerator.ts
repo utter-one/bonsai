@@ -23,7 +23,8 @@ export const ID_PREFIXES = {
   REQUEST: 'req',
   INPUT: 'tinp',
   OUTPUT: 'tout',
-  CHUNK: 'chnk'
+  CHUNK: 'chnk',
+  ARTIFACT: 'artf'
 } as const;
 
 type EntityPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

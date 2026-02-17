@@ -140,12 +140,25 @@ export const llmProviderInfoSchema = z.object({
 export type LlmProviderInfo = z.infer<typeof llmProviderInfoSchema>;
 
 /**
+ * Schema for storage provider capabilities
+ */
+export const storageProviderInfoSchema = z.object({
+  apiType: z.string().describe('Provider API type'),
+  displayName: z.string().describe('Human-readable provider name'),
+  description: z.string().optional().describe('Additional information'),
+  features: z.array(z.string()).optional().describe('List of supported features'),
+});
+
+export type StorageProviderInfo = z.infer<typeof storageProviderInfoSchema>;
+
+/**
  * Schema for complete provider catalog
  */
 export const providerCatalogSchema = z.object({
   asr: z.array(asrProviderInfoSchema).describe('ASR providers'),
   tts: z.array(ttsProviderInfoSchema).describe('TTS providers'),
   llm: z.array(llmProviderInfoSchema).describe('LLM providers'),
+  storage: z.array(storageProviderInfoSchema).describe('Storage providers'),
 });
 
 export type ProviderCatalog = z.infer<typeof providerCatalogSchema>;
@@ -160,6 +173,7 @@ export class ProviderCatalogService {
       asr: this.getAsrProviders(),
       tts: this.getTtsProviders(),
       llm: this.getLlmProviders(),
+      storage: this.getStorageProviders(),
     };
   }
 
@@ -182,6 +196,13 @@ export class ProviderCatalogService {
    */
   getLlmProvider(apiType: string): LlmProviderInfo | undefined {
     return this.getLlmProviders().find((p) => p.apiType === apiType);
+  }
+
+  /**
+   * Gets information about a specific storage provider by API type
+   */
+  getStorageProvider(apiType: string): StorageProviderInfo | undefined {
+    return this.getStorageProviders().find((p) => p.apiType === apiType);
   }
 
   /**
@@ -1185,6 +1206,38 @@ export class ProviderCatalogService {
             contextWindow: 2000000,
           },
         ],
+      },
+    ];
+  }
+
+  /**
+   * Gets all storage provider information
+   */
+  private getStorageProviders(): StorageProviderInfo[] {
+    return [
+      {
+        apiType: 's3',
+        displayName: 'AWS S3 / MinIO',
+        description: 'Amazon S3 compatible object storage (including MinIO and other S3-compatible services)',
+        features: ['Signed URLs', 'Server-side encryption', 'ACL support', 'Custom endpoints for S3-compatible services'],
+      },
+      {
+        apiType: 'azure-blob',
+        displayName: 'Azure Blob Storage',
+        description: 'Microsoft Azure Blob Storage service',
+        features: ['SAS URLs', 'Access tiers (Hot/Cool/Archive)', 'Custom metadata', 'Custom endpoints'],
+      },
+      {
+        apiType: 'gcs',
+        displayName: 'Google Cloud Storage',
+        description: 'Google Cloud Platform object storage',
+        features: ['Signed URLs (v4)', 'Storage classes', 'Custom metadata', 'Service account authentication'],
+      },
+      {
+        apiType: 'local',
+        displayName: 'Local Filesystem',
+        description: 'Local filesystem storage (for development and testing)',
+        features: ['Token-based URLs', 'Metadata sidecar files', 'Configurable base path', 'Optional HTTP serving'],
       },
     ];
   }

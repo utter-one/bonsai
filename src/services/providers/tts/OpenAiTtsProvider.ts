@@ -41,6 +41,9 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
   /** Sentence splitter for processing streaming text */
   private sentenceSplitter: SentenceSplitter | null = null;
 
+  /** Buffer for accumulating text when sentence splitter is disabled */
+  private textBuffer: string = '';
+
   /** Current no-speech marker being processed */
   private inNoSpeechSection?: NoSpeechMarker;
 
@@ -80,6 +83,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.isStarted = true;
+    this.textBuffer = '';
 
     // Set default values
     const effectiveModel = this.settings.model ?? 'gpt-4o-mini-tts';
@@ -121,6 +125,11 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
     // Finalize any remaining text in the sentence splitter
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.finalize();
+    } else if (this.textBuffer.trim()) {
+      // Synthesize buffered text when sentence splitter is disabled
+      logger.info(`[OpenAI TTS] Synthesizing buffered text: "${this.textBuffer}"`);
+      await this.synthesizeSentence(this.textBuffer);
+      this.textBuffer = '';
     }
 
     logger.info(`[OpenAI TTS] Ending speech generation`);
@@ -147,9 +156,9 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
       // Add text to sentence splitter - it will automatically call synthesizeSentence for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
-      logger.debug(`[OpenAI TTS] Synthesizing text directly: "${text}"`);
-      // Synthesize text directly without sentence splitting
-      await this.synthesizeSentence(text);
+      logger.debug(`[OpenAI TTS] Buffering text: "${text}"`);
+      // Buffer text until end() is called to allow TTS provider to handle complete text
+      this.textBuffer += text;
     }
   }
 
@@ -394,6 +403,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
 
     this.inNoSpeechSection = undefined;
     this.isStarted = false;
+    this.textBuffer = '';
 
     await super.cleanup();
   }

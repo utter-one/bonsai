@@ -16,7 +16,7 @@ import {
   issues,
   environments,
   auditLogs,
-  conversationAssets,
+  conversationArtifacts,
   providers,
   projects,
 } from '../db/schema';
@@ -39,7 +39,7 @@ export type GlobalAction = InferSelectModel<typeof globalActions>;
 export type Issue = InferSelectModel<typeof issues>;
 export type Environment = InferSelectModel<typeof environments>;
 export type AuditLog = InferSelectModel<typeof auditLogs>;
-export type ConversationAsset = InferSelectModel<typeof conversationAssets>;
+export type ConversationArtifact = InferSelectModel<typeof conversationArtifacts>;
 export type Provider = InferSelectModel<typeof providers>;
 export type Project = InferSelectModel<typeof projects>;
 

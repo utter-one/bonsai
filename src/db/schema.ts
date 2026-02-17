@@ -5,10 +5,11 @@ import { ConversationState } from '../types/conversationEvents';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
 import { TtsProviderConfig, TtsSettings } from '../services/providers/tts/TtsProviderFactory';
+import { StorageProviderConfig } from '../http/contracts/provider';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 
 
-export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig;
+export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig;
 
 // User table
 export const users = pgTable('users', {
@@ -68,6 +69,10 @@ export const projects = pgTable('projects', {
   }>(),
   acceptVoice: boolean('accept_voice').notNull().default(true),
   generateVoice: boolean('generate_voice').notNull().default(true),
+  storageConfig: jsonb('storage_config').$type<{
+    storageProviderId?: string;
+    settings?: unknown;
+  }>(),
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
@@ -257,8 +262,8 @@ export const providers = pgTable('providers', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
-  providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings
-  apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex
+  providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings, storage
+  apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex, s3, azure-blob, gcs, local
   config: jsonb('config').notNull().$type<ProviderConfig>(),
   createdBy: text('created_by').references(() => admins.id),
   tags: jsonb('tags').$type<string[]>(),
@@ -294,11 +299,19 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
-// ConversationAsset table
-export const conversationAssets = pgTable('conversation_assets', {
+export type ArtifactType = 'user_voice' | 'user_transcript' | 'ai_voice' | 'ai_transcript' | 'tool_input' | 'tool_output' | 'other';
+
+// ConversationArtifact table
+export const conversationArtifacts = pgTable('conversation_artifacts', {
   id: text('id').primaryKey(),
   conversationId: text('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  data: text('data').notNull(), // Binary data as base64 or use bytea
+  artifactType: text('artifact_type').notNull().$type<ArtifactType>(),
+  eventId: text('event_id').references(() => conversationEvents.id, { onDelete: 'set null' }),
+  inputTurnId: text('input_turn_id'),
+  outputTurnId: text('output_turn_id'),
+  storageKey: text('storage_key'),
+  storageUrl: text('storage_url'),
+  data: text('data'), // Binary data as base64 - optional since we may store in external storage
   mimeType: text('mime_type').notNull(),
   fileSize: integer('file_size').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -321,7 +334,7 @@ export const conversationsRelations = relations(conversations, ({ one, many }) =
     references: [users.id],
   }),
   events: many(conversationEvents),
-  assets: many(conversationAssets),
+  artifacts: many(conversationArtifacts),
 }));
 
 export const conversationEventsRelations = relations(conversationEvents, ({ one }) => ({
@@ -413,10 +426,14 @@ export const knowledgeCategoriesRelations = relations(knowledgeCategories, ({ on
   items: many(knowledgeItems),
 }));
 
-export const conversationAssetsRelations = relations(conversationAssets, ({ one }) => ({
+export const conversationArtifactsRelations = relations(conversationArtifacts, ({ one }) => ({
   conversation: one(conversations, {
-    fields: [conversationAssets.conversationId],
+    fields: [conversationArtifacts.conversationId],
     references: [conversations.id],
+  }),
+  event: one(conversationEvents, {
+    fields: [conversationArtifacts.eventId],
+    references: [conversationEvents.id],
   }),
 }));
 
