@@ -1,20 +1,20 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, providerCatalogSchema } from '../../services/providers/ProviderCatalogService';
+import { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema, providerCatalogSchema } from '../../services/providers/ProviderCatalogService';
 
 extendZodWithOpenApi(z);
 
 /**
  * Export schemas from ProviderCatalogService for use in API contracts
  */
-export { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, providerCatalogSchema };
-export type { AsrModelInfo, LlmModelInfo, VoiceInfo, LanguageInfo, TtsModelInfo, AsrProviderInfo, TtsProviderInfo, LlmProviderInfo, ProviderCatalog } from '../../services/providers/ProviderCatalogService';
+export { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema, providerCatalogSchema };
+export type { AsrModelInfo, LlmModelInfo, VoiceInfo, LanguageInfo, TtsModelInfo, AsrProviderInfo, TtsProviderInfo, LlmProviderInfo, StorageProviderInfo, ProviderCatalog } from '../../services/providers/ProviderCatalogService';
 
 /**
  * Schema for provider type route parameter
  */
 export const providerTypeParamSchema = z.object({
-  type: z.enum(['asr', 'tts', 'llm']).describe('Provider type (asr, tts, or llm)'),
+  type: z.enum(['asr', 'tts', 'llm', 'storage']).describe('Provider type (asr, tts, llm, or storage)'),
 });
 
 export type ProviderTypeParam = z.infer<typeof providerTypeParamSchema>;
@@ -23,8 +23,8 @@ export type ProviderTypeParam = z.infer<typeof providerTypeParamSchema>;
  * Schema for specific provider route parameters
  */
 export const specificProviderParamsSchema = z.object({
-  type: z.enum(['asr', 'tts', 'llm']).describe('Provider type (asr, tts, or llm)'),
-  apiType: z.string().describe('Provider API type (e.g., azure, elevenlabs, openai, anthropic)'),
+  type: z.enum(['asr', 'tts', 'llm', 'storage']).describe('Provider type (asr, tts, llm, or storage)'),
+  apiType: z.string().describe('Provider API type (e.g., azure, elevenlabs, openai, anthropic, s3, azure-blob, gcs, local)'),
 });
 
 export type SpecificProviderParams = z.infer<typeof specificProviderParamsSchema>;
@@ -55,3 +55,12 @@ export const llmProvidersResponseSchema = z.object({
 });
 
 export type LlmProvidersResponse = z.infer<typeof llmProvidersResponseSchema>;
+
+/**
+ * Schema for storage providers list response
+ */
+export const storageProvidersResponseSchema = z.object({
+  providers: z.array(storageProviderInfoSchema).describe('List of storage providers'),
+});
+
+export type StorageProvidersResponse = z.infer<typeof storageProvidersResponseSchema>;

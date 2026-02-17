@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "storage_config" jsonb;

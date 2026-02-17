@@ -1,12 +1,39 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { audioFormatValues } from '../../types/audio';
+import { s3StorageSettingsSchema } from '../../services/providers/storage/S3StorageProvider';
+import { azureBlobStorageSettingsSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
+import { gcsStorageSettingsSchema } from '../../services/providers/storage/GcsStorageProvider';
+import { localStorageSettingsSchema } from '../../services/providers/storage/LocalStorageProvider';
 
 extendZodWithOpenApi(z);
 
 /**
  * Project request and response schemas
  */
+
+/**
+ * Schema for storage provider settings (union of all storage provider settings)
+ */
+export const storageSettingsSchema = z.union([
+  s3StorageSettingsSchema,
+  azureBlobStorageSettingsSchema,
+  gcsStorageSettingsSchema,
+  localStorageSettingsSchema,
+]).describe('Storage provider settings');
+
+export type StorageSettings = z.infer<typeof storageSettingsSchema>;
+
+/**
+ * Schema for storage configuration
+ * Similar to ASR configuration pattern
+ */
+export const storageConfigSchema = z.object({
+  storageProviderId: z.string().optional().describe('ID of the storage provider (e.g., "s3-provider", "azure-blob-provider")'),
+  settings: storageSettingsSchema.optional().describe('Storage-specific settings including bucket, prefix, etc.'),
+}).openapi('StorageConfig').optional().describe('Storage configuration settings');
+
+export type StorageConfig = z.infer<typeof storageConfigSchema>;
 
 /**
  * Schema for ASR configuration settings
@@ -37,6 +64,7 @@ export const createProjectSchema = z.object({
   asrConfig: asrConfigSchema.optional().describe('Optional ASR configuration settings'),
   acceptVoice: z.boolean().optional().default(true).describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().default(true).describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
+  storageConfig: storageConfigSchema.optional().describe('Optional storage configuration for conversation artifacts'),
   constants: z.record(z.string(), z.any()).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
 });
@@ -52,6 +80,7 @@ export const updateProjectSchema = z.object({
   asrConfig: asrConfigSchema.describe('Updated ASR configuration settings'),
   acceptVoice: z.boolean().optional().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
+  storageConfig: storageConfigSchema.describe('Updated storage configuration settings'),
   constants: z.record(z.string(), z.any()).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
   version: z.number().describe('The current version number for optimistic locking'),
@@ -69,6 +98,7 @@ export const projectResponseSchema = z.object({
   asrConfig: asrConfigSchema.nullable().describe('ASR configuration settings'),
   acceptVoice: z.boolean().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
+  storageConfig: storageConfigSchema.nullable().describe('Storage configuration for conversation artifacts'),
   constants: z.record(z.string(), z.any()).nullable().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).nullable().describe('Additional metadata for the project'),
   version: z.number().describe('The version number of the project'),

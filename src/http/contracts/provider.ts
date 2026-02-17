@@ -11,6 +11,10 @@ import { geminiLlmProviderConfigSchema } from '../../services/providers/llm/Gemi
 import { elevenLabsTtsProviderConfigSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsProviderConfigSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { azureAsrProviderConfigSchema } from '../../services/providers/asr/AzureAsrProvider';
+import { s3StorageProviderConfigSchema } from '../../services/providers/storage/S3StorageProvider';
+import { azureBlobStorageProviderConfigSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
+import { gcsStorageProviderConfigSchema } from '../../services/providers/storage/GcsStorageProvider';
+import { localStorageProviderConfigSchema } from '../../services/providers/storage/LocalStorageProvider';
 
 extendZodWithOpenApi(z);
 
@@ -40,12 +44,25 @@ export const ttsProviderConfigSchema = z.union([
 export const asrProviderConfigSchema = azureAsrProviderConfigSchema.describe('ASR provider configuration');
 
 /**
+ * Union schema for all storage provider configurations
+ */
+export const storageProviderConfigSchema = z.union([
+  s3StorageProviderConfigSchema,
+  azureBlobStorageProviderConfigSchema,
+  gcsStorageProviderConfigSchema,
+  localStorageProviderConfigSchema,
+]).describe('Storage provider configuration');
+
+export type StorageProviderConfig = z.infer<typeof storageProviderConfigSchema>;
+
+/**
  * Union schema for all provider configurations
  */
 export const providerConfigSchema = z.union([
   llmProviderConfigSchema,
   ttsProviderConfigSchema,
   asrProviderConfigSchema,
+  storageProviderConfigSchema,
 ]).describe('Provider-specific configuration object');
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;
@@ -58,7 +75,7 @@ export const providerRouteParamsSchema = z.object({
 /**
  * Enum for provider types
  */
-export const providerTypeSchema = z.enum(['asr', 'tts', 'llm', 'embeddings']).describe('Type of provider service');
+export const providerTypeSchema = z.enum(['asr', 'tts', 'llm', 'embeddings', 'storage']).describe('Type of provider service');
 
 /**
  * Provider name (openai, anthropic, azure, elevenlabs, etc.)

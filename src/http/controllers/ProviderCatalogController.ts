@@ -3,7 +3,7 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ProviderCatalogService } from '../../services/providers/ProviderCatalogService';
-import { providerCatalogSchema, providerTypeParamSchema, specificProviderParamsSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema } from '../contracts/providerCatalog';
+import { providerCatalogSchema, providerTypeParamSchema, specificProviderParamsSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, storageProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema } from '../contracts/providerCatalog';
 
 /**
  * Controller for provider catalog endpoints
@@ -88,6 +88,23 @@ export class ProviderCatalogController {
       },
       {
         method: 'get',
+        path: '/api/provider-catalog/storage',
+        tags: ['Provider Catalog'],
+        summary: 'Get storage providers',
+        description: 'Returns information about all available storage providers including S3, Azure Blob, Google Cloud Storage, and local filesystem',
+        responses: {
+          200: {
+            description: 'List of storage providers',
+            content: {
+              'application/json': {
+                schema: storageProvidersResponseSchema,
+              },
+            },
+          },
+        },
+      },
+      {
+        method: 'get',
         path: '/api/provider-catalog/{type}/{apiType}',
         tags: ['Provider Catalog'],
         summary: 'Get specific provider information',
@@ -100,7 +117,7 @@ export class ProviderCatalogController {
             description: 'Specific provider information',
             content: {
               'application/json': {
-                schema: asrProviderInfoSchema.or(ttsProviderInfoSchema).or(llmProviderInfoSchema),
+                schema: asrProviderInfoSchema.or(ttsProviderInfoSchema).or(llmProviderInfoSchema).or(storageProviderInfoSchema),
               },
             },
           },
@@ -120,6 +137,7 @@ export class ProviderCatalogController {
     router.get('/api/provider-catalog/asr', asyncHandler(this.getAsrProviders.bind(this)));
     router.get('/api/provider-catalog/tts', asyncHandler(this.getTtsProviders.bind(this)));
     router.get('/api/provider-catalog/llm', asyncHandler(this.getLlmProviders.bind(this)));
+    router.get('/api/provider-catalog/storage', asyncHandler(this.getStorageProviders.bind(this)));
     router.get('/api/provider-catalog/:type/:apiType', asyncHandler(this.getSpecificProvider.bind(this)));
   }
 
@@ -160,6 +178,15 @@ export class ProviderCatalogController {
   }
 
   /**
+   * GET /api/provider-catalog/storage
+   * Returns all storage providers
+   */
+  private async getStorageProviders(req: Request, res: Response): Promise<void> {
+    const catalog = this.catalogService.getCatalog();
+    res.status(200).json({ providers: catalog.storage });
+  }
+
+  /**
    * GET /api/provider-catalog/:type/:apiType
    * Returns information about a specific provider
    */
@@ -176,6 +203,9 @@ export class ProviderCatalogController {
         break;
       case 'llm':
         provider = this.catalogService.getLlmProvider(params.apiType);
+        break;
+      case 'storage':
+        provider = this.catalogService.getStorageProvider(params.apiType);
         break;
     }
 

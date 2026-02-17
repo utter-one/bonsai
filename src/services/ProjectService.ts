@@ -1,17 +1,18 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
-import { projects } from '../db/schema';
+import { projects, providers } from '../db/schema';
 import type { CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse } from '../http/contracts/project';
 import type { ListParams } from '../http/contracts/common';
 import { projectResponseSchema, projectListResponseSchema } from '../http/contracts/project';
 import { AuditService } from './AuditService';
-import { OptimisticLockError, NotFoundError } from '../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
-import { PERMISSIONS } from '../permissions';import { generateId, ID_PREFIXES } from '../utils/idGenerator';
+import { PERMISSIONS } from '../permissions';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 /**
  * Service for managing projects with full CRUD operations and audit logging
  */
@@ -31,13 +32,18 @@ export class ProjectService extends BaseService {
     this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
     logger.info({ name: input.name, adminId: context?.adminId }, 'Creating project');
 
+    // Validate storage provider if configured
+    if (input.storageConfig?.storageProviderId) {
+      await this.validateStorageProvider(input.storageConfig.storageProviderId);
+    }
+
     try {
       const id = generateId(ID_PREFIXES.PROJECT);
-      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, constants: input.constants, metadata: input.metadata, version: 1 }).returning();
+      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, version: 1 }).returning();
 
       const createdProject = project[0];
 
-      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, constants: createdProject.constants, metadata: createdProject.metadata }, context?.adminId);
+      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, storageConfig: createdProject.storageConfig, constants: createdProject.constants, metadata: createdProject.metadata }, context?.adminId);
 
       logger.info({ projectId: createdProject.id }, 'Project created successfully');
 
@@ -123,6 +129,11 @@ export class ProjectService extends BaseService {
     this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
     logger.info({ projectId: id, adminId: context?.adminId }, 'Updating project');
 
+    // Validate storage provider if being updated
+    if (input.storageConfig?.storageProviderId) {
+      await this.validateStorageProvider(input.storageConfig.storageProviderId);
+    }
+
     try {
       const existingProject = await db.query.projects.findFirst({ where: eq(projects.id, id) });
 
@@ -135,14 +146,14 @@ export class ProjectService extends BaseService {
         throw new OptimisticLockError('Project');
       }
 
-      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, constants: input.constants, metadata: input.metadata, version: existingProject.version + 1, updatedAt: new Date() };
+      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, version: existingProject.version + 1, updatedAt: new Date() };
       const updatedProject = await db.update(projects).set(updateData).where(eq(projects.id, id)).returning();
 
       if (!updatedProject[0]) {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, constants: existingProject.constants, metadata: existingProject.metadata }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata }, context?.adminId);
+      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata }, context?.adminId);
 
       logger.info({ projectId: id }, 'Project updated successfully');
 
@@ -172,12 +183,27 @@ export class ProjectService extends BaseService {
 
       await db.delete(projects).where(eq(projects.id, id));
 
-      await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, constants: existingProject.constants, metadata: existingProject.metadata }, context?.adminId);
+      await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata }, context?.adminId);
 
       logger.info({ projectId: id }, 'Project deleted successfully');
     } catch (error) {
       logger.error({ error, projectId: id }, 'Failed to delete project');
       throw error;
+    }
+  }
+
+  /**
+   * Validates that a storage provider exists and is of type 'storage'
+   */
+  private async validateStorageProvider(storageProviderId: string): Promise<void> {
+    const provider = await db.query.providers.findFirst({ where: eq(providers.id, storageProviderId) });
+
+    if (!provider) {
+      throw new NotFoundError(`Storage provider with id ${storageProviderId} not found`);
+    }
+
+    if (provider.providerType !== 'storage') {
+      throw new InvalidOperationError(`Provider ${storageProviderId} is not a storage provider (type: ${provider.providerType})`);
     }
   }
 }
