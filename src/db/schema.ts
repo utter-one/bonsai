@@ -5,10 +5,11 @@ import { ConversationState } from '../types/conversationEvents';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
 import { TtsProviderConfig, TtsSettings } from '../services/providers/tts/TtsProviderFactory';
+import { StorageProviderConfig } from '../http/contracts/provider';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 
 
-export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig;
+export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig;
 
 // User table
 export const users = pgTable('users', {
@@ -68,6 +69,10 @@ export const projects = pgTable('projects', {
   }>(),
   acceptVoice: boolean('accept_voice').notNull().default(true),
   generateVoice: boolean('generate_voice').notNull().default(true),
+  storageConfig: jsonb('storage_config').$type<{
+    storageProviderId?: string;
+    settings?: unknown;
+  }>(),
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
@@ -257,8 +262,8 @@ export const providers = pgTable('providers', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
-  providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings
-  apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex
+  providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings, storage
+  apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex, s3, azure-blob, gcs, local
   config: jsonb('config').notNull().$type<ProviderConfig>(),
   createdBy: text('created_by').references(() => admins.id),
   tags: jsonb('tags').$type<string[]>(),

@@ -58,3 +58,13 @@ export class ForbiddenError extends Error {
     this.name = 'ForbiddenError';
   }
 }
+
+/**
+ * Error thrown when something is not configured
+ */
+export class NotConfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotConfiguredError';
+  }
+}
