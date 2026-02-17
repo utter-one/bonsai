@@ -35,6 +35,7 @@ import { s3StorageProviderConfigSchema, s3StorageSettingsSchema } from './servic
 import { azureBlobStorageProviderConfigSchema, azureBlobStorageSettingsSchema } from './services/providers/storage/AzureBlobStorageProvider';
 import { gcsStorageProviderConfigSchema, gcsStorageSettingsSchema } from './services/providers/storage/GcsStorageProvider';
 import { localStorageProviderConfigSchema, localStorageSettingsSchema } from './services/providers/storage/LocalStorageProvider';
+import { cartesiaTtsSettingsSchema } from './services/providers/tts/CartesiaTtsProvider';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -80,6 +81,7 @@ export function getOpenAPISpec(): any {
   registry.register('ElevenLabsTtsSettings', elevenLabsTtsSettingsSchema);
   registry.register('OpenAiTtsSettings', openAiTtsSettingsSchema);
   registry.register('DeepgramTtsSettings', deepgramTtsSettingsSchema);
+  registry.register('CartesiaTtsSettings', cartesiaTtsSettingsSchema);
 
   // Voice and ASR configuration schemas
   registry.register('AsrConfig', asrConfigSchema);

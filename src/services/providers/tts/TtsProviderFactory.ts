@@ -5,21 +5,22 @@ import type { ITtsProvider } from './ITtsProvider';
 import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProviderConfigSchema, ElevenLabsTtsSettings } from './ElevenLabsTtsProvider';
 import { OpenAiTtsProvider, OpenAiTtsProviderConfig, openAiTtsProviderConfigSchema, OpenAiTtsSettings } from './OpenAiTtsProvider';
 import { DeepgramTtsProvider, DeepgramTtsProviderConfig, deepgramTtsProviderConfigSchema, DeepgramTtsSettings } from './DeepgramTtsProvider';
+import { CartesiaTtsProvider, CartesiaTtsProviderConfig, cartesiaTtsProviderConfigSchema, CartesiaTtsSettings } from './CartesiaTtsProvider';
 
 /**
  * Supported TTS provider API types
  */
-export type TtsProviderApiType = 'elevenlabs' | 'openai' | 'deepgram';
+export type TtsProviderApiType = 'elevenlabs' | 'openai' | 'deepgram' | 'cartesia';
 
 /**
  * Union type for all TTS voice settings
  */
-export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings | DeepgramTtsSettings;
+export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings | DeepgramTtsSettings | CartesiaTtsSettings;
 
 /**
  * Union type for all TTS provider configurations
  */
-export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig | DeepgramTtsProviderConfig;
+export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig | DeepgramTtsProviderConfig | CartesiaTtsProviderConfig;
 
 /**
  * Factory service for creating TTS provider instances based on provider entity configuration
@@ -53,8 +54,11 @@ export class TtsProviderFactory {
       case 'deepgram':
         return this.createDeepgramProvider(provider, settings as DeepgramTtsSettings);
 
+      case 'cartesia':
+        return this.createCartesiaProvider(provider, settings as CartesiaTtsSettings);
+
       default:
-        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram`;
+        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -103,6 +107,20 @@ export class TtsProviderFactory {
   }
 
   /**
+   * Creates a Cartesia TTS provider instance from provider entity
+   * @param provider - Provider entity with Cartesia-specific configuration
+   * @param settings - Cartesia-specific TTS settings
+   * @returns Configured Cartesia TTS provider
+   * @throws {Error} When required Cartesia configuration fields are missing
+   */
+  private createCartesiaProvider(provider: Provider, settings: CartesiaTtsSettings): CartesiaTtsProvider {
+    const config = cartesiaTtsProviderConfigSchema.parse(provider.config);
+
+    logger.info(`Creating Cartesia TTS provider for provider ${provider.id}`);
+    return new CartesiaTtsProvider(config, settings);
+  }
+
+  /**
    * Validates if a provider can be used for TTS
    * @param provider - Provider entity to validate
    * @returns True if provider is valid for TTS, false otherwise
@@ -112,7 +130,7 @@ export class TtsProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: TtsProviderApiType[] = ['elevenlabs', 'openai', 'deepgram'];
+    const supportedApiTypes: TtsProviderApiType[] = ['elevenlabs', 'openai', 'deepgram', 'cartesia'];
     return supportedApiTypes.includes(provider.apiType as TtsProviderApiType);
   }
 
@@ -121,6 +139,6 @@ export class TtsProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): TtsProviderApiType[] {
-    return ['elevenlabs', 'openai', 'deepgram'];
+    return ['elevenlabs', 'openai', 'deepgram', 'cartesia'];
   }
 }
