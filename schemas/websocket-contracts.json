@@ -681,7 +681,134 @@
                               "propertyNames": {
                                 "type": "string"
                               },
-                              "additionalProperties": {}
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {},
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {},
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "data": {
+                                        "type": "string",
+                                        "description": "Base64-encoded audio data"
+                                      },
+                                      "format": {
+                                        "type": "string",
+                                        "enum": [
+                                          "pcm",
+                                          "mp3",
+                                          "wav",
+                                          "opus"
+                                        ],
+                                        "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                                      },
+                                      "mimeType": {
+                                        "type": "string",
+                                        "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                                      },
+                                      "metadata": {
+                                        "description": "Optional metadata about the audio",
+                                        "type": "object",
+                                        "properties": {
+                                          "sampleRate": {
+                                            "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                                            "type": "number"
+                                          },
+                                          "channels": {
+                                            "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                                            "type": "number"
+                                          },
+                                          "bitDepth": {
+                                            "description": "Bit depth per sample (e.g., 16, 24)",
+                                            "type": "number"
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "data",
+                                      "format",
+                                      "mimeType"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Audio parameter value structure for multimodal parameters"
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "data": {
+                                        "type": "string",
+                                        "description": "Base64-encoded image data"
+                                      },
+                                      "mimeType": {
+                                        "type": "string",
+                                        "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                                      },
+                                      "metadata": {
+                                        "description": "Optional metadata about the image",
+                                        "type": "object",
+                                        "properties": {
+                                          "width": {
+                                            "description": "Image width in pixels",
+                                            "type": "number"
+                                          },
+                                          "height": {
+                                            "description": "Image height in pixels",
+                                            "type": "number"
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "data",
+                                      "mimeType"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Image parameter value structure for multimodal parameters"
+                                  }
+                                ],
+                                "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                              }
                             }
                           },
                           "required": [
@@ -1046,7 +1173,134 @@
                   "propertyNames": {
                     "type": "string"
                   },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "boolean"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": false
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded audio data"
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pcm",
+                              "mp3",
+                              "wav",
+                              "opus"
+                            ],
+                            "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                          },
+                          "metadata": {
+                            "description": "Optional metadata about the audio",
+                            "type": "object",
+                            "properties": {
+                              "sampleRate": {
+                                "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                                "type": "number"
+                              },
+                              "channels": {
+                                "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                                "type": "number"
+                              },
+                              "bitDepth": {
+                                "description": "Bit depth per sample (e.g., 16, 24)",
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "format",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Audio parameter value structure for multimodal parameters"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded image data"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                          },
+                          "metadata": {
+                            "description": "Optional metadata about the image",
+                            "type": "object",
+                            "properties": {
+                              "width": {
+                                "description": "Image width in pixels",
+                                "type": "number"
+                              },
+                              "height": {
+                                "description": "Image height in pixels",
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Image parameter value structure for multimodal parameters"
+                      }
+                    ],
+                    "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                  }
                 },
                 "metadata": {
                   "type": "object",
@@ -1075,7 +1329,134 @@
                   "propertyNames": {
                     "type": "string"
                   },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "boolean"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": false
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded audio data"
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pcm",
+                              "mp3",
+                              "wav",
+                              "opus"
+                            ],
+                            "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                          },
+                          "metadata": {
+                            "description": "Optional metadata about the audio",
+                            "type": "object",
+                            "properties": {
+                              "sampleRate": {
+                                "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                                "type": "number"
+                              },
+                              "channels": {
+                                "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                                "type": "number"
+                              },
+                              "bitDepth": {
+                                "description": "Bit depth per sample (e.g., 16, 24)",
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "format",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Audio parameter value structure for multimodal parameters"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded image data"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                          },
+                          "metadata": {
+                            "description": "Optional metadata about the image",
+                            "type": "object",
+                            "properties": {
+                              "width": {
+                                "description": "Image width in pixels",
+                                "type": "number"
+                              },
+                              "height": {
+                                "description": "Image height in pixels",
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Image parameter value structure for multimodal parameters"
+                      }
+                    ],
+                    "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                  }
                 },
                 "success": {
                   "type": "boolean"
@@ -1218,7 +1599,134 @@
                   "propertyNames": {
                     "type": "string"
                   },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "boolean"
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {},
+                          "additionalProperties": false
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded audio data"
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pcm",
+                              "mp3",
+                              "wav",
+                              "opus"
+                            ],
+                            "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                          },
+                          "metadata": {
+                            "description": "Optional metadata about the audio",
+                            "type": "object",
+                            "properties": {
+                              "sampleRate": {
+                                "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                                "type": "number"
+                              },
+                              "channels": {
+                                "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                                "type": "number"
+                              },
+                              "bitDepth": {
+                                "description": "Bit depth per sample (e.g., 16, 24)",
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "format",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Audio parameter value structure for multimodal parameters"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "data": {
+                            "type": "string",
+                            "description": "Base64-encoded image data"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                          },
+                          "metadata": {
+                            "description": "Optional metadata about the image",
+                            "type": "object",
+                            "properties": {
+                              "width": {
+                                "description": "Image width in pixels",
+                                "type": "number"
+                              },
+                              "height": {
+                                "description": "Image height in pixels",
+                                "type": "number"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "data",
+                          "mimeType"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Image parameter value structure for multimodal parameters"
+                      }
+                    ],
+                    "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                  }
                 },
                 "metadata": {
                   "type": "object",
@@ -1818,7 +2326,132 @@
           "description": "Name of the variable to set"
         },
         "variableValue": {
-          "description": "Value to set for the variable (can be any JSON-serializable type)"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Base64-encoded audio data"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "pcm",
+                    "mp3",
+                    "wav",
+                    "opus"
+                  ],
+                  "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                },
+                "metadata": {
+                  "description": "Optional metadata about the audio",
+                  "type": "object",
+                  "properties": {
+                    "sampleRate": {
+                      "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                      "type": "number"
+                    },
+                    "channels": {
+                      "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                      "type": "number"
+                    },
+                    "bitDepth": {
+                      "description": "Bit depth per sample (e.g., 16, 24)",
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "data",
+                "format",
+                "mimeType"
+              ],
+              "additionalProperties": false,
+              "description": "Audio parameter value structure for multimodal parameters"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Base64-encoded image data"
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                },
+                "metadata": {
+                  "description": "Optional metadata about the image",
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "description": "Image width in pixels",
+                      "type": "number"
+                    },
+                    "height": {
+                      "description": "Image height in pixels",
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "data",
+                "mimeType"
+              ],
+              "additionalProperties": false,
+              "description": "Image parameter value structure for multimodal parameters"
+            }
+          ],
+          "description": "Value to set for the variable (can be string, number, boolean, object, or array)"
         }
       },
       "required": [
@@ -1931,7 +2564,132 @@
           "description": "Name of the retrieved variable"
         },
         "variableValue": {
-          "description": "Value of the variable (undefined if not found)"
+          "description": "Value of the variable (undefined if not found)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "boolean"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Base64-encoded audio data"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "pcm",
+                    "mp3",
+                    "wav",
+                    "opus"
+                  ],
+                  "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                },
+                "metadata": {
+                  "description": "Optional metadata about the audio",
+                  "type": "object",
+                  "properties": {
+                    "sampleRate": {
+                      "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                      "type": "number"
+                    },
+                    "channels": {
+                      "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                      "type": "number"
+                    },
+                    "bitDepth": {
+                      "description": "Bit depth per sample (e.g., 16, 24)",
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "data",
+                "format",
+                "mimeType"
+              ],
+              "additionalProperties": false,
+              "description": "Audio parameter value structure for multimodal parameters"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Base64-encoded image data"
+                },
+                "mimeType": {
+                  "type": "string",
+                  "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                },
+                "metadata": {
+                  "description": "Optional metadata about the image",
+                  "type": "object",
+                  "properties": {
+                    "width": {
+                      "description": "Image width in pixels",
+                      "type": "number"
+                    },
+                    "height": {
+                      "description": "Image height in pixels",
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "data",
+                "mimeType"
+              ],
+              "additionalProperties": false,
+              "description": "Image parameter value structure for multimodal parameters"
+            }
+          ]
         },
         "error": {
           "description": "Error message if retrieving the variable failed",
@@ -2007,7 +2765,134 @@
           "propertyNames": {
             "type": "string"
           },
-          "additionalProperties": {},
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "boolean"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded audio data"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pcm",
+                      "mp3",
+                      "wav",
+                      "opus"
+                    ],
+                    "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                  },
+                  "metadata": {
+                    "description": "Optional metadata about the audio",
+                    "type": "object",
+                    "properties": {
+                      "sampleRate": {
+                        "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                        "type": "number"
+                      },
+                      "channels": {
+                        "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                        "type": "number"
+                      },
+                      "bitDepth": {
+                        "description": "Bit depth per sample (e.g., 16, 24)",
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "data",
+                  "format",
+                  "mimeType"
+                ],
+                "additionalProperties": false,
+                "description": "Audio parameter value structure for multimodal parameters"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                  },
+                  "metadata": {
+                    "description": "Optional metadata about the image",
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "description": "Image width in pixels",
+                        "type": "number"
+                      },
+                      "height": {
+                        "description": "Image height in pixels",
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "data",
+                  "mimeType"
+                ],
+                "additionalProperties": false,
+                "description": "Image parameter value structure for multimodal parameters"
+              }
+            ],
+            "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+          },
           "description": "Map of variable names to their values"
         },
         "error": {
@@ -2050,7 +2935,134 @@
         },
         "parameters": {
           "type": "array",
-          "items": {},
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "boolean"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded audio data"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pcm",
+                      "mp3",
+                      "wav",
+                      "opus"
+                    ],
+                    "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                  },
+                  "metadata": {
+                    "description": "Optional metadata about the audio",
+                    "type": "object",
+                    "properties": {
+                      "sampleRate": {
+                        "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                        "type": "number"
+                      },
+                      "channels": {
+                        "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                        "type": "number"
+                      },
+                      "bitDepth": {
+                        "description": "Bit depth per sample (e.g., 16, 24)",
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "data",
+                  "format",
+                  "mimeType"
+                ],
+                "additionalProperties": false,
+                "description": "Audio parameter value structure for multimodal parameters"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                  },
+                  "metadata": {
+                    "description": "Optional metadata about the image",
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "description": "Image width in pixels",
+                        "type": "number"
+                      },
+                      "height": {
+                        "description": "Image height in pixels",
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "data",
+                  "mimeType"
+                ],
+                "additionalProperties": false,
+                "description": "Image parameter value structure for multimodal parameters"
+              }
+            ],
+            "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+          },
           "description": "Array of parameters to pass to the action"
         }
       },
@@ -2086,7 +3098,113 @@
           "description": "Whether the action was successfully executed"
         },
         "result": {
-          "description": "Result returned by the action"
+          "description": "Result returned by the action as array of multi-modal content blocks (text, image, or audio)",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "contentType",
+                  "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "const": "image"
+                  },
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type (e.g., image/png, image/jpeg)"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "type": "number"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "contentType",
+                  "data",
+                  "mimeType"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "const": "audio"
+                  },
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded audio data"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pcm",
+                      "mp3",
+                      "wav",
+                      "opus"
+                    ],
+                    "description": "Audio format"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type (e.g., audio/pcm, audio/mpeg)"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "sampleRate": {
+                        "type": "number"
+                      },
+                      "channels": {
+                        "type": "number"
+                      },
+                      "bitDepth": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "contentType",
+                  "data",
+                  "format",
+                  "mimeType"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
         },
         "error": {
           "description": "Error message if action execution failed",
@@ -2130,7 +3248,134 @@
           "propertyNames": {
             "type": "string"
           },
-          "additionalProperties": {},
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "boolean"
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded audio data"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pcm",
+                      "mp3",
+                      "wav",
+                      "opus"
+                    ],
+                    "description": "Audio format identifier (pcm, mp3, wav, opus)"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+                  },
+                  "metadata": {
+                    "description": "Optional metadata about the audio",
+                    "type": "object",
+                    "properties": {
+                      "sampleRate": {
+                        "description": "Sample rate in Hz (e.g., 44100, 48000)",
+                        "type": "number"
+                      },
+                      "channels": {
+                        "description": "Number of audio channels (1 for mono, 2 for stereo)",
+                        "type": "number"
+                      },
+                      "bitDepth": {
+                        "description": "Bit depth per sample (e.g., 16, 24)",
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "data",
+                  "format",
+                  "mimeType"
+                ],
+                "additionalProperties": false,
+                "description": "Audio parameter value structure for multimodal parameters"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+                  },
+                  "metadata": {
+                    "description": "Optional metadata about the image",
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "description": "Image width in pixels",
+                        "type": "number"
+                      },
+                      "height": {
+                        "description": "Image height in pixels",
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "data",
+                  "mimeType"
+                ],
+                "additionalProperties": false,
+                "description": "Image parameter value structure for multimodal parameters"
+              }
+            ],
+            "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+          },
           "description": "Map of parameter names to their values"
         }
       },
@@ -2166,7 +3411,113 @@
           "description": "Whether the tool was successfully executed"
         },
         "result": {
-          "description": "Result returned by the tool execution"
+          "description": "Result returned by the tool execution as array of multi-modal content blocks (text, image, or audio)",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "const": "text"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "contentType",
+                  "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "const": "image"
+                  },
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type (e.g., image/png, image/jpeg)"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "width": {
+                        "type": "number"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "contentType",
+                  "data",
+                  "mimeType"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "contentType": {
+                    "type": "string",
+                    "const": "audio"
+                  },
+                  "data": {
+                    "type": "string",
+                    "description": "Base64-encoded audio data"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pcm",
+                      "mp3",
+                      "wav",
+                      "opus"
+                    ],
+                    "description": "Audio format"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME type (e.g., audio/pcm, audio/mpeg)"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "sampleRate": {
+                        "type": "number"
+                      },
+                      "channels": {
+                        "type": "number"
+                      },
+                      "bitDepth": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "contentType",
+                  "data",
+                  "format",
+                  "mimeType"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
         },
         "error": {
           "description": "Error message if tool execution failed",

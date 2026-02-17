@@ -1,5 +1,20 @@
 import { z } from 'zod';
 import { sessionInputMessageSchema, sessionOutputMessageSchema } from './common';
+import { llmContentSchema } from '../../services/providers/llm/ILlmProvider';
+import { parameterValueSchema } from '../../types/parameters';
+
+/**
+ * Schema for webhook call results stored in context.
+ * Contains HTTP response details including status, headers, and data.
+ */
+export const webhookResultSchema = z.object({
+  status: z.number().describe('HTTP status code'),
+  statusText: z.string().describe('HTTP status text'),
+  headers: z.record(z.string(), z.string()).describe('HTTP response headers'),
+  data: z.unknown().describe('Response body (parsed JSON or raw text)'),
+});
+
+export type WebhookResult = z.infer<typeof webhookResultSchema>;
 
 /** Request to navigate to a specific stage in a conversation. */
 export const goToStageRequestSchema = sessionInputMessageSchema.extend({
@@ -25,7 +40,7 @@ export const setVarRequestSchema = sessionInputMessageSchema.extend({
   conversationId: z.string().describe('Unique identifier of the conversation'),
   stageId: z.string().describe('Unique identifier of the stage'),
   variableName: z.string().describe('Name of the variable to set'),
-  variableValue: z.any().describe('Value to set for the variable (can be any JSON-serializable type)'),
+  variableValue: parameterValueSchema.describe('Value to set for the variable (can be string, number, boolean, object, or array)'),
 });
 
 export type SetVarRequest = z.infer<typeof setVarRequestSchema>;
@@ -54,7 +69,7 @@ export const getVarResponseSchema = sessionOutputMessageSchema.extend({
   type: z.literal('get_var').describe('Message type for get variable response'),
   success: z.boolean().describe('Whether the variable was successfully retrieved'),
   variableName: z.string().describe('Name of the retrieved variable'),
-  variableValue: z.any().optional().describe('Value of the variable (undefined if not found)'),
+  variableValue: parameterValueSchema.optional().describe('Value of the variable (undefined if not found)'),
   error: z.string().optional().describe('Error message if retrieving the variable failed'),
 });
 
@@ -73,7 +88,7 @@ export type GetAllVarsRequest = z.infer<typeof getAllVarsRequestSchema>;
 export const getAllVarsResponseSchema = sessionOutputMessageSchema.extend({
   type: z.literal('get_all_vars').describe('Message type for get all variables response'),
   success: z.boolean().describe('Whether the variables were successfully retrieved'),
-  variables: z.record(z.string(), z.any()).describe('Map of variable names to their values'),
+  variables: z.record(z.string(), parameterValueSchema).describe('Map of variable names to their values'),
   error: z.string().optional().describe('Error message if retrieving variables failed'),
 });
 
@@ -84,7 +99,7 @@ export const runActionRequestSchema = sessionInputMessageSchema.extend({
   type: z.literal('run_action').describe('Message type for running an action'),
   conversationId: z.string().describe('Unique identifier of the conversation'),
   actionName: z.string().describe('Name of the global action to execute'),
-  parameters: z.array(z.any()).describe('Array of parameters to pass to the action'),
+  parameters: z.array(parameterValueSchema).describe('Array of parameters to pass to the action'),
 });
 
 export type RunActionRequest = z.infer<typeof runActionRequestSchema>;
@@ -93,7 +108,7 @@ export type RunActionRequest = z.infer<typeof runActionRequestSchema>;
 export const runActionResponseSchema = sessionOutputMessageSchema.extend({
   type: z.literal('run_action').describe('Message type for run action response'),
   success: z.boolean().describe('Whether the action was successfully executed'),
-  result: z.any().optional().describe('Result returned by the action'),
+  result: z.array(llmContentSchema).optional().describe('Result returned by the action as array of multi-modal content blocks (text, image, or audio)'),
   error: z.string().optional().describe('Error message if action execution failed'),
 });
 
@@ -104,7 +119,7 @@ export const callToolRequestSchema = sessionInputMessageSchema.extend({
   type: z.literal('call_tool').describe('Message type for calling a tool'),
   conversationId: z.string().describe('Unique identifier of the conversation'),
   toolId: z.string().describe('Unique identifier of the tool to execute'),
-  parameters: z.record(z.string(), z.any()).describe('Map of parameter names to their values'),
+  parameters: z.record(z.string(), parameterValueSchema).describe('Map of parameter names to their values'),
 });
 
 export type CallToolRequest = z.infer<typeof callToolRequestSchema>;
@@ -113,7 +128,7 @@ export type CallToolRequest = z.infer<typeof callToolRequestSchema>;
 export const callToolResponseSchema = sessionOutputMessageSchema.extend({
   type: z.literal('call_tool').describe('Message type for call tool response'),
   success: z.boolean().describe('Whether the tool was successfully executed'),
-  result: z.any().optional().describe('Result returned by the tool execution'),
+  result: z.array(llmContentSchema).optional().describe('Result returned by the tool execution as array of multi-modal content blocks (text, image, or audio)'),
   error: z.string().optional().describe('Error message if tool execution failed'),
 });
 

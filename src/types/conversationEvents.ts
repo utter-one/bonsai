@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { classificationResultWithClassifierSchema } from "./classification";
 import { effectSchema } from "./actions";
 import { llmContentSchema } from '../services/providers/llm/ILlmProvider';
+import { parameterValueSchema } from './parameters';
 
 // Conversation State Schema
 export const conversationStateSchema = z.enum([
@@ -64,7 +65,7 @@ export type ActionEventData = z.infer<typeof actionEventDataSchema>;
 
 export const commandEventDataSchema = z.object({
   command: z.string(),
-  parameters: z.record(z.string(), z.any()).optional(),
+  parameters: z.record(z.string(), parameterValueSchema).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -73,7 +74,7 @@ export type CommandEventData = z.infer<typeof commandEventDataSchema>;
 export const toolCallEventDataSchema = z.object({
   toolId: z.string(),
   toolName: z.string(),
-  parameters: z.record(z.string(), z.any()),
+  parameters: z.record(z.string(), parameterValueSchema),
   success: z.boolean(),
   result: z.array(llmContentSchema).optional(),
   error: z.string().optional(),
@@ -84,7 +85,7 @@ export type ToolCallEventData = z.infer<typeof toolCallEventDataSchema>;
 
 export const conversationStartEventDataSchema = z.object({
   stageId: z.string(),
-  initialVariables: z.record(z.string(), z.any()).optional(),
+  initialVariables: z.record(z.string(), parameterValueSchema).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 

@@ -8,12 +8,13 @@ import { llmContentSchema, LlmGenerationOptions } from "../providers/llm/ILlmPro
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
+import { parameterValueSchema } from "../../types/parameters";
 
 export const toolExecutionResultSchema = z.object({
   success: z.boolean(),
   failureReason: z.string().optional(),
   toolId: z.string(),
-  parameters: z.record(z.string(), z.any()),
+  parameters: z.record(z.string(), parameterValueSchema).describe('Parameters that were passed to the tool during execution'),
   result: z.array(llmContentSchema).optional().describe('Optional field for tool output'),
   renderedPrompt: z.string().optional(),
   llmSettings: z.any().optional(),

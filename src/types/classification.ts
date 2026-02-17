@@ -1,12 +1,13 @@
 import { z } from 'zod';
+import { parameterValueSchema } from './parameters';
 
 export const classificationResultSchema = z.object({
-  actions: z.record(z.string(), z.record(z.string(), z.any())).optional().default({}),
+  actions: z.record(z.string(), z.record(z.string(), parameterValueSchema)).optional().default({}),
 });
 
 export const actionClassificationResultSchema = z.object({
   name: z.string(),
-  parameters: z.record(z.string(), z.any()),
+  parameters: z.record(z.string(), parameterValueSchema),
 });
 
 export type ActionClassificationResult = z.infer<typeof actionClassificationResultSchema>;
