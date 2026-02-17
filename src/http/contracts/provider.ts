@@ -10,6 +10,8 @@ import { anthropicLlmProviderConfigSchema } from '../../services/providers/llm/A
 import { geminiLlmProviderConfigSchema } from '../../services/providers/llm/GeminiLlmProvider';
 import { elevenLabsTtsProviderConfigSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsProviderConfigSchema } from '../../services/providers/tts/OpenAiTtsProvider';
+import { deepgramTtsProviderConfigSchema } from '../../services/providers/tts/DeepgramTtsProvider';
+import { cartesiaTtsProviderConfigSchema } from '../../services/providers/tts/CartesiaTtsProvider';
 import { azureAsrProviderConfigSchema } from '../../services/providers/asr/AzureAsrProvider';
 import { s3StorageProviderConfigSchema } from '../../services/providers/storage/S3StorageProvider';
 import { azureBlobStorageProviderConfigSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
@@ -36,6 +38,8 @@ export const llmProviderConfigSchema = z.union([
 export const ttsProviderConfigSchema = z.union([
   elevenLabsTtsProviderConfigSchema,
   openAiTtsProviderConfigSchema,
+  deepgramTtsProviderConfigSchema,
+  cartesiaTtsProviderConfigSchema,
 ]).describe('TTS provider configuration');
 
 /**
