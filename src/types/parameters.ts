@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+
+extendZodWithOpenApi(z);
 
 /**
  * Schema for parameter types supported in stage actions and tools
@@ -29,8 +32,8 @@ export const imageParameterValueSchema = z.object({
   metadata: z.object({
     width: z.number().optional().describe('Image width in pixels'),
     height: z.number().optional().describe('Image height in pixels'),
-  }).optional().describe('Optional metadata about the image'),
-}).describe('Image parameter value structure for multimodal parameters');
+  }).passthrough().optional().describe('Optional metadata about the image'),
+}).openapi('ImageParameterValue').describe('Image parameter value structure for multimodal parameters');
 
 export type ImageParameterValue = z.infer<typeof imageParameterValueSchema>;
 
@@ -46,8 +49,8 @@ export const audioParameterValueSchema = z.object({
     sampleRate: z.number().optional().describe('Sample rate in Hz (e.g., 44100, 48000)'),
     channels: z.number().optional().describe('Number of audio channels (1 for mono, 2 for stereo)'),
     bitDepth: z.number().optional().describe('Bit depth per sample (e.g., 16, 24)'),
-  }).optional().describe('Optional metadata about the audio'),
-}).describe('Audio parameter value structure for multimodal parameters');
+  }).passthrough().optional().describe('Optional metadata about the audio'),
+}).openapi('AudioParameterValue').describe('Audio parameter value structure for multimodal parameters');
 
 export type AudioParameterValue = z.infer<typeof audioParameterValueSchema>;
 
@@ -55,13 +58,13 @@ export const parameterValueSchema = z.union([
   z.string(),
   z.number(),
   z.boolean(),
-  z.object(), // For free-form JSON objects
+  z.object({}).passthrough(), // For free-form JSON objects
   z.array(z.string()),
   z.array(z.number()),
   z.array(z.boolean()),
-  z.array(z.object()), // For arrays of free-form JSON objects
-  audioParameterValueSchema,
+  z.array(z.object({}).passthrough()), // For arrays of free-form JSON objects
   imageParameterValueSchema,
-]).describe('Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)');
+  audioParameterValueSchema,
+]).openapi('ParameterValue').describe('Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)');
 
 export type ParameterValue = z.infer<typeof parameterValueSchema>;

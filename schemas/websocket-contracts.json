@@ -5,8 +5,147 @@
   "description": "JSON Schema definitions for all WebSocket message types in the Nexus Backend API",
   "version": "1.0.0",
   "definitions": {
+    "ImageParameterValue": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Base64-encoded image data"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number",
+              "description": "Image width in pixels"
+            },
+            "height": {
+              "type": "number",
+              "description": "Image height in pixels"
+            }
+          },
+          "additionalProperties": {
+            "nullable": true
+          },
+          "description": "Optional metadata about the image"
+        }
+      },
+      "required": [
+        "data",
+        "mimeType"
+      ],
+      "description": "Image parameter value structure for multimodal parameters"
+    },
+    "AudioParameterValue": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Base64-encoded audio data"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "pcm",
+            "mp3",
+            "wav",
+            "opus"
+          ],
+          "description": "Audio format identifier (pcm, mp3, wav, opus)"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "sampleRate": {
+              "type": "number",
+              "description": "Sample rate in Hz (e.g., 44100, 48000)"
+            },
+            "channels": {
+              "type": "number",
+              "description": "Number of audio channels (1 for mono, 2 for stereo)"
+            },
+            "bitDepth": {
+              "type": "number",
+              "description": "Bit depth per sample (e.g., 16, 24)"
+            }
+          },
+          "additionalProperties": {
+            "nullable": true
+          },
+          "description": "Optional metadata about the audio"
+        }
+      },
+      "required": [
+        "data",
+        "format",
+        "mimeType"
+      ],
+      "description": "Audio parameter value structure for multimodal parameters"
+    },
+    "ParameterValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": {
+            "nullable": true
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+              "nullable": true
+            }
+          }
+        },
+        {
+          "$ref": "#/components/schemas/ImageParameterValue"
+        },
+        {
+          "$ref": "#/components/schemas/AudioParameterValue"
+        }
+      ],
+      "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+    },
     "base-input-message": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -21,16 +160,14 @@
       "required": [
         "requestId",
         "type"
-      ],
-      "additionalProperties": false
+      ]
     },
     "base-output-message": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
@@ -39,11 +176,9 @@
       },
       "required": [
         "type"
-      ],
-      "additionalProperties": false
+      ]
     },
     "session-input-message": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -63,16 +198,14 @@
         "requestId",
         "type",
         "sessionId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "session-output-message": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
@@ -86,11 +219,9 @@
       "required": [
         "type",
         "sessionId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "auth-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -99,7 +230,9 @@
         },
         "type": {
           "type": "string",
-          "const": "auth",
+          "enum": [
+            "auth"
+          ],
           "description": "Message type for authentication"
         },
         "apiKey": {
@@ -107,63 +240,55 @@
           "description": "API key for authentication"
         },
         "sessionSettings": {
-          "description": "Session settings for the client",
           "type": "object",
           "properties": {
             "sendVoiceInput": {
+              "type": "boolean",
               "default": true,
-              "description": "Whether the client can send voice input",
-              "type": "boolean"
+              "description": "Whether the client can send voice input"
             },
             "sendTextInput": {
+              "type": "boolean",
               "default": true,
-              "description": "Whether the client can send text input",
-              "type": "boolean"
+              "description": "Whether the client can send text input"
             },
             "receiveVoiceOutput": {
+              "type": "boolean",
               "default": true,
-              "description": "Whether the client wants to receive voice output",
-              "type": "boolean"
+              "description": "Whether the client wants to receive voice output"
             },
             "receiveTranscriptionUpdates": {
+              "type": "boolean",
               "default": true,
-              "description": "Whether the client wants to receive intermediate transcription updates for voice input and output",
-              "type": "boolean"
+              "description": "Whether the client wants to receive intermediate transcription updates for voice input and output"
             },
             "receiveEvents": {
+              "type": "boolean",
               "default": true,
-              "description": "Whether the client wants to receive all conversation events (e.g. turn start/end, agent actions)",
-              "type": "boolean"
+              "description": "Whether the client wants to receive all conversation events (e.g. turn start/end, agent actions)"
             }
           },
-          "required": [
-            "sendVoiceInput",
-            "sendTextInput",
-            "receiveVoiceOutput",
-            "receiveTranscriptionUpdates",
-            "receiveEvents"
-          ],
-          "additionalProperties": false
+          "description": "Session settings for the client"
         }
       },
       "required": [
         "requestId",
         "type",
         "apiKey"
-      ],
-      "additionalProperties": false
+      ]
     },
     "auth-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "auth",
+          "enum": [
+            "auth"
+          ],
           "description": "Message type for authentication response"
         },
         "success": {
@@ -171,11 +296,10 @@
           "description": "Whether authentication was successful"
         },
         "sessionId": {
-          "description": "Unique identifier for the automatically created session",
-          "type": "string"
+          "type": "string",
+          "description": "Unique identifier for the automatically created session"
         },
         "projectSettings": {
-          "description": "Project settings available after authentication",
           "type": "object",
           "properties": {
             "projectId": {
@@ -191,132 +315,28 @@
               "description": "Whether conversations generate voice output"
             },
             "asrConfig": {
-              "anyOf": [
-                {
-                  "description": "ASR configuration settings",
-                  "type": "object",
-                  "properties": {
-                    "asrProviderId": {
-                      "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")",
-                      "type": "string"
-                    },
-                    "settings": {
-                      "description": "ASR-specific settings including model, language preferences, etc.",
-                      "type": "object",
-                      "properties": {
-                        "language": {
-                          "description": "The language code for speech recognition (e.g., \"en-US\")",
-                          "type": "string"
-                        },
-                        "dictionaryPhrases": {
-                          "description": "The phrases to add to the speech recognition dictionary",
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "audioFormat": {
-                          "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")",
-                          "type": "string",
-                          "enum": [
-                            "mp3",
-                            "opus",
-                            "aac",
-                            "flac",
-                            "wav",
-                            "pcm_8000",
-                            "pcm_16000",
-                            "pcm_22050",
-                            "pcm_24000",
-                            "pcm_44100",
-                            "pcm_48000",
-                            "mulaw",
-                            "alaw",
-                            "linear16"
-                          ]
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    "unintelligiblePlaceholder": {
-                      "description": "Placeholder text to use when speech is unintelligible or cannot be transcribed",
-                      "type": "string"
-                    },
-                    "voiceActivityDetection": {
-                      "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence",
-                      "type": "boolean"
-                    }
-                  },
-                  "additionalProperties": false
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "ASR configuration settings with full ASR settings"
-            }
-          },
-          "required": [
-            "projectId",
-            "acceptVoice",
-            "generateVoice"
-          ],
-          "additionalProperties": false
-        },
-        "error": {
-          "description": "Error message if authentication failed",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type",
-        "success"
-      ],
-      "additionalProperties": false
-    },
-    "project-settings": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string",
-          "description": "Unique identifier of the project"
-        },
-        "acceptVoice": {
-          "type": "boolean",
-          "description": "Whether conversations can accept voice input"
-        },
-        "generateVoice": {
-          "type": "boolean",
-          "description": "Whether conversations generate voice output"
-        },
-        "asrConfig": {
-          "anyOf": [
-            {
-              "description": "ASR configuration settings",
               "type": "object",
+              "nullable": true,
               "properties": {
                 "asrProviderId": {
-                  "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")",
-                  "type": "string"
+                  "type": "string",
+                  "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")"
                 },
                 "settings": {
-                  "description": "ASR-specific settings including model, language preferences, etc.",
                   "type": "object",
                   "properties": {
                     "language": {
-                      "description": "The language code for speech recognition (e.g., \"en-US\")",
-                      "type": "string"
+                      "type": "string",
+                      "description": "The language code for speech recognition (e.g., \"en-US\")"
                     },
                     "dictionaryPhrases": {
-                      "description": "The phrases to add to the speech recognition dictionary",
                       "type": "array",
                       "items": {
                         "type": "string"
-                      }
+                      },
+                      "description": "The phrases to add to the speech recognition dictionary"
                     },
                     "audioFormat": {
-                      "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")",
                       "type": "string",
                       "enum": [
                         "mp3",
@@ -333,26 +353,110 @@
                         "mulaw",
                         "alaw",
                         "linear16"
-                      ]
+                      ],
+                      "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
                     }
                   },
-                  "additionalProperties": false
+                  "description": "ASR-specific settings including model, language preferences, etc."
                 },
                 "unintelligiblePlaceholder": {
-                  "description": "Placeholder text to use when speech is unintelligible or cannot be transcribed",
-                  "type": "string"
+                  "type": "string",
+                  "description": "Placeholder text to use when speech is unintelligible or cannot be transcribed"
                 },
                 "voiceActivityDetection": {
-                  "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence",
-                  "type": "boolean"
+                  "type": "boolean",
+                  "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence"
                 }
               },
-              "additionalProperties": false
-            },
-            {
-              "type": "null"
+              "description": "ASR configuration settings with full ASR settings"
             }
+          },
+          "required": [
+            "projectId",
+            "acceptVoice",
+            "generateVoice"
           ],
+          "description": "Project settings available after authentication"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if authentication failed"
+        }
+      },
+      "required": [
+        "type",
+        "success"
+      ]
+    },
+    "project-settings": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "description": "Unique identifier of the project"
+        },
+        "acceptVoice": {
+          "type": "boolean",
+          "description": "Whether conversations can accept voice input"
+        },
+        "generateVoice": {
+          "type": "boolean",
+          "description": "Whether conversations generate voice output"
+        },
+        "asrConfig": {
+          "type": "object",
+          "nullable": true,
+          "properties": {
+            "asrProviderId": {
+              "type": "string",
+              "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")"
+            },
+            "settings": {
+              "type": "object",
+              "properties": {
+                "language": {
+                  "type": "string",
+                  "description": "The language code for speech recognition (e.g., \"en-US\")"
+                },
+                "dictionaryPhrases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The phrases to add to the speech recognition dictionary"
+                },
+                "audioFormat": {
+                  "type": "string",
+                  "enum": [
+                    "mp3",
+                    "opus",
+                    "aac",
+                    "flac",
+                    "wav",
+                    "pcm_8000",
+                    "pcm_16000",
+                    "pcm_22050",
+                    "pcm_24000",
+                    "pcm_44100",
+                    "pcm_48000",
+                    "mulaw",
+                    "alaw",
+                    "linear16"
+                  ],
+                  "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
+                }
+              },
+              "description": "ASR-specific settings including model, language preferences, etc."
+            },
+            "unintelligiblePlaceholder": {
+              "type": "string",
+              "description": "Placeholder text to use when speech is unintelligible or cannot be transcribed"
+            },
+            "voiceActivityDetection": {
+              "type": "boolean",
+              "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence"
+            }
+          },
           "description": "ASR configuration settings with full ASR settings"
         }
       },
@@ -360,11 +464,9 @@
         "projectId",
         "acceptVoice",
         "generateVoice"
-      ],
-      "additionalProperties": false
+      ]
     },
     "start-conversation-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -373,7 +475,9 @@
         },
         "type": {
           "type": "string",
-          "const": "start_conversation",
+          "enum": [
+            "start_conversation"
+          ],
           "description": "Message type for starting a new conversation"
         },
         "sessionId": {
@@ -385,8 +489,8 @@
           "description": "User ID initiating the conversation"
         },
         "personaId": {
-          "description": "Optional persona ID for the conversation",
-          "type": "string"
+          "type": "string",
+          "description": "Optional persona ID for the conversation"
         },
         "stageId": {
           "type": "string",
@@ -399,20 +503,20 @@
         "sessionId",
         "userId",
         "stageId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "start-conversation-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "start_conversation",
+          "enum": [
+            "start_conversation"
+          ],
           "description": "Message type for start conversation response"
         },
         "sessionId": {
@@ -424,23 +528,21 @@
           "description": "Whether conversation was successfully started"
         },
         "conversationId": {
-          "description": "Unique identifier for the created conversation",
-          "type": "string"
+          "type": "string",
+          "description": "Unique identifier for the created conversation"
         },
         "error": {
-          "description": "Error message if conversation creation failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if conversation creation failed"
         }
       },
       "required": [
         "type",
         "sessionId",
         "success"
-      ],
-      "additionalProperties": false
+      ]
     },
     "resume-conversation-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -449,7 +551,9 @@
         },
         "type": {
           "type": "string",
-          "const": "resume_conversation",
+          "enum": [
+            "resume_conversation"
+          ],
           "description": "Message type for resuming a conversation"
         },
         "sessionId": {
@@ -466,20 +570,20 @@
         "type",
         "sessionId",
         "conversationId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "resume-conversation-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "resume_conversation",
+          "enum": [
+            "resume_conversation"
+          ],
           "description": "Message type for resume conversation response"
         },
         "sessionId": {
@@ -491,23 +595,21 @@
           "description": "Whether conversation was successfully resumed"
         },
         "conversationId": {
-          "description": "Unique identifier of the resumed conversation",
-          "type": "string"
+          "type": "string",
+          "description": "Unique identifier of the resumed conversation"
         },
         "error": {
-          "description": "Error message if conversation resumption failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if conversation resumption failed"
         }
       },
       "required": [
         "type",
         "sessionId",
         "success"
-      ],
-      "additionalProperties": false
+      ]
     },
     "end-conversation-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -516,7 +618,9 @@
         },
         "type": {
           "type": "string",
-          "const": "end_conversation",
+          "enum": [
+            "end_conversation"
+          ],
           "description": "Message type for ending a conversation"
         },
         "sessionId": {
@@ -533,20 +637,20 @@
         "type",
         "sessionId",
         "conversationId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "end-conversation-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "end_conversation",
+          "enum": [
+            "end_conversation"
+          ],
           "description": "Message type for end conversation response"
         },
         "sessionId": {
@@ -558,28 +662,28 @@
           "description": "Whether conversation was successfully ended"
         },
         "error": {
-          "description": "Error message if conversation termination failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if conversation termination failed"
         }
       },
       "required": [
         "type",
         "sessionId",
         "success"
-      ],
-      "additionalProperties": false
+      ]
     },
     "conversation-event": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "conversation_event",
+          "enum": [
+            "conversation_event"
+          ],
           "description": "Message type for conversation events"
         },
         "sessionId": {
@@ -591,12 +695,12 @@
           "description": "Unique identifier of the conversation"
         },
         "inputTurnId": {
-          "description": "Identifier of the input turn associated with the event, if applicable",
-          "type": "string"
+          "type": "string",
+          "description": "Identifier of the input turn associated with the event, if applicable"
         },
         "outputTurnId": {
-          "description": "Identifier of the output turn associated with the event, if applicable",
-          "type": "string"
+          "type": "string",
+          "description": "Identifier of the output turn associated with the event, if applicable"
         },
         "eventType": {
           "type": "string",
@@ -635,18 +739,16 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "role",
                 "text",
                 "originalText"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -678,144 +780,15 @@
                             },
                             "parameters": {
                               "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
                               "additionalProperties": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "boolean"
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {},
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "number"
-                                    }
-                                  },
-                                  {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "boolean"
-                                    }
-                                  },
-                                  {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "object",
-                                      "properties": {},
-                                      "additionalProperties": false
-                                    }
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "data": {
-                                        "type": "string",
-                                        "description": "Base64-encoded audio data"
-                                      },
-                                      "format": {
-                                        "type": "string",
-                                        "enum": [
-                                          "pcm",
-                                          "mp3",
-                                          "wav",
-                                          "opus"
-                                        ],
-                                        "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                                      },
-                                      "mimeType": {
-                                        "type": "string",
-                                        "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                                      },
-                                      "metadata": {
-                                        "description": "Optional metadata about the audio",
-                                        "type": "object",
-                                        "properties": {
-                                          "sampleRate": {
-                                            "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                                            "type": "number"
-                                          },
-                                          "channels": {
-                                            "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                                            "type": "number"
-                                          },
-                                          "bitDepth": {
-                                            "description": "Bit depth per sample (e.g., 16, 24)",
-                                            "type": "number"
-                                          }
-                                        },
-                                        "additionalProperties": false
-                                      }
-                                    },
-                                    "required": [
-                                      "data",
-                                      "format",
-                                      "mimeType"
-                                    ],
-                                    "additionalProperties": false,
-                                    "description": "Audio parameter value structure for multimodal parameters"
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "data": {
-                                        "type": "string",
-                                        "description": "Base64-encoded image data"
-                                      },
-                                      "mimeType": {
-                                        "type": "string",
-                                        "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                                      },
-                                      "metadata": {
-                                        "description": "Optional metadata about the image",
-                                        "type": "object",
-                                        "properties": {
-                                          "width": {
-                                            "description": "Image width in pixels",
-                                            "type": "number"
-                                          },
-                                          "height": {
-                                            "description": "Image height in pixels",
-                                            "type": "number"
-                                          }
-                                        },
-                                        "additionalProperties": false
-                                      }
-                                    },
-                                    "required": [
-                                      "data",
-                                      "mimeType"
-                                    ],
-                                    "additionalProperties": false,
-                                    "description": "Image parameter value structure for multimodal parameters"
-                                  }
-                                ],
-                                "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                                "$ref": "#/components/schemas/ParameterValue"
                               }
                             }
                           },
                           "required": [
                             "name",
                             "parameters"
-                          ],
-                          "additionalProperties": false
+                          ]
                         }
                       }
                     },
@@ -823,24 +796,21 @@
                       "classifierId",
                       "classifierName",
                       "actions"
-                    ],
-                    "additionalProperties": false
+                    ]
                   }
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "classifierId",
                 "input",
                 "actions"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -854,313 +824,21 @@
                 "effects": {
                   "type": "array",
                   "items": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "end_conversation",
-                            "description": "Effect type"
-                          },
-                          "reason": {
-                            "description": "Optional reason for ending the conversation",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "type"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "abort_conversation",
-                            "description": "Effect type"
-                          },
-                          "reason": {
-                            "description": "Optional reason for aborting the conversation",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "type"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "go_to_stage",
-                            "description": "Effect type"
-                          },
-                          "stageId": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "ID of the stage to switch to"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "stageId"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "run_script",
-                            "description": "Effect type"
-                          },
-                          "code": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "JavaScript code to execute in isolated context"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "code"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "modify_user_input",
-                            "description": "Effect type"
-                          },
-                          "template": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "Template to render and replace user input with"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "template"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "modify_variables",
-                            "description": "Effect type"
-                          },
-                          "modifications": {
-                            "minItems": 1,
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "variableName": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "description": "Name of the variable to modify"
-                                },
-                                "operation": {
-                                  "type": "string",
-                                  "enum": [
-                                    "set",
-                                    "reset",
-                                    "add",
-                                    "remove"
-                                  ],
-                                  "description": "Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)"
-                                },
-                                "value": {
-                                  "description": "Value for the operation (not used for reset operation)"
-                                }
-                              },
-                              "required": [
-                                "variableName",
-                                "operation",
-                                "value"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "description": "Array of variable modifications to apply"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "modifications"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "modify_user_profile",
-                            "description": "Effect type"
-                          },
-                          "modifications": {
-                            "minItems": 1,
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "fieldName": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "description": "Name of the profile field to modify"
-                                },
-                                "operation": {
-                                  "type": "string",
-                                  "enum": [
-                                    "set",
-                                    "reset",
-                                    "add",
-                                    "remove"
-                                  ],
-                                  "description": "Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)"
-                                },
-                                "value": {
-                                  "description": "Value for the operation (not used for reset operation)"
-                                }
-                              },
-                              "required": [
-                                "fieldName",
-                                "operation",
-                                "value"
-                              ],
-                              "additionalProperties": false
-                            },
-                            "description": "Array of user profile field modifications to apply"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "modifications"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "call_tool",
-                            "description": "Effect type"
-                          },
-                          "toolId": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "ID of the tool to call"
-                          },
-                          "parameters": {
-                            "type": "object",
-                            "propertyNames": {
-                              "type": "string"
-                            },
-                            "additionalProperties": {},
-                            "description": "Parameters to pass to the tool"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "toolId",
-                          "parameters"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "call_webhook",
-                            "description": "Effect type"
-                          },
-                          "url": {
-                            "type": "string",
-                            "format": "uri",
-                            "description": "HTTP(S) URL to call"
-                          },
-                          "method": {
-                            "default": "GET",
-                            "description": "HTTP method to use",
-                            "type": "string",
-                            "enum": [
-                              "GET",
-                              "POST",
-                              "PUT",
-                              "PATCH",
-                              "DELETE"
-                            ]
-                          },
-                          "headers": {
-                            "description": "HTTP headers to send with the request",
-                            "type": "object",
-                            "propertyNames": {
-                              "type": "string"
-                            },
-                            "additionalProperties": {
-                              "type": "string"
-                            }
-                          },
-                          "body": {
-                            "description": "Request body for POST/PUT/PATCH requests"
-                          },
-                          "resultKey": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "Key name to store the webhook result under in context.results.webhooks"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "url",
-                          "method",
-                          "resultKey"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "const": "generate_response",
-                            "description": "Effect type"
-                          }
-                        },
-                        "required": [
-                          "type"
-                        ],
-                        "additionalProperties": false
-                      }
-                    ]
+                    "$ref": "#/components/schemas/Effect"
                   }
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "actionName",
                 "stageId",
                 "effects"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1170,150 +848,20 @@
                 },
                 "parameters": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
                   "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "boolean"
-                      },
-                      {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "boolean"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {},
-                          "additionalProperties": false
-                        }
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded audio data"
-                          },
-                          "format": {
-                            "type": "string",
-                            "enum": [
-                              "pcm",
-                              "mp3",
-                              "wav",
-                              "opus"
-                            ],
-                            "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                          },
-                          "metadata": {
-                            "description": "Optional metadata about the audio",
-                            "type": "object",
-                            "properties": {
-                              "sampleRate": {
-                                "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                                "type": "number"
-                              },
-                              "channels": {
-                                "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                                "type": "number"
-                              },
-                              "bitDepth": {
-                                "description": "Bit depth per sample (e.g., 16, 24)",
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        },
-                        "required": [
-                          "data",
-                          "format",
-                          "mimeType"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Audio parameter value structure for multimodal parameters"
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded image data"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                          },
-                          "metadata": {
-                            "description": "Optional metadata about the image",
-                            "type": "object",
-                            "properties": {
-                              "width": {
-                                "description": "Image width in pixels",
-                                "type": "number"
-                              },
-                              "height": {
-                                "description": "Image height in pixels",
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        },
-                        "required": [
-                          "data",
-                          "mimeType"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Image parameter value structure for multimodal parameters"
-                      }
-                    ],
-                    "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                    "$ref": "#/components/schemas/ParameterValue"
                   }
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "command"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1326,136 +874,8 @@
                 },
                 "parameters": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
                   "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "boolean"
-                      },
-                      {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "boolean"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {},
-                          "additionalProperties": false
-                        }
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded audio data"
-                          },
-                          "format": {
-                            "type": "string",
-                            "enum": [
-                              "pcm",
-                              "mp3",
-                              "wav",
-                              "opus"
-                            ],
-                            "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                          },
-                          "metadata": {
-                            "description": "Optional metadata about the audio",
-                            "type": "object",
-                            "properties": {
-                              "sampleRate": {
-                                "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                                "type": "number"
-                              },
-                              "channels": {
-                                "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                                "type": "number"
-                              },
-                              "bitDepth": {
-                                "description": "Bit depth per sample (e.g., 16, 24)",
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        },
-                        "required": [
-                          "data",
-                          "format",
-                          "mimeType"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Audio parameter value structure for multimodal parameters"
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded image data"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                          },
-                          "metadata": {
-                            "description": "Optional metadata about the image",
-                            "type": "object",
-                            "properties": {
-                              "width": {
-                                "description": "Image width in pixels",
-                                "type": "number"
-                              },
-                              "height": {
-                                "description": "Image height in pixels",
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        },
-                        "required": [
-                          "data",
-                          "mimeType"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Image parameter value structure for multimodal parameters"
-                      }
-                    ],
-                    "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                    "$ref": "#/components/schemas/ParameterValue"
                   }
                 },
                 "success": {
@@ -1470,7 +890,9 @@
                         "properties": {
                           "contentType": {
                             "type": "string",
-                            "const": "text"
+                            "enum": [
+                              "text"
+                            ]
                           },
                           "text": {
                             "type": "string"
@@ -1479,15 +901,16 @@
                         "required": [
                           "contentType",
                           "text"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       {
                         "type": "object",
                         "properties": {
                           "contentType": {
                             "type": "string",
-                            "const": "image"
+                            "enum": [
+                              "image"
+                            ]
                           },
                           "data": {
                             "type": "string",
@@ -1507,22 +930,25 @@
                                 "type": "number"
                               }
                             },
-                            "additionalProperties": {}
+                            "additionalProperties": {
+                              "nullable": true
+                            }
                           }
                         },
                         "required": [
                           "contentType",
                           "data",
                           "mimeType"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       {
                         "type": "object",
                         "properties": {
                           "contentType": {
                             "type": "string",
-                            "const": "audio"
+                            "enum": [
+                              "audio"
+                            ]
                           },
                           "data": {
                             "type": "string",
@@ -1555,7 +981,9 @@
                                 "type": "number"
                               }
                             },
-                            "additionalProperties": {}
+                            "additionalProperties": {
+                              "nullable": true
+                            }
                           }
                         },
                         "required": [
@@ -1563,8 +991,7 @@
                           "data",
                           "format",
                           "mimeType"
-                        ],
-                        "additionalProperties": false
+                        ]
                       }
                     ]
                   }
@@ -1574,10 +1001,9 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
@@ -1585,8 +1011,7 @@
                 "toolName",
                 "parameters",
                 "success"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1596,150 +1021,20 @@
                 },
                 "initialVariables": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
                   "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "boolean"
-                      },
-                      {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "boolean"
-                        }
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {},
-                          "additionalProperties": false
-                        }
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded audio data"
-                          },
-                          "format": {
-                            "type": "string",
-                            "enum": [
-                              "pcm",
-                              "mp3",
-                              "wav",
-                              "opus"
-                            ],
-                            "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                          },
-                          "metadata": {
-                            "description": "Optional metadata about the audio",
-                            "type": "object",
-                            "properties": {
-                              "sampleRate": {
-                                "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                                "type": "number"
-                              },
-                              "channels": {
-                                "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                                "type": "number"
-                              },
-                              "bitDepth": {
-                                "description": "Bit depth per sample (e.g., 16, 24)",
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        },
-                        "required": [
-                          "data",
-                          "format",
-                          "mimeType"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Audio parameter value structure for multimodal parameters"
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded image data"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                          },
-                          "metadata": {
-                            "description": "Optional metadata about the image",
-                            "type": "object",
-                            "properties": {
-                              "width": {
-                                "description": "Image width in pixels",
-                                "type": "number"
-                              },
-                              "height": {
-                                "description": "Image height in pixels",
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        },
-                        "required": [
-                          "data",
-                          "mimeType"
-                        ],
-                        "additionalProperties": false,
-                        "description": "Image parameter value structure for multimodal parameters"
-                      }
-                    ],
-                    "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+                    "$ref": "#/components/schemas/ParameterValue"
                   }
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "stageId"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1762,17 +1057,15 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "previousStatus",
                 "stageId"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1785,16 +1078,14 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "stageId"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1807,17 +1098,15 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "reason",
                 "stageId"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1830,16 +1119,14 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "reason"
-              ],
-              "additionalProperties": false
+              ]
             },
             {
               "type": "object",
@@ -1852,17 +1139,15 @@
                 },
                 "metadata": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
+                  "additionalProperties": {
+                    "nullable": true
+                  }
                 }
               },
               "required": [
                 "fromStageId",
                 "toStageId"
-              ],
-              "additionalProperties": false
+              ]
             }
           ],
           "description": "Data associated with the conversation event"
@@ -1874,11 +1159,357 @@
         "conversationId",
         "eventType",
         "eventData"
+      ]
+    },
+    "Effect": {
+      "oneOf": [
+        {
+          "$ref": "#/components/schemas/EndConversationEffect"
+        },
+        {
+          "$ref": "#/components/schemas/AbortConversationEffect"
+        },
+        {
+          "$ref": "#/components/schemas/GoToStageEffect"
+        },
+        {
+          "$ref": "#/components/schemas/RunScriptEffect"
+        },
+        {
+          "$ref": "#/components/schemas/ModifyUserInputEffect"
+        },
+        {
+          "$ref": "#/components/schemas/ModifyVariablesEffect"
+        },
+        {
+          "$ref": "#/components/schemas/ModifyUserProfileEffect"
+        },
+        {
+          "$ref": "#/components/schemas/CallToolEffect"
+        },
+        {
+          "$ref": "#/components/schemas/CallWebhookEffect"
+        },
+        {
+          "$ref": "#/components/schemas/GenerateResponseEffect"
+        }
       ],
-      "additionalProperties": false
+      "discriminator": {
+        "propertyName": "type",
+        "mapping": {
+          "end_conversation": "#/components/schemas/EndConversationEffect",
+          "abort_conversation": "#/components/schemas/AbortConversationEffect",
+          "go_to_stage": "#/components/schemas/GoToStageEffect",
+          "run_script": "#/components/schemas/RunScriptEffect",
+          "modify_user_input": "#/components/schemas/ModifyUserInputEffect",
+          "modify_variables": "#/components/schemas/ModifyVariablesEffect",
+          "modify_user_profile": "#/components/schemas/ModifyUserProfileEffect",
+          "call_tool": "#/components/schemas/CallToolEffect",
+          "call_webhook": "#/components/schemas/CallWebhookEffect",
+          "generate_response": "#/components/schemas/GenerateResponseEffect"
+        }
+      }
+    },
+    "EndConversationEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "end_conversation"
+          ],
+          "description": "Effect type"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for ending the conversation"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "AbortConversationEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "abort_conversation"
+          ],
+          "description": "Effect type"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for aborting the conversation"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "GoToStageEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "go_to_stage"
+          ],
+          "description": "Effect type"
+        },
+        "stageId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ID of the stage to switch to"
+        }
+      },
+      "required": [
+        "type",
+        "stageId"
+      ]
+    },
+    "RunScriptEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "run_script"
+          ],
+          "description": "Effect type"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "JavaScript code to execute in isolated context"
+        }
+      },
+      "required": [
+        "type",
+        "code"
+      ]
+    },
+    "ModifyUserInputEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "modify_user_input"
+          ],
+          "description": "Effect type"
+        },
+        "template": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Template to render and replace user input with"
+        }
+      },
+      "required": [
+        "type",
+        "template"
+      ]
+    },
+    "ModifyVariablesEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "modify_variables"
+          ],
+          "description": "Effect type"
+        },
+        "modifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/VariableOperation"
+          },
+          "minItems": 1,
+          "description": "Array of variable modifications to apply"
+        }
+      },
+      "required": [
+        "type",
+        "modifications"
+      ]
+    },
+    "VariableOperation": {
+      "type": "object",
+      "properties": {
+        "variableName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the variable to modify"
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "set",
+            "reset",
+            "add",
+            "remove"
+          ],
+          "description": "Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)"
+        },
+        "value": {
+          "nullable": true,
+          "description": "Value for the operation (not used for reset operation)"
+        }
+      },
+      "required": [
+        "variableName",
+        "operation"
+      ]
+    },
+    "ModifyUserProfileEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "modify_user_profile"
+          ],
+          "description": "Effect type"
+        },
+        "modifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/UserProfileOperation"
+          },
+          "minItems": 1,
+          "description": "Array of user profile field modifications to apply"
+        }
+      },
+      "required": [
+        "type",
+        "modifications"
+      ]
+    },
+    "UserProfileOperation": {
+      "type": "object",
+      "properties": {
+        "fieldName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the profile field to modify"
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "set",
+            "reset",
+            "add",
+            "remove"
+          ],
+          "description": "Operation to perform: set (assign value), reset (clear value), add (append to array), remove (remove from array)"
+        },
+        "value": {
+          "nullable": true,
+          "description": "Value for the operation (not used for reset operation)"
+        }
+      },
+      "required": [
+        "fieldName",
+        "operation"
+      ]
+    },
+    "CallToolEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_tool"
+          ],
+          "description": "Effect type"
+        },
+        "toolId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ID of the tool to call"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          },
+          "description": "Parameters to pass to the tool"
+        }
+      },
+      "required": [
+        "type",
+        "toolId",
+        "parameters"
+      ]
+    },
+    "CallWebhookEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_webhook"
+          ],
+          "description": "Effect type"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "HTTP(S) URL to call"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "default": "GET",
+          "description": "HTTP method to use"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "HTTP headers to send with the request"
+        },
+        "body": {
+          "nullable": true,
+          "description": "Request body for POST/PUT/PATCH requests"
+        },
+        "resultKey": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Key name to store the webhook result under in context.results.webhooks"
+        }
+      },
+      "required": [
+        "type",
+        "url",
+        "resultKey"
+      ]
+    },
+    "GenerateResponseEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "generate_response"
+          ],
+          "description": "Effect type"
+        }
+      },
+      "required": [
+        "type"
+      ]
     },
     "start-user-voice-input-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -1887,7 +1518,9 @@
         },
         "type": {
           "type": "string",
-          "const": "start_user_voice_input",
+          "enum": [
+            "start_user_voice_input"
+          ],
           "description": "Message type for starting user voice input"
         },
         "sessionId": {
@@ -1904,20 +1537,20 @@
         "type",
         "sessionId",
         "conversationId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "start-user-voice-input-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "start_user_voice_input",
+          "enum": [
+            "start_user_voice_input"
+          ],
           "description": "Message type for start user voice input response"
         },
         "sessionId": {
@@ -1929,8 +1562,8 @@
           "description": "Whether voice input was successfully started"
         },
         "error": {
-          "description": "Error message if voice input start failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if voice input start failed"
         },
         "inputTurnId": {
           "type": "string",
@@ -1942,11 +1575,9 @@
         "sessionId",
         "success",
         "inputTurnId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "send-user-voice-chunk-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -1955,7 +1586,9 @@
         },
         "type": {
           "type": "string",
-          "const": "send_user_voice_chunk",
+          "enum": [
+            "send_user_voice_chunk"
+          ],
           "description": "Message type for sending user voice chunk"
         },
         "sessionId": {
@@ -1987,20 +1620,20 @@
         "audioData",
         "ordinal",
         "inputTurnId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "send-user-voice-chunk-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "send_user_voice_chunk",
+          "enum": [
+            "send_user_voice_chunk"
+          ],
           "description": "Message type for send user voice chunk response"
         },
         "sessionId": {
@@ -2012,8 +1645,8 @@
           "description": "Whether voice chunk was successfully received"
         },
         "error": {
-          "description": "Error message if voice chunk processing failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if voice chunk processing failed"
         },
         "inputTurnId": {
           "type": "string",
@@ -2025,11 +1658,9 @@
         "sessionId",
         "success",
         "inputTurnId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "end-user-voice-input-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -2038,7 +1669,9 @@
         },
         "type": {
           "type": "string",
-          "const": "end_user_voice_input",
+          "enum": [
+            "end_user_voice_input"
+          ],
           "description": "Message type for ending user voice input"
         },
         "sessionId": {
@@ -2060,20 +1693,20 @@
         "sessionId",
         "conversationId",
         "inputTurnId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "end-user-voice-input-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "end_user_voice_input",
+          "enum": [
+            "end_user_voice_input"
+          ],
           "description": "Message type for end user voice input response"
         },
         "sessionId": {
@@ -2085,8 +1718,8 @@
           "description": "Whether voice input was successfully ended"
         },
         "error": {
-          "description": "Error message if voice input ending failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if voice input ending failed"
         },
         "inputTurnId": {
           "type": "string",
@@ -2098,11 +1731,9 @@
         "sessionId",
         "success",
         "inputTurnId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "send-user-text-input-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -2111,7 +1742,9 @@
         },
         "type": {
           "type": "string",
-          "const": "send_user_text_input",
+          "enum": [
+            "send_user_text_input"
+          ],
           "description": "Message type for sending user text input"
         },
         "sessionId": {
@@ -2133,20 +1766,20 @@
         "sessionId",
         "conversationId",
         "text"
-      ],
-      "additionalProperties": false
+      ]
     },
     "send-user-text-input-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "send_user_text_input",
+          "enum": [
+            "send_user_text_input"
+          ],
           "description": "Message type for send user text input response"
         },
         "sessionId": {
@@ -2158,8 +1791,8 @@
           "description": "Whether text input was successfully received"
         },
         "error": {
-          "description": "Error message if text input processing failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if text input processing failed"
         },
         "inputTurnId": {
           "type": "string",
@@ -2171,20 +1804,20 @@
         "sessionId",
         "success",
         "inputTurnId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "user-transcribed-chunk": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "user_transcribed_chunk",
+          "enum": [
+            "user_transcribed_chunk"
+          ],
           "description": "Message type for user text chunk"
         },
         "sessionId": {
@@ -2225,11 +1858,9 @@
         "chunkText",
         "ordinal",
         "isFinal"
-      ],
-      "additionalProperties": false
+      ]
     },
     "go-to-stage-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -2238,7 +1869,9 @@
         },
         "type": {
           "type": "string",
-          "const": "go_to_stage",
+          "enum": [
+            "go_to_stage"
+          ],
           "description": "Message type for navigating to a stage"
         },
         "sessionId": {
@@ -2260,20 +1893,20 @@
         "sessionId",
         "conversationId",
         "stageId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "go-to-stage-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "go_to_stage",
+          "enum": [
+            "go_to_stage"
+          ],
           "description": "Message type for go to stage response"
         },
         "sessionId": {
@@ -2285,19 +1918,17 @@
           "description": "Whether navigation to the stage was successful"
         },
         "error": {
-          "description": "Error message if navigation failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if navigation failed"
         }
       },
       "required": [
         "type",
         "sessionId",
         "success"
-      ],
-      "additionalProperties": false
+      ]
     },
     "set-var-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -2306,7 +1937,9 @@
         },
         "type": {
           "type": "string",
-          "const": "set_var",
+          "enum": [
+            "set_var"
+          ],
           "description": "Message type for setting a variable"
         },
         "sessionId": {
@@ -2326,132 +1959,14 @@
           "description": "Name of the variable to set"
         },
         "variableValue": {
-          "anyOf": [
+          "allOf": [
             {
-              "type": "string"
+              "$ref": "#/components/schemas/ParameterValue"
             },
             {
-              "type": "number"
-            },
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "object",
-              "properties": {},
-              "additionalProperties": false
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "number"
-              }
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "boolean"
-              }
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-              }
-            },
-            {
-              "type": "object",
-              "properties": {
-                "data": {
-                  "type": "string",
-                  "description": "Base64-encoded audio data"
-                },
-                "format": {
-                  "type": "string",
-                  "enum": [
-                    "pcm",
-                    "mp3",
-                    "wav",
-                    "opus"
-                  ],
-                  "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                },
-                "mimeType": {
-                  "type": "string",
-                  "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                },
-                "metadata": {
-                  "description": "Optional metadata about the audio",
-                  "type": "object",
-                  "properties": {
-                    "sampleRate": {
-                      "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                      "type": "number"
-                    },
-                    "channels": {
-                      "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                      "type": "number"
-                    },
-                    "bitDepth": {
-                      "description": "Bit depth per sample (e.g., 16, 24)",
-                      "type": "number"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "required": [
-                "data",
-                "format",
-                "mimeType"
-              ],
-              "additionalProperties": false,
-              "description": "Audio parameter value structure for multimodal parameters"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "data": {
-                  "type": "string",
-                  "description": "Base64-encoded image data"
-                },
-                "mimeType": {
-                  "type": "string",
-                  "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                },
-                "metadata": {
-                  "description": "Optional metadata about the image",
-                  "type": "object",
-                  "properties": {
-                    "width": {
-                      "description": "Image width in pixels",
-                      "type": "number"
-                    },
-                    "height": {
-                      "description": "Image height in pixels",
-                      "type": "number"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "required": [
-                "data",
-                "mimeType"
-              ],
-              "additionalProperties": false,
-              "description": "Image parameter value structure for multimodal parameters"
+              "description": "Value to set for the variable (can be string, number, boolean, object, or array)"
             }
-          ],
-          "description": "Value to set for the variable (can be string, number, boolean, object, or array)"
+          ]
         }
       },
       "required": [
@@ -2462,20 +1977,20 @@
         "stageId",
         "variableName",
         "variableValue"
-      ],
-      "additionalProperties": false
+      ]
     },
     "set-var-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "set_var",
+          "enum": [
+            "set_var"
+          ],
           "description": "Message type for set variable response"
         },
         "sessionId": {
@@ -2487,19 +2002,17 @@
           "description": "Whether the variable was successfully set"
         },
         "error": {
-          "description": "Error message if setting the variable failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if setting the variable failed"
         }
       },
       "required": [
         "type",
         "sessionId",
         "success"
-      ],
-      "additionalProperties": false
+      ]
     },
     "get-var-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -2508,7 +2021,9 @@
         },
         "type": {
           "type": "string",
-          "const": "get_var",
+          "enum": [
+            "get_var"
+          ],
           "description": "Message type for getting a variable"
         },
         "sessionId": {
@@ -2535,20 +2050,20 @@
         "conversationId",
         "stageId",
         "variableName"
-      ],
-      "additionalProperties": false
+      ]
     },
     "get-var-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "get_var",
+          "enum": [
+            "get_var"
+          ],
           "description": "Message type for get variable response"
         },
         "sessionId": {
@@ -2564,7 +2079,6 @@
           "description": "Name of the retrieved variable"
         },
         "variableValue": {
-          "description": "Value of the variable (undefined if not found)",
           "anyOf": [
             {
               "type": "string"
@@ -2578,7 +2092,9 @@
             {
               "type": "object",
               "properties": {},
-              "additionalProperties": false
+              "additionalProperties": {
+                "nullable": true
+              }
             },
             {
               "type": "array",
@@ -2603,97 +2119,23 @@
               "items": {
                 "type": "object",
                 "properties": {},
-                "additionalProperties": false
+                "additionalProperties": {
+                  "nullable": true
+                }
               }
             },
             {
-              "type": "object",
-              "properties": {
-                "data": {
-                  "type": "string",
-                  "description": "Base64-encoded audio data"
-                },
-                "format": {
-                  "type": "string",
-                  "enum": [
-                    "pcm",
-                    "mp3",
-                    "wav",
-                    "opus"
-                  ],
-                  "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                },
-                "mimeType": {
-                  "type": "string",
-                  "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                },
-                "metadata": {
-                  "description": "Optional metadata about the audio",
-                  "type": "object",
-                  "properties": {
-                    "sampleRate": {
-                      "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                      "type": "number"
-                    },
-                    "channels": {
-                      "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                      "type": "number"
-                    },
-                    "bitDepth": {
-                      "description": "Bit depth per sample (e.g., 16, 24)",
-                      "type": "number"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "required": [
-                "data",
-                "format",
-                "mimeType"
-              ],
-              "additionalProperties": false,
-              "description": "Audio parameter value structure for multimodal parameters"
+              "$ref": "#/components/schemas/ImageParameterValue"
             },
             {
-              "type": "object",
-              "properties": {
-                "data": {
-                  "type": "string",
-                  "description": "Base64-encoded image data"
-                },
-                "mimeType": {
-                  "type": "string",
-                  "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                },
-                "metadata": {
-                  "description": "Optional metadata about the image",
-                  "type": "object",
-                  "properties": {
-                    "width": {
-                      "description": "Image width in pixels",
-                      "type": "number"
-                    },
-                    "height": {
-                      "description": "Image height in pixels",
-                      "type": "number"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "required": [
-                "data",
-                "mimeType"
-              ],
-              "additionalProperties": false,
-              "description": "Image parameter value structure for multimodal parameters"
+              "$ref": "#/components/schemas/AudioParameterValue"
             }
-          ]
+          ],
+          "description": "Value of the variable (undefined if not found)"
         },
         "error": {
-          "description": "Error message if retrieving the variable failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if retrieving the variable failed"
         }
       },
       "required": [
@@ -2701,11 +2143,9 @@
         "sessionId",
         "success",
         "variableName"
-      ],
-      "additionalProperties": false
+      ]
     },
     "get-all-vars-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -2714,7 +2154,9 @@
         },
         "type": {
           "type": "string",
-          "const": "get_all_vars",
+          "enum": [
+            "get_all_vars"
+          ],
           "description": "Message type for getting all variables"
         },
         "sessionId": {
@@ -2736,20 +2178,20 @@
         "sessionId",
         "conversationId",
         "stageId"
-      ],
-      "additionalProperties": false
+      ]
     },
     "get-all-vars-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "get_all_vars",
+          "enum": [
+            "get_all_vars"
+          ],
           "description": "Message type for get all variables response"
         },
         "sessionId": {
@@ -2762,142 +2204,14 @@
         },
         "variables": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "number"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "boolean"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {},
-                  "additionalProperties": false
-                }
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string",
-                    "description": "Base64-encoded audio data"
-                  },
-                  "format": {
-                    "type": "string",
-                    "enum": [
-                      "pcm",
-                      "mp3",
-                      "wav",
-                      "opus"
-                    ],
-                    "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                  },
-                  "mimeType": {
-                    "type": "string",
-                    "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                  },
-                  "metadata": {
-                    "description": "Optional metadata about the audio",
-                    "type": "object",
-                    "properties": {
-                      "sampleRate": {
-                        "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                        "type": "number"
-                      },
-                      "channels": {
-                        "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                        "type": "number"
-                      },
-                      "bitDepth": {
-                        "description": "Bit depth per sample (e.g., 16, 24)",
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "required": [
-                  "data",
-                  "format",
-                  "mimeType"
-                ],
-                "additionalProperties": false,
-                "description": "Audio parameter value structure for multimodal parameters"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string",
-                    "description": "Base64-encoded image data"
-                  },
-                  "mimeType": {
-                    "type": "string",
-                    "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                  },
-                  "metadata": {
-                    "description": "Optional metadata about the image",
-                    "type": "object",
-                    "properties": {
-                      "width": {
-                        "description": "Image width in pixels",
-                        "type": "number"
-                      },
-                      "height": {
-                        "description": "Image height in pixels",
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "required": [
-                  "data",
-                  "mimeType"
-                ],
-                "additionalProperties": false,
-                "description": "Image parameter value structure for multimodal parameters"
-              }
-            ],
-            "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+            "$ref": "#/components/schemas/ParameterValue"
           },
           "description": "Map of variable names to their values"
         },
         "error": {
-          "description": "Error message if retrieving variables failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if retrieving variables failed"
         }
       },
       "required": [
@@ -2905,11 +2219,9 @@
         "sessionId",
         "success",
         "variables"
-      ],
-      "additionalProperties": false
+      ]
     },
     "run-action-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -2918,7 +2230,9 @@
         },
         "type": {
           "type": "string",
-          "const": "run_action",
+          "enum": [
+            "run_action"
+          ],
           "description": "Message type for running an action"
         },
         "sessionId": {
@@ -2936,132 +2250,7 @@
         "parameters": {
           "type": "array",
           "items": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "number"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "boolean"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {},
-                  "additionalProperties": false
-                }
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string",
-                    "description": "Base64-encoded audio data"
-                  },
-                  "format": {
-                    "type": "string",
-                    "enum": [
-                      "pcm",
-                      "mp3",
-                      "wav",
-                      "opus"
-                    ],
-                    "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                  },
-                  "mimeType": {
-                    "type": "string",
-                    "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                  },
-                  "metadata": {
-                    "description": "Optional metadata about the audio",
-                    "type": "object",
-                    "properties": {
-                      "sampleRate": {
-                        "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                        "type": "number"
-                      },
-                      "channels": {
-                        "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                        "type": "number"
-                      },
-                      "bitDepth": {
-                        "description": "Bit depth per sample (e.g., 16, 24)",
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "required": [
-                  "data",
-                  "format",
-                  "mimeType"
-                ],
-                "additionalProperties": false,
-                "description": "Audio parameter value structure for multimodal parameters"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string",
-                    "description": "Base64-encoded image data"
-                  },
-                  "mimeType": {
-                    "type": "string",
-                    "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                  },
-                  "metadata": {
-                    "description": "Optional metadata about the image",
-                    "type": "object",
-                    "properties": {
-                      "width": {
-                        "description": "Image width in pixels",
-                        "type": "number"
-                      },
-                      "height": {
-                        "description": "Image height in pixels",
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "required": [
-                  "data",
-                  "mimeType"
-                ],
-                "additionalProperties": false,
-                "description": "Image parameter value structure for multimodal parameters"
-              }
-            ],
-            "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+            "$ref": "#/components/schemas/ParameterValue"
           },
           "description": "Array of parameters to pass to the action"
         }
@@ -3073,20 +2262,20 @@
         "conversationId",
         "actionName",
         "parameters"
-      ],
-      "additionalProperties": false
+      ]
     },
     "run-action-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "run_action",
+          "enum": [
+            "run_action"
+          ],
           "description": "Message type for run action response"
         },
         "sessionId": {
@@ -3098,7 +2287,6 @@
           "description": "Whether the action was successfully executed"
         },
         "result": {
-          "description": "Result returned by the action as array of multi-modal content blocks (text, image, or audio)",
           "type": "array",
           "items": {
             "oneOf": [
@@ -3107,7 +2295,9 @@
                 "properties": {
                   "contentType": {
                     "type": "string",
-                    "const": "text"
+                    "enum": [
+                      "text"
+                    ]
                   },
                   "text": {
                     "type": "string"
@@ -3116,15 +2306,16 @@
                 "required": [
                   "contentType",
                   "text"
-                ],
-                "additionalProperties": false
+                ]
               },
               {
                 "type": "object",
                 "properties": {
                   "contentType": {
                     "type": "string",
-                    "const": "image"
+                    "enum": [
+                      "image"
+                    ]
                   },
                   "data": {
                     "type": "string",
@@ -3144,22 +2335,25 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {}
+                    "additionalProperties": {
+                      "nullable": true
+                    }
                   }
                 },
                 "required": [
                   "contentType",
                   "data",
                   "mimeType"
-                ],
-                "additionalProperties": false
+                ]
               },
               {
                 "type": "object",
                 "properties": {
                   "contentType": {
                     "type": "string",
-                    "const": "audio"
+                    "enum": [
+                      "audio"
+                    ]
                   },
                   "data": {
                     "type": "string",
@@ -3192,7 +2386,9 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {}
+                    "additionalProperties": {
+                      "nullable": true
+                    }
                   }
                 },
                 "required": [
@@ -3200,26 +2396,24 @@
                   "data",
                   "format",
                   "mimeType"
-                ],
-                "additionalProperties": false
+                ]
               }
             ]
-          }
+          },
+          "description": "Result returned by the action as array of multi-modal content blocks (text, image, or audio)"
         },
         "error": {
-          "description": "Error message if action execution failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if action execution failed"
         }
       },
       "required": [
         "type",
         "sessionId",
         "success"
-      ],
-      "additionalProperties": false
+      ]
     },
     "call-tool-request": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
@@ -3228,7 +2422,9 @@
         },
         "type": {
           "type": "string",
-          "const": "call_tool",
+          "enum": [
+            "call_tool"
+          ],
           "description": "Message type for calling a tool"
         },
         "sessionId": {
@@ -3245,136 +2441,8 @@
         },
         "parameters": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "object",
-                "properties": {},
-                "additionalProperties": false
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "number"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "boolean"
-                }
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {},
-                  "additionalProperties": false
-                }
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string",
-                    "description": "Base64-encoded audio data"
-                  },
-                  "format": {
-                    "type": "string",
-                    "enum": [
-                      "pcm",
-                      "mp3",
-                      "wav",
-                      "opus"
-                    ],
-                    "description": "Audio format identifier (pcm, mp3, wav, opus)"
-                  },
-                  "mimeType": {
-                    "type": "string",
-                    "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg, audio/wav)"
-                  },
-                  "metadata": {
-                    "description": "Optional metadata about the audio",
-                    "type": "object",
-                    "properties": {
-                      "sampleRate": {
-                        "description": "Sample rate in Hz (e.g., 44100, 48000)",
-                        "type": "number"
-                      },
-                      "channels": {
-                        "description": "Number of audio channels (1 for mono, 2 for stereo)",
-                        "type": "number"
-                      },
-                      "bitDepth": {
-                        "description": "Bit depth per sample (e.g., 16, 24)",
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "required": [
-                  "data",
-                  "format",
-                  "mimeType"
-                ],
-                "additionalProperties": false,
-                "description": "Audio parameter value structure for multimodal parameters"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string",
-                    "description": "Base64-encoded image data"
-                  },
-                  "mimeType": {
-                    "type": "string",
-                    "description": "MIME type of the image (e.g., image/png, image/jpeg, image/webp)"
-                  },
-                  "metadata": {
-                    "description": "Optional metadata about the image",
-                    "type": "object",
-                    "properties": {
-                      "width": {
-                        "description": "Image width in pixels",
-                        "type": "number"
-                      },
-                      "height": {
-                        "description": "Image height in pixels",
-                        "type": "number"
-                      }
-                    },
-                    "additionalProperties": false
-                  }
-                },
-                "required": [
-                  "data",
-                  "mimeType"
-                ],
-                "additionalProperties": false,
-                "description": "Image parameter value structure for multimodal parameters"
-              }
-            ],
-            "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
+            "$ref": "#/components/schemas/ParameterValue"
           },
           "description": "Map of parameter names to their values"
         }
@@ -3386,20 +2454,20 @@
         "conversationId",
         "toolId",
         "parameters"
-      ],
-      "additionalProperties": false
+      ]
     },
     "call-tool-response": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "call_tool",
+          "enum": [
+            "call_tool"
+          ],
           "description": "Message type for call tool response"
         },
         "sessionId": {
@@ -3411,7 +2479,6 @@
           "description": "Whether the tool was successfully executed"
         },
         "result": {
-          "description": "Result returned by the tool execution as array of multi-modal content blocks (text, image, or audio)",
           "type": "array",
           "items": {
             "oneOf": [
@@ -3420,7 +2487,9 @@
                 "properties": {
                   "contentType": {
                     "type": "string",
-                    "const": "text"
+                    "enum": [
+                      "text"
+                    ]
                   },
                   "text": {
                     "type": "string"
@@ -3429,15 +2498,16 @@
                 "required": [
                   "contentType",
                   "text"
-                ],
-                "additionalProperties": false
+                ]
               },
               {
                 "type": "object",
                 "properties": {
                   "contentType": {
                     "type": "string",
-                    "const": "image"
+                    "enum": [
+                      "image"
+                    ]
                   },
                   "data": {
                     "type": "string",
@@ -3457,22 +2527,25 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {}
+                    "additionalProperties": {
+                      "nullable": true
+                    }
                   }
                 },
                 "required": [
                   "contentType",
                   "data",
                   "mimeType"
-                ],
-                "additionalProperties": false
+                ]
               },
               {
                 "type": "object",
                 "properties": {
                   "contentType": {
                     "type": "string",
-                    "const": "audio"
+                    "enum": [
+                      "audio"
+                    ]
                   },
                   "data": {
                     "type": "string",
@@ -3505,7 +2578,9 @@
                         "type": "number"
                       }
                     },
-                    "additionalProperties": {}
+                    "additionalProperties": {
+                      "nullable": true
+                    }
                   }
                 },
                 "required": [
@@ -3513,35 +2588,35 @@
                   "data",
                   "format",
                   "mimeType"
-                ],
-                "additionalProperties": false
+                ]
               }
             ]
-          }
+          },
+          "description": "Result returned by the tool execution as array of multi-modal content blocks (text, image, or audio)"
         },
         "error": {
-          "description": "Error message if tool execution failed",
-          "type": "string"
+          "type": "string",
+          "description": "Error message if tool execution failed"
         }
       },
       "required": [
         "type",
         "sessionId",
         "success"
-      ],
-      "additionalProperties": false
+      ]
     },
     "start-ai-generation-output": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "start_ai_generation_output",
+          "enum": [
+            "start_ai_generation_output"
+          ],
           "description": "Message type for starting AI voice output"
         },
         "sessionId": {
@@ -3567,20 +2642,20 @@
         "conversationId",
         "outputTurnId",
         "expectVoice"
-      ],
-      "additionalProperties": false
+      ]
     },
     "send-ai-voice-chunk": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "send_ai_voice_chunk",
+          "enum": [
+            "send_ai_voice_chunk"
+          ],
           "description": "Message type for sending AI voice chunk"
         },
         "sessionId": {
@@ -3632,12 +2707,12 @@
           "description": "Whether this is the final chunk in the voice output sequence"
         },
         "sampleRate": {
-          "description": "Sample rate of the audio chunk (e.g., 24000)",
-          "type": "number"
+          "type": "number",
+          "description": "Sample rate of the audio chunk (e.g., 24000)"
         },
         "bitRate": {
-          "description": "Bit rate of the audio chunk in bits per second (e.g., 64000)",
-          "type": "number"
+          "type": "number",
+          "description": "Bit rate of the audio chunk in bits per second (e.g., 64000)"
         }
       },
       "required": [
@@ -3650,20 +2725,20 @@
         "chunkId",
         "ordinal",
         "isFinal"
-      ],
-      "additionalProperties": false
+      ]
     },
     "end-ai-generation-output": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "end_ai_generation_output",
+          "enum": [
+            "end_ai_generation_output"
+          ],
           "description": "Message type for ending AI voice output"
         },
         "sessionId": {
@@ -3689,20 +2764,20 @@
         "conversationId",
         "outputTurnId",
         "fullText"
-      ],
-      "additionalProperties": false
+      ]
     },
     "ai-transcribed-chunk": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "ai_transcribed_chunk",
+          "enum": [
+            "ai_transcribed_chunk"
+          ],
           "description": "Message type for AI transcribed text chunk"
         },
         "sessionId": {
@@ -3743,20 +2818,20 @@
         "chunkText",
         "ordinal",
         "isFinal"
-      ],
-      "additionalProperties": false
+      ]
     },
     "send-ai-image-output": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "send_ai_image_output",
+          "enum": [
+            "send_ai_image_output"
+          ],
           "description": "Message type for sending AI-generated image"
         },
         "sessionId": {
@@ -3792,20 +2867,20 @@
         "imageData",
         "mimeType",
         "sequenceNumber"
-      ],
-      "additionalProperties": false
+      ]
     },
     "send-ai-audio-output": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "Optional request ID for correlating responses with requests",
-          "type": "string"
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "type": {
           "type": "string",
-          "const": "send_ai_audio_output",
+          "enum": [
+            "send_ai_audio_output"
+          ],
           "description": "Message type for sending AI-generated audio"
         },
         "sessionId": {
@@ -3843,23 +2918,22 @@
           "description": "Sequence number if multiple audio blocks in response"
         },
         "metadata": {
-          "description": "Audio metadata",
           "type": "object",
           "properties": {
             "sampleRate": {
-              "description": "Sample rate in Hz",
-              "type": "number"
+              "type": "number",
+              "description": "Sample rate in Hz"
             },
             "channels": {
-              "description": "Number of audio channels",
-              "type": "number"
+              "type": "number",
+              "description": "Number of audio channels"
             },
             "bitDepth": {
-              "description": "Bit depth per sample",
-              "type": "number"
+              "type": "number",
+              "description": "Bit depth per sample"
             }
           },
-          "additionalProperties": false
+          "description": "Audio metadata"
         }
       },
       "required": [
@@ -3871,8 +2945,7 @@
         "audioFormat",
         "mimeType",
         "sequenceNumber"
-      ],
-      "additionalProperties": false
+      ]
     }
   }
 }
