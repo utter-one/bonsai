@@ -41,7 +41,6 @@ interface SignedUrlToken {
 export class LocalStorageProvider extends StorageProviderBase<LocalStorageProviderConfig> {
   private settings: LocalStorageSettings;
   private signedUrlTokens: Map<string, SignedUrlToken> = new Map();
-  private readonly SECRET_KEY = process.env.STORAGE_URL_SECRET || crypto.randomBytes(32).toString('hex');
 
   constructor(config: LocalStorageProviderConfig, settings: LocalStorageSettings) {
     super(config);
