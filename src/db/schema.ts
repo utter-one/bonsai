@@ -299,11 +299,19 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
-// ConversationAsset table
-export const conversationAssets = pgTable('conversation_assets', {
+export type ArtifactType = 'user_voice' | 'user_transcript' | 'ai_voice' | 'ai_transcript' | 'tool_input' | 'tool_output' | 'other';
+
+// ConversationArtifact table
+export const conversationArtifacts = pgTable('conversation_artifacts', {
   id: text('id').primaryKey(),
   conversationId: text('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  data: text('data').notNull(), // Binary data as base64 or use bytea
+  artifactType: text('artifact_type').notNull().$type<ArtifactType>(),
+  eventId: text('event_id').references(() => conversationEvents.id, { onDelete: 'set null' }),
+  inputTurnId: text('input_turn_id'),
+  outputTurnId: text('output_turn_id'),
+  storageKey: text('storage_key'),
+  storageUrl: text('storage_url'),
+  data: text('data'), // Binary data as base64 - optional since we may store in external storage
   mimeType: text('mime_type').notNull(),
   fileSize: integer('file_size').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -326,7 +334,7 @@ export const conversationsRelations = relations(conversations, ({ one, many }) =
     references: [users.id],
   }),
   events: many(conversationEvents),
-  assets: many(conversationAssets),
+  artifacts: many(conversationArtifacts),
 }));
 
 export const conversationEventsRelations = relations(conversationEvents, ({ one }) => ({
@@ -418,10 +426,14 @@ export const knowledgeCategoriesRelations = relations(knowledgeCategories, ({ on
   items: many(knowledgeItems),
 }));
 
-export const conversationAssetsRelations = relations(conversationAssets, ({ one }) => ({
+export const conversationArtifactsRelations = relations(conversationArtifacts, ({ one }) => ({
   conversation: one(conversations, {
-    fields: [conversationAssets.conversationId],
+    fields: [conversationArtifacts.conversationId],
     references: [conversations.id],
+  }),
+  event: one(conversationEvents, {
+    fields: [conversationArtifacts.eventId],
+    references: [conversationEvents.id],
   }),
 }));
 

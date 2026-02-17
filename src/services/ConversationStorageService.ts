@@ -1,13 +1,15 @@
 import { inject, singleton } from 'tsyringe';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { providers } from '../db/schema';
+import { providers, conversationArtifacts } from '../db/schema';
+import type { ArtifactType } from '../db/schema';
 import { StorageProviderFactory } from './providers/storage/StorageProviderFactory';
 import type { IStorageProvider } from './providers/storage/IStorageProvider';
 import type { StorageMetadata } from './providers/storage/IStorageProvider';
 import type { ErrorCallback } from '../types/callbacks';
 import { logger } from '../utils/logger';
 import { NotConfiguredError, NotFoundError } from '../errors';
+import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing conversation artifacts in storage
@@ -18,17 +20,20 @@ export class ConversationStorageService {
   constructor(@inject(StorageProviderFactory) private readonly storageFactory: StorageProviderFactory) {}
 
   /**
-   * Upload a conversation artifact to storage
+   * Upload a conversation artifact to storage and save metadata to database
    * @param storageConfig Storage configuration from project (containing storageProviderId and settings)
    * @param conversationId Conversation ID for organizing artifacts
-   * @param artifactType Type of artifact (e.g., 'audio', 'transcript', 'metadata')
+   * @param artifactType Type of artifact (e.g., 'user_voice', 'ai_transcript')
    * @param data Binary data to upload
    * @param metadata Optional metadata (content type, encoding, etc.)
+   * @param eventId Optional event ID to link artifact to a specific conversation event
+   * @param inputTurnId Optional input turn ID to link artifact to user input
+   * @param outputTurnId Optional output turn ID to link artifact to AI output
    * @param errorCallback Optional error callback for error handling
-   * @returns URL of the uploaded artifact
+   * @returns Artifact ID and URL of the uploaded artifact
    * @throws NotConfiguredError if storage is not configured for the project
    */
-  async uploadArtifact(storageConfig: { storageProviderId?: string; settings?: unknown } | null | undefined, conversationId: string, artifactType: string, data: Buffer, metadata?: StorageMetadata, errorCallback?: ErrorCallback): Promise<string> {
+  async uploadArtifact(storageConfig: { storageProviderId?: string; settings?: unknown } | null | undefined, conversationId: string, artifactType: ArtifactType, data: Buffer, metadata?: StorageMetadata, eventId?: string, inputTurnId?: string, outputTurnId?: string, errorCallback?: ErrorCallback): Promise<{ id: string; url: string }> {
     if (!storageConfig?.storageProviderId || !storageConfig?.settings) {
       throw new NotConfiguredError('Storage provider not configured for this project');
     }
@@ -37,8 +42,25 @@ export class ConversationStorageService {
     const key = this.generateArtifactKey(conversationId, artifactType);
     const url = await provider.upload(key, data, metadata);
 
-    logger.info(`Uploaded artifact for conversation ${conversationId}: ${artifactType} -> ${url}`);
-    return url;
+    // Save artifact metadata to database
+    const artifactId = generateId(ID_PREFIXES.ARTIFACT);
+    await db.insert(conversationArtifacts).values({
+      id: artifactId,
+      conversationId,
+      artifactType,
+      eventId: eventId ?? null,
+      inputTurnId: inputTurnId ?? null,
+      outputTurnId: outputTurnId ?? null,
+      storageKey: key,
+      storageUrl: url,
+      data: null, // Not storing in database, only in external storage
+      mimeType: metadata?.contentType ?? 'application/octet-stream',
+      fileSize: data.length,
+      metadata: metadata?.customMetadata ?? null,
+    });
+
+    logger.info(`Uploaded artifact for conversation ${conversationId}: ${artifactType} -> ${url} (artifact ID: ${artifactId})`);
+    return { id: artifactId, url };
   }
 
   /**
