@@ -137,10 +137,10 @@
           }
         },
         {
-          "$ref": "#/components/schemas/ImageParameterValue"
+          "$ref": "#/definitions/ImageParameterValue"
         },
         {
-          "$ref": "#/components/schemas/AudioParameterValue"
+          "$ref": "#/definitions/AudioParameterValue"
         }
       ],
       "description": "Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)"
@@ -781,7 +781,7 @@
                             "parameters": {
                               "type": "object",
                               "additionalProperties": {
-                                "$ref": "#/components/schemas/ParameterValue"
+                                "$ref": "#/definitions/ParameterValue"
                               }
                             }
                           },
@@ -824,7 +824,7 @@
                 "effects": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Effect"
+                    "$ref": "#/definitions/Effect"
                   }
                 },
                 "metadata": {
@@ -849,7 +849,7 @@
                 "parameters": {
                   "type": "object",
                   "additionalProperties": {
-                    "$ref": "#/components/schemas/ParameterValue"
+                    "$ref": "#/definitions/ParameterValue"
                   }
                 },
                 "metadata": {
@@ -875,7 +875,7 @@
                 "parameters": {
                   "type": "object",
                   "additionalProperties": {
-                    "$ref": "#/components/schemas/ParameterValue"
+                    "$ref": "#/definitions/ParameterValue"
                   }
                 },
                 "success": {
@@ -1022,7 +1022,7 @@
                 "initialVariables": {
                   "type": "object",
                   "additionalProperties": {
-                    "$ref": "#/components/schemas/ParameterValue"
+                    "$ref": "#/definitions/ParameterValue"
                   }
                 },
                 "metadata": {
@@ -1164,49 +1164,49 @@
     "Effect": {
       "oneOf": [
         {
-          "$ref": "#/components/schemas/EndConversationEffect"
+          "$ref": "#/definitions/EndConversationEffect"
         },
         {
-          "$ref": "#/components/schemas/AbortConversationEffect"
+          "$ref": "#/definitions/AbortConversationEffect"
         },
         {
-          "$ref": "#/components/schemas/GoToStageEffect"
+          "$ref": "#/definitions/GoToStageEffect"
         },
         {
-          "$ref": "#/components/schemas/RunScriptEffect"
+          "$ref": "#/definitions/RunScriptEffect"
         },
         {
-          "$ref": "#/components/schemas/ModifyUserInputEffect"
+          "$ref": "#/definitions/ModifyUserInputEffect"
         },
         {
-          "$ref": "#/components/schemas/ModifyVariablesEffect"
+          "$ref": "#/definitions/ModifyVariablesEffect"
         },
         {
-          "$ref": "#/components/schemas/ModifyUserProfileEffect"
+          "$ref": "#/definitions/ModifyUserProfileEffect"
         },
         {
-          "$ref": "#/components/schemas/CallToolEffect"
+          "$ref": "#/definitions/CallToolEffect"
         },
         {
-          "$ref": "#/components/schemas/CallWebhookEffect"
+          "$ref": "#/definitions/CallWebhookEffect"
         },
         {
-          "$ref": "#/components/schemas/GenerateResponseEffect"
+          "$ref": "#/definitions/GenerateResponseEffect"
         }
       ],
       "discriminator": {
         "propertyName": "type",
         "mapping": {
-          "end_conversation": "#/components/schemas/EndConversationEffect",
-          "abort_conversation": "#/components/schemas/AbortConversationEffect",
-          "go_to_stage": "#/components/schemas/GoToStageEffect",
-          "run_script": "#/components/schemas/RunScriptEffect",
-          "modify_user_input": "#/components/schemas/ModifyUserInputEffect",
-          "modify_variables": "#/components/schemas/ModifyVariablesEffect",
-          "modify_user_profile": "#/components/schemas/ModifyUserProfileEffect",
-          "call_tool": "#/components/schemas/CallToolEffect",
-          "call_webhook": "#/components/schemas/CallWebhookEffect",
-          "generate_response": "#/components/schemas/GenerateResponseEffect"
+          "end_conversation": "#/definitions/EndConversationEffect",
+          "abort_conversation": "#/definitions/AbortConversationEffect",
+          "go_to_stage": "#/definitions/GoToStageEffect",
+          "run_script": "#/definitions/RunScriptEffect",
+          "modify_user_input": "#/definitions/ModifyUserInputEffect",
+          "modify_variables": "#/definitions/ModifyVariablesEffect",
+          "modify_user_profile": "#/definitions/ModifyUserProfileEffect",
+          "call_tool": "#/definitions/CallToolEffect",
+          "call_webhook": "#/definitions/CallWebhookEffect",
+          "generate_response": "#/definitions/GenerateResponseEffect"
         }
       }
     },
@@ -1324,7 +1324,7 @@
         "modifications": {
           "type": "array",
           "items": {
-            "$ref": "#/components/schemas/VariableOperation"
+            "$ref": "#/definitions/VariableOperation"
           },
           "minItems": 1,
           "description": "Array of variable modifications to apply"
@@ -1376,7 +1376,7 @@
         "modifications": {
           "type": "array",
           "items": {
-            "$ref": "#/components/schemas/UserProfileOperation"
+            "$ref": "#/definitions/UserProfileOperation"
           },
           "minItems": 1,
           "description": "Array of user profile field modifications to apply"
@@ -1961,7 +1961,7 @@
         "variableValue": {
           "allOf": [
             {
-              "$ref": "#/components/schemas/ParameterValue"
+              "$ref": "#/definitions/ParameterValue"
             },
             {
               "description": "Value to set for the variable (can be string, number, boolean, object, or array)"
@@ -2125,10 +2125,10 @@
               }
             },
             {
-              "$ref": "#/components/schemas/ImageParameterValue"
+              "$ref": "#/definitions/ImageParameterValue"
             },
             {
-              "$ref": "#/components/schemas/AudioParameterValue"
+              "$ref": "#/definitions/AudioParameterValue"
             }
           ],
           "description": "Value of the variable (undefined if not found)"
@@ -2205,7 +2205,7 @@
         "variables": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/components/schemas/ParameterValue"
+            "$ref": "#/definitions/ParameterValue"
           },
           "description": "Map of variable names to their values"
         },
@@ -2250,7 +2250,7 @@
         "parameters": {
           "type": "array",
           "items": {
-            "$ref": "#/components/schemas/ParameterValue"
+            "$ref": "#/definitions/ParameterValue"
           },
           "description": "Array of parameters to pass to the action"
         }
@@ -2442,7 +2442,7 @@
         "parameters": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/components/schemas/ParameterValue"
+            "$ref": "#/definitions/ParameterValue"
           },
           "description": "Map of parameter names to their values"
         }

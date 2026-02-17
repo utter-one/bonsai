@@ -128,6 +128,11 @@ function generateWebSocketSchemas(): void {
   const generator = new OpenApiGeneratorV3(registry.definitions);
   const openApiDoc = generator.generateComponents();
   
+  // Convert OpenAPI-style $refs to JSON Schema-style $refs
+  // OpenAPI uses #/components/schemas/... but JSON Schema uses #/definitions/...
+  const schemasJson = JSON.stringify(openApiDoc.components?.schemas || {});
+  const convertedSchemas = JSON.parse(schemasJson.replace(/#\/components\/schemas\//g, '#/definitions/'));
+  
   const outputPath = join(outputDir, 'websocket-contracts.json');
   writeFileSync(
     outputPath,
@@ -138,7 +143,7 @@ function generateWebSocketSchemas(): void {
         title: 'WebSocket Message Contracts',
         description: 'JSON Schema definitions for all WebSocket message types in the Nexus Backend API',
         version: '1.0.0',
-        definitions: openApiDoc.components?.schemas || {},
+        definitions: convertedSchemas,
       },
       null,
       2,
@@ -146,7 +151,7 @@ function generateWebSocketSchemas(): void {
   );
   console.log(`Generated: ${outputPath}`);
 
-  const schemaCount = Object.keys(openApiDoc.components?.schemas || {}).length;
+  const schemaCount = Object.keys(convertedSchemas).length;
   console.log(`\n✅ Successfully generated WebSocket contracts schema with ${schemaCount} schema definitions`);
 }
 
