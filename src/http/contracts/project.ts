@@ -5,6 +5,7 @@ import { s3StorageSettingsSchema } from '../../services/providers/storage/S3Stor
 import { azureBlobStorageSettingsSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
 import { gcsStorageSettingsSchema } from '../../services/providers/storage/GcsStorageProvider';
 import { localStorageSettingsSchema } from '../../services/providers/storage/LocalStorageProvider';
+import { parameterValueSchema } from '../../types/parameters';
 
 extendZodWithOpenApi(z);
 
@@ -65,7 +66,7 @@ export const createProjectSchema = z.object({
   acceptVoice: z.boolean().optional().default(true).describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().default(true).describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.optional().describe('Optional storage configuration for conversation artifacts'),
-  constants: z.record(z.string(), z.any()).optional().describe('Key-value store of constants used in templating and conversation logic'),
+  constants: z.record(z.string(), parameterValueSchema).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
 });
 
@@ -81,7 +82,7 @@ export const updateProjectSchema = z.object({
   acceptVoice: z.boolean().optional().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.describe('Updated storage configuration settings'),
-  constants: z.record(z.string(), z.any()).optional().describe('Updated constants key-value store'),
+  constants: z.record(z.string(), parameterValueSchema).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
   version: z.number().describe('The current version number for optimistic locking'),
 });
@@ -99,7 +100,7 @@ export const projectResponseSchema = z.object({
   acceptVoice: z.boolean().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.nullable().describe('Storage configuration for conversation artifacts'),
-  constants: z.record(z.string(), z.any()).nullable().describe('Key-value store of constants used in templating and conversation logic'),
+  constants: z.record(z.string(), parameterValueSchema).nullable().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).nullable().describe('Additional metadata for the project'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),

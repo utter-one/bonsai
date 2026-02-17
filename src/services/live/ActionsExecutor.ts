@@ -9,6 +9,7 @@ import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 import { NotFoundError } from '../../errors';
+import { ParameterValue } from '../../types/parameters';
 
 /**
  * Execution result for an action
@@ -715,7 +716,7 @@ export class ActionsExecutor {
       // - Render the tool prompt with context and parameters
       // - Call the LLM
       // - Return the result
-      const executionResult = await this.toolExecutor.executeTool(tool as any, context, effect.parameters);
+      const executionResult = await this.toolExecutor.executeTool(tool as any, context, effect.parameters as Record<string, ParameterValue>);
 
       if (!executionResult.success) {
         throw new Error(executionResult.failureReason || 'Tool execution failed');

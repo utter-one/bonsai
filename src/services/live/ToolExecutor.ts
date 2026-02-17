@@ -4,16 +4,17 @@ import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { Tool } from "../../types/models";
 import { db } from "../../db";
 import { NotFoundError } from "../../errors";
-import { llmContentSchema, LlmGenerationOptions } from "../providers/llm/ILlmProvider";
+import { llmContentSchema, LlmGenerationOptions, LlmMessage, MessageContent } from "../providers/llm/ILlmProvider";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
+import { ImageParameterValue, ParameterValue, parameterValueSchema } from "../../types/parameters";
 
 export const toolExecutionResultSchema = z.object({
   success: z.boolean(),
   failureReason: z.string().optional(),
   toolId: z.string(),
-  parameters: z.record(z.string(), z.any()),
+  parameters: z.record(z.string(), parameterValueSchema).describe('Parameters that were passed to the tool during execution'),
   result: z.array(llmContentSchema).optional().describe('Optional field for tool output'),
   renderedPrompt: z.string().optional(),
   llmSettings: z.any().optional(),
@@ -36,7 +37,7 @@ export class ToolExecutor {
    * @throws NotFoundError if the associated LLM provider is not found.
    * @throws Error for any issues during tool execution, which will be captured in the failureReason of the result.
    */
-  async executeTool(tool: Tool, context: ConversationContext, parameters: Record<string, any>): Promise<ToolExecutionResult> {
+  async executeTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
     if (!tool.llmProviderId) {
       throw new Error(`Tool "${tool.name}" does not have an associated LLM provider`);
     }
@@ -52,16 +53,22 @@ export class ToolExecutor {
       const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);
       logger.info({ toolId: tool.id, renderedPrompt, actualContext }, `Rendered prompt for tool "${tool.name}"`);
 
-      const messages = [
+      const messages: LlmMessage[] = [
         {
           role: 'system' as const,
           content: renderedPrompt
-        },
-        {
-          role: 'user' as const,
-          content: 'Please complete the requested task based on the system instructions.'
         }
       ];
+
+      // Extract and add image parameters as user messages
+      const imageMessages = this.extractImageMessages(parameters);
+      messages.push(...imageMessages);
+
+      // Add final user instruction message
+      messages.push({
+        role: 'user' as const,
+        content: 'Please complete the requested task based on the system instructions.'
+      });
 
       const result = await llmProvider.generate(messages, { outputFormat: this.getOutputFormat(tool) });
       
@@ -86,5 +93,71 @@ export class ToolExecutor {
 
     // Add more formats as needed
     return 'text';
+  }
+
+  /**
+   * Extracts image parameters from the parameters object and converts them to user messages with image content.
+   * Supports both single image parameters and image array parameters.
+   * @param parameters The parameters object containing potential image values
+   * @returns Array of LlmMessage objects containing image content
+   */
+  private extractImageMessages(parameters: Record<string, ParameterValue>): LlmMessage[] {
+    const imageMessages: LlmMessage[] = [];
+
+    for (const [key, value] of Object.entries(parameters)) {
+      if (this.isImageParameter(value)) {
+        // Single image parameter
+        const imageContent = this.convertImageToContent(value);
+        imageMessages.push({
+          role: 'user',
+          content: [imageContent]
+        });
+      } else if (Array.isArray(value) && value.length > 0) {
+        // Check if all array items are image parameters
+        const arrayValue = value as any[];
+        const allImages = arrayValue.every(v => this.isImageParameter(v));
+        if (allImages) {
+          // Image array parameter - combine all images into one message
+          const imageContents = arrayValue.map(img => this.convertImageToContent(img as ImageParameterValue));
+          imageMessages.push({
+            role: 'user',
+            content: imageContents
+          });
+        }
+      }
+    }
+
+    return imageMessages;
+  }
+
+  /**
+   * Checks if a value is an image parameter based on its structure
+   * @param value The value to check
+   * @returns True if the value matches the image parameter structure
+   */
+  private isImageParameter(value: any): value is ImageParameterValue {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof value.data === 'string' &&
+      typeof value.mimeType === 'string' &&
+      value.mimeType.startsWith('image/')
+    );
+  }
+
+  /**
+   * Converts an image parameter value to MessageContent format for LLM provider
+   * @param image The image parameter value to convert
+   * @returns MessageContent object with image data
+   */
+  private convertImageToContent(image: ImageParameterValue): MessageContent {
+    return {
+      type: 'image',
+      source: {
+        type: 'base64',
+        data: image.data,
+        mimeType: image.mimeType
+      }
+    };
   }
 }

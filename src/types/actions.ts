@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { parameterTypeSchema } from './parameters';
 
 extendZodWithOpenApi(z);
 
@@ -149,20 +150,6 @@ export type CallWebhookEffect = z.infer<typeof callWebhookEffectSchema>;
 export type GenerateResponseEffect = z.infer<typeof generateResponseEffectSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 
-/**
- * Schema for parameter types supported in stage actions and tools
- * Defines the valid parameter types that can be extracted from user input or passed to tools
- */
-export const parameterTypeSchema = z.enum([
-  'string',
-  'number',
-  'boolean',
-  'object',
-  'string[]',
-  'number[]',
-  'boolean[]',
-  'object[]',
-]).describe('Type of the parameter: string, number, boolean, object (free-form JSON), or arrays of these');
 
 /**
  * Schema for a single stage action parameter
