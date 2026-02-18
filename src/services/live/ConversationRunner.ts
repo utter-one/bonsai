@@ -944,6 +944,14 @@ export class ConversationRunner {
     // Save/send tool call events from action execution
     await this.saveAndSendOutcomeEvents(outcome);
 
+    // Register action event
+    const actionEventData: ActionEventData = {
+      actionName,
+      stageId: this.stageData.id,
+      effects: actionToExecute.effects,
+    };
+    await this.saveAndSendEvent('action', actionEventData);
+
     if (await this.applyActionOutcome(context, outcome)) {
       // TODO: this needs more thought
       await this.generateResponse(context, outcome);
