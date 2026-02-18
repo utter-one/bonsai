@@ -937,7 +937,8 @@ export class ConversationRunner {
 
     const actionToExecute = stageAction || globalAction;
     logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
-    const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionToExecute, parameters);
+    const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionName, actionToExecute, parameters);
+    logger.info({ context }, `Built context for action ${actionName}`);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
 
     // Save/send tool call events from action execution

@@ -18,7 +18,7 @@ export class RunActionHandler implements WebSocketHandler<RunActionRequest> {
    * Handles run action requests.
    */
   async handle(context: WebSocketHandlerContext, message: RunActionRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName, requestId: message.requestId }, 'Run action request received');
+    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName, requestId: message.requestId, message }, 'Run action request received');
 
     try {
       if (!context.connection) {
