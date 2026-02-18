@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, boolean, jsonb, integer, serial } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { StageAction, Effect, ToolParameter } from '../types/actions';
+import { FieldDescriptor } from '../types/parameters';
 import { ConversationState } from '../types/conversationEvents';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
@@ -164,7 +165,7 @@ export const stages = pgTable('stages', {
   knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
   useGlobalActions: boolean('use_global_actions').notNull().default(true),
   globalActions: jsonb('global_actions').notNull().default([]).$type<string[]>(),
-  variables: jsonb('variables').notNull().default({}).$type<Record<string, any>>(),
+  variableDescriptors: jsonb('variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
   actions: jsonb('actions').notNull().default({}).$type<Record<string, StageAction>>(),
   defaultClassifierId: text('default_classifier_id').references(() => classifiers.id),
   transformerIds: jsonb('transformer_ids').notNull().default([]).$type<string[]>(),

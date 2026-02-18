@@ -24,6 +24,7 @@ import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyR
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { asrConfigSchema } from './http/contracts/project';
 import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, runScriptEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, callWebhookEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema } from './types/actions';
+import { fieldDescriptorSchema } from './types/parameters';
 import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmSettingsSchema } from './services/providers/llm/AnthropicLlmProvider';
@@ -97,6 +98,7 @@ export function getOpenAPISpec(): any {
   registry.register('LocalStorageSettings', localStorageSettingsSchema);
 
   // Effect schemas (for stages and global actions)
+  registry.register('FieldDescriptor', fieldDescriptorSchema);
   registry.register('EndConversationEffect', endConversationEffectSchema);
   registry.register('AbortConversationEffect', abortConversationEffectSchema);
   registry.register('GoToStageEffect', goToStageEffectSchema);
