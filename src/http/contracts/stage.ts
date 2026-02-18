@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
+import { fieldDescriptorSchema } from '../../types/parameters';
+import type { FieldDescriptor } from '../../types/parameters';
 import {
   effectSchema,
   endConversationEffectSchema,
@@ -86,10 +88,10 @@ export type StageRouteParams = z.infer<typeof stageRouteParamsSchema>;
 export const enterBehaviorSchema = z.enum(['generate_response', 'await_user_input']).describe('What should happen when entering the stage');
 
 /**
- * Schema for variable definitions
- * Defines variables available in this conversation stage
+ * Schema for variable descriptor definitions
+ * Defines the schema of variables available in this conversation stage
  */
-export const variablesSchema = z.record(z.string(), z.unknown()).describe('Variable definitions for this stage');
+export const variableDescriptorsSchema = z.array(fieldDescriptorSchema).describe('Variable descriptor definitions for this stage');
 
 /**
  * Schema for action definitions
@@ -118,7 +120,7 @@ export const actionsSchema = z.record(z.string(), stageActionSchema).describe('A
 /**
  * Schema for creating a new stage
  * Required fields: id, prompt, personaId
- * Optional fields: llmProviderId, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variables, actions, defaultClassifierId, transformerIds, metadata
+ * Optional fields: llmProviderId, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variableDescriptors, actions, defaultClassifierId, transformerIds, metadata
  */
 export const createStageSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the stage (auto-generated if not provided)'),
@@ -134,7 +136,7 @@ export const createStageSchema = z.object({
   knowledgeSections: z.array(z.string()).optional().default([]).describe('List of knowledge section IDs to include'),
   useGlobalActions: z.boolean().optional().default(true).describe('Whether to enable global actions in this stage'),
   globalActions: z.array(z.string()).optional().default([]).describe('List of global action IDs available in this stage'),
-  variables: variablesSchema.optional().describe('Variable definitions for this stage'),
+  variableDescriptors: variableDescriptorsSchema.optional().default([]).describe('Variable descriptor definitions for this stage'),
   actions: actionsSchema.optional().describe('Action definitions for this stage'),
   defaultClassifierId: z.string().nullable().optional().describe('ID of the default classifier to use for this stage (can be overridden per action)'),
   transformerIds: z.array(z.string()).optional().default([]).describe('List of context transformer IDs to use in this stage'),
@@ -157,7 +159,7 @@ export const updateStageBodySchema = z.object({
   knowledgeSections: z.array(z.string()).optional().describe('Updated knowledge section IDs'),
   useGlobalActions: z.boolean().optional().describe('Updated global actions flag'),
   globalActions: z.array(z.string()).optional().describe('Updated global action IDs'),
-  variables: variablesSchema.optional().describe('Updated variable definitions'),
+  variableDescriptors: variableDescriptorsSchema.optional().describe('Updated variable descriptor definitions'),
   actions: actionsSchema.optional().describe('Updated action definitions'),
   defaultClassifierId: z.string().nullable().optional().describe('Updated default classifier ID'),
   transformerIds: z.array(z.string()).optional().describe('Updated transformer IDs'),
@@ -191,7 +193,7 @@ export const stageResponseSchema = z.object({
   knowledgeSections: z.array(z.string()).describe('Knowledge section IDs included in this stage'),
   useGlobalActions: z.boolean().describe('Whether global actions are enabled'),
   globalActions: z.array(z.string()).describe('Global action IDs available in this stage'),
-  variables: variablesSchema.describe('Variable definitions'),
+  variableDescriptors: variableDescriptorsSchema.describe('Variable descriptor definitions'),
   actions: actionsSchema.describe('Action definitions'),
   defaultClassifierId: z.string().nullable().describe('Default classifier ID used in this stage (actions can override with overrideClassifierId)'),
   transformerIds: z.array(z.string()).describe('Context transformer IDs used in this stage'),

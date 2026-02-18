@@ -68,3 +68,26 @@ export const parameterValueSchema = z.union([
 ]).openapi('ParameterValue').describe('Value of the parameter, can be a primitive type, an array of primitives, a free-form JSON object, or a multimodal parameter (image or audio)');
 
 export type ParameterValue = z.infer<typeof parameterValueSchema>;
+
+/**
+ * Type for a single field/variable descriptor in a stage
+ * Defines the structure and type of a variable available in a conversation stage
+ */
+export type FieldDescriptor = {
+  name: string;
+  type: z.infer<typeof parameterTypeSchema>;
+  isArray: boolean;
+  objectSchema?: FieldDescriptor[];
+};
+
+/**
+ * Schema for a field/variable descriptor
+ * Defines the structure and type of a variable available in a conversation stage
+ * Supports recursive nested object schemas for complex types
+ */
+export const fieldDescriptorSchema: z.ZodType<FieldDescriptor> = z.object({
+  name: z.string().describe('Local name of the field'),
+  type: parameterTypeSchema.describe('Type of the field value'),
+  isArray: z.boolean().describe('Whether this field holds an array of values'),
+  objectSchema: z.array(z.lazy(() => fieldDescriptorSchema)).optional().describe('Nested field definitions for object types'),
+}).openapi('FieldDescriptor');
