@@ -191,7 +191,7 @@ export class ConversationContextBuilder {
    * @param action - The action being triggered
    * @param parameters - Parameters for the triggered action
    */
-  async buildContextForAction(conversation: Conversation, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
+  async buildContextForAction(conversation: Conversation, actionName: string, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: eq(users.id, conversation.userId),
@@ -211,14 +211,14 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
       history: [],
-      command: action,
       actions: {
-        [action.name]: { parameters },
+        [actionName]: { parameters },
       },
       results: {
         webhooks: {},
         tools: {},
       },
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage!, user?.profile || {})),
     };
 
     // Get history from database

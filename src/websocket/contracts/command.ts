@@ -99,7 +99,7 @@ export const runActionRequestSchema = sessionInputMessageSchema.extend({
   type: z.literal('run_action').describe('Message type for running an action'),
   conversationId: z.string().describe('Unique identifier of the conversation'),
   actionName: z.string().describe('Name of the global action to execute'),
-  parameters: z.array(parameterValueSchema).describe('Array of parameters to pass to the action'),
+  parameters: z.record(z.string(), parameterValueSchema).describe('Map of parameter names to their values'),
 });
 
 export type RunActionRequest = z.infer<typeof runActionRequestSchema>;

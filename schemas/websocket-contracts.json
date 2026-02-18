@@ -2248,11 +2248,11 @@
           "description": "Name of the global action to execute"
         },
         "parameters": {
-          "type": "array",
-          "items": {
+          "type": "object",
+          "additionalProperties": {
             "$ref": "#/definitions/ParameterValue"
           },
-          "description": "Array of parameters to pass to the action"
+          "description": "Map of parameter names to their values"
         }
       },
       "required": [
