@@ -8,11 +8,11 @@ import type { JWTPayload } from '../http/middleware/auth';
 import { UnauthorizedError, InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
 
-/** Access token expiry time (15 minutes) */
-const ACCESS_TOKEN_EXPIRY = '15m';
+/** Access token expiry time (18 hours) */
+const ACCESS_TOKEN_EXPIRY = '18h';
 
-/** Refresh token expiry time (7 days) */
-const REFRESH_TOKEN_EXPIRY = '7d';
+/** Refresh token expiry time (14 days) */
+const REFRESH_TOKEN_EXPIRY = '14d';
 
 /** Salt rounds for bcrypt password hashing */
 const BCRYPT_SALT_ROUNDS = 10;
