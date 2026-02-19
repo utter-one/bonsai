@@ -66,7 +66,8 @@ export class UserInputProcessor {
             classifierName: result.classifierName,
             actionCount: result.actions.length,
             systemPrompt: result.renderedPrompt,
-            llmSettings: classifier?.classifier.llmSettings
+            llmSettings: classifier?.classifier.llmSettings,
+            currentVariables: conversation?.stageVars[stage.id] || {},
           },
         };
         await this.conversationService.saveConversationEvent(conversation.id, 'classification', eventData);

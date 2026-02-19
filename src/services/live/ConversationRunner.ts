@@ -428,7 +428,7 @@ export class ConversationRunner {
       completionLlmProvider.setOnGenerationCompleted(async (result) => {
         const textContent = extractTextFromContent(result.content);
         const contentSize = getContentSize(result.content);
-        
+
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens, contentBlocks: result.content.length }, `LLM completion finished for conversation ${conversationId}: ${contentSize} bytes in ${result.content.length} content blocks, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
 
@@ -1255,9 +1255,16 @@ export class ConversationRunner {
   /**
    * Helper method to save a conversation event and send it to connected clients via WebSocket
    */
-  private async saveAndSendEvent(eventType: any, eventData: any, metadata?: Record<string, any>): Promise<void> {
-    await this.conversationService.saveConversationEvent(this.conversation.id, eventType, eventData, metadata);
-    this.connectionManager.sendConversationEvent(this.conversation.id, eventType, eventData, metadata?.inputTurnId, metadata?.outputTurnId);
+  private async saveAndSendEvent(eventType: any, eventData: any): Promise<void> {
+    const inputTurnId = this.stageData.inputTurnId;
+    const outputTurnId = this.stageData.outputTurnId;
+    if (!eventData.metadata) {
+      eventData.metadata = {};
+    }
+    eventData.metadata['currentVariables'] = this.conversation.stageVars?.[this.stageData.id] || {};
+
+    await this.conversationService.saveConversationEvent(this.conversation.id, eventType, eventData);
+    this.connectionManager.sendConversationEvent(this.conversation.id, eventType, eventData, inputTurnId, outputTurnId);
   }
 
   /**
