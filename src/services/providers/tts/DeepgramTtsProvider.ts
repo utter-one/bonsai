@@ -22,6 +22,7 @@ export type DeepgramTtsProviderConfig = z.infer<typeof deepgramTtsProviderConfig
  * Schema for Deepgram TTS settings
  */
 export const deepgramTtsSettingsSchema = z.object({
+  provider: z.literal('deepgram').describe('TTS provider type identifier'),
   model: z.enum(['aura-1', 'aura-2']).optional().describe('Model version to use ("aura-1" or "aura-2")'),
   voiceId: z.string().optional().describe('Voice ID to use for speech synthesis (e.g., "thalia-en", "andromeda-en"). Combined with model to form full model string (e.g., "aura-2-thalia-en")'),
   audioFormat: z.enum(['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac']).optional().describe('Preferred audio output format. Streaming supports: linear16, opus, mulaw, alaw. REST-only: mp3, flac, aac'),

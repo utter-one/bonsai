@@ -8,6 +8,7 @@ import { elevenLabsTtsSettingsSchema } from '../../services/providers/tts/Eleven
 import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
 import { cartesiaTtsSettingsSchema } from '../../services/providers/tts/CartesiaTtsProvider';
+import { azureTtsSettingsSchema } from '../../services/providers/tts/AzureTtsProvider';
 
 extendZodWithOpenApi(z);
 
@@ -97,12 +98,14 @@ export const llmSettingsSchema = z.union([
  * Discriminated union of all TTS settings types
  * Each settings object contains provider-specific configuration for TTS generation
  * Individual schemas are defined in their respective provider files
+ * Uses a 'provider' discriminator field to identify the correct schema
  */
-export const ttsSettingsSchema = z.union([
+export const ttsSettingsSchema = z.discriminatedUnion('provider', [
   elevenLabsTtsSettingsSchema,
   openAiTtsSettingsSchema,
   deepgramTtsSettingsSchema,
   cartesiaTtsSettingsSchema,
+  azureTtsSettingsSchema,
 ]).openapi('TtsSettings').nullable().optional().describe('TTS provider-specific settings');
 
 export type TtsSettings = z.infer<typeof ttsSettingsSchema>;

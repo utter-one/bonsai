@@ -57,6 +57,13 @@
       "when": 1771406011042,
       "tag": "0007_nifty_wind_dancer",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771432020095,
+      "tag": "0008_add_provider_field_to_tts_settings",
+      "breakpoints": true
     }
   ]
 }

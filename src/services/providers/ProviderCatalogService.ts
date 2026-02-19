@@ -5093,6 +5093,4075 @@ export class ProviderCatalogService {
           { code: 'pa', displayName: 'Punjabi' },
         ],
       },
+      {
+        apiType: 'azure',
+        displayName: 'Azure Text-to-Speech',
+        description: 'Microsoft Azure Cognitive Services TTS with neural voices, expressive styles, and support for 100+ languages',
+        models: [
+          {
+            id: 'neural',
+            displayName: 'Azure Neural TTS',
+            description: 'High-quality neural text-to-speech with natural prosody and expressive voice styles',
+            recommended: true,
+            languages: ['en-US', 'en-GB', 'en-AU', 'en-CA', 'es-ES', 'es-MX', 'fr-FR', 'fr-CA', 'de-DE', 'it-IT', 'pt-BR', 'pt-PT', 'ja-JP', 'zh-CN', 'zh-TW', 'ko-KR', 'ar-SA', 'hi-IN', 'ru-RU', 'nl-NL', 'pl-PL', 'sv-SE', 'tr-TR', 'da-DK', 'fi-FI', 'no-NO', 'cs-CZ', 'ro-RO', 'el-GR', 'hu-HU', 'th-TH', 'vi-VN', 'id-ID', 'ms-MY', 'fil-PH', 'uk-UA', 'bg-BG', 'hr-HR', 'sk-SK', 'sl-SI', 'et-EE', 'lv-LV', 'lt-LT', 'mt-MT', 'ga-IE', 'cy-GB', 'is-IS', 'kk-KZ', 'bn-IN', 'ta-IN', 'te-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'ur-PK', 'fa-IR', 'he-IL', 'sw-KE', 'af-ZA', 'zu-ZA', 'am-ET', 'km-KH', 'lo-LA', 'my-MM', 'ne-NP', 'si-LK', 'so-SO'],
+            supportedAudioFormats: ['pcm_16000', 'pcm_24000', 'pcm_48000', 'opus', 'mp3', 'mulaw', 'alaw'],
+            supportsFullStreaming: true,
+            supportsVoiceSettings: true,
+          },
+        ],
+        voices: [
+          {
+            id: "af-ZA-AdriNeural",
+            displayName: "Adri (af-ZA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["af-ZA"]
+          },
+          {
+            id: "af-ZA-WillemNeural",
+            displayName: "Willem (af-ZA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["af-ZA"]
+          },
+          {
+            id: "am-ET-AmehaNeural",
+            displayName: "Ameha (am-ET)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["am-ET"]
+          },
+          {
+            id: "am-ET-MekdesNeural",
+            displayName: "Mekdes (am-ET)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["am-ET"]
+          },
+          {
+            id: "ar-AE-FatimaNeural",
+            displayName: "Fatima (ar-AE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-AE"]
+          },
+          {
+            id: "ar-AE-HamdanNeural",
+            displayName: "Hamdan (ar-AE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-AE"]
+          },
+          {
+            id: "ar-BH-AliNeural",
+            displayName: "Ali (ar-BH)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-BH"]
+          },
+          {
+            id: "ar-BH-LailaNeural",
+            displayName: "Laila (ar-BH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-BH"]
+          },
+          {
+            id: "ar-DZ-AminaNeural",
+            displayName: "Amina (ar-DZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-DZ"]
+          },
+          {
+            id: "ar-DZ-IsmaelNeural",
+            displayName: "Ismael (ar-DZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-DZ"]
+          },
+          {
+            id: "ar-EG-SalmaNeural",
+            displayName: "Salma (ar-EG)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-EG"]
+          },
+          {
+            id: "ar-EG-ShakirNeural",
+            displayName: "Shakir (ar-EG)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-EG"]
+          },
+          {
+            id: "ar-IQ-BasselNeural",
+            displayName: "Bassel (ar-IQ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-IQ"]
+          },
+          {
+            id: "ar-IQ-RanaNeural",
+            displayName: "Rana (ar-IQ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-IQ"]
+          },
+          {
+            id: "ar-JO-SanaNeural",
+            displayName: "Sana (ar-JO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-JO"]
+          },
+          {
+            id: "ar-JO-TaimNeural",
+            displayName: "Taim (ar-JO)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-JO"]
+          },
+          {
+            id: "ar-KW-FahedNeural",
+            displayName: "Fahed (ar-KW)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-KW"]
+          },
+          {
+            id: "ar-KW-NouraNeural",
+            displayName: "Noura (ar-KW)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-KW"]
+          },
+          {
+            id: "ar-LB-LaylaNeural",
+            displayName: "Layla (ar-LB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-LB"]
+          },
+          {
+            id: "ar-LB-RamiNeural",
+            displayName: "Rami (ar-LB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-LB"]
+          },
+          {
+            id: "ar-LY-ImanNeural",
+            displayName: "Iman (ar-LY)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-LY"]
+          },
+          {
+            id: "ar-LY-OmarNeural",
+            displayName: "Omar (ar-LY)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-LY"]
+          },
+          {
+            id: "ar-MA-JamalNeural",
+            displayName: "Jamal (ar-MA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-MA"]
+          },
+          {
+            id: "ar-MA-MounaNeural",
+            displayName: "Mouna (ar-MA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-MA"]
+          },
+          {
+            id: "ar-OM-AbdullahNeural",
+            displayName: "Abdullah (ar-OM)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-OM"]
+          },
+          {
+            id: "ar-OM-AyshaNeural",
+            displayName: "Aysha (ar-OM)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-OM"]
+          },
+          {
+            id: "ar-QA-AmalNeural",
+            displayName: "Amal (ar-QA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-QA"]
+          },
+          {
+            id: "ar-QA-MoazNeural",
+            displayName: "Moaz (ar-QA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-QA"]
+          },
+          {
+            id: "ar-SA-HamedNeural",
+            displayName: "Hamed (ar-SA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-SA"]
+          },
+          {
+            id: "ar-SA-ZariyahNeural",
+            displayName: "Zariyah (ar-SA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-SA"]
+          },
+          {
+            id: "ar-SY-AmanyNeural",
+            displayName: "Amany (ar-SY)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-SY"]
+          },
+          {
+            id: "ar-SY-LaithNeural",
+            displayName: "Laith (ar-SY)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-SY"]
+          },
+          {
+            id: "ar-TN-HediNeural",
+            displayName: "Hedi (ar-TN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-TN"]
+          },
+          {
+            id: "ar-TN-ReemNeural",
+            displayName: "Reem (ar-TN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-TN"]
+          },
+          {
+            id: "ar-YE-MaryamNeural",
+            displayName: "Maryam (ar-YE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ar-YE"]
+          },
+          {
+            id: "ar-YE-SalehNeural",
+            displayName: "Saleh (ar-YE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ar-YE"]
+          },
+          {
+            id: "as-IN-PriyomNeural",
+            displayName: "Priyom (as-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["as-IN"]
+          },
+          {
+            id: "as-IN-YashicaNeural",
+            displayName: "Yashica (as-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["as-IN"]
+          },
+          {
+            id: "az-AZ-BabekNeural",
+            displayName: "Babek (az-AZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["az-AZ"]
+          },
+          {
+            id: "az-AZ-BanuNeural",
+            displayName: "Banu (az-AZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["az-AZ"]
+          },
+          {
+            id: "bg-BG-BorislavNeural",
+            displayName: "Borislav (bg-BG)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["bg-BG"]
+          },
+          {
+            id: "bg-BG-KalinaNeural",
+            displayName: "Kalina (bg-BG)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["bg-BG"]
+          },
+          {
+            id: "bn-BD-NabanitaNeural",
+            displayName: "Nabanita (bn-BD)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["bn-BD"]
+          },
+          {
+            id: "bn-BD-PradeepNeural",
+            displayName: "Pradeep (bn-BD)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["bn-BD"]
+          },
+          {
+            id: "bn-IN-BashkarNeural",
+            displayName: "Bashkar (bn-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["bn-IN"]
+          },
+          {
+            id: "bn-IN-TanishaaNeural",
+            displayName: "Tanishaa (bn-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["bn-IN"]
+          },
+          {
+            id: "bs-BA-GoranNeural",
+            displayName: "Goran (bs-BA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["bs-BA"]
+          },
+          {
+            id: "bs-BA-VesnaNeural",
+            displayName: "Vesna (bs-BA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["bs-BA"]
+          },
+          {
+            id: "ca-ES-AlbaNeural",
+            displayName: "Alba (ca-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ca-ES"]
+          },
+          {
+            id: "ca-ES-EnricNeural",
+            displayName: "Enric (ca-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ca-ES"]
+          },
+          {
+            id: "ca-ES-JoanaNeural",
+            displayName: "Joana (ca-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ca-ES"]
+          },
+          {
+            id: "cs-CZ-AntoninNeural",
+            displayName: "Antonin (cs-CZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["cs-CZ"]
+          },
+          {
+            id: "cs-CZ-VlastaNeural",
+            displayName: "Vlasta (cs-CZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["cs-CZ"]
+          },
+          {
+            id: "cy-GB-AledNeural",
+            displayName: "Aled (cy-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["cy-GB"]
+          },
+          {
+            id: "cy-GB-NiaNeural",
+            displayName: "Nia (cy-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["cy-GB"]
+          },
+          {
+            id: "da-DK-ChristelNeural",
+            displayName: "Christel (da-DK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["da-DK"]
+          },
+          {
+            id: "da-DK-JeppeNeural",
+            displayName: "Jeppe (da-DK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["da-DK"]
+          },
+          {
+            id: "de-AT-IngridNeural",
+            displayName: "Ingrid (de-AT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-AT"]
+          },
+          {
+            id: "de-AT-JonasNeural",
+            displayName: "Jonas (de-AT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-AT"]
+          },
+          {
+            id: "de-CH-JanNeural",
+            displayName: "Jan (de-CH)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-CH"]
+          },
+          {
+            id: "de-CH-LeniNeural",
+            displayName: "Leni (de-CH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-CH"]
+          },
+          {
+            id: "de-DE-AmalaNeural",
+            displayName: "Amala (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-BerndNeural",
+            displayName: "Bernd (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-ChristophNeural",
+            displayName: "Christoph (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-ConradNeural",
+            displayName: "Conrad (de-DE)",
+            description: "Supports styles: cheerful, sad",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-ElkeNeural",
+            displayName: "Elke (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-FlorianMultilingualNeural",
+            displayName: "FlorianMultilingual (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-GiselaNeural",
+            displayName: "Gisela (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-KasperNeural",
+            displayName: "Kasper (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-KatjaNeural",
+            displayName: "Katja (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-KillianNeural",
+            displayName: "Killian (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-KlarissaNeural",
+            displayName: "Klarissa (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-KlausNeural",
+            displayName: "Klaus (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-LouisaNeural",
+            displayName: "Louisa (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-MajaNeural",
+            displayName: "Maja (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-RalfNeural",
+            displayName: "Ralf (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-SeraphinaMultilingualNeural",
+            displayName: "SeraphinaMultilingual (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "de-DE-TanjaNeural",
+            displayName: "Tanja (de-DE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["de-DE"]
+          },
+          {
+            id: "el-GR-AthinaNeural",
+            displayName: "Athina (el-GR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["el-GR"]
+          },
+          {
+            id: "el-GR-NestorasNeural",
+            displayName: "Nestoras (el-GR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["el-GR"]
+          },
+          {
+            id: "en-AU-AnnetteNeural",
+            displayName: "Annette (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-CarlyNeural",
+            displayName: "Carly (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-DarrenNeural",
+            displayName: "Darren (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-DuncanNeural",
+            displayName: "Duncan (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-ElsieNeural",
+            displayName: "Elsie (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-FreyaNeural",
+            displayName: "Freya (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-JoanneNeural",
+            displayName: "Joanne (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-KenNeural",
+            displayName: "Ken (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-KimNeural",
+            displayName: "Kim (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-NatashaNeural",
+            displayName: "Natasha (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-NeilNeural",
+            displayName: "Neil (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-TimNeural",
+            displayName: "Tim (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-TinaNeural",
+            displayName: "Tina (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-WilliamNeural",
+            displayName: "William (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-AU-WilliamMultilingualNeural",
+            displayName: "WilliamMultilingual (en-AU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-AU"]
+          },
+          {
+            id: "en-CA-ClaraNeural",
+            displayName: "Clara (en-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-CA"]
+          },
+          {
+            id: "en-CA-LiamNeural",
+            displayName: "Liam (en-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-CA"]
+          },
+          {
+            id: "en-GB-AbbiNeural",
+            displayName: "Abbi (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-AdaMultilingualNeural",
+            displayName: "AdaMultilingual (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-AlfieNeural",
+            displayName: "Alfie (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-BellaNeural",
+            displayName: "Bella (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-ElliotNeural",
+            displayName: "Elliot (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-EthanNeural",
+            displayName: "Ethan (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-HollieNeural",
+            displayName: "Hollie (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-LibbyNeural",
+            displayName: "Libby (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-MaisieNeural",
+            displayName: "Maisie (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-MiaNeural",
+            displayName: "Mia (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-NoahNeural",
+            displayName: "Noah (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-OliverNeural",
+            displayName: "Oliver (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-OliviaNeural",
+            displayName: "Olivia (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-OllieMultilingualNeural",
+            displayName: "OllieMultilingual (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-RyanNeural",
+            displayName: "Ryan (en-GB)",
+            description: "Supports styles: cheerful, chat, whispering, sad",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-SoniaNeural",
+            displayName: "Sonia (en-GB)",
+            description: "Supports styles: cheerful, sad",
+            gender: "female",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-GB-ThomasNeural",
+            displayName: "Thomas (en-GB)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-GB"]
+          },
+          {
+            id: "en-HK-SamNeural",
+            displayName: "Sam (en-HK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-HK"]
+          },
+          {
+            id: "en-HK-YanNeural",
+            displayName: "Yan (en-HK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-HK"]
+          },
+          {
+            id: "en-IE-ConnorNeural",
+            displayName: "Connor (en-IE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IE"]
+          },
+          {
+            id: "en-IE-EmilyNeural",
+            displayName: "Emily (en-IE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-IE"]
+          },
+          {
+            id: "en-IN-AaravNeural",
+            displayName: "Aarav (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-AartiNeural",
+            displayName: "Aarti (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-AartiIndicNeural",
+            displayName: "AartiIndic (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-AashiNeural",
+            displayName: "Aashi (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-AnanyaNeural",
+            displayName: "Ananya (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-ArjunNeural",
+            displayName: "Arjun (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-ArjunIndicNeural",
+            displayName: "ArjunIndic (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-KavyaNeural",
+            displayName: "Kavya (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-KunalNeural",
+            displayName: "Kunal (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-NeerjaNeural",
+            displayName: "Neerja (en-IN)",
+            description: "Supports styles: newscast, cheerful, empathetic",
+            gender: "female",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-NeerjaIndicNeural",
+            displayName: "NeerjaIndic (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-PrabhatNeural",
+            displayName: "Prabhat (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-PrabhatIndicNeural",
+            displayName: "PrabhatIndic (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-IN-RehaanNeural",
+            displayName: "Rehaan (en-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-IN"]
+          },
+          {
+            id: "en-KE-AsiliaNeural",
+            displayName: "Asilia (en-KE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-KE"]
+          },
+          {
+            id: "en-KE-ChilembaNeural",
+            displayName: "Chilemba (en-KE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-KE"]
+          },
+          {
+            id: "en-NG-AbeoNeural",
+            displayName: "Abeo (en-NG)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-NG"]
+          },
+          {
+            id: "en-NG-EzinneNeural",
+            displayName: "Ezinne (en-NG)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-NG"]
+          },
+          {
+            id: "en-NZ-MitchellNeural",
+            displayName: "Mitchell (en-NZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-NZ"]
+          },
+          {
+            id: "en-NZ-MollyNeural",
+            displayName: "Molly (en-NZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-NZ"]
+          },
+          {
+            id: "en-PH-JamesNeural",
+            displayName: "James (en-PH)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-PH"]
+          },
+          {
+            id: "en-PH-RosaNeural",
+            displayName: "Rosa (en-PH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-PH"]
+          },
+          {
+            id: "en-SG-LunaNeural",
+            displayName: "Luna (en-SG)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-SG"]
+          },
+          {
+            id: "en-SG-WayneNeural",
+            displayName: "Wayne (en-SG)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-SG"]
+          },
+          {
+            id: "en-TZ-ElimuNeural",
+            displayName: "Elimu (en-TZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-TZ"]
+          },
+          {
+            id: "en-TZ-ImaniNeural",
+            displayName: "Imani (en-TZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-TZ"]
+          },
+          {
+            id: "en-US-AdamMultilingualNeural",
+            displayName: "AdamMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AIGenerate1Neural",
+            displayName: "AIGenerate1 (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AIGenerate2Neural",
+            displayName: "AIGenerate2 (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AlloyTurboMultilingualNeural",
+            displayName: "AlloyTurboMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AmandaMultilingualNeural",
+            displayName: "AmandaMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AmberNeural",
+            displayName: "Amber (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AnaNeural",
+            displayName: "Ana (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AndrewNeural",
+            displayName: "Andrew (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AndrewMultilingualNeural",
+            displayName: "AndrewMultilingual (en-US)",
+            description: "Supports styles: empathetic, relieved",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AriaNeural",
+            displayName: "Aria (en-US)",
+            description: "Supports styles: chat, customerservice, narration-professional, newscast-casual, newscast-formal, cheerful, empathetic, angry, sad, excited, friendly, terrified, shouting, unfriendly, whispering, hopeful",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AshleyNeural",
+            displayName: "Ashley (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AshTurboMultilingualNeural",
+            displayName: "AshTurboMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AvaNeural",
+            displayName: "Ava (en-US)",
+            description: "Supports styles: angry, fearful, sad",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-AvaMultilingualNeural",
+            displayName: "AvaMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-BlueNeural",
+            displayName: "Blue (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "neutral",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-BrandonNeural",
+            displayName: "Brandon (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-BrandonMultilingualNeural",
+            displayName: "BrandonMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-BrianNeural",
+            displayName: "Brian (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-BrianMultilingualNeural",
+            displayName: "BrianMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-ChristopherNeural",
+            displayName: "Christopher (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-ChristopherMultilingualNeural",
+            displayName: "ChristopherMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-CoraNeural",
+            displayName: "Cora (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-CoraMultilingualNeural",
+            displayName: "CoraMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-DavisNeural",
+            displayName: "Davis (en-US)",
+            description: "Supports styles: chat, angry, cheerful, excited, friendly, hopeful, sad, shouting, terrified, unfriendly, whispering",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-DavisMultilingualNeural",
+            displayName: "DavisMultilingual (en-US)",
+            description: "Supports styles: empathetic, funny, relieved",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-DerekMultilingualNeural",
+            displayName: "DerekMultilingual (en-US)",
+            description: "Supports styles: empathetic, excited, relieved, shy",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-DustinMultilingualNeural",
+            displayName: "DustinMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-EchoTurboMultilingualNeural",
+            displayName: "EchoTurboMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-ElizabethNeural",
+            displayName: "Elizabeth (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-EmmaNeural",
+            displayName: "Emma (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-EmmaMultilingualNeural",
+            displayName: "EmmaMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-EricNeural",
+            displayName: "Eric (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-EvelynMultilingualNeural",
+            displayName: "EvelynMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-FableTurboMultilingualNeural",
+            displayName: "FableTurboMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "neutral",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-GuyNeural",
+            displayName: "Guy (en-US)",
+            description: "Supports styles: newscast, angry, cheerful, sad, excited, friendly, terrified, shouting, unfriendly, whispering, hopeful",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-JacobNeural",
+            displayName: "Jacob (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-JaneNeural",
+            displayName: "Jane (en-US)",
+            description: "Supports styles: angry, cheerful, excited, friendly, hopeful, sad, shouting, terrified, unfriendly, whispering",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-JasonNeural",
+            displayName: "Jason (en-US)",
+            description: "Supports styles: angry, cheerful, excited, friendly, hopeful, sad, shouting, terrified, unfriendly, whispering",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-JennyNeural",
+            displayName: "Jenny (en-US)",
+            description: "Supports styles: assistant, chat, customerservice, newscast, angry, cheerful, sad, excited, friendly, terrified, shouting, unfriendly, whispering, hopeful",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-JennyMultilingualNeural",
+            displayName: "JennyMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-Jimmie:DragonHDFlashLatestNeural",
+            displayName: "Jimmie:DragonHDFlashLatest (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-KaiNeural",
+            displayName: "Kai (en-US)",
+            description: "Supports styles: conversation",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-LewisMultilingualNeural",
+            displayName: "LewisMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-LolaMultilingualNeural",
+            displayName: "LolaMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-LunaNeural",
+            displayName: "Luna (en-US)",
+            description: "Supports styles: conversation",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-MichelleNeural",
+            displayName: "Michelle (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-MonicaNeural",
+            displayName: "Monica (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-NancyNeural",
+            displayName: "Nancy (en-US)",
+            description: "Supports styles: angry, cheerful, excited, friendly, hopeful, sad, shouting, terrified, unfriendly, whispering",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-NancyMultilingualNeural",
+            displayName: "NancyMultilingual (en-US)",
+            description: "Supports styles: excited, friendly, funny, relieved, shy",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-NovaTurboMultilingualNeural",
+            displayName: "NovaTurboMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-OnyxTurboMultilingualNeural",
+            displayName: "OnyxTurboMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-PhoebeMultilingualNeural",
+            displayName: "PhoebeMultilingual (en-US)",
+            description: "Supports styles: empathetic, sad, serious",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-RogerNeural",
+            displayName: "Roger (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-RyanMultilingualNeural",
+            displayName: "RyanMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-SamuelMultilingualNeural",
+            displayName: "SamuelMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-SaraNeural",
+            displayName: "Sara (en-US)",
+            description: "Supports styles: angry, cheerful, excited, friendly, hopeful, sad, shouting, terrified, unfriendly, whispering",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-SerenaMultilingualNeural",
+            displayName: "SerenaMultilingual (en-US)",
+            description: "Supports styles: empathetic, excited, friendly, shy, serious, relieved, sad",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-ShimmerTurboMultilingualNeural",
+            displayName: "ShimmerTurboMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-SteffanNeural",
+            displayName: "Steffan (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-SteffanMultilingualNeural",
+            displayName: "SteffanMultilingual (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-Tiana:DragonHDFlashLatestNeural",
+            displayName: "Tiana:DragonHDFlashLatest (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-TonyNeural",
+            displayName: "Tony (en-US)",
+            description: "Supports styles: angry, cheerful, excited, friendly, hopeful, sad, shouting, terrified, unfriendly, whispering",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-US-Tyler:DragonHDFlashLatestNeural",
+            displayName: "Tyler:DragonHDFlashLatest (en-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-US"]
+          },
+          {
+            id: "en-ZA-LeahNeural",
+            displayName: "Leah (en-ZA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["en-ZA"]
+          },
+          {
+            id: "en-ZA-LukeNeural",
+            displayName: "Luke (en-ZA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["en-ZA"]
+          },
+          {
+            id: "es-AR-ElenaNeural",
+            displayName: "Elena (es-AR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-AR"]
+          },
+          {
+            id: "es-AR-TomasNeural",
+            displayName: "Tomas (es-AR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-AR"]
+          },
+          {
+            id: "es-BO-MarceloNeural",
+            displayName: "Marcelo (es-BO)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-BO"]
+          },
+          {
+            id: "es-BO-SofiaNeural",
+            displayName: "Sofia (es-BO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-BO"]
+          },
+          {
+            id: "es-CL-CatalinaNeural",
+            displayName: "Catalina (es-CL)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-CL"]
+          },
+          {
+            id: "es-CL-LorenzoNeural",
+            displayName: "Lorenzo (es-CL)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-CL"]
+          },
+          {
+            id: "es-CO-GonzaloNeural",
+            displayName: "Gonzalo (es-CO)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-CO"]
+          },
+          {
+            id: "es-CO-SalomeNeural",
+            displayName: "Salome (es-CO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-CO"]
+          },
+          {
+            id: "es-CR-JuanNeural",
+            displayName: "Juan (es-CR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-CR"]
+          },
+          {
+            id: "es-CR-MariaNeural",
+            displayName: "Maria (es-CR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-CR"]
+          },
+          {
+            id: "es-CU-BelkysNeural",
+            displayName: "Belkys (es-CU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-CU"]
+          },
+          {
+            id: "es-CU-ManuelNeural",
+            displayName: "Manuel (es-CU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-CU"]
+          },
+          {
+            id: "es-DO-EmilioNeural",
+            displayName: "Emilio (es-DO)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-DO"]
+          },
+          {
+            id: "es-DO-RamonaNeural",
+            displayName: "Ramona (es-DO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-DO"]
+          },
+          {
+            id: "es-EC-AndreaNeural",
+            displayName: "Andrea (es-EC)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-EC"]
+          },
+          {
+            id: "es-EC-LuisNeural",
+            displayName: "Luis (es-EC)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-EC"]
+          },
+          {
+            id: "es-ES-AbrilNeural",
+            displayName: "Abril (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-AlvaroNeural",
+            displayName: "Alvaro (es-ES)",
+            description: "Supports styles: cheerful, sad",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-ArabellaMultilingualNeural",
+            displayName: "ArabellaMultilingual (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-ArnauNeural",
+            displayName: "Arnau (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-DarioNeural",
+            displayName: "Dario (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-EliasNeural",
+            displayName: "Elias (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-ElviraNeural",
+            displayName: "Elvira (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-EstrellaNeural",
+            displayName: "Estrella (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-IreneNeural",
+            displayName: "Irene (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-IsidoraMultilingualNeural",
+            displayName: "IsidoraMultilingual (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-LaiaNeural",
+            displayName: "Laia (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-LiaNeural",
+            displayName: "Lia (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-NilNeural",
+            displayName: "Nil (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-SaulNeural",
+            displayName: "Saul (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-TeoNeural",
+            displayName: "Teo (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-TrianaNeural",
+            displayName: "Triana (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-TristanMultilingualNeural",
+            displayName: "TristanMultilingual (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-VeraNeural",
+            displayName: "Vera (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-XimenaNeural",
+            displayName: "Ximena (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-ES-XimenaMultilingualNeural",
+            displayName: "XimenaMultilingual (es-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-ES"]
+          },
+          {
+            id: "es-GQ-JavierNeural",
+            displayName: "Javier (es-GQ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-GQ"]
+          },
+          {
+            id: "es-GQ-TeresaNeural",
+            displayName: "Teresa (es-GQ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-GQ"]
+          },
+          {
+            id: "es-GT-AndresNeural",
+            displayName: "Andres (es-GT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-GT"]
+          },
+          {
+            id: "es-GT-MartaNeural",
+            displayName: "Marta (es-GT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-GT"]
+          },
+          {
+            id: "es-HN-CarlosNeural",
+            displayName: "Carlos (es-HN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-HN"]
+          },
+          {
+            id: "es-HN-KarlaNeural",
+            displayName: "Karla (es-HN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-HN"]
+          },
+          {
+            id: "es-MX-BeatrizNeural",
+            displayName: "Beatriz (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-CandelaNeural",
+            displayName: "Candela (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-CarlotaNeural",
+            displayName: "Carlota (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-CecilioNeural",
+            displayName: "Cecilio (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-DaliaNeural",
+            displayName: "Dalia (es-MX)",
+            description: "Supports styles: cheerful, sad, whispering",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-DaliaMultilingualNeural",
+            displayName: "DaliaMultilingual (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-GerardoNeural",
+            displayName: "Gerardo (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-JorgeNeural",
+            displayName: "Jorge (es-MX)",
+            description: "Supports styles: cheerful, chat, whispering, sad, excited",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-JorgeMultilingualNeural",
+            displayName: "JorgeMultilingual (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-LarissaNeural",
+            displayName: "Larissa (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-LibertoNeural",
+            displayName: "Liberto (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-LucianoNeural",
+            displayName: "Luciano (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-MarinaNeural",
+            displayName: "Marina (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-NuriaNeural",
+            displayName: "Nuria (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-PelayoNeural",
+            displayName: "Pelayo (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-RenataNeural",
+            displayName: "Renata (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-MX-YagoNeural",
+            displayName: "Yago (es-MX)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-MX"]
+          },
+          {
+            id: "es-NI-FedericoNeural",
+            displayName: "Federico (es-NI)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-NI"]
+          },
+          {
+            id: "es-NI-YolandaNeural",
+            displayName: "Yolanda (es-NI)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-NI"]
+          },
+          {
+            id: "es-PA-MargaritaNeural",
+            displayName: "Margarita (es-PA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-PA"]
+          },
+          {
+            id: "es-PA-RobertoNeural",
+            displayName: "Roberto (es-PA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-PA"]
+          },
+          {
+            id: "es-PE-AlexNeural",
+            displayName: "Alex (es-PE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-PE"]
+          },
+          {
+            id: "es-PE-CamilaNeural",
+            displayName: "Camila (es-PE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-PE"]
+          },
+          {
+            id: "es-PR-KarinaNeural",
+            displayName: "Karina (es-PR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-PR"]
+          },
+          {
+            id: "es-PR-VictorNeural",
+            displayName: "Victor (es-PR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-PR"]
+          },
+          {
+            id: "es-PY-MarioNeural",
+            displayName: "Mario (es-PY)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-PY"]
+          },
+          {
+            id: "es-PY-TaniaNeural",
+            displayName: "Tania (es-PY)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-PY"]
+          },
+          {
+            id: "es-SV-LorenaNeural",
+            displayName: "Lorena (es-SV)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-SV"]
+          },
+          {
+            id: "es-SV-RodrigoNeural",
+            displayName: "Rodrigo (es-SV)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-SV"]
+          },
+          {
+            id: "es-US-AlonsoNeural",
+            displayName: "Alonso (es-US)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-US"]
+          },
+          {
+            id: "es-US-PalomaNeural",
+            displayName: "Paloma (es-US)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-US"]
+          },
+          {
+            id: "es-UY-MateoNeural",
+            displayName: "Mateo (es-UY)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-UY"]
+          },
+          {
+            id: "es-UY-ValentinaNeural",
+            displayName: "Valentina (es-UY)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-UY"]
+          },
+          {
+            id: "es-VE-PaolaNeural",
+            displayName: "Paola (es-VE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["es-VE"]
+          },
+          {
+            id: "es-VE-SebastianNeural",
+            displayName: "Sebastian (es-VE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["es-VE"]
+          },
+          {
+            id: "et-EE-AnuNeural",
+            displayName: "Anu (et-EE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["et-EE"]
+          },
+          {
+            id: "et-EE-KertNeural",
+            displayName: "Kert (et-EE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["et-EE"]
+          },
+          {
+            id: "eu-ES-AinhoaNeural",
+            displayName: "Ainhoa (eu-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["eu-ES"]
+          },
+          {
+            id: "eu-ES-AnderNeural",
+            displayName: "Ander (eu-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["eu-ES"]
+          },
+          {
+            id: "fa-IR-DilaraNeural",
+            displayName: "Dilara (fa-IR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fa-IR"]
+          },
+          {
+            id: "fa-IR-FaridNeural",
+            displayName: "Farid (fa-IR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fa-IR"]
+          },
+          {
+            id: "fi-FI-HarriNeural",
+            displayName: "Harri (fi-FI)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fi-FI"]
+          },
+          {
+            id: "fi-FI-NooraNeural",
+            displayName: "Noora (fi-FI)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fi-FI"]
+          },
+          {
+            id: "fi-FI-SelmaNeural",
+            displayName: "Selma (fi-FI)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fi-FI"]
+          },
+          {
+            id: "fil-PH-AngeloNeural",
+            displayName: "Angelo (fil-PH)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fil-PH"]
+          },
+          {
+            id: "fil-PH-BlessicaNeural",
+            displayName: "Blessica (fil-PH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fil-PH"]
+          },
+          {
+            id: "fr-BE-CharlineNeural",
+            displayName: "Charline (fr-BE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-BE"]
+          },
+          {
+            id: "fr-BE-GerardNeural",
+            displayName: "Gerard (fr-BE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-BE"]
+          },
+          {
+            id: "fr-CA-AntoineNeural",
+            displayName: "Antoine (fr-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-CA"]
+          },
+          {
+            id: "fr-CA-JeanNeural",
+            displayName: "Jean (fr-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-CA"]
+          },
+          {
+            id: "fr-CA-SylvieNeural",
+            displayName: "Sylvie (fr-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-CA"]
+          },
+          {
+            id: "fr-CA-ThierryNeural",
+            displayName: "Thierry (fr-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-CA"]
+          },
+          {
+            id: "fr-CH-ArianeNeural",
+            displayName: "Ariane (fr-CH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-CH"]
+          },
+          {
+            id: "fr-CH-FabriceNeural",
+            displayName: "Fabrice (fr-CH)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-CH"]
+          },
+          {
+            id: "fr-FR-AlainNeural",
+            displayName: "Alain (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-BrigitteNeural",
+            displayName: "Brigitte (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-CelesteNeural",
+            displayName: "Celeste (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-ClaudeNeural",
+            displayName: "Claude (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-CoralieNeural",
+            displayName: "Coralie (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-DeniseNeural",
+            displayName: "Denise (fr-FR)",
+            description: "Supports styles: cheerful, sad, whispering, excited",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-EloiseNeural",
+            displayName: "Eloise (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-HenriNeural",
+            displayName: "Henri (fr-FR)",
+            description: "Supports styles: cheerful, sad, whispering, excited",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-JacquelineNeural",
+            displayName: "Jacqueline (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-JeromeNeural",
+            displayName: "Jerome (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-JosephineNeural",
+            displayName: "Josephine (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-LucienMultilingualNeural",
+            displayName: "LucienMultilingual (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-MauriceNeural",
+            displayName: "Maurice (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-RemyMultilingualNeural",
+            displayName: "RemyMultilingual (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-VivienneMultilingualNeural",
+            displayName: "VivienneMultilingual (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-YvesNeural",
+            displayName: "Yves (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "fr-FR-YvetteNeural",
+            displayName: "Yvette (fr-FR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["fr-FR"]
+          },
+          {
+            id: "ga-IE-ColmNeural",
+            displayName: "Colm (ga-IE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ga-IE"]
+          },
+          {
+            id: "ga-IE-OrlaNeural",
+            displayName: "Orla (ga-IE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ga-IE"]
+          },
+          {
+            id: "gl-ES-RoiNeural",
+            displayName: "Roi (gl-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["gl-ES"]
+          },
+          {
+            id: "gl-ES-SabelaNeural",
+            displayName: "Sabela (gl-ES)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["gl-ES"]
+          },
+          {
+            id: "gu-IN-DhwaniNeural",
+            displayName: "Dhwani (gu-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["gu-IN"]
+          },
+          {
+            id: "gu-IN-NiranjanNeural",
+            displayName: "Niranjan (gu-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["gu-IN"]
+          },
+          {
+            id: "he-IL-AvriNeural",
+            displayName: "Avri (he-IL)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["he-IL"]
+          },
+          {
+            id: "he-IL-HilaNeural",
+            displayName: "Hila (he-IL)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["he-IL"]
+          },
+          {
+            id: "hi-IN-AaravNeural",
+            displayName: "Aarav (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-AartiNeural",
+            displayName: "Aarti (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-AnanyaNeural",
+            displayName: "Ananya (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-ArjunNeural",
+            displayName: "Arjun (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-KavyaNeural",
+            displayName: "Kavya (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-KunalNeural",
+            displayName: "Kunal (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-MadhurNeural",
+            displayName: "Madhur (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-RehaanNeural",
+            displayName: "Rehaan (hi-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hi-IN-SwaraNeural",
+            displayName: "Swara (hi-IN)",
+            description: "Supports styles: newscast, cheerful, empathetic",
+            gender: "female",
+            languages: ["hi-IN"]
+          },
+          {
+            id: "hr-HR-GabrijelaNeural",
+            displayName: "Gabrijela (hr-HR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["hr-HR"]
+          },
+          {
+            id: "hr-HR-SreckoNeural",
+            displayName: "Srecko (hr-HR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hr-HR"]
+          },
+          {
+            id: "hu-HU-NoemiNeural",
+            displayName: "Noemi (hu-HU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["hu-HU"]
+          },
+          {
+            id: "hu-HU-TamasNeural",
+            displayName: "Tamas (hu-HU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hu-HU"]
+          },
+          {
+            id: "hy-AM-AnahitNeural",
+            displayName: "Anahit (hy-AM)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["hy-AM"]
+          },
+          {
+            id: "hy-AM-HaykNeural",
+            displayName: "Hayk (hy-AM)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["hy-AM"]
+          },
+          {
+            id: "id-ID-ArdiNeural",
+            displayName: "Ardi (id-ID)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["id-ID"]
+          },
+          {
+            id: "id-ID-GadisNeural",
+            displayName: "Gadis (id-ID)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["id-ID"]
+          },
+          {
+            id: "is-IS-GudrunNeural",
+            displayName: "Gudrun (is-IS)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["is-IS"]
+          },
+          {
+            id: "is-IS-GunnarNeural",
+            displayName: "Gunnar (is-IS)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["is-IS"]
+          },
+          {
+            id: "it-IT-AlessioMultilingualNeural",
+            displayName: "AlessioMultilingual (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-BenignoNeural",
+            displayName: "Benigno (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-CalimeroNeural",
+            displayName: "Calimero (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-CataldoNeural",
+            displayName: "Cataldo (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-DiegoNeural",
+            displayName: "Diego (it-IT)",
+            description: "Supports styles: cheerful, sad, excited",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-ElsaNeural",
+            displayName: "Elsa (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-FabiolaNeural",
+            displayName: "Fabiola (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-FiammaNeural",
+            displayName: "Fiamma (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-GianniNeural",
+            displayName: "Gianni (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-GiuseppeNeural",
+            displayName: "Giuseppe (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-GiuseppeMultilingualNeural",
+            displayName: "GiuseppeMultilingual (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-ImeldaNeural",
+            displayName: "Imelda (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-IrmaNeural",
+            displayName: "Irma (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-IsabellaNeural",
+            displayName: "Isabella (it-IT)",
+            description: "Supports styles: cheerful, chat, whispering, sad, excited",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-IsabellaMultilingualNeural",
+            displayName: "IsabellaMultilingual (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-LisandroNeural",
+            displayName: "Lisandro (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-MarcelloMultilingualNeural",
+            displayName: "MarcelloMultilingual (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-PalmiraNeural",
+            displayName: "Palmira (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-PierinaNeural",
+            displayName: "Pierina (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["it-IT"]
+          },
+          {
+            id: "it-IT-RinaldoNeural",
+            displayName: "Rinaldo (it-IT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["it-IT"]
+          },
+          {
+            id: "iu-Cans-CA-SiqiniqNeural",
+            displayName: "Siqiniq (iu-Cans-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["iu-Cans-CA"]
+          },
+          {
+            id: "iu-Cans-CA-TaqqiqNeural",
+            displayName: "Taqqiq (iu-Cans-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["iu-Cans-CA"]
+          },
+          {
+            id: "iu-Latn-CA-SiqiniqNeural",
+            displayName: "Siqiniq (iu-Latn-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["iu-Latn-CA"]
+          },
+          {
+            id: "iu-Latn-CA-TaqqiqNeural",
+            displayName: "Taqqiq (iu-Latn-CA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["iu-Latn-CA"]
+          },
+          {
+            id: "ja-JP-AoiNeural",
+            displayName: "Aoi (ja-JP)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "ja-JP-DaichiNeural",
+            displayName: "Daichi (ja-JP)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "ja-JP-KeitaNeural",
+            displayName: "Keita (ja-JP)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "ja-JP-MasaruMultilingualNeural",
+            displayName: "MasaruMultilingual (ja-JP)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "ja-JP-MayuNeural",
+            displayName: "Mayu (ja-JP)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "ja-JP-NanamiNeural",
+            displayName: "Nanami (ja-JP)",
+            description: "Supports styles: chat, customerservice, cheerful",
+            gender: "female",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "ja-JP-NaokiNeural",
+            displayName: "Naoki (ja-JP)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "ja-JP-ShioriNeural",
+            displayName: "Shiori (ja-JP)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ja-JP"]
+          },
+          {
+            id: "jv-ID-DimasNeural",
+            displayName: "Dimas (jv-ID)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["jv-ID"]
+          },
+          {
+            id: "jv-ID-SitiNeural",
+            displayName: "Siti (jv-ID)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["jv-ID"]
+          },
+          {
+            id: "ka-GE-EkaNeural",
+            displayName: "Eka (ka-GE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ka-GE"]
+          },
+          {
+            id: "ka-GE-GiorgiNeural",
+            displayName: "Giorgi (ka-GE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ka-GE"]
+          },
+          {
+            id: "kk-KZ-AigulNeural",
+            displayName: "Aigul (kk-KZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["kk-KZ"]
+          },
+          {
+            id: "kk-KZ-DauletNeural",
+            displayName: "Daulet (kk-KZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["kk-KZ"]
+          },
+          {
+            id: "km-KH-PisethNeural",
+            displayName: "Piseth (km-KH)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["km-KH"]
+          },
+          {
+            id: "km-KH-SreymomNeural",
+            displayName: "Sreymom (km-KH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["km-KH"]
+          },
+          {
+            id: "kn-IN-GaganNeural",
+            displayName: "Gagan (kn-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["kn-IN"]
+          },
+          {
+            id: "kn-IN-SapnaNeural",
+            displayName: "Sapna (kn-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["kn-IN"]
+          },
+          {
+            id: "ko-KR-BongJinNeural",
+            displayName: "BongJin (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-GookMinNeural",
+            displayName: "GookMin (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-HyunsuNeural",
+            displayName: "Hyunsu (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-HyunsuMultilingualNeural",
+            displayName: "HyunsuMultilingual (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-InJoonNeural",
+            displayName: "InJoon (ko-KR)",
+            description: "Supports styles: sad",
+            gender: "male",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-JiMinNeural",
+            displayName: "JiMin (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-SeoHyeonNeural",
+            displayName: "SeoHyeon (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-SoonBokNeural",
+            displayName: "SoonBok (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-SunHiNeural",
+            displayName: "SunHi (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "ko-KR-YuJinNeural",
+            displayName: "YuJin (ko-KR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ko-KR"]
+          },
+          {
+            id: "lo-LA-ChanthavongNeural",
+            displayName: "Chanthavong (lo-LA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["lo-LA"]
+          },
+          {
+            id: "lo-LA-KeomanyNeural",
+            displayName: "Keomany (lo-LA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["lo-LA"]
+          },
+          {
+            id: "lt-LT-LeonasNeural",
+            displayName: "Leonas (lt-LT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["lt-LT"]
+          },
+          {
+            id: "lt-LT-OnaNeural",
+            displayName: "Ona (lt-LT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["lt-LT"]
+          },
+          {
+            id: "lv-LV-EveritaNeural",
+            displayName: "Everita (lv-LV)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["lv-LV"]
+          },
+          {
+            id: "lv-LV-NilsNeural",
+            displayName: "Nils (lv-LV)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["lv-LV"]
+          },
+          {
+            id: "mk-MK-AleksandarNeural",
+            displayName: "Aleksandar (mk-MK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["mk-MK"]
+          },
+          {
+            id: "mk-MK-MarijaNeural",
+            displayName: "Marija (mk-MK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["mk-MK"]
+          },
+          {
+            id: "ml-IN-MidhunNeural",
+            displayName: "Midhun (ml-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ml-IN"]
+          },
+          {
+            id: "ml-IN-SobhanaNeural",
+            displayName: "Sobhana (ml-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ml-IN"]
+          },
+          {
+            id: "mn-MN-BataaNeural",
+            displayName: "Bataa (mn-MN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["mn-MN"]
+          },
+          {
+            id: "mn-MN-YesuiNeural",
+            displayName: "Yesui (mn-MN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["mn-MN"]
+          },
+          {
+            id: "mr-IN-AarohiNeural",
+            displayName: "Aarohi (mr-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["mr-IN"]
+          },
+          {
+            id: "mr-IN-ManoharNeural",
+            displayName: "Manohar (mr-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["mr-IN"]
+          },
+          {
+            id: "ms-MY-OsmanNeural",
+            displayName: "Osman (ms-MY)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ms-MY"]
+          },
+          {
+            id: "ms-MY-YasminNeural",
+            displayName: "Yasmin (ms-MY)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ms-MY"]
+          },
+          {
+            id: "mt-MT-GraceNeural",
+            displayName: "Grace (mt-MT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["mt-MT"]
+          },
+          {
+            id: "mt-MT-JosephNeural",
+            displayName: "Joseph (mt-MT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["mt-MT"]
+          },
+          {
+            id: "my-MM-NilarNeural",
+            displayName: "Nilar (my-MM)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["my-MM"]
+          },
+          {
+            id: "my-MM-ThihaNeural",
+            displayName: "Thiha (my-MM)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["my-MM"]
+          },
+          {
+            id: "nb-NO-FinnNeural",
+            displayName: "Finn (nb-NO)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["nb-NO"]
+          },
+          {
+            id: "nb-NO-IselinNeural",
+            displayName: "Iselin (nb-NO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["nb-NO"]
+          },
+          {
+            id: "nb-NO-PernilleNeural",
+            displayName: "Pernille (nb-NO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["nb-NO"]
+          },
+          {
+            id: "ne-NP-HemkalaNeural",
+            displayName: "Hemkala (ne-NP)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ne-NP"]
+          },
+          {
+            id: "ne-NP-SagarNeural",
+            displayName: "Sagar (ne-NP)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ne-NP"]
+          },
+          {
+            id: "nl-BE-ArnaudNeural",
+            displayName: "Arnaud (nl-BE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["nl-BE"]
+          },
+          {
+            id: "nl-BE-DenaNeural",
+            displayName: "Dena (nl-BE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["nl-BE"]
+          },
+          {
+            id: "nl-NL-ColetteNeural",
+            displayName: "Colette (nl-NL)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["nl-NL"]
+          },
+          {
+            id: "nl-NL-FennaNeural",
+            displayName: "Fenna (nl-NL)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["nl-NL"]
+          },
+          {
+            id: "nl-NL-MaartenNeural",
+            displayName: "Maarten (nl-NL)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["nl-NL"]
+          },
+          {
+            id: "or-IN-SubhasiniNeural",
+            displayName: "Subhasini (or-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["or-IN"]
+          },
+          {
+            id: "or-IN-SukantNeural",
+            displayName: "Sukant (or-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["or-IN"]
+          },
+          {
+            id: "pa-IN-OjasNeural",
+            displayName: "Ojas (pa-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pa-IN"]
+          },
+          {
+            id: "pa-IN-VaaniNeural",
+            displayName: "Vaani (pa-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pa-IN"]
+          },
+          {
+            id: "pl-PL-AgnieszkaNeural",
+            displayName: "Agnieszka (pl-PL)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pl-PL"]
+          },
+          {
+            id: "pl-PL-MarekNeural",
+            displayName: "Marek (pl-PL)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pl-PL"]
+          },
+          {
+            id: "pl-PL-ZofiaNeural",
+            displayName: "Zofia (pl-PL)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pl-PL"]
+          },
+          {
+            id: "ps-AF-GulNawazNeural",
+            displayName: "GulNawaz (ps-AF)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ps-AF"]
+          },
+          {
+            id: "ps-AF-LatifaNeural",
+            displayName: "Latifa (ps-AF)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ps-AF"]
+          },
+          {
+            id: "pt-BR-AntonioNeural",
+            displayName: "Antonio (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-BrendaNeural",
+            displayName: "Brenda (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-DonatoNeural",
+            displayName: "Donato (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-ElzaNeural",
+            displayName: "Elza (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-FabioNeural",
+            displayName: "Fabio (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-FranciscaNeural",
+            displayName: "Francisca (pt-BR)",
+            description: "Supports styles: calm",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-GiovannaNeural",
+            displayName: "Giovanna (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-HumbertoNeural",
+            displayName: "Humberto (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-JulioNeural",
+            displayName: "Julio (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-LeilaNeural",
+            displayName: "Leila (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-LeticiaNeural",
+            displayName: "Leticia (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-MacerioMultilingualNeural",
+            displayName: "MacerioMultilingual (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-ManuelaNeural",
+            displayName: "Manuela (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-NicolauNeural",
+            displayName: "Nicolau (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-ThalitaNeural",
+            displayName: "Thalita (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-ThalitaMultilingualNeural",
+            displayName: "ThalitaMultilingual (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-ValerioNeural",
+            displayName: "Valerio (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-BR-YaraNeural",
+            displayName: "Yara (pt-BR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-BR"]
+          },
+          {
+            id: "pt-PT-DuarteNeural",
+            displayName: "Duarte (pt-PT)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["pt-PT"]
+          },
+          {
+            id: "pt-PT-FernandaNeural",
+            displayName: "Fernanda (pt-PT)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["pt-PT"]
+          },
+          {
+            id: "pt-PT-RaquelNeural",
+            displayName: "Raquel (pt-PT)",
+            description: "Supports styles: sad, whispering",
+            gender: "female",
+            languages: ["pt-PT"]
+          },
+          {
+            id: "ro-RO-AlinaNeural",
+            displayName: "Alina (ro-RO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ro-RO"]
+          },
+          {
+            id: "ro-RO-EmilNeural",
+            displayName: "Emil (ro-RO)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ro-RO"]
+          },
+          {
+            id: "ru-RU-DariyaNeural",
+            displayName: "Dariya (ru-RU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ru-RU"]
+          },
+          {
+            id: "ru-RU-DmitryNeural",
+            displayName: "Dmitry (ru-RU)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ru-RU"]
+          },
+          {
+            id: "ru-RU-SvetlanaNeural",
+            displayName: "Svetlana (ru-RU)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ru-RU"]
+          },
+          {
+            id: "si-LK-SameeraNeural",
+            displayName: "Sameera (si-LK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["si-LK"]
+          },
+          {
+            id: "si-LK-ThiliniNeural",
+            displayName: "Thilini (si-LK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["si-LK"]
+          },
+          {
+            id: "sk-SK-LukasNeural",
+            displayName: "Lukas (sk-SK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sk-SK"]
+          },
+          {
+            id: "sk-SK-ViktoriaNeural",
+            displayName: "Viktoria (sk-SK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sk-SK"]
+          },
+          {
+            id: "sl-SI-PetraNeural",
+            displayName: "Petra (sl-SI)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sl-SI"]
+          },
+          {
+            id: "sl-SI-RokNeural",
+            displayName: "Rok (sl-SI)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sl-SI"]
+          },
+          {
+            id: "so-SO-MuuseNeural",
+            displayName: "Muuse (so-SO)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["so-SO"]
+          },
+          {
+            id: "so-SO-UbaxNeural",
+            displayName: "Ubax (so-SO)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["so-SO"]
+          },
+          {
+            id: "sq-AL-AnilaNeural",
+            displayName: "Anila (sq-AL)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sq-AL"]
+          },
+          {
+            id: "sq-AL-IlirNeural",
+            displayName: "Ilir (sq-AL)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sq-AL"]
+          },
+          {
+            id: "sr-Latn-RS-NicholasNeural",
+            displayName: "Nicholas (sr-Latn-RS)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sr-Latn-RS"]
+          },
+          {
+            id: "sr-Latn-RS-SophieNeural",
+            displayName: "Sophie (sr-Latn-RS)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sr-Latn-RS"]
+          },
+          {
+            id: "sr-RS-NicholasNeural",
+            displayName: "Nicholas (sr-RS)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sr-RS"]
+          },
+          {
+            id: "sr-RS-SophieNeural",
+            displayName: "Sophie (sr-RS)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sr-RS"]
+          },
+          {
+            id: "su-ID-JajangNeural",
+            displayName: "Jajang (su-ID)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["su-ID"]
+          },
+          {
+            id: "su-ID-TutiNeural",
+            displayName: "Tuti (su-ID)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["su-ID"]
+          },
+          {
+            id: "sv-SE-HilleviNeural",
+            displayName: "Hillevi (sv-SE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sv-SE"]
+          },
+          {
+            id: "sv-SE-MattiasNeural",
+            displayName: "Mattias (sv-SE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sv-SE"]
+          },
+          {
+            id: "sv-SE-SofieNeural",
+            displayName: "Sofie (sv-SE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sv-SE"]
+          },
+          {
+            id: "sw-KE-RafikiNeural",
+            displayName: "Rafiki (sw-KE)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sw-KE"]
+          },
+          {
+            id: "sw-KE-ZuriNeural",
+            displayName: "Zuri (sw-KE)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sw-KE"]
+          },
+          {
+            id: "sw-TZ-DaudiNeural",
+            displayName: "Daudi (sw-TZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["sw-TZ"]
+          },
+          {
+            id: "sw-TZ-RehemaNeural",
+            displayName: "Rehema (sw-TZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["sw-TZ"]
+          },
+          {
+            id: "ta-IN-PallaviNeural",
+            displayName: "Pallavi (ta-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ta-IN"]
+          },
+          {
+            id: "ta-IN-ValluvarNeural",
+            displayName: "Valluvar (ta-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ta-IN"]
+          },
+          {
+            id: "ta-LK-KumarNeural",
+            displayName: "Kumar (ta-LK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ta-LK"]
+          },
+          {
+            id: "ta-LK-SaranyaNeural",
+            displayName: "Saranya (ta-LK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ta-LK"]
+          },
+          {
+            id: "ta-MY-KaniNeural",
+            displayName: "Kani (ta-MY)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ta-MY"]
+          },
+          {
+            id: "ta-MY-SuryaNeural",
+            displayName: "Surya (ta-MY)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ta-MY"]
+          },
+          {
+            id: "ta-SG-AnbuNeural",
+            displayName: "Anbu (ta-SG)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ta-SG"]
+          },
+          {
+            id: "ta-SG-VenbaNeural",
+            displayName: "Venba (ta-SG)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ta-SG"]
+          },
+          {
+            id: "te-IN-MohanNeural",
+            displayName: "Mohan (te-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["te-IN"]
+          },
+          {
+            id: "te-IN-ShrutiNeural",
+            displayName: "Shruti (te-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["te-IN"]
+          },
+          {
+            id: "th-TH-AcharaNeural",
+            displayName: "Achara (th-TH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["th-TH"]
+          },
+          {
+            id: "th-TH-NiwatNeural",
+            displayName: "Niwat (th-TH)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["th-TH"]
+          },
+          {
+            id: "th-TH-PremwadeeNeural",
+            displayName: "Premwadee (th-TH)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["th-TH"]
+          },
+          {
+            id: "tr-TR-AhmetNeural",
+            displayName: "Ahmet (tr-TR)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["tr-TR"]
+          },
+          {
+            id: "tr-TR-EmelNeural",
+            displayName: "Emel (tr-TR)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["tr-TR"]
+          },
+          {
+            id: "uk-UA-OstapNeural",
+            displayName: "Ostap (uk-UA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["uk-UA"]
+          },
+          {
+            id: "uk-UA-PolinaNeural",
+            displayName: "Polina (uk-UA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["uk-UA"]
+          },
+          {
+            id: "ur-IN-GulNeural",
+            displayName: "Gul (ur-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ur-IN"]
+          },
+          {
+            id: "ur-IN-SalmanNeural",
+            displayName: "Salman (ur-IN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ur-IN"]
+          },
+          {
+            id: "ur-PK-AsadNeural",
+            displayName: "Asad (ur-PK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["ur-PK"]
+          },
+          {
+            id: "ur-PK-UzmaNeural",
+            displayName: "Uzma (ur-PK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["ur-PK"]
+          },
+          {
+            id: "uz-UZ-MadinaNeural",
+            displayName: "Madina (uz-UZ)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["uz-UZ"]
+          },
+          {
+            id: "uz-UZ-SardorNeural",
+            displayName: "Sardor (uz-UZ)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["uz-UZ"]
+          },
+          {
+            id: "vi-VN-HoaiMyNeural",
+            displayName: "HoaiMy (vi-VN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["vi-VN"]
+          },
+          {
+            id: "vi-VN-NamMinhNeural",
+            displayName: "NamMinh (vi-VN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["vi-VN"]
+          },
+          {
+            id: "wuu-CN-XiaotongNeural",
+            displayName: "Xiaotong (wuu-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["wuu-CN"]
+          },
+          {
+            id: "wuu-CN-YunzheNeural",
+            displayName: "Yunzhe (wuu-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["wuu-CN"]
+          },
+          {
+            id: "yue-CN-XiaoMinNeural",
+            displayName: "XiaoMin (yue-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["yue-CN"]
+          },
+          {
+            id: "yue-CN-YunSongNeural",
+            displayName: "YunSong (yue-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["yue-CN"]
+          },
+          {
+            id: "zh-CN-XiaochenNeural",
+            displayName: "Xiaochen (zh-CN)",
+            description: "Supports styles: livecommercial",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Xiaochen:DragonHDFlashLatestNeural",
+            displayName: "Xiaochen:DragonHDFlashLatest (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaochenMultilingualNeural",
+            displayName: "XiaochenMultilingual (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaohanNeural",
+            displayName: "Xiaohan (zh-CN)",
+            description: "Supports styles: calm, fearful, cheerful, disgruntled, serious, angry, sad, gentle, affectionate, embarrassed",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaomengNeural",
+            displayName: "Xiaomeng (zh-CN)",
+            description: "Supports styles: chat",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaomoNeural",
+            displayName: "Xiaomo (zh-CN)",
+            description: "Supports styles: embarrassed, calm, fearful, cheerful, disgruntled, serious, angry, sad, depressed, affectionate, gentle, envious",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoqiuNeural",
+            displayName: "Xiaoqiu (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaorouNeural",
+            displayName: "Xiaorou (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoruiNeural",
+            displayName: "Xiaorui (zh-CN)",
+            description: "Supports styles: calm, fearful, angry, sad",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoshuangNeural",
+            displayName: "Xiaoshuang (zh-CN)",
+            description: "Supports styles: chat",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Xiaoshuang:DragonHDFlashLatestNeural",
+            displayName: "Xiaoshuang:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: chat",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoshuangMultilingualNeural",
+            displayName: "XiaoshuangMultilingual (zh-CN)",
+            description: "Supports styles: chat",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoxiaoNeural",
+            displayName: "Xiaoxiao (zh-CN)",
+            description: "Supports styles: assistant, chat, customerservice, newscast, affectionate, angry, calm, cheerful, disgruntled, fearful, gentle, lyrical, sad, serious, poetry-reading, friendly, chat-casual, whispering, sorry, excited",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Xiaoxiao:DragonHDFlashLatestNeural",
+            displayName: "Xiaoxiao:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: angry, chat, cheerful, excited, fearful, sad, voiceassistant, customerservice",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Xiaoxiao2:DragonHDFlashLatestNeural",
+            displayName: "Xiaoxiao2:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: affectionate, angry, anxious, cheerful, curious, disappointed, empathetic, encouragement, excited, fearful, guilty, lonely, poetry-reading, sad, surprised, sentiment, sorry, story, whisper, tired",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoxiaoDialectsNeural",
+            displayName: "XiaoxiaoDialects (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoxiaoMultilingualNeural",
+            displayName: "XiaoxiaoMultilingual (zh-CN)",
+            description: "Supports styles: affectionate, cheerful, empathetic, excited, poetry-reading, sorry, story",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoyanNeural",
+            displayName: "Xiaoyan (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoyiNeural",
+            displayName: "Xiaoyi (zh-CN)",
+            description: "Supports styles: angry, disgruntled, affectionate, cheerful, fearful, sad, embarrassed, serious, gentle",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Xiaoyi:DragonHDFlashLatestNeural",
+            displayName: "Xiaoyi:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: angry, cheerful, complaining, cutesy, gentle, nervous, sad, shy, strict",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoyouNeural",
+            displayName: "Xiaoyou (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Xiaoyou:DragonHDFlashLatestNeural",
+            displayName: "Xiaoyou:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: chat, angry, cheerful, poetry-reading, sad, story, cute",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoyouMultilingualNeural",
+            displayName: "XiaoyouMultilingual (zh-CN)",
+            description: "Supports styles: chat, angry, cheerful, poetry-reading, sad, story, cute",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Xiaoyu:DragonHDFlashLatestNeural",
+            displayName: "Xiaoyu:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: argue, angry, cheerful, comfort, sad, sorry",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaoyuMultilingualNeural",
+            displayName: "XiaoyuMultilingual (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-XiaozhenNeural",
+            displayName: "Xiaozhen (zh-CN)",
+            description: "Supports styles: angry, disgruntled, cheerful, fearful, sad, serious",
+            gender: "female",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunfanMultilingualNeural",
+            displayName: "YunfanMultilingual (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunfengNeural",
+            displayName: "Yunfeng (zh-CN)",
+            description: "Supports styles: angry, disgruntled, cheerful, fearful, sad, serious, depressed",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunhaoNeural",
+            displayName: "Yunhao (zh-CN)",
+            description: "Supports styles: advertisement-upbeat",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunjianNeural",
+            displayName: "Yunjian (zh-CN)",
+            description: "Supports styles: narration-relaxed, sports-commentary, sports-commentary-excited, angry, disgruntled, cheerful, sad, serious, depressed, documentary-narration",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunjieNeural",
+            displayName: "Yunjie (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunxiNeural",
+            displayName: "Yunxi (zh-CN)",
+            description: "Supports styles: narration-relaxed, embarrassed, fearful, cheerful, disgruntled, serious, angry, sad, depressed, chat, assistant, newscast",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunxiaNeural",
+            displayName: "Yunxia (zh-CN)",
+            description: "Supports styles: calm, fearful, cheerful, angry, sad",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Yunxia:DragonHDFlashLatestNeural",
+            displayName: "Yunxia:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: affectionate, angry, comfort, cheerful, encourage, excited, fearful, sad, surprised",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Yunxiao:DragonHDFlashLatestNeural",
+            displayName: "Yunxiao:DragonHDFlashLatest (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunxiaoMultilingualNeural",
+            displayName: "YunxiaoMultilingual (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunyangNeural",
+            displayName: "Yunyang (zh-CN)",
+            description: "Supports styles: customerservice, narration-professional, newscast-casual",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunyeNeural",
+            displayName: "Yunye (zh-CN)",
+            description: "Supports styles: embarrassed, calm, fearful, cheerful, disgruntled, serious, angry, sad",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Yunye:DragonHDFlashLatestNeural",
+            displayName: "Yunye:DragonHDFlashLatest (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-Yunyi:DragonHDFlashLatestNeural",
+            displayName: "Yunyi:DragonHDFlashLatest (zh-CN)",
+            description: "Supports styles: assassin, captain, cavalier, drake, gamenarrator, geomancer, poet",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunyiMultilingualNeural",
+            displayName: "YunyiMultilingual (zh-CN)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-YunzeNeural",
+            displayName: "Yunze (zh-CN)",
+            description: "Supports styles: calm, fearful, cheerful, disgruntled, serious, angry, sad, depressed, documentary-narration",
+            gender: "male",
+            languages: ["zh-CN"]
+          },
+          {
+            id: "zh-CN-guangxi-YunqiNeural",
+            displayName: "Yunqi (zh-CN-guangxi)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN-guangxi"]
+          },
+          {
+            id: "zh-CN-henan-YundengNeural",
+            displayName: "Yundeng (zh-CN-henan)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN-henan"]
+          },
+          {
+            id: "zh-CN-liaoning-XiaobeiNeural",
+            displayName: "Xiaobei (zh-CN-liaoning)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN-liaoning"]
+          },
+          {
+            id: "zh-CN-liaoning-YunbiaoNeural",
+            displayName: "Yunbiao (zh-CN-liaoning)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN-liaoning"]
+          },
+          {
+            id: "zh-CN-shaanxi-XiaoniNeural",
+            displayName: "Xiaoni (zh-CN-shaanxi)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-CN-shaanxi"]
+          },
+          {
+            id: "zh-CN-shandong-YunxiangNeural",
+            displayName: "Yunxiang (zh-CN-shandong)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN-shandong"]
+          },
+          {
+            id: "zh-CN-sichuan-YunxiNeural",
+            displayName: "Yunxi (zh-CN-sichuan)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-CN-sichuan"]
+          },
+          {
+            id: "zh-HK-HiuGaaiNeural",
+            displayName: "HiuGaai (zh-HK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-HK"]
+          },
+          {
+            id: "zh-HK-HiuMaanNeural",
+            displayName: "HiuMaan (zh-HK)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-HK"]
+          },
+          {
+            id: "zh-HK-WanLungNeural",
+            displayName: "WanLung (zh-HK)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-HK"]
+          },
+          {
+            id: "zh-TW-HsiaoChenNeural",
+            displayName: "HsiaoChen (zh-TW)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-TW"]
+          },
+          {
+            id: "zh-TW-HsiaoYuNeural",
+            displayName: "HsiaoYu (zh-TW)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zh-TW"]
+          },
+          {
+            id: "zh-TW-YunJheNeural",
+            displayName: "YunJhe (zh-TW)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zh-TW"]
+          },
+          {
+            id: "zu-ZA-ThandoNeural",
+            displayName: "Thando (zu-ZA)",
+            description: "Neural voice with natural prosody",
+            gender: "female",
+            languages: ["zu-ZA"]
+          },
+          {
+            id: "zu-ZA-ThembaNeural",
+            displayName: "Themba (zu-ZA)",
+            description: "Neural voice with natural prosody",
+            gender: "male",
+            languages: ["zu-ZA"]
+          }
+        ],
+        languages: [
+          { code: 'en-US', displayName: 'English (United States)' },
+          { code: 'en-GB', displayName: 'English (United Kingdom)' },
+          { code: 'en-AU', displayName: 'English (Australia)' },
+          { code: 'en-CA', displayName: 'English (Canada)' },
+          { code: 'es-ES', displayName: 'Spanish (Spain)' },
+          { code: 'es-MX', displayName: 'Spanish (Mexico)' },
+          { code: 'fr-FR', displayName: 'French (France)' },
+          { code: 'fr-CA', displayName: 'French (Canada)' },
+          { code: 'de-DE', displayName: 'German (Germany)' },
+          { code: 'it-IT', displayName: 'Italian (Italy)' },
+          { code: 'pt-BR', displayName: 'Portuguese (Brazil)' },
+          { code: 'pt-PT', displayName: 'Portuguese (Portugal)' },
+          { code: 'ja-JP', displayName: 'Japanese (Japan)' },
+          { code: 'zh-CN', displayName: 'Chinese (Simplified, China)' },
+          { code: 'zh-TW', displayName: 'Chinese (Traditional, Taiwan)' },
+          { code: 'ko-KR', displayName: 'Korean (South Korea)' },
+          { code: 'ar-SA', displayName: 'Arabic (Saudi Arabia)' },
+          { code: 'hi-IN', displayName: 'Hindi (India)' },
+          { code: 'ru-RU', displayName: 'Russian (Russia)' },
+          { code: 'nl-NL', displayName: 'Dutch (Netherlands)' },
+          { code: 'pl-PL', displayName: 'Polish (Poland)' },
+          { code: 'sv-SE', displayName: 'Swedish (Sweden)' },
+          { code: 'tr-TR', displayName: 'Turkish (Turkey)' },
+        ],
+      },
     ];
   }
 

@@ -21,6 +21,7 @@ export type OpenAiTtsProviderConfig = z.infer<typeof openAiTtsProviderConfigSche
  * Schema for OpenAI TTS settings
  */
 export const openAiTtsSettingsSchema = z.object({
+  provider: z.literal('openai').describe('TTS provider type identifier'),
   model: z.string().optional().describe('Model ID to use for speech synthesis: "gpt-4o-mini-tts" (promptable), "tts-1" (low latency), or "tts-1-hd" (high quality)'),
   voiceId: z.string().optional().describe('Voice ID to use (alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse, marin, cedar)'),
   audioFormat: z.enum(['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm_24000']).optional().describe('Preferred audio output format for synthesized speech'),
