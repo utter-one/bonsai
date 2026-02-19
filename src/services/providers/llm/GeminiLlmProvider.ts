@@ -65,43 +65,26 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
   /**
    * Generate a non-streaming response
    */
-  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
-    this.ensureInitialized();
-    this.validateMessages(messages);
-
+  protected async generateResponse(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     if (!this.client) {
       throw new Error('Gemini client not initialized');
     }
 
     const { systemInstruction, contents } = this.convertToGeminiMessages(messages);
 
-    await this.notifyStarted();
+    logger.info(`Generating Gemini completion with model: ${this.settings.model}`);
 
-    try {
-      logger.info(`Generating Gemini completion with model: ${this.settings.model}`);
+    const outputFormat = options?.outputFormat || 'text';
 
-      const outputFormat = options?.outputFormat || 'text';
-
-      let result: LlmGenerationResult;
-      if (outputFormat === 'text' || outputFormat === 'json') {
-        // Handle text or JSON output formats
-        result = await this.generateTextBasedResponse(systemInstruction, contents, options);
-      } else if (outputFormat === 'image') {
-        result = await this.generateImageBasedResponse(systemInstruction, contents, options);
-      } else if (outputFormat === 'audio') {
-        result = await this.generateAudioBasedResponse(systemInstruction, contents, options);
-      } else {
-        throw new Error(`Unsupported output format: ${outputFormat}`);
-      }
-
-      await this.notifyComplete(result);
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Gemini generation error: ${errorMessage}`);
-      await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
-      throw error;
+    if (outputFormat === 'text' || outputFormat === 'json') {
+      return this.generateTextBasedResponse(systemInstruction, contents, options);
+    } else if (outputFormat === 'image') {
+      return this.generateImageBasedResponse(systemInstruction, contents, options);
+    } else if (outputFormat === 'audio') {
+      return this.generateAudioBasedResponse(systemInstruction, contents, options);
     }
+
+    throw new Error(`Unsupported output format: ${outputFormat}`);
   }
 
   /**

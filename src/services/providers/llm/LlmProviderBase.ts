@@ -1,7 +1,6 @@
 import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
 import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptions, LlmGenerationResult, LlmMessage } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
-import { log } from 'handlebars';
 
 /**
  * Abstract base class for LLM provider implementations
@@ -29,10 +28,48 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   }
 
   /**
-   * Generate a non-streaming response
-   * Must be implemented by subclasses
+   * Generate a non-streaming response with automatic retry support
+   * Handles lifecycle (validation, notifications) and retries, delegating core logic to generateResponse
    */
-  abstract generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult>;
+  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    this.ensureInitialized();
+    this.validateMessages(messages);
+
+    await this.notifyStarted();
+
+    const maxRetries = options?.maxRetries ?? 0;
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = this.calculateRetryDelay(attempt);
+          logger.info(`Retrying LLM generation (attempt ${attempt + 1}/${maxRetries + 1}) after ${delay}ms delay`);
+          await this.delay(delay);
+        }
+
+        const result = await this.generateResponse(messages, options);
+        await this.notifyComplete(result);
+        return result;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        logger.error(`LLM generation attempt ${attempt + 1}/${maxRetries + 1} failed: ${lastError.message}`);
+
+        if (attempt >= maxRetries) {
+          break;
+        }
+      }
+    }
+
+    await this.notifyError(lastError!);
+    throw lastError;
+  }
+
+  /**
+   * Core generation logic to be implemented by subclasses
+   * Called by generate() which handles validation, lifecycle notifications, and retries
+   */
+  protected abstract generateResponse(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult>;
 
   /**
    * Generate a streaming response
@@ -153,6 +190,7 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   protected applyDefaultOptions(options?: LlmGenerationOptions): LlmGenerationOptions {
     return {
       maxTokens: options?.maxTokens ?? 1024,
+      maxRetries: options?.maxRetries ?? 0,
       metadata: options?.metadata,
       outputFormat: options?.outputFormat ?? 'text',
     };
@@ -190,5 +228,23 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
       }
       return msg.content.filter((c) => c.type === 'text').map((c) => (c as any).text).join(' ');
     }).join('\n');
+  }
+
+  /**
+   * Calculate exponential backoff delay for retries
+   */
+  private calculateRetryDelay(attempt: number): number {
+    const baseDelay = 1000;
+    const maxDelay = 10000;
+    const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+    const jitter = delay * 0.2 * Math.random();
+    return Math.round(delay + jitter);
+  }
+
+  /**
+   * Delay execution for a specified number of milliseconds
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

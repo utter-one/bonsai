@@ -68,43 +68,26 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
   /**
    * Generate a non-streaming response
    */
-  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
-    this.ensureInitialized();
-    this.validateMessages(messages);
-
+  protected async generateResponse(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     if (!this.client) {
       throw new Error('Anthropic client not initialized');
     }
 
     const { system, messages: anthropicMessages } = this.convertToAnthropicMessages(messages);
 
-    await this.notifyStarted();
+    logger.info(`Generating Anthropic completion with model: ${this.settings.model}`);
 
-    try {
-      logger.info(`Generating Anthropic completion with model: ${this.settings.model}`);
+    const outputFormat = options?.outputFormat || 'text';
 
-      const outputFormat = options?.outputFormat || 'text';
-
-      let result: LlmGenerationResult;
-      if (outputFormat === 'text' || outputFormat === 'json') {
-        // Handle text or JSON output formats
-        result = await this.generateTextBasedResponse(system, anthropicMessages, options);
-      } else if (outputFormat === 'image') {
-        result = await this.generateImageBasedResponse(system, anthropicMessages, options);
-      } else if (outputFormat === 'audio') {
-        result = await this.generateAudioBasedResponse(system, anthropicMessages, options);
-      } else {
-        throw new Error(`Unsupported output format: ${outputFormat}`);
-      }
-
-      await this.notifyComplete(result);
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Anthropic generation error: ${errorMessage}`);
-      await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
-      throw error;
+    if (outputFormat === 'text' || outputFormat === 'json') {
+      return this.generateTextBasedResponse(system, anthropicMessages, options);
+    } else if (outputFormat === 'image') {
+      return this.generateImageBasedResponse(system, anthropicMessages, options);
+    } else if (outputFormat === 'audio') {
+      return this.generateAudioBasedResponse(system, anthropicMessages, options);
     }
+
+    throw new Error(`Unsupported output format: ${outputFormat}`);
   }
 
   /**

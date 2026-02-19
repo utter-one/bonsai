@@ -155,6 +155,7 @@ export type LlmGenerationResult = z.infer<typeof llmGenerationResultSchema>;
  */
 export const llmGenerationOptionsSchema = z.object({
   maxTokens: z.number().describe('Maximum number of tokens to generate').optional(),
+  maxRetries: z.number().describe('Maximum number of retries on failure for non-streaming requests').optional(),
   metadata: z.record(z.string(), z.any()).describe('Custom metadata to attach to the request').optional(),
   outputFormat: z.enum(['text', 'json', 'image', 'audio']).describe('Output format for the generation').optional(),
 });
@@ -169,20 +170,6 @@ export type LlmChunkCallback = (chunk: LlmChunk) => Promise<void> | Promise<void
  * Callback for complete generation
  */
 export type LlmCompleteCallback = (result: LlmGenerationResult) => void | Promise<void>;
-
-/**
- * Base configuration for all LLM providers
- */
-// export interface LlmProviderConfig {
-//   apiKey: string;
-//   baseUrl?: string;
-//   model: string;
-//   defaultMaxTokens?: number;
-//   defaultTemperature?: number;
-//   defaultTopP?: number;
-//   timeout?: number;
-//   [key: string]: any;
-// }
 
 /**
  * Interface for LLM provider implementations
