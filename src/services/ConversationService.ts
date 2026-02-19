@@ -128,7 +128,7 @@ export class ConversationService extends BaseService {
    * @param eventData - The data associated with the event
    * @param metadata - Optional metadata for the event
    */
-  async saveConversationEvent(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, metadata?: Record<string, any>): Promise<void> {
+  async saveConversationEvent(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<void> {
     logger.debug({ conversationId, eventType }, 'Saving conversation event');
 
     try {
@@ -139,7 +139,7 @@ export class ConversationService extends BaseService {
         eventType,
         eventData,
         timestamp: new Date(),
-        metadata: metadata ?? null,
+        metadata: null
       };
 
       // Validate before inserting

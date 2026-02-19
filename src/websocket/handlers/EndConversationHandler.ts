@@ -27,9 +27,10 @@ export class EndConversationHandler implements WebSocketHandler<EndConversationR
     try {
       const connection = context.connection;
       const stageId = connection?.runner?.getRuntimeData()?.stage?.id || '';
+      const conversation = connection?.runner?.getRuntimeData()?.conversation;
 
       // Save event and send WebSocket message BEFORE detaching conversation
-      const eventData = { reason: '', stageId };
+      const eventData = { reason: '', stageId, metadata: { currentVariables: conversation?.stageVars?.[stageId] || {} } };
       await this.conversationService.saveConversationEvent(message.conversationId, 'conversation_end', eventData);
       this.connectionManager.sendConversationEvent(message.conversationId, 'conversation_end', eventData);
       
