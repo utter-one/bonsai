@@ -530,7 +530,11 @@ export class ActionsExecutor {
 
     try {
       for (const modification of effect.modifications) {
-        const { variableName, operation: op, value } = modification;
+        const { variableName, operation: op } = modification;
+        let { value } = modification;
+        if (typeof value === 'string') {
+          value = await this.templatingEngine.render(value, context);
+        }
 
         switch (op) {
           case 'set': {
