@@ -3,7 +3,8 @@ import type { Request, Response, NextFunction, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ContextTransformerService } from '../../services/ContextTransformerService';
-import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema, contextTransformerRouteParamsSchema } from '../contracts/contextTransformer';
+import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema, contextTransformerRouteParamsSchema, cloneContextTransformerSchema } from '../contracts/contextTransformer';
+import type { CloneContextTransformerRequest } from '../contracts/contextTransformer';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -159,6 +160,35 @@ export class ContextTransformerController {
           404: { description: 'Context transformer not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/context-transformers/{id}/clone',
+        tags: ['Context Transformers'],
+        summary: 'Clone context transformer',
+        description: 'Creates a copy of an existing context transformer with a new ID and optional name override',
+        request: {
+          params: contextTransformerRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: cloneContextTransformerSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Context transformer cloned successfully',
+            content: {
+              'application/json': {
+                schema: contextTransformerResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Context transformer not found' },
+        },
+      },
     ];
   }
 
@@ -172,6 +202,7 @@ export class ContextTransformerController {
     router.put('/api/context-transformers/:id', asyncHandler(this.updateContextTransformer.bind(this)));
     router.delete('/api/context-transformers/:id', asyncHandler(this.deleteContextTransformer.bind(this)));
     router.get('/api/context-transformers/:id/audit-logs', asyncHandler(this.getContextTransformerAuditLogs.bind(this)));
+    router.post('/api/context-transformers/:id/clone', asyncHandler(this.cloneContextTransformer.bind(this)));
   }
 
   /**
@@ -240,5 +271,17 @@ export class ContextTransformerController {
     const params = contextTransformerRouteParamsSchema.parse(req.params);
     const auditLogs = await this.contextTransformerService.getContextTransformerAuditLogs(params.id);
     res.status(200).json(auditLogs);
+  }
+
+  /**
+   * POST /api/context-transformers/:id/clone
+   * Clone a context transformer
+   */
+  private async cloneContextTransformer(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_WRITE]);
+    const params = contextTransformerRouteParamsSchema.parse(req.params);
+    const body = cloneContextTransformerSchema.parse(req.body);
+    const transformer = await this.contextTransformerService.cloneContextTransformer(params.id, body, req.context);
+    res.status(201).json(transformer);
   }
 }

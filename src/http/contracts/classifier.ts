@@ -90,6 +90,18 @@ export type UpdateClassifierRequest = z.infer<typeof updateClassifierBodySchema>
 /** Request body for deleting a classifier */
 export type DeleteClassifierRequest = z.infer<typeof deleteClassifierBodySchema>;
 
+/**
+ * Schema for cloning a classifier
+ * All fields are optional - id defaults to auto-generated, name defaults to "{original name} (Clone)"
+ */
+export const cloneClassifierSchema = z.object({
+  id: z.string().min(1).optional().describe('New ID for the cloned classifier (auto-generated if not provided)'),
+  name: z.string().min(1).optional().describe('Name for the cloned classifier (defaults to "{original name} (Clone)")'),
+});
+
+/** Request body for cloning a classifier */
+export type CloneClassifierRequest = z.infer<typeof cloneClassifierSchema>;
+
 /** Response for a single classifier */
 export type ClassifierResponse = z.infer<typeof classifierResponseSchema>;
 

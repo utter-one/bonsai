@@ -93,6 +93,18 @@ export type UpdateContextTransformerRequest = z.infer<typeof updateContextTransf
 /** Request body for deleting a context transformer */
 export type DeleteContextTransformerRequest = z.infer<typeof deleteContextTransformerBodySchema>;
 
+/**
+ * Schema for cloning a context transformer
+ * All fields are optional - id defaults to auto-generated, name defaults to "{original name} (Clone)"
+ */
+export const cloneContextTransformerSchema = z.object({
+  id: z.string().min(1).optional().describe('New ID for the cloned context transformer (auto-generated if not provided)'),
+  name: z.string().min(1).optional().describe('Name for the cloned context transformer (defaults to "{original name} (Clone)")'),
+});
+
+/** Request body for cloning a context transformer */
+export type CloneContextTransformerRequest = z.infer<typeof cloneContextTransformerSchema>;
+
 /** Response for a single context transformer */
 export type ContextTransformerResponse = z.infer<typeof contextTransformerResponseSchema>;
 

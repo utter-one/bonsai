@@ -3,7 +3,8 @@ import type { Request, Response, NextFunction, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ClassifierService } from '../../services/ClassifierService';
-import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema, classifierRouteParamsSchema } from '../contracts/classifier';
+import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema, classifierRouteParamsSchema, cloneClassifierSchema } from '../contracts/classifier';
+import type { CloneClassifierRequest } from '../contracts/classifier';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -159,6 +160,35 @@ export class ClassifierController {
           404: { description: 'Classifier not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/classifiers/{id}/clone',
+        tags: ['Classifiers'],
+        summary: 'Clone classifier',
+        description: 'Creates a copy of an existing classifier with a new ID and optional name override',
+        request: {
+          params: classifierRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: cloneClassifierSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Classifier cloned successfully',
+            content: {
+              'application/json': {
+                schema: classifierResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Classifier not found' },
+        },
+      },
     ];
   }
 
@@ -172,6 +202,7 @@ export class ClassifierController {
     router.put('/api/classifiers/:id', asyncHandler(this.updateClassifier.bind(this)));
     router.delete('/api/classifiers/:id', asyncHandler(this.deleteClassifier.bind(this)));
     router.get('/api/classifiers/:id/audit-logs', asyncHandler(this.getClassifierAuditLogs.bind(this)));
+    router.post('/api/classifiers/:id/clone', asyncHandler(this.cloneClassifier.bind(this)));
   }
 
   /**
@@ -240,5 +271,17 @@ export class ClassifierController {
     const params = classifierRouteParamsSchema.parse(req.params);
     const auditLogs = await this.classifierService.getClassifierAuditLogs(params.id);
     res.status(200).json(auditLogs);
+  }
+
+  /**
+   * POST /api/classifiers/:id/clone
+   * Clone a classifier
+   */
+  private async cloneClassifier(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.CLASSIFIER_WRITE]);
+    const params = classifierRouteParamsSchema.parse(req.params);
+    const body = cloneClassifierSchema.parse(req.body);
+    const classifier = await this.classifierService.cloneClassifier(params.id, body, req.context);
+    res.status(201).json(classifier);
   }
 }

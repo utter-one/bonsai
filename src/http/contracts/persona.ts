@@ -81,6 +81,15 @@ export const personaListResponseSchema = z.object({
   limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
 });
 
+/**
+ * Schema for cloning a persona
+ * All fields are optional - id defaults to auto-generated, name defaults to "{original name} (Clone)"
+ */
+export const clonePersonaSchema = z.object({
+  id: z.string().min(1).optional().describe('New ID for the cloned persona (auto-generated if not provided)'),
+  name: z.string().min(1).optional().describe('Name for the cloned persona (defaults to "{original name} (Clone)")'),
+});
+
 /** Request body for creating a new persona */
 export type CreatePersonaRequest = z.infer<typeof createPersonaSchema>;
 
@@ -89,6 +98,9 @@ export type UpdatePersonaRequest = z.infer<typeof updatePersonaBodySchema>;
 
 /** Request body for deleting a persona */
 export type DeletePersonaRequest = z.infer<typeof deletePersonaBodySchema>;
+
+/** Request body for cloning a persona */
+export type ClonePersonaRequest = z.infer<typeof clonePersonaSchema>;
 
 /** Response for a single persona */
 export type PersonaResponse = z.infer<typeof personaResponseSchema>;

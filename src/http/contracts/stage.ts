@@ -214,6 +214,15 @@ export const stageListResponseSchema = z.object({
   limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
 });
 
+/**
+ * Schema for cloning a stage
+ * All fields are optional - id defaults to auto-generated, name defaults to "{original name} (Clone)"
+ */
+export const cloneStageSchema = z.object({
+  id: z.string().min(1).optional().describe('New ID for the cloned stage (auto-generated if not provided)'),
+  name: z.string().min(1).optional().describe('Name for the cloned stage (defaults to "{original name} (Clone)")'),
+});
+
 /** Request body for creating a new stage */
 export type CreateStageRequest = z.infer<typeof createStageSchema>;
 
@@ -222,6 +231,9 @@ export type UpdateStageRequest = z.infer<typeof updateStageBodySchema>;
 
 /** Request body for deleting a stage */
 export type DeleteStageRequest = z.infer<typeof deleteStageBodySchema>;
+
+/** Request body for cloning a stage */
+export type CloneStageRequest = z.infer<typeof cloneStageSchema>;
 
 /** Response for a single stage */
 export type StageResponse = z.infer<typeof stageResponseSchema>;
