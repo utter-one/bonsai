@@ -22,6 +22,7 @@ export type CartesiaTtsProviderConfig = z.infer<typeof cartesiaTtsProviderConfig
  * Schema for Cartesia TTS settings
  */
 export const cartesiaTtsSettingsSchema = z.object({
+  provider: z.literal('cartesia').describe('TTS provider type identifier'),
   model: z.string().optional().describe('Model ID to use for speech synthesis (e.g., "sonic-3", "sonic-3-latest", "sonic-3-2026-01-12"). Defaults to "sonic-3-latest"'),
   voiceId: z.string().optional().describe('Voice ID to use for speech synthesis (e.g., "f786b574-daa5-4673-aa0c-cbe3e8534c02" for Katie). See Cartesia voice catalog'),
   language: z.string().optional().describe('Language code for speech synthesis (e.g., "en", "es", "fr"). Sonic-3 supports 42 languages'),

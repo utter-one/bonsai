@@ -22,6 +22,7 @@ export type ElevenLabsTtsProviderConfig = z.infer<typeof elevenLabsTtsProviderCo
  * Schema for ElevenLabs TTS settings
  */
 export const elevenLabsTtsSettingsSchema = z.object({
+  provider: z.literal('elevenlabs').describe('TTS provider type identifier'),
   model: z.string().optional().describe('Model ID to use for speech synthesis (e.g., "eleven_flash_v2_5", "eleven_multilingual_v2")'),
   voiceId: z.string().optional().describe('Voice UUID to use for speech synthesis'),
   audioFormat: z.enum(['pcm_16000', 'pcm_22050', 'pcm_44100']).optional().describe('Preferred audio output format for synthesized speech'),

@@ -15,7 +15,7 @@ import logger from '../../utils/logger';
  */
 @singleton()
 export class PersonaController {
-  constructor(@inject(PersonaService) private readonly personaService: PersonaService) {}
+  constructor(@inject(PersonaService) private readonly personaService: PersonaService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -203,7 +203,7 @@ export class PersonaController {
    * List personas with optional filters
    */
   private async listPersonas(req: Request, res: Response): Promise<void> {
-    logger.info({query: req.query}, 'Listing personas with query');
+    logger.info({ query: req.query }, 'Listing personas with query');
     checkPermissions(req, [PERMISSIONS.PERSONA_READ]);
     const query = listParamsSchema.parse(req.query);
     const personas = await this.personaService.listPersonas(query);
