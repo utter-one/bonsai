@@ -3,8 +3,8 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { GlobalActionService } from '../../services/GlobalActionService';
-import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from '../contracts/globalAction';
-import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, DeleteGlobalActionRequest } from '../contracts/globalAction';
+import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema, cloneGlobalActionSchema } from '../contracts/globalAction';
+import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, DeleteGlobalActionRequest, CloneGlobalActionRequest } from '../contracts/globalAction';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -161,6 +161,35 @@ export class GlobalActionController {
           404: { description: 'Global action not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/global-actions/{id}/clone',
+        tags: ['Global Actions'],
+        summary: 'Clone global action',
+        description: 'Creates a copy of an existing global action with a new ID and optional name override',
+        request: {
+          params: globalActionRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: cloneGlobalActionSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Global action cloned successfully',
+            content: {
+              'application/json': {
+                schema: globalActionResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Global action not found' },
+        },
+      },
     ];
   }
 
@@ -174,6 +203,7 @@ export class GlobalActionController {
     router.put('/api/global-actions/:id', asyncHandler(this.updateGlobalAction.bind(this)));
     router.delete('/api/global-actions/:id', asyncHandler(this.deleteGlobalAction.bind(this)));
     router.get('/api/global-actions/:id/audit-logs', asyncHandler(this.getGlobalActionAuditLogs.bind(this)));
+    router.post('/api/global-actions/:id/clone', asyncHandler(this.cloneGlobalAction.bind(this)));
   }
 
   /**
@@ -242,5 +272,17 @@ export class GlobalActionController {
     const params = globalActionRouteParamsSchema.parse(req.params);
     const logs = await this.globalActionService.getGlobalActionAuditLogs(params.id);
     res.status(200).json(logs);
+  }
+
+  /**
+   * POST /api/global-actions/:id/clone
+   * Clone a global action
+   */
+  private async cloneGlobalAction(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_WRITE]);
+    const params = globalActionRouteParamsSchema.parse(req.params);
+    const body = cloneGlobalActionSchema.parse(req.body);
+    const action = await this.globalActionService.cloneGlobalAction(params.id, body, req.context);
+    res.status(201).json(action);
   }
 }

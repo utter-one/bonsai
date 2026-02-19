@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc, inArray } from 'drizzle-orm';
 import { db } from '../db/index';
 import { stages, personas, classifiers, contextTransformers, knowledgeSections, globalActions } from '../db/schema';
-import type { CreateStageRequest, UpdateStageRequest, StageResponse, StageListResponse } from '../http/contracts/stage';
+import type { CreateStageRequest, UpdateStageRequest, StageResponse, StageListResponse, CloneStageRequest } from '../http/contracts/stage';
 import type { ListParams } from '../http/contracts/common';
 import { stageResponseSchema, stageListResponseSchema } from '../http/contracts/stage';
 import { AuditService } from './AuditService';
@@ -315,6 +315,32 @@ export class StageService extends BaseService {
       logger.info({ id }, 'Stage deleted successfully');
     } catch (error) {
       logger.error({ error, id }, 'Failed to delete stage');
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a copy of an existing stage with a new ID and optional name override
+   * @param id - The unique identifier of the stage to clone
+   * @param input - Clone options including optional new id and name
+   * @param context - Request context for auditing and authorization
+   * @returns The newly created cloned stage
+   * @throws {NotFoundError} When the source stage is not found
+   */
+  async cloneStage(id: string, input: CloneStageRequest, context: RequestContext): Promise<StageResponse> {
+    this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
+    logger.info({ id, adminId: context?.adminId }, 'Cloning stage');
+
+    try {
+      const existingStage = await db.query.stages.findFirst({ where: eq(stages.id, id) });
+
+      if (!existingStage) {
+        throw new NotFoundError(`Stage with id ${id} not found`);
+      }
+
+      return await this.createStage({ id: input.id, projectId: existingStage.projectId, name: input.name ?? `${existingStage.name} (Clone)`, description: existingStage.description ?? undefined, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings as any, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior as 'generate_response' | 'await_user_input', useKnowledge: existingStage.useKnowledge, knowledgeSections: existingStage.knowledgeSections as string[], useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions as string[], variableDescriptors: existingStage.variableDescriptors as any, actions: existingStage.actions as any, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds as string[], metadata: existingStage.metadata ?? undefined }, context);
+    } catch (error) {
+      logger.error({ error, id }, 'Failed to clone stage');
       throw error;
     }
   }

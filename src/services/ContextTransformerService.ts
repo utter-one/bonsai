@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { contextTransformers } from '../db/schema';
-import type { CreateContextTransformerRequest, UpdateContextTransformerRequest, ContextTransformerResponse, ContextTransformerListResponse } from '../http/contracts/contextTransformer';
+import type { CreateContextTransformerRequest, UpdateContextTransformerRequest, ContextTransformerResponse, ContextTransformerListResponse, CloneContextTransformerRequest } from '../http/contracts/contextTransformer';
 import type { ListParams } from '../http/contracts/common';
 import { contextTransformerResponseSchema, contextTransformerListResponseSchema } from '../http/contracts/contextTransformer';
 import { AuditService } from './AuditService';
@@ -230,6 +230,32 @@ export class ContextTransformerService extends BaseService {
       logger.info({ transformerId: id }, 'Context transformer deleted successfully');
     } catch (error) {
       logger.error({ error, transformerId: id }, 'Failed to delete context transformer');
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a copy of an existing context transformer with a new ID and optional name override
+   * @param id - The unique identifier of the context transformer to clone
+   * @param input - Clone options including optional new id and name
+   * @param context - Request context for auditing and authorization
+   * @returns The newly created cloned context transformer
+   * @throws {NotFoundError} When the source context transformer is not found
+   */
+  async cloneContextTransformer(id: string, input: CloneContextTransformerRequest, context: RequestContext): Promise<ContextTransformerResponse> {
+    this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_WRITE);
+    logger.info({ id, adminId: context?.adminId }, 'Cloning context transformer');
+
+    try {
+      const existingTransformer = await db.query.contextTransformers.findFirst({ where: eq(contextTransformers.id, id) });
+
+      if (!existingTransformer) {
+        throw new NotFoundError(`Context transformer with id ${id} not found`);
+      }
+
+      return await this.createContextTransformer({ id: input.id, projectId: existingTransformer.projectId, name: input.name ?? `${existingTransformer.name} (Clone)`, description: existingTransformer.description ?? undefined, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields as string[] ?? undefined, llmProviderId: existingTransformer.llmProviderId, llmSettings: existingTransformer.llmSettings as any, metadata: existingTransformer.metadata ?? undefined }, context);
+    } catch (error) {
+      logger.error({ error, id }, 'Failed to clone context transformer');
       throw error;
     }
   }

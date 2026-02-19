@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { classifiers } from '../db/schema';
-import type { CreateClassifierRequest, UpdateClassifierRequest, ClassifierResponse, ClassifierListResponse } from '../http/contracts/classifier';
+import type { CreateClassifierRequest, UpdateClassifierRequest, ClassifierResponse, ClassifierListResponse, CloneClassifierRequest } from '../http/contracts/classifier';
 import type { ListParams } from '../http/contracts/common';
 import { classifierResponseSchema, classifierListResponseSchema } from '../http/contracts/classifier';
 import { AuditService } from './AuditService';
@@ -229,6 +229,32 @@ export class ClassifierService extends BaseService {
       logger.info({ classifierId: id }, 'Classifier deleted successfully');
     } catch (error) {
       logger.error({ error, classifierId: id }, 'Failed to delete classifier');
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a copy of an existing classifier with a new ID and optional name override
+   * @param id - The unique identifier of the classifier to clone
+   * @param input - Clone options including optional new id and name
+   * @param context - Request context for auditing and authorization
+   * @returns The newly created cloned classifier
+   * @throws {NotFoundError} When the source classifier is not found
+   */
+  async cloneClassifier(id: string, input: CloneClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
+    this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
+    logger.info({ id, adminId: context?.adminId }, 'Cloning classifier');
+
+    try {
+      const existingClassifier = await db.query.classifiers.findFirst({ where: eq(classifiers.id, id) });
+
+      if (!existingClassifier) {
+        throw new NotFoundError(`Classifier with id ${id} not found`);
+      }
+
+      return await this.createClassifier({ id: input.id, projectId: existingClassifier.projectId, name: input.name ?? `${existingClassifier.name} (Clone)`, description: existingClassifier.description ?? undefined, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings as any, metadata: existingClassifier.metadata ?? undefined }, context);
+    } catch (error) {
+      logger.error({ error, id }, 'Failed to clone classifier');
       throw error;
     }
   }

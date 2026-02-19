@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { tools } from '../db/schema';
-import type { CreateToolRequest, UpdateToolRequest, ToolResponse, ToolListResponse } from '../http/contracts/tool';
+import type { CreateToolRequest, UpdateToolRequest, ToolResponse, ToolListResponse, CloneToolRequest } from '../http/contracts/tool';
 import type { ListParams } from '../http/contracts/common';
 import { toolResponseSchema, toolListResponseSchema } from '../http/contracts/tool';
 import { AuditService } from './AuditService';
@@ -234,6 +234,32 @@ export class ToolService extends BaseService {
       logger.info({ toolId: id }, 'Tool deleted successfully');
     } catch (error) {
       logger.error({ error, toolId: id }, 'Failed to delete tool');
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a copy of an existing tool with a new ID and optional name override
+   * @param id - The unique identifier of the tool to clone
+   * @param input - Clone options including optional new id and name
+   * @param context - Request context for auditing and authorization
+   * @returns The newly created cloned tool
+   * @throws {NotFoundError} When the source tool is not found
+   */
+  async cloneTool(id: string, input: CloneToolRequest, context: RequestContext): Promise<ToolResponse> {
+    this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
+    logger.info({ id, adminId: context?.adminId }, 'Cloning tool');
+
+    try {
+      const existingTool = await db.query.tools.findFirst({ where: eq(tools.id, id) });
+
+      if (!existingTool) {
+        throw new NotFoundError(`Tool with id ${id} not found`);
+      }
+
+      return await this.createTool({ id: input.id, projectId: existingTool.projectId, name: input.name ?? `${existingTool.name} (Clone)`, description: existingTool.description ?? undefined, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings as any, inputType: existingTool.inputType as 'text' | 'image' | 'multi-modal', outputType: existingTool.outputType as 'text' | 'image' | 'multi-modal', parameters: existingTool.parameters as any, metadata: existingTool.metadata ?? undefined }, context);
+    } catch (error) {
+      logger.error({ error, id }, 'Failed to clone tool');
       throw error;
     }
   }

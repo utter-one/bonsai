@@ -3,8 +3,8 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ToolService } from '../../services/ToolService';
-import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolRouteParamsSchema } from '../contracts/tool';
-import type { UpdateToolRequest } from '../contracts/tool';
+import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolRouteParamsSchema, cloneToolSchema } from '../contracts/tool';
+import type { UpdateToolRequest, CloneToolRequest } from '../contracts/tool';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -161,6 +161,35 @@ export class ToolController {
           404: { description: 'Tool not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/tools/{id}/clone',
+        tags: ['Tools'],
+        summary: 'Clone tool',
+        description: 'Creates a copy of an existing tool with a new ID and optional name override',
+        request: {
+          params: toolRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: cloneToolSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Tool cloned successfully',
+            content: {
+              'application/json': {
+                schema: toolResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Tool not found' },
+        },
+      },
     ];
   }
 
@@ -174,6 +203,7 @@ export class ToolController {
     router.put('/api/tools/:id', asyncHandler(this.updateTool.bind(this)));
     router.delete('/api/tools/:id', asyncHandler(this.deleteTool.bind(this)));
     router.get('/api/tools/:id/audit-logs', asyncHandler(this.getToolAuditLogs.bind(this)));
+    router.post('/api/tools/:id/clone', asyncHandler(this.cloneTool.bind(this)));
   }
 
   /**
@@ -242,5 +272,17 @@ export class ToolController {
     const params = toolRouteParamsSchema.parse(req.params);
     const logs = await this.toolService.getToolAuditLogs(params.id);
     res.status(200).json(logs);
+  }
+
+  /**
+   * POST /api/tools/:id/clone
+   * Clone a tool
+   */
+  private async cloneTool(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.TOOL_WRITE]);
+    const params = toolRouteParamsSchema.parse(req.params);
+    const body = cloneToolSchema.parse(req.body);
+    const tool = await this.toolService.cloneTool(params.id, body, req.context);
+    res.status(201).json(tool);
   }
 }

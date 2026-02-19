@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { personas } from '../db/schema';
-import type { CreatePersonaRequest, UpdatePersonaRequest, PersonaResponse, PersonaListResponse } from '../http/contracts/persona';
+import type { CreatePersonaRequest, UpdatePersonaRequest, PersonaResponse, PersonaListResponse, ClonePersonaRequest } from '../http/contracts/persona';
 import type { ListParams } from '../http/contracts/common';
 import { personaResponseSchema, personaListResponseSchema } from '../http/contracts/persona';
 import { AuditService } from './AuditService';
@@ -219,6 +219,32 @@ export class PersonaService extends BaseService {
       logger.info({ personaId: id }, 'Persona deleted successfully');
     } catch (error) {
       logger.error({ error, personaId: id }, 'Failed to delete persona');
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a copy of an existing persona with a new ID and optional name override
+   * @param id - The unique identifier of the persona to clone
+   * @param input - Clone options including optional new id and name
+   * @param context - Request context for auditing and authorization
+   * @returns The newly created cloned persona
+   * @throws {NotFoundError} When the source persona is not found
+   */
+  async clonePersona(id: string, input: ClonePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
+    this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
+    logger.info({ id, adminId: context?.adminId }, 'Cloning persona');
+
+    try {
+      const existingPersona = await db.query.personas.findFirst({ where: eq(personas.id, id) });
+
+      if (!existingPersona) {
+        throw new NotFoundError(`Persona with id ${id} not found`);
+      }
+
+      return await this.createPersona({ id: input.id, projectId: existingPersona.projectId, name: input.name ?? `${existingPersona.name} (Clone)`, description: existingPersona.description ?? undefined, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId ?? undefined, ttsSettings: existingPersona.ttsSettings as any, metadata: existingPersona.metadata ?? undefined }, context);
+    } catch (error) {
+      logger.error({ error, id }, 'Failed to clone persona');
       throw error;
     }
   }

@@ -116,6 +116,18 @@ export type UpdateToolRequest = z.infer<typeof updateToolBodySchema>;
 /** Request body for deleting a tool */
 export type DeleteToolRequest = z.infer<typeof deleteToolBodySchema>;
 
+/**
+ * Schema for cloning a tool
+ * All fields are optional - id defaults to auto-generated, name defaults to "{original name} (Clone)"
+ */
+export const cloneToolSchema = z.object({
+  id: z.string().min(1).optional().describe('New ID for the cloned tool (auto-generated if not provided)'),
+  name: z.string().min(1).optional().describe('Name for the cloned tool (defaults to "{original name} (Clone)")'),
+});
+
+/** Request body for cloning a tool */
+export type CloneToolRequest = z.infer<typeof cloneToolSchema>;
+
 /** Response for a single tool */
 export type ToolResponse = z.infer<typeof toolResponseSchema>;
 

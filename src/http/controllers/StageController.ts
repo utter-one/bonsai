@@ -3,8 +3,8 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { StageService } from '../../services/StageService';
-import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema, stageRouteParamsSchema } from '../contracts/stage';
-import type { UpdateStageRequest } from '../contracts/stage';
+import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema, stageRouteParamsSchema, cloneStageSchema } from '../contracts/stage';
+import type { UpdateStageRequest, CloneStageRequest } from '../contracts/stage';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -161,6 +161,35 @@ export class StageController {
           404: { description: 'Stage not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/stages/{id}/clone',
+        tags: ['Stages'],
+        summary: 'Clone stage',
+        description: 'Creates a copy of an existing stage with a new ID and optional name override',
+        request: {
+          params: stageRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: cloneStageSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Stage cloned successfully',
+            content: {
+              'application/json': {
+                schema: stageResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Stage not found' },
+        },
+      },
     ];
   }
 
@@ -174,6 +203,7 @@ export class StageController {
     router.put('/api/stages/:id', asyncHandler(this.updateStage.bind(this)));
     router.delete('/api/stages/:id', asyncHandler(this.deleteStage.bind(this)));
     router.get('/api/stages/:id/audit-logs', asyncHandler(this.getStageAuditLogs.bind(this)));
+    router.post('/api/stages/:id/clone', asyncHandler(this.cloneStage.bind(this)));
   }
 
   /**
@@ -242,5 +272,17 @@ export class StageController {
     const params = stageRouteParamsSchema.parse(req.params);
     const logs = await this.stageService.getStageAuditLogs(params.id);
     res.status(200).json(logs);
+  }
+
+  /**
+   * POST /api/stages/:id/clone
+   * Clone a stage
+   */
+  private async cloneStage(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.STAGE_WRITE]);
+    const params = stageRouteParamsSchema.parse(req.params);
+    const body = cloneStageSchema.parse(req.body);
+    const stage = await this.stageService.cloneStage(params.id, body, req.context);
+    res.status(201).json(stage);
   }
 }

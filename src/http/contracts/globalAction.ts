@@ -141,6 +141,18 @@ export type UpdateGlobalActionRequest = z.infer<typeof updateGlobalActionBodySch
 /** Request body for deleting a global action */
 export type DeleteGlobalActionRequest = z.infer<typeof deleteGlobalActionBodySchema>;
 
+/**
+ * Schema for cloning a global action
+ * All fields are optional - id defaults to auto-generated, name defaults to "{original name} (Clone)"
+ */
+export const cloneGlobalActionSchema = z.object({
+  id: z.string().min(1).optional().describe('New ID for the cloned global action (auto-generated if not provided)'),
+  name: z.string().min(1).optional().describe('Name for the cloned global action (defaults to "{original name} (Clone)")'),
+});
+
+/** Request body for cloning a global action */
+export type CloneGlobalActionRequest = z.infer<typeof cloneGlobalActionSchema>;
+
 /** Response for a single global action */
 export type GlobalActionResponse = z.infer<typeof globalActionResponseSchema>;
 

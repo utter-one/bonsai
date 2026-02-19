@@ -3,8 +3,8 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { PersonaService } from '../../services/PersonaService';
-import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaRouteParamsSchema, personaResponseSchema, personaListResponseSchema } from '../contracts/persona';
-import type { CreatePersonaRequest, UpdatePersonaRequest, DeletePersonaRequest } from '../contracts/persona';
+import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaRouteParamsSchema, personaResponseSchema, personaListResponseSchema, clonePersonaSchema } from '../contracts/persona';
+import type { CreatePersonaRequest, UpdatePersonaRequest, DeletePersonaRequest, ClonePersonaRequest } from '../contracts/persona';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -161,6 +161,35 @@ export class PersonaController {
           404: { description: 'Persona not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/personas/{id}/clone',
+        tags: ['Personas'],
+        summary: 'Clone persona',
+        description: 'Creates a copy of an existing persona with a new ID and optional name override',
+        request: {
+          params: personaRouteParamsSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: clonePersonaSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Persona cloned successfully',
+            content: {
+              'application/json': {
+                schema: personaResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Persona not found' },
+        },
+      },
     ];
   }
 
@@ -174,6 +203,7 @@ export class PersonaController {
     router.put('/api/personas/:id', asyncHandler(this.updatePersona.bind(this)));
     router.delete('/api/personas/:id', asyncHandler(this.deletePersona.bind(this)));
     router.get('/api/personas/:id/audit-logs', asyncHandler(this.getPersonaAuditLogs.bind(this)));
+    router.post('/api/personas/:id/clone', asyncHandler(this.clonePersona.bind(this)));
   }
 
   /**
@@ -243,5 +273,17 @@ export class PersonaController {
     const params = personaRouteParamsSchema.parse(req.params);
     const auditLogs = await this.personaService.getPersonaAuditLogs(params.id);
     res.status(200).json(auditLogs);
+  }
+
+  /**
+   * POST /api/personas/:id/clone
+   * Clone a persona
+   */
+  private async clonePersona(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.PERSONA_WRITE]);
+    const params = personaRouteParamsSchema.parse(req.params);
+    const body = clonePersonaSchema.parse(req.body);
+    const persona = await this.personaService.clonePersona(params.id, body, req.context);
+    res.status(201).json(persona);
   }
 }

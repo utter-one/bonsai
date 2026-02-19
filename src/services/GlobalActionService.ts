@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
 import { globalActions } from '../db/schema';
-import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, GlobalActionResponse, GlobalActionListResponse } from '../http/contracts/globalAction';
+import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, GlobalActionResponse, GlobalActionListResponse, CloneGlobalActionRequest } from '../http/contracts/globalAction';
 import type { ListParams } from '../http/contracts/common';
 import { globalActionResponseSchema, globalActionListResponseSchema } from '../http/contracts/globalAction';
 import { AuditService } from './AuditService';
@@ -231,6 +231,32 @@ export class GlobalActionService extends BaseService {
       logger.info({ globalActionId: id }, 'Global action deleted successfully');
     } catch (error) {
       logger.error({ error, globalActionId: id }, 'Failed to delete global action');
+      throw error;
+    }
+  }
+
+  /**
+   * Creates a copy of an existing global action with a new ID and optional name override
+   * @param id - The unique identifier of the global action to clone
+   * @param input - Clone options including optional new id and name
+   * @param context - Request context for auditing and authorization
+   * @returns The newly created cloned global action
+   * @throws {NotFoundError} When the source global action is not found
+   */
+  async cloneGlobalAction(id: string, input: CloneGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
+    this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
+    logger.info({ id, adminId: context?.adminId }, 'Cloning global action');
+
+    try {
+      const existingAction = await db.query.globalActions.findFirst({ where: eq(globalActions.id, id) });
+
+      if (!existingAction) {
+        throw new NotFoundError(`Global action with id ${id} not found`);
+      }
+
+      return await this.createGlobalAction({ id: input.id, projectId: existingAction.projectId, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, effects: existingAction.effects as any, examples: existingAction.examples as string[] ?? undefined, metadata: existingAction.metadata ?? undefined }, context);
+    } catch (error) {
+      logger.error({ error, id }, 'Failed to clone global action');
       throw error;
     }
   }
