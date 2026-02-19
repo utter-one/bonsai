@@ -530,7 +530,11 @@ export class ActionsExecutor {
 
     try {
       for (const modification of effect.modifications) {
-        const { variableName, operation: op, value } = modification;
+        const { variableName, operation: op } = modification;
+        let { value } = modification;
+        if (typeof value === 'string') {
+          value = await this.templatingEngine.render(value, context);
+        }
 
         switch (op) {
           case 'set': {
@@ -673,6 +677,115 @@ export class ActionsExecutor {
   }
 
   /**
+   * Parses a `{{vars.x.y.z}}` template expression and returns the variable path (e.g. `"vars.x.y.z"`),
+   * or `null` if the value is not a vars reference.
+   * @param value - Raw parameter value string to inspect
+   */
+  private parseVarsReference(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (trimmed.startsWith('{{') && trimmed.endsWith('}}')) {
+      const inner = trimmed.slice(2, -2).trim();
+      if (inner.startsWith('vars.') || inner === 'vars') {
+        return inner;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Resolves a dotted variable path (e.g. `"vars.foo.bar"`) against the conversation vars.
+   * The leading `"vars."` segment is stripped before traversal.
+   * @param vars - Stage variables from the conversation context
+   * @param path - Dotted path string starting with `"vars."`
+   * @returns The resolved value, or `undefined` if any segment is missing
+   */
+  private resolveVarPath(vars: Record<string, any>, path: string): unknown {
+    const withoutPrefix = path.startsWith('vars.') ? path.slice(5) : path;
+    if (!withoutPrefix) return vars;
+    const parts = withoutPrefix.split('.');
+    let current: any = vars;
+    for (const part of parts) {
+      if (current === null || current === undefined || typeof current !== 'object') return undefined;
+      current = current[part];
+    }
+    return current;
+  }
+
+  /**
+   * Resolves and validates an image value read from a stage variable.
+   * Logs a warning if the value does not conform to the ImageParameterValue shape.
+   * @param value - The variable value to validate
+   * @param paramName - Parameter name used in log messages
+   * @param varPath - Variable path used in log messages
+   * @param conversationId - Conversation ID used in log messages
+   * @param toolId - Tool ID used in log messages
+   */
+  private validateImageVarValue(value: unknown, paramName: string, varPath: string, conversationId: string, toolId: string): void {
+    if (!value || typeof value !== 'object' || !('data' in value) || !('mimeType' in value) || typeof (value as any).mimeType !== 'string' || !(value as any).mimeType.startsWith('image/')) {
+      logger.warn({ conversationId, toolId, parameterName: paramName, variablePath: varPath }, `Image parameter ${paramName} resolved from ${varPath} does not match ImageParameterValue schema (expected { data, mimeType })`);
+    }
+  }
+
+  /**
+   * Resolves all call_tool effect parameters:
+   * - Parameters whose tool definition type is `image` or `image[]` are resolved from stage
+   *   variables referenced as `{{vars.path.to.value}}` expressions.
+   * - All other string parameters are rendered through the templating engine.
+   * - Non-string, non-image values are passed through unchanged.
+   * @param effectParameters - Raw parameters from the CallToolEffect
+   * @param toolParameterTypes - Map of parameter name → expected type from tool definition
+   * @param context - Conversation context (provides vars and templating data)
+   * @param toolId - Tool ID used in log messages
+   * @returns Resolved parameters ready to pass to ToolExecutor
+   */
+  private async resolveToolParameters(
+    effectParameters: Record<string, unknown>,
+    toolParameterTypes: Map<string, string>,
+    context: ConversationContext,
+    toolId: string,
+  ): Promise<Record<string, ParameterValue>> {
+    const resolved: Record<string, ParameterValue> = {};
+
+    for (const [key, value] of Object.entries(effectParameters)) {
+      const paramType = toolParameterTypes.get(key);
+      const isImageParam = paramType === 'image' || paramType === 'image[]';
+
+      if (isImageParam && typeof value === 'string') {
+        // Resolve image from stage variable reference {{vars.x.y.z}}
+        const varPath = this.parseVarsReference(value);
+        if (varPath !== null) {
+          const varValue = this.resolveVarPath(context.vars, varPath);
+          if (varValue === undefined) {
+            logger.warn({ conversationId: context.conversationId, toolId, parameterName: key, variablePath: varPath }, `Image parameter ${key} references variable path ${varPath} which is not set in context.vars`);
+            resolved[key] = value as ParameterValue;
+          } else if (paramType === 'image[]' && Array.isArray(varValue)) {
+            for (const [index, item] of varValue.entries()) {
+              this.validateImageVarValue(item, `${key}[${index}]`, varPath, context.conversationId, toolId);
+            }
+            resolved[key] = varValue as ParameterValue;
+            logger.debug({ conversationId: context.conversationId, toolId, parameterName: key, variablePath: varPath, itemCount: varValue.length }, `Resolved image[] parameter ${key} from variable ${varPath}`);
+          } else {
+            this.validateImageVarValue(varValue, key, varPath, context.conversationId, toolId);
+            resolved[key] = varValue as ParameterValue;
+            logger.debug({ conversationId: context.conversationId, toolId, parameterName: key, variablePath: varPath }, `Resolved image parameter ${key} from variable ${varPath}`);
+          }
+        } else {
+          logger.warn({ conversationId: context.conversationId, toolId, parameterName: key }, `Image parameter ${key} value is not a {{vars.*}} reference; passing through as-is`);
+          resolved[key] = value as ParameterValue;
+        }
+      } else if (typeof value === 'string') {
+        // Render text parameters through the templating engine
+        resolved[key] = await this.templatingEngine.render(value, context);
+      } else {
+        resolved[key] = value as ParameterValue;
+      }
+    }
+
+    return resolved;
+  }
+
+  /**
    * Executes call_tool effect
    * Calls a tool with the specified parameters and stores the result
    */
@@ -691,32 +804,26 @@ export class ActionsExecutor {
 
       logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, inputType: tool.inputType, outputType: tool.outputType }, `Tool loaded: ${tool.name}`);
 
-      // 2. Validate input parameters against tool.inputType
-      // The inputType tells us what format we expect:
-      // - 'text': parameters should be simple string values
-      // - 'image': parameters might contain image data/URLs
-      // - 'multi-modal': parameters can be mixed
-      // For now, we'll do basic validation that parameters exist and match expectations
-      if (tool.inputType === 'text') {
-        // For text input, ensure all parameters can be serialized to text
-        for (const [key, value] of Object.entries(effect.parameters)) {
-          if (value !== null && value !== undefined && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
-            const renderedValue = await this.templatingEngine.render(String(value), context);
-            effect.parameters[key] = renderedValue;
-            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId, parameterName: key, parameterType: typeof value }, `Parameter ${key} is not a simple type for text-based tool`);
-          }
-        }
+      // 2. Build a map of parameter name → expected type from the tool definition
+      const toolParameterTypes = new Map<string, string>();
+      for (const param of (tool.parameters || [])) {
+        toolParameterTypes.set(param.name, param.type);
       }
 
-      logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, parameters: effect.parameters }, `Input parameters validated for tool`);
+      // 3. Resolve parameters:
+      //    - image / image[] typed parameters are resolved from {{vars.x.y.z}} stage variable references
+      //    - all other string parameters are rendered through the templating engine
+      const resolvedParameters = await this.resolveToolParameters(effect.parameters, toolParameterTypes, context, effect.toolId);
 
-      // 3. Execute the tool using ToolExecutor
+      logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, parameters: resolvedParameters }, `Input parameters resolved for tool`);
+
+      // 4. Execute the tool using ToolExecutor
       // ToolExecutor will:
       // - Load the LLM provider
       // - Render the tool prompt with context and parameters
       // - Call the LLM
       // - Return the result
-      const executionResult = await this.toolExecutor.executeTool(tool as any, context, effect.parameters as Record<string, ParameterValue>);
+      const executionResult = await this.toolExecutor.executeTool(tool as any, context, resolvedParameters);
 
       if (!executionResult.success) {
         throw new Error(executionResult.failureReason || 'Tool execution failed');
@@ -754,7 +861,7 @@ export class ActionsExecutor {
         toolName: tool.name,
         inputType: tool.inputType,
         outputType: tool.outputType,
-        parameters: effect.parameters,
+        parameters: resolvedParameters,
         result: executionResult.result,
         executedAt: new Date().toISOString(),
       };
@@ -768,7 +875,7 @@ export class ActionsExecutor {
         toolCallEvent: {
           toolId: tool.id,
           toolName: tool.name,
-          parameters: effect.parameters,
+          parameters: resolvedParameters,
           success: executionResult.success,
           result: executionResult.result,
           error: executionResult.failureReason,
