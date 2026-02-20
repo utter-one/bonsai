@@ -8,8 +8,9 @@ import { ConversationService } from "../ConversationService";
 import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
-import { Conversation } from "../../types/models";
+import { Conversation, GlobalAction } from "../../types/models";
 import { extractTextFromContent } from "../../utils/llm";
+import { StageAction } from "../../types/actions";
 
 /**
  * Service responsible for processing user input during live sessions.
@@ -74,7 +75,31 @@ export class UserInputProcessor {
         this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
       }
 
-      return classificationResultsWithClassifiers.map(x => x.actions).flat();
+      const allActions = classificationResultsWithClassifiers.map(x => x.actions).flat();
+      const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.id, ga]));
+
+      const filteredActions = allActions.filter(action => {
+        let actionDef : GlobalAction | StageAction = globalActionsMap.get(action.name);
+        if (!actionDef) {
+          actionDef = stage.actions[action.name];
+        } 
+
+        if (!actionDef) {
+          logger.warn({ conversationId: session.id, actionName: action.name }, `Received action ${action.name} from classifier which does not exist in global actions or stage actions. Ignoring.`);
+          return false;
+        }
+
+        // Check if we have all required parameters for the action
+        const missingRequiredParams = (actionDef.parameters || []).filter(p => p.required && action.parameters[p.name] == null).map(p => p.name);
+        if (missingRequiredParams.length > 0) {
+          logger.warn({ conversationId: session.id, actionName: action.name, missingParameters: missingRequiredParams }, `Received incomplete action ${action.name} from classifier. Missing required parameters: ${missingRequiredParams.join(', ')}. Ignoring.`);
+          return false;
+        }
+
+        return true;
+      });
+
+      return filteredActions;
     } catch (error) {
       logger.error({ error, sessionId: session.id }, 'Error processing text input using classifiers');
       throw error;
