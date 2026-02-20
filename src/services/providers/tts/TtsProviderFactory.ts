@@ -7,21 +7,22 @@ import { OpenAiTtsProvider, OpenAiTtsProviderConfig, openAiTtsProviderConfigSche
 import { DeepgramTtsProvider, DeepgramTtsProviderConfig, deepgramTtsProviderConfigSchema, DeepgramTtsSettings } from './DeepgramTtsProvider';
 import { CartesiaTtsProvider, CartesiaTtsProviderConfig, cartesiaTtsProviderConfigSchema, CartesiaTtsSettings } from './CartesiaTtsProvider';
 import { AzureTtsProvider, AzureTtsProviderConfig, azureTtsProviderConfigSchema, AzureTtsSettings } from './AzureTtsProvider';
+import { GeminiTtsProvider, GeminiTtsProviderConfig, geminiTtsProviderConfigSchema, GeminiTtsSettings } from './GeminiTtsProvider';
 
 /**
  * Supported TTS provider API types
  */
-export type TtsProviderApiType = 'elevenlabs' | 'openai' | 'deepgram' | 'cartesia' | 'azure';
+export type TtsProviderApiType = 'elevenlabs' | 'openai' | 'deepgram' | 'cartesia' | 'azure' | 'gemini';
 
 /**
  * Union type for all TTS voice settings
  */
-export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings | DeepgramTtsSettings | CartesiaTtsSettings | AzureTtsSettings;
+export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings | DeepgramTtsSettings | CartesiaTtsSettings | AzureTtsSettings | GeminiTtsSettings;
 
 /**
  * Union type for all TTS provider configurations
  */
-export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig | DeepgramTtsProviderConfig | CartesiaTtsProviderConfig | AzureTtsProviderConfig;
+export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig | DeepgramTtsProviderConfig | CartesiaTtsProviderConfig | AzureTtsProviderConfig | GeminiTtsProviderConfig;
 
 /**
  * Factory service for creating TTS provider instances based on provider entity configuration
@@ -61,8 +62,11 @@ export class TtsProviderFactory {
       case 'azure':
         return this.createAzureProvider(provider, settings as AzureTtsSettings);
 
+      case 'gemini':
+        return this.createGeminiProvider(provider, settings as GeminiTtsSettings);
+
       default:
-        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia, azure`;
+        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia, azure, gemini`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -139,6 +143,20 @@ export class TtsProviderFactory {
   }
 
   /**
+   * Creates a Gemini TTS provider instance from provider entity
+   * @param provider - Provider entity with Gemini-specific configuration
+   * @param settings - Gemini-specific TTS settings
+   * @returns Configured Gemini TTS provider
+   * @throws {Error} When required Gemini configuration fields are missing
+   */
+  private createGeminiProvider(provider: Provider, settings: GeminiTtsSettings): GeminiTtsProvider {
+    const config = geminiTtsProviderConfigSchema.parse(provider.config);
+
+    logger.info(`Creating Gemini TTS provider for provider ${provider.id}`);
+    return new GeminiTtsProvider(config, settings);
+  }
+
+  /**
    * Validates if a provider can be used for TTS
    * @param provider - Provider entity to validate
    * @returns True if provider is valid for TTS, false otherwise
@@ -157,6 +175,6 @@ export class TtsProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): TtsProviderApiType[] {
-    return ['elevenlabs', 'openai', 'deepgram', 'cartesia', 'azure'];
+    return ['elevenlabs', 'openai', 'deepgram', 'cartesia', 'azure', 'gemini'];
   }
 }

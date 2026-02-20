@@ -33,6 +33,7 @@ import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabs
 import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from './services/providers/tts/DeepgramTtsProvider';
 import { azureTtsSettingsSchema } from './services/providers/tts/AzureTtsProvider';
+import { geminiTtsSettingsSchema } from './services/providers/tts/GeminiTtsProvider';
 import { s3StorageProviderConfigSchema, s3StorageSettingsSchema } from './services/providers/storage/S3StorageProvider';
 import { azureBlobStorageProviderConfigSchema, azureBlobStorageSettingsSchema } from './services/providers/storage/AzureBlobStorageProvider';
 import { gcsStorageProviderConfigSchema, gcsStorageSettingsSchema } from './services/providers/storage/GcsStorageProvider';
@@ -85,6 +86,7 @@ export function getOpenAPISpec(): any {
   registry.register('DeepgramTtsSettings', deepgramTtsSettingsSchema);
   registry.register('CartesiaTtsSettings', cartesiaTtsSettingsSchema);
   registry.register('AzureTtsSettings', azureTtsSettingsSchema);
+  registry.register('GeminiTtsSettings', geminiTtsSettingsSchema);
 
   // Voice and ASR configuration schemas
   registry.register('AsrConfig', asrConfigSchema);

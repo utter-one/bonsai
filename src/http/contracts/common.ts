@@ -9,6 +9,7 @@ import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsP
 import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
 import { cartesiaTtsSettingsSchema } from '../../services/providers/tts/CartesiaTtsProvider';
 import { azureTtsSettingsSchema } from '../../services/providers/tts/AzureTtsProvider';
+import { geminiTtsSettingsSchema } from '../../services/providers/tts/GeminiTtsProvider';
 
 extendZodWithOpenApi(z);
 
@@ -106,6 +107,7 @@ export const ttsSettingsSchema = z.discriminatedUnion('provider', [
   deepgramTtsSettingsSchema,
   cartesiaTtsSettingsSchema,
   azureTtsSettingsSchema,
+  geminiTtsSettingsSchema,
 ]).openapi('TtsSettings').nullable().optional().describe('TTS provider-specific settings');
 
 export type TtsSettings = z.infer<typeof ttsSettingsSchema>;

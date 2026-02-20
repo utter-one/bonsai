@@ -13,6 +13,7 @@ import { openAiTtsProviderConfigSchema } from '../../services/providers/tts/Open
 import { deepgramTtsProviderConfigSchema } from '../../services/providers/tts/DeepgramTtsProvider';
 import { cartesiaTtsProviderConfigSchema } from '../../services/providers/tts/CartesiaTtsProvider';
 import { azureTtsProviderConfigSchema } from '../../services/providers/tts/AzureTtsProvider';
+import { geminiTtsProviderConfigSchema } from '../../services/providers/tts/GeminiTtsProvider';
 import { azureAsrProviderConfigSchema } from '../../services/providers/asr/AzureAsrProvider';
 import { s3StorageProviderConfigSchema } from '../../services/providers/storage/S3StorageProvider';
 import { azureBlobStorageProviderConfigSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
@@ -42,6 +43,7 @@ export const ttsProviderConfigSchema = z.union([
   deepgramTtsProviderConfigSchema,
   cartesiaTtsProviderConfigSchema,
   azureTtsProviderConfigSchema,
+  geminiTtsProviderConfigSchema,
 ]).describe('TTS provider configuration');
 
 /**
