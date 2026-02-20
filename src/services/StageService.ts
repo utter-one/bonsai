@@ -157,6 +157,7 @@ export class StageService extends BaseService {
         projectId: stages.projectId,
         name: stages.name,
         personaId: stages.personaId,
+        enterBehavior: stages.enterBehavior,
         useKnowledge: stages.useKnowledge,
         useGlobalActions: stages.useGlobalActions,
         version: stages.version,
