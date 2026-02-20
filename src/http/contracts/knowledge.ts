@@ -38,7 +38,7 @@ export const createKnowledgeCategorySchema = z.object({
   projectId: z.string().min(1).describe('ID of the project this knowledge category belongs to'),
   name: z.string().min(1).describe('Name of the knowledge category'),
   promptTrigger: z.string().min(1).describe('Trigger phrase that activates this category in conversations'),
-  knowledgeTags: z.array(z.string()).optional().describe('Array of knowledge tags this category belongs to'),
+  tags: z.array(z.string()).optional().describe('Array of knowledge tags this category belongs to'),
   order: z.number().int().min(0).optional().describe('Display order for the category (default: 0)'),
 });
 
@@ -50,7 +50,7 @@ export const createKnowledgeCategorySchema = z.object({
 export const updateKnowledgeCategoryBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated name of the category'),
   promptTrigger: z.string().min(1).optional().describe('Updated trigger phrase'),
-  knowledgeTags: z.array(z.string()).optional().describe('Updated array of knowledge tags'),
+  tags: z.array(z.string()).optional().describe('Updated array of knowledge tags'),
   order: z.number().int().min(0).optional().describe('Updated display order'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -86,7 +86,7 @@ export const knowledgeCategoryResponseSchema = z.object({
   projectId: z.string().describe('ID of the project this knowledge category belongs to'),
   name: z.string().describe('Name of the knowledge category'),
   promptTrigger: z.string().describe('Trigger phrase that activates this category'),
-  knowledgeTags: z.array(z.string()).describe('Array of knowledge tags'),
+  tags: z.array(z.string()).describe('Array of knowledge tags'),
   order: z.number().int().describe('Display order for the category'),
   items: z.array(knowledgeItemInCategorySchema).optional().describe('Knowledge items within this category'),
   version: z.number().int().describe('Version number for optimistic locking'),

@@ -40,7 +40,7 @@ export class KnowledgeService extends BaseService {
     logger.info({ categoryId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
 
     try {
-      const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, tags: input.knowledgeTags ?? [], order: input.order ?? 0, version: 1 }).returning();
+      const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, tags: input.tags ?? [], order: input.order ?? 0, version: 1 }).returning();
 
       const createdCategory = category[0];
 
@@ -154,7 +154,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge category version mismatch. Expected ${expectedVersion}, got ${existingCategory.version}`);
       }
 
-      const updatedCategory = await db.update(knowledgeCategories).set({ name: updateData.name, promptTrigger: updateData.promptTrigger, tags: updateData.knowledgeTags, order: updateData.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
+      const updatedCategory = await db.update(knowledgeCategories).set({ name: updateData.name, promptTrigger: updateData.promptTrigger, tags: updateData.tags, order: updateData.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
 
       if (updatedCategory.length === 0) {
         throw new OptimisticLockError(`Failed to update knowledge category due to version conflict`);
