@@ -3,21 +3,22 @@ import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IAsrProvider } from './IAsrProvider';
 import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema, AzureAsrSettings } from './AzureAsrProvider';
+import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProviderConfigSchema, ElevenLabsAsrSettings } from './ElevenLabsAsrProvider';
 
 /**
  * Supported ASR provider API types
  */
-export type AsrProviderApiType = 'azure';
+export type AsrProviderApiType = 'azure' | 'elevenlabs';
 
 /** 
  * Union type for all ASR provider settings
  */
-export type AsrSettings = AzureAsrSettings;
+export type AsrSettings = AzureAsrSettings | ElevenLabsAsrSettings;
 
 /**
  * Union type for all ASR provider configurations
  */
-export type AsrProviderConfig = AzureAsrProviderConfig;
+export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderConfig;
 
 /**
  * Factory service for creating ASR provider instances based on provider entity configuration
@@ -44,8 +45,11 @@ export class AsrProviderFactory {
       case 'azure':
         return this.createAzureProvider(provider, settings as AzureAsrSettings);
 
+      case 'elevenlabs':
+        return this.createElevenLabsProvider(provider, settings as ElevenLabsAsrSettings);
+
       default:
-        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure`;
+        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -66,6 +70,20 @@ export class AsrProviderFactory {
   }
 
   /**
+   * Creates an ElevenLabs ASR provider instance from provider entity
+   * @param provider - Provider entity with ElevenLabs-specific configuration
+   * @returns Configured ElevenLabs ASR provider
+   * @throws {Error} When required ElevenLabs configuration fields are missing
+   */
+  private createElevenLabsProvider(provider: Provider, settings: ElevenLabsAsrSettings): ElevenLabsAsrProvider {
+    const config = elevenLabsAsrProviderConfigSchema.parse(provider.config);
+    const safeSettings = (settings ?? {}) as ElevenLabsAsrSettings;
+
+    logger.info(`Creating ElevenLabs ASR provider for provider ${provider.id}`);
+    return new ElevenLabsAsrProvider(config, safeSettings);
+  }
+
+  /**
    * Validates if a provider can be used for ASR
    * @param provider - Provider entity to validate
    * @returns True if provider is valid for ASR, false otherwise
@@ -75,7 +93,7 @@ export class AsrProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: AsrProviderApiType[] = ['azure'];
+    const supportedApiTypes: AsrProviderApiType[] = ['azure', 'elevenlabs'];
     return supportedApiTypes.includes(provider.apiType as AsrProviderApiType);
   }
 
@@ -84,6 +102,6 @@ export class AsrProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): AsrProviderApiType[] {
-    return ['azure'];
+    return ['azure', 'elevenlabs'];
   }
 }
