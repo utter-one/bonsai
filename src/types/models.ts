@@ -9,7 +9,6 @@ import {
   contextTransformers,
   tools,
   stages,
-  knowledgeSections,
   knowledgeCategories,
   knowledgeItems,
   globalActions,
@@ -32,7 +31,6 @@ export type Classifier = InferSelectModel<typeof classifiers>;
 export type ContextTransformer = InferSelectModel<typeof contextTransformers>;
 export type Tool = InferSelectModel<typeof tools>;
 export type Stage = InferSelectModel<typeof stages>;
-export type KnowledgeSection = InferSelectModel<typeof knowledgeSections>;
 export type KnowledgeCategory = InferSelectModel<typeof knowledgeCategories>;
 export type KnowledgeItem = InferSelectModel<typeof knowledgeItems>;
 export type GlobalAction = InferSelectModel<typeof globalActions>;

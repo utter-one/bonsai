@@ -5,12 +5,14 @@ import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
+import { KnowledgeService } from "../KnowledgeService";
 import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
 import { Conversation, GlobalAction } from "../../types/models";
 import { extractTextFromContent } from "../../utils/llm";
 import { StageAction } from "../../types/actions";
+import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 
 /**
  * Service responsible for processing user input during live sessions.
@@ -21,7 +23,8 @@ export class UserInputProcessor {
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private conversationService: ConversationService,
-    @inject(ConnectionManager) private connectionManager: ConnectionManager
+    @inject(ConnectionManager) private connectionManager: ConnectionManager,
+    @inject(KnowledgeService) private knowledgeService: KnowledgeService
   ) {}
 
   /** Processes text input from the user within a session.
@@ -40,8 +43,19 @@ export class UserInputProcessor {
       const stage = session.runner.getRuntimeData().stage;
       const conversation = session.runner.getRuntimeData().conversation;
       const globalActions = session.runner.getRuntimeData().globalActions;
+
+      // Fetch knowledge categories for the default classifier when knowledge is enabled
+      let knowledgeCategories: KnowledgeCategoryResponse[] = [];
+      if (stage.useKnowledge && stage.defaultClassifierId) {
+        knowledgeCategories = stage.knowledgeTags.length > 0
+          ? await this.knowledgeService.getCategoriesByTags(stage.knowledgeTags)
+          : (await this.knowledgeService.listKnowledgeCategories({ filters: { projectId: session.runner.getRuntimeData().conversation.projectId } , offset: 0, limit: 100 })).items;
+        logger.debug({ conversationId: conversation.id, categoryCount: knowledgeCategories.length, classifierId: stage.defaultClassifierId }, 'Fetched knowledge categories for default classifier');
+      }
       
       const actionPromises = classifiers.map(async (classifier) => {
+        // Inject knowledge categories only for the default classifier
+        const classifierKnowledgeCategories = classifier.classifier.id === stage.defaultClassifierId ? knowledgeCategories : [];
         // Build context specific to this classifier with filtered actions
         const classifierContext = await this.contextBuilder.buildContextForClassifier(
           conversation,
@@ -49,7 +63,8 @@ export class UserInputProcessor {
           globalActions,
           classifier.classifier.id,
           userInput,
-          originalUserInput
+          originalUserInput,
+          classifierKnowledgeCategories
         );
         return this.classifyTextInput(session, classifier, classifierContext);
       });
@@ -78,7 +93,14 @@ export class UserInputProcessor {
       const allActions = classificationResultsWithClassifiers.map(x => x.actions).flat();
       const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.id, ga]));
 
+      const knowledgeCategoryIds = new Set(knowledgeCategories.map(c => `__knowledge_${c.id}`));
+
       const filteredActions = allActions.filter(action => {
+        // Allow synthetic knowledge actions to pass through without looking them up in stage or global actions
+        if (knowledgeCategoryIds.has(action.name)) {
+          return true;
+        }
+
         let actionDef : GlobalAction | StageAction = globalActionsMap.get(action.name);
         if (!actionDef) {
           actionDef = stage.actions[action.name];

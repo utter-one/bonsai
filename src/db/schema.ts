@@ -162,7 +162,7 @@ export const stages = pgTable('stages', {
   personaId: text('persona_id').notNull().references(() => personas.id),
   enterBehavior: text('enter_behavior').notNull().$type<StageEnterBehavior>().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),
-  knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
+  knowledgeTags: jsonb('knowledge_tags').notNull().default([]).$type<string[]>(),
   useGlobalActions: boolean('use_global_actions').notNull().default(true),
   globalActions: jsonb('global_actions').notNull().default([]).$type<string[]>(),
   variableDescriptors: jsonb('variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
@@ -175,21 +175,13 @@ export const stages = pgTable('stages', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// KnowledgeSection table
-export const knowledgeSections = pgTable('knowledge_sections', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
 // KnowledgeCategory table
 export const knowledgeCategories = pgTable('knowledge_categories', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   promptTrigger: text('prompt_trigger').notNull(),
-  knowledgeSections: jsonb('knowledge_sections').notNull().default([]).$type<string[]>(),
+  tags: jsonb('tags').notNull().default([]).$type<string[]>(),
   order: integer('order').notNull().default(0),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

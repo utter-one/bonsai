@@ -8,6 +8,15 @@ import { MessageEventData } from "../../types/conversationEvents";
 import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
 import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
+import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
+
+/**
+ * A single FAQ item consisting of a question and its answer, sourced from the knowledge base.
+ */
+export type FaqItem = {
+  question: string;
+  answer: string;
+};
 
 export type ConversationContext = {
   /** ID of the conversation */
@@ -47,6 +56,9 @@ export type ConversationContext = {
     webhooks: Record<string, any>;
     tools: Record<string, any>;
   }
+
+  /** FAQ items gathered from knowledge base categories triggered during this conversation turn */
+  faq?: FaqItem[];
 
   /** Stage configuration and available actions (optional, included for classification and processing contexts) */
   stage?: {
@@ -121,8 +133,9 @@ export class ConversationContextBuilder {
    * @param globalActions - Array of global actions for the stage
    * @param classifierId - ID of the classifier to filter actions for
    * @param rawContext - The conversation context to use for condition evaluation
+   * @param knowledgeCategories - Optional knowledge categories to inject as synthetic actions (only for the default classifier)
    */
-  private async buildStageContextForClassifier(stage: Stage, globalActions: GlobalAction[], classifierId: string, rawContext: ConversationContext) {
+  private async buildStageContextForClassifier(stage: Stage, globalActions: GlobalAction[], classifierId: string, rawContext: ConversationContext, knowledgeCategories?: KnowledgeCategoryResponse[]) {
     // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId) AND condition is met
     const stageActionEntries = Object.entries(stage.actions || {})
       .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId));
@@ -176,8 +189,15 @@ export class ConversationContextBuilder {
     const stageActions = stageActionsWithNulls.filter(a => a !== null);
     const filteredGlobalActions = globalActionsWithNulls.filter(a => a !== null);
 
-    // Combine stage actions and global actions
-    const availableActions = [...stageActions, ...filteredGlobalActions];
+    // Build synthetic knowledge actions from knowledge categories (injected only for the default classifier)
+    const knowledgeActions = (knowledgeCategories ?? []).map(category => ({
+      id: `__knowledge_${category.id}`,
+      name: `__knowledge_${category.id}`,
+      trigger: category.promptTrigger,
+    }));
+
+    // Combine stage actions, global actions, and knowledge actions
+    const availableActions = [...stageActions, ...filteredGlobalActions, ...knowledgeActions];
 
     return {
       id: stage.id,
@@ -289,8 +309,9 @@ export class ConversationContextBuilder {
    * @param classifierId - ID of the classifier to build context for
    * @param userInput - The user input text
    * @param originalUserInput - The original user input before any transformations
+   * @param knowledgeCategories - Optional knowledge categories to inject as synthetic actions for this classifier
    */
-  async buildContextForClassifier(conversation: Conversation, stage: Stage, globalActions: GlobalAction[], classifierId: string, userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+  async buildContextForClassifier(conversation: Conversation, stage: Stage, globalActions: GlobalAction[], classifierId: string, userInput?: string, originalUserInput?: string, knowledgeCategories?: KnowledgeCategoryResponse[]): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: eq(users.id, conversation.userId),
@@ -314,7 +335,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
-      stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext),
+      stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext, knowledgeCategories),
     };
 
     // Get history from database
@@ -344,9 +365,10 @@ export class ConversationContextBuilder {
    * @param userInput - The user input text
    * @param originalUserInput - The original user input before any transformations
    * @param actions - Array of action classification results
+   * @param faq - Optional FAQ items from knowledge base to include in the context
    * @returns ConversationContext with all relevant data for processing user input and generating responses, including all actions that can be triggered by user input.
    */
-  async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string): Promise<ConversationContext> {
+  async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string, faq?: FaqItem[]): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: eq(users.id, conversation.userId),
@@ -364,6 +386,7 @@ export class ConversationContextBuilder {
       }, {} as Record<string, { parameters: Record<string, any> }>),
       userInput,
       originalUserInput,
+      faq: faq ?? [],
       results: {
         webhooks: {},
         tools: {},

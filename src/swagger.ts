@@ -8,7 +8,7 @@ import { createProjectSchema, updateProjectSchema, projectResponseSchema, projec
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './http/contracts/persona';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
 import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './http/contracts/setup';
-import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './http/contracts/knowledge';
+import { createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './http/contracts/knowledge';
 import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './http/contracts/issue';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './http/contracts/conversation';
 import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './http/contracts/stage';
@@ -146,10 +146,6 @@ export function getOpenAPISpec(): any {
   registry.register('InitialAdminSetupRequest', initialAdminSetupSchema);
   registry.register('SetupStatusResponse', setupStatusResponseSchema);
   registry.register('InitialAdminSetupResponse', initialAdminSetupResponseSchema);
-  registry.register('CreateKnowledgeSectionRequest', createKnowledgeSectionSchema);
-  registry.register('UpdateKnowledgeSectionRequest', updateKnowledgeSectionSchema);
-  registry.register('KnowledgeSectionResponse', knowledgeSectionResponseSchema);
-  registry.register('KnowledgeSectionListResponse', knowledgeSectionListResponseSchema);
   registry.register('CreateKnowledgeCategoryRequest', createKnowledgeCategorySchema);
   registry.register('UpdateKnowledgeCategoryRequest', updateKnowledgeCategoryBodySchema);
   registry.register('DeleteKnowledgeCategoryRequest', deleteKnowledgeCategoryBodySchema);
