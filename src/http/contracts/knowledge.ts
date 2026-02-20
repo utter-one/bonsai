@@ -25,86 +25,32 @@ export const knowledgeCategoryItemsRouteParamsSchema = z.object({
 });
 
 // ============================================================
-// KNOWLEDGE SECTION SCHEMAS
-// ============================================================
-
-/**
- * Schema for creating a new knowledge section
- * Required fields: id, name
- */
-export const createKnowledgeSectionSchema = z.object({
-  id: z.string().min(1).optional().describe('Unique identifier for the knowledge section (auto-generated if not provided)'),
-  name: z.string().min(1).describe('Name of the knowledge section'),
-});
-
-/**
- * Schema for updating a knowledge section
- * Required fields: name
- */
-export const updateKnowledgeSectionSchema = z.object({
-  name: z.string().min(1).describe('Updated name of the knowledge section'),
-});
-
-/**
- * Schema for knowledge section response
- * Includes: id, name, createdAt, updatedAt
- */
-export const knowledgeSectionResponseSchema = z.object({
-  id: z.string().describe('Unique identifier for the knowledge section'),
-  name: z.string().describe('Name of the knowledge section'),
-  createdAt: z.coerce.date().describe('Timestamp when the section was created'),
-  updatedAt: z.coerce.date().describe('Timestamp when the section was last updated'),
-});
-
-/**
- * Schema for paginated list of knowledge sections
- */
-export const knowledgeSectionListResponseSchema = z.object({
-  items: z.array(knowledgeSectionResponseSchema).describe('Array of knowledge sections in the current page'),
-  total: z.number().int().min(0).describe('Total number of sections matching the query'),
-  offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
-});
-
-/** Request body for creating a new knowledge section */
-export type CreateKnowledgeSectionRequest = z.infer<typeof createKnowledgeSectionSchema>;
-
-/** Request body for updating a knowledge section */
-export type UpdateKnowledgeSectionRequest = z.infer<typeof updateKnowledgeSectionSchema>;
-
-/** Response for a single knowledge section */
-export type KnowledgeSectionResponse = z.infer<typeof knowledgeSectionResponseSchema>;
-
-/** Response for paginated list of knowledge sections */
-export type KnowledgeSectionListResponse = z.infer<typeof knowledgeSectionListResponseSchema>;
-
-// ============================================================
 // KNOWLEDGE CATEGORY SCHEMAS
 // ============================================================
 
 /**
  * Schema for creating a new knowledge category
  * Required fields: id, name, promptTrigger
- * Optional fields: knowledgeSections, order
+ * Optional fields: knowledgeTags, order
  */
 export const createKnowledgeCategorySchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the knowledge category (auto-generated if not provided)'),
   projectId: z.string().min(1).describe('ID of the project this knowledge category belongs to'),
   name: z.string().min(1).describe('Name of the knowledge category'),
   promptTrigger: z.string().min(1).describe('Trigger phrase that activates this category in conversations'),
-  knowledgeSections: z.array(z.string()).optional().describe('Array of knowledge section IDs this category belongs to'),
+  knowledgeTags: z.array(z.string()).optional().describe('Array of knowledge tags this category belongs to'),
   order: z.number().int().min(0).optional().describe('Display order for the category (default: 0)'),
 });
 
 /**
  * Schema for updating a knowledge category
- * Optional fields: name, promptTrigger, knowledgeSections, order, version
+ * Optional fields: name, promptTrigger, knowledgeTags, order, version
  * Version is required for optimistic locking
  */
 export const updateKnowledgeCategoryBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated name of the category'),
   promptTrigger: z.string().min(1).optional().describe('Updated trigger phrase'),
-  knowledgeSections: z.array(z.string()).optional().describe('Updated array of knowledge section IDs'),
+  knowledgeTags: z.array(z.string()).optional().describe('Updated array of knowledge tags'),
   order: z.number().int().min(0).optional().describe('Updated display order'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -133,14 +79,14 @@ export const knowledgeItemInCategorySchema = z.object({
 
 /**
  * Schema for knowledge category response
- * Includes: id, name, promptTrigger, knowledgeSections, order, items, version, createdAt, updatedAt
+ * Includes: id, name, promptTrigger, knowledgeTags, order, items, version, createdAt, updatedAt
  */
 export const knowledgeCategoryResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the knowledge category'),
   projectId: z.string().describe('ID of the project this knowledge category belongs to'),
   name: z.string().describe('Name of the knowledge category'),
   promptTrigger: z.string().describe('Trigger phrase that activates this category'),
-  knowledgeSections: z.array(z.string()).describe('Array of knowledge section IDs'),
+  knowledgeTags: z.array(z.string()).describe('Array of knowledge tags'),
   order: z.number().int().describe('Display order for the category'),
   items: z.array(knowledgeItemInCategorySchema).optional().describe('Knowledge items within this category'),
   version: z.number().int().describe('Version number for optimistic locking'),

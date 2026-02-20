@@ -4,14 +4,13 @@ import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { PERMISSIONS } from '../../permissions';
 import { KnowledgeService } from '../../services/KnowledgeService';
-import { createKnowledgeSectionSchema, updateKnowledgeSectionSchema, knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema, knowledgeSectionRouteParamsSchema, knowledgeCategoryRouteParamsSchema, knowledgeItemRouteParamsSchema, knowledgeCategoryItemsRouteParamsSchema } from '../contracts/knowledge';
-import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, DeleteKnowledgeCategoryRequest, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, DeleteKnowledgeItemRequest } from '../contracts/knowledge';
+import { createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema, knowledgeCategoryRouteParamsSchema, knowledgeItemRouteParamsSchema, knowledgeCategoryItemsRouteParamsSchema } from '../contracts/knowledge';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
 /**
- * Controller for knowledge base management including sections, categories, and items
+ * Controller for knowledge base management including categories, and items
  */
 @singleton()
 export class KnowledgeController {
@@ -23,122 +22,6 @@ export class KnowledgeController {
   static getOpenAPIPaths(): RouteConfig[] {
     return [
       // ============================================================
-      // KNOWLEDGE SECTION ENDPOINTS
-      // ============================================================
-      {
-        method: 'post',
-        path: '/api/knowledge/sections',
-        tags: ['Knowledge'],
-        summary: 'Create a new knowledge section',
-        description: 'Creates a new knowledge section that can contain multiple categories',
-        request: {
-          body: {
-            content: {
-              'application/json': {
-                schema: createKnowledgeSectionSchema,
-              },
-            },
-          },
-        },
-        responses: {
-          201: {
-            description: 'Knowledge section created successfully',
-            content: {
-              'application/json': {
-                schema: knowledgeSectionResponseSchema,
-              },
-            },
-          },
-          400: { description: 'Invalid request body' },
-          409: { description: 'Knowledge section already exists' },
-        },
-      },
-      {
-        method: 'get',
-        path: '/api/knowledge/sections/{id}',
-        tags: ['Knowledge'],
-        summary: 'Get knowledge section by ID',
-        description: 'Retrieves a single knowledge section by its unique identifier',
-        request: {
-          params: knowledgeSectionRouteParamsSchema,
-        },
-        responses: {
-          200: {
-            description: 'Knowledge section retrieved successfully',
-            content: {
-              'application/json': {
-                schema: knowledgeSectionResponseSchema,
-              },
-            },
-          },
-          404: { description: 'Knowledge section not found' },
-        },
-      },
-      {
-        method: 'get',
-        path: '/api/knowledge/sections',
-        tags: ['Knowledge'],
-        summary: 'List knowledge sections',
-        description: 'Retrieves a paginated list of knowledge sections with optional filtering and sorting',
-        request: {
-          query: listParamsSchema,
-        },
-        responses: {
-          200: {
-            description: 'List of knowledge sections retrieved successfully',
-            content: {
-              'application/json': {
-                schema: knowledgeSectionListResponseSchema,
-              },
-            },
-          },
-          400: { description: 'Invalid query parameters' },
-        },
-      },
-      {
-        method: 'put',
-        path: '/api/knowledge/sections/{id}',
-        tags: ['Knowledge'],
-        summary: 'Update knowledge section',
-        description: 'Updates an existing knowledge section',
-        request: {
-          params: knowledgeSectionRouteParamsSchema,
-          body: {
-            content: {
-              'application/json': {
-                schema: updateKnowledgeSectionSchema,
-              },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: 'Knowledge section updated successfully',
-            content: {
-              'application/json': {
-                schema: knowledgeSectionResponseSchema,
-              },
-            },
-          },
-          400: { description: 'Invalid request body' },
-          404: { description: 'Knowledge section not found' },
-        },
-      },
-      {
-        method: 'delete',
-        path: '/api/knowledge/sections/{id}',
-        tags: ['Knowledge'],
-        summary: 'Delete knowledge section',
-        description: 'Deletes a knowledge section',
-        request: {
-          params: knowledgeSectionRouteParamsSchema,
-        },
-        responses: {
-          204: { description: 'Knowledge section deleted successfully' },
-          404: { description: 'Knowledge section not found' },
-        },
-      },
-      // ============================================================
       // KNOWLEDGE CATEGORY ENDPOINTS
       // ============================================================
       {
@@ -146,7 +29,7 @@ export class KnowledgeController {
         path: '/api/knowledge/categories',
         tags: ['Knowledge'],
         summary: 'Create a new knowledge category',
-        description: 'Creates a new knowledge category with trigger phrase and associated sections',
+        description: 'Creates a new knowledge category with trigger phrase and associated tags',
         request: {
           body: {
             content: {
@@ -418,13 +301,6 @@ export class KnowledgeController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    // Section routes
-    router.post('/api/knowledge/sections', asyncHandler(this.createKnowledgeSection.bind(this)));
-    router.get('/api/knowledge/sections/:id', asyncHandler(this.getKnowledgeSectionById.bind(this)));
-    router.get('/api/knowledge/sections', asyncHandler(this.listKnowledgeSections.bind(this)));
-    router.put('/api/knowledge/sections/:id', asyncHandler(this.updateKnowledgeSection.bind(this)));
-    router.delete('/api/knowledge/sections/:id', asyncHandler(this.deleteKnowledgeSection.bind(this)));
-
     // Category routes
     router.post('/api/knowledge/categories', asyncHandler(this.createKnowledgeCategory.bind(this)));
     router.get('/api/knowledge/categories/:id', asyncHandler(this.getKnowledgeCategoryById.bind(this)));
@@ -441,66 +317,6 @@ export class KnowledgeController {
 
     // Category items route
     router.get('/api/knowledge/categories/:categoryId/items', asyncHandler(this.getItemsByCategory.bind(this)));
-  }
-
-  // ============================================================
-  // KNOWLEDGE SECTION HANDLERS
-  // ============================================================
-
-  /**
-   * POST /api/knowledge/sections
-   * Create a new knowledge section
-   */
-  private async createKnowledgeSection(req: Request, res: Response): Promise<void> {
-    checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
-    const body = createKnowledgeSectionSchema.parse(req.body);
-    const section = await this.knowledgeService.createKnowledgeSection(body, req.context);
-    res.status(201).json(section);
-  }
-
-  /**
-   * GET /api/knowledge/sections/:id
-   * Get a knowledge section by ID
-   */
-  private async getKnowledgeSectionById(req: Request, res: Response): Promise<void> {
-    checkPermissions(req, [PERMISSIONS.KNOWLEDGE_READ]);
-    const params = knowledgeSectionRouteParamsSchema.parse(req.params);
-    const section = await this.knowledgeService.getKnowledgeSectionById(params.id);
-    res.status(200).json(section);
-  }
-
-  /**
-   * GET /api/knowledge/sections
-   * List knowledge sections with optional filters
-   */
-  private async listKnowledgeSections(req: Request, res: Response): Promise<void> {
-    checkPermissions(req, [PERMISSIONS.KNOWLEDGE_READ]);
-    const query = listParamsSchema.parse(req.query);
-    const sections = await this.knowledgeService.listKnowledgeSections(query);
-    res.status(200).json(sections);
-  }
-
-  /**
-   * PUT /api/knowledge/sections/:id
-   * Update a knowledge section
-   */
-  private async updateKnowledgeSection(req: Request, res: Response): Promise<void> {
-    checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
-    const params = knowledgeSectionRouteParamsSchema.parse(req.params);
-    const body = updateKnowledgeSectionSchema.parse(req.body);
-    const section = await this.knowledgeService.updateKnowledgeSection(params.id, body, req.context);
-    res.status(200).json(section);
-  }
-
-  /**
-   * DELETE /api/knowledge/sections/:id
-   * Delete a knowledge section
-   */
-  private async deleteKnowledgeSection(req: Request, res: Response): Promise<void> {
-    checkPermissions(req, [PERMISSIONS.KNOWLEDGE_DELETE]);
-    const params = knowledgeSectionRouteParamsSchema.parse(req.params);
-    await this.knowledgeService.deleteKnowledgeSection(params.id, req.context);
-    res.status(204).send();
   }
 
   // ============================================================

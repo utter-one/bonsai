@@ -120,7 +120,7 @@ export const actionsSchema = z.record(z.string(), stageActionSchema).describe('A
 /**
  * Schema for creating a new stage
  * Required fields: id, prompt, personaId
- * Optional fields: llmProviderId, enterBehavior, useKnowledge, knowledgeSections, useGlobalActions, globalActions, variableDescriptors, actions, defaultClassifierId, transformerIds, metadata
+ * Optional fields: llmProviderId, enterBehavior, useKnowledge, useGlobalActions, globalActions, variableDescriptors, actions, defaultClassifierId, transformerIds, metadata
  */
 export const createStageSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the stage (auto-generated if not provided)'),
@@ -133,7 +133,7 @@ export const createStageSchema = z.object({
   personaId: z.string().min(1).describe('ID of the persona associated with this stage'),
   enterBehavior: enterBehaviorSchema.optional().default('generate_response').describe('What should happen when entering the stage'),
   useKnowledge: z.boolean().optional().default(false).describe('Whether to use knowledge base in this stage'),
-  knowledgeSections: z.array(z.string()).optional().default([]).describe('List of knowledge section IDs to include'),
+  knowledgeTags: z.array(z.string()).optional().default([]).describe('List of knowledge tags to include'),
   useGlobalActions: z.boolean().optional().default(true).describe('Whether to enable global actions in this stage'),
   globalActions: z.array(z.string()).optional().default([]).describe('List of global action IDs available in this stage'),
   variableDescriptors: variableDescriptorsSchema.optional().default([]).describe('Variable descriptor definitions for this stage'),
@@ -156,7 +156,7 @@ export const updateStageBodySchema = z.object({
   personaId: z.string().min(1).optional().describe('Updated persona ID'),
   enterBehavior: enterBehaviorSchema.optional().describe('Updated behavior when entering this stage'),
   useKnowledge: z.boolean().optional().describe('Updated knowledge usage flag'),
-  knowledgeSections: z.array(z.string()).optional().describe('Updated knowledge section IDs'),
+  knowledgeTags: z.array(z.string()).optional().describe('Updated knowledge tags'),
   useGlobalActions: z.boolean().optional().describe('Updated global actions flag'),
   globalActions: z.array(z.string()).optional().describe('Updated global action IDs'),
   variableDescriptors: variableDescriptorsSchema.optional().describe('Updated variable descriptor definitions'),
@@ -190,7 +190,7 @@ export const stageResponseSchema = z.object({
   personaId: z.string().describe('ID of the associated persona'),
   enterBehavior: enterBehaviorSchema.describe('What happens when entering the stage'),
   useKnowledge: z.boolean().describe('Whether knowledge base is enabled'),
-  knowledgeSections: z.array(z.string()).describe('Knowledge section IDs included in this stage'),
+  knowledgeTags: z.array(z.string()).describe('Knowledge tags included in this stage'),
   useGlobalActions: z.boolean().describe('Whether global actions are enabled'),
   globalActions: z.array(z.string()).describe('Global action IDs available in this stage'),
   variableDescriptors: variableDescriptorsSchema.describe('Variable descriptor definitions'),

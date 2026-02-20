@@ -71,6 +71,13 @@
       "when": 1771578233134,
       "tag": "0009_wild_charles_xavier",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1771599295015,
+      "tag": "0010_sturdy_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

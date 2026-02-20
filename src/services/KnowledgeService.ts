@@ -1,10 +1,10 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc, inArray } from 'drizzle-orm';
+import { eq, and, like, SQL, desc } from 'drizzle-orm';
 import { db } from '../db/index';
-import { knowledgeSections, knowledgeCategories, knowledgeItems } from '../db/schema';
-import type { CreateKnowledgeSectionRequest, UpdateKnowledgeSectionRequest, KnowledgeSectionResponse, KnowledgeSectionListResponse, CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, KnowledgeCategoryResponse, KnowledgeCategoryListResponse, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, KnowledgeItemResponse, KnowledgeItemListResponse } from '../http/contracts/knowledge';
+import { knowledgeCategories, knowledgeItems } from '../db/schema';
+import type { CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, KnowledgeCategoryResponse, KnowledgeCategoryListResponse, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, KnowledgeItemResponse, KnowledgeItemListResponse } from '../http/contracts/knowledge';
 import type { ListParams } from '../http/contracts/common';
-import { knowledgeSectionResponseSchema, knowledgeSectionListResponseSchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../http/contracts/knowledge';
+import { knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from '../http/contracts/knowledge';
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
@@ -15,177 +15,13 @@ import { PERMISSIONS } from '../permissions';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
- * Service for managing knowledge base including sections, categories, and items
+ * Service for managing knowledge base including categories, and items
  * Handles full CRUD operations with audit logging and maintains relationships between entities
  */
 @injectable()
 export class KnowledgeService extends BaseService {
   constructor(@inject(AuditService) private readonly auditService: AuditService) {
     super();
-  }
-
-  // ============================================================
-  // KNOWLEDGE SECTIONS
-  // ============================================================
-
-  /**
-   * Creates a new knowledge section
-   * @param input - Section creation data including id and name
-   * @param context - Request context for auditing
-   * @returns The created knowledge section
-   */
-  async createKnowledgeSection(input: CreateKnowledgeSectionRequest, context: RequestContext): Promise<KnowledgeSectionResponse> {
-    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
-    const sectionId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_SECTION);
-    logger.info({ sectionId, name: input.name, adminId: context?.adminId }, 'Creating knowledge section');
-
-    try {
-      const section = await db.insert(knowledgeSections).values({ id: sectionId, name: input.name }).returning();
-
-      const createdSection = section[0];
-
-      await this.auditService.logCreate('knowledge_section', createdSection.id, { id: createdSection.id, name: createdSection.name }, context?.adminId);
-
-      logger.info({ sectionId: createdSection.id }, 'Knowledge section created successfully');
-
-      return knowledgeSectionResponseSchema.parse(createdSection);
-    } catch (error) {
-      logger.error({ error, sectionId: input.id }, 'Failed to create knowledge section');
-      throw error;
-    }
-  }
-
-  /**
-   * Retrieves a knowledge section by ID
-   * @param id - The unique identifier of the section
-   * @returns The knowledge section if found
-   * @throws {NotFoundError} When section is not found
-   */
-  async getKnowledgeSectionById(id: string): Promise<KnowledgeSectionResponse> {
-    logger.debug({ sectionId: id }, 'Fetching knowledge section by ID');
-
-    try {
-      const section = await db.query.knowledgeSections.findFirst({ where: eq(knowledgeSections.id, id) });
-
-      if (!section) {
-        throw new NotFoundError(`Knowledge section with id ${id} not found`);
-      }
-
-      return knowledgeSectionResponseSchema.parse(section);
-    } catch (error) {
-      logger.error({ error, sectionId: id }, 'Failed to fetch knowledge section');
-      throw error;
-    }
-  }
-
-  /**
-   * Lists knowledge sections with flexible filtering, sorting, and pagination
-   * @param params - List parameters including filters, sorting, and pagination
-   * @returns Paginated array of knowledge sections
-   */
-  async listKnowledgeSections(params?: ListParams): Promise<KnowledgeSectionListResponse> {
-    logger.debug({ params }, 'Listing knowledge sections');
-
-    try {
-      const conditions: SQL[] = [];
-      const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
-
-      const columnMap = {
-        id: knowledgeSections.id,
-        name: knowledgeSections.name,
-        createdAt: knowledgeSections.createdAt,
-        updatedAt: knowledgeSections.updatedAt,
-      };
-
-      if (params?.filters) {
-        for (const [field, filter] of Object.entries(params.filters)) {
-          const condition = buildFilterCondition(field, filter, columnMap, logger);
-          if (condition) {
-            conditions.push(condition);
-          }
-        }
-      }
-
-      if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(knowledgeSections.name, searchTerm));
-      }
-
-      const orderByClause = buildOrderBy(params?.orderBy, columnMap);
-
-      const totalResult = await db.query.knowledgeSections.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined });
-      const total = totalResult.length;
-
-      const sectionList = await db.query.knowledgeSections.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined, orderBy: orderByClause.length > 0 ? orderByClause : [desc(knowledgeSections.createdAt)], limit: limit ?? undefined, offset });
-
-      return knowledgeSectionListResponseSchema.parse({ items: sectionList, total, offset, limit });
-    } catch (error) {
-      logger.error({ error, params }, 'Failed to list knowledge sections');
-      throw error;
-    }
-  }
-
-  /**
-   * Updates a knowledge section
-   * @param id - The unique identifier of the section to update
-   * @param input - Section update data
-   * @param context - Request context for auditing
-   * @returns The updated knowledge section
-   * @throws {NotFoundError} When section is not found
-   */
-  async updateKnowledgeSection(id: string, input: UpdateKnowledgeSectionRequest, context: RequestContext): Promise<KnowledgeSectionResponse> {
-    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
-    logger.info({ sectionId: id, adminId: context?.adminId }, 'Updating knowledge section');
-
-    try {
-      const existingSection = await db.query.knowledgeSections.findFirst({ where: eq(knowledgeSections.id, id) });
-
-      if (!existingSection) {
-        throw new NotFoundError(`Knowledge section with id ${id} not found`);
-      }
-
-      const updatedSection = await db.update(knowledgeSections).set({ name: input.name, updatedAt: new Date() }).where(eq(knowledgeSections.id, id)).returning();
-
-      const section = updatedSection[0];
-
-      await this.auditService.logUpdate('knowledge_section', section.id, { id: existingSection.id, name: existingSection.name }, { id: section.id, name: section.name }, context?.adminId);
-
-      logger.info({ sectionId: section.id }, 'Knowledge section updated successfully');
-
-      return knowledgeSectionResponseSchema.parse(section);
-    } catch (error) {
-      logger.error({ error, sectionId: id }, 'Failed to update knowledge section');
-      throw error;
-    }
-  }
-
-  /**
-   * Deletes a knowledge section
-   * @param id - The unique identifier of the section to delete
-   * @param context - Request context for auditing
-   * @throws {NotFoundError} When section is not found
-   */
-  async deleteKnowledgeSection(id: string, context: RequestContext): Promise<void> {
-    this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
-    logger.info({ sectionId: id, adminId: context?.adminId }, 'Deleting knowledge section');
-
-    try {
-      const existingSection = await db.query.knowledgeSections.findFirst({ where: eq(knowledgeSections.id, id) });
-
-      if (!existingSection) {
-        throw new NotFoundError(`Knowledge section with id ${id} not found`);
-      }
-
-      await db.delete(knowledgeSections).where(eq(knowledgeSections.id, id));
-
-      await this.auditService.logDelete('knowledge_section', id, { id: existingSection.id, name: existingSection.name }, context?.adminId);
-
-      logger.info({ sectionId: id }, 'Knowledge section deleted successfully');
-    } catch (error) {
-      logger.error({ error, sectionId: id }, 'Failed to delete knowledge section');
-      throw error;
-    }
   }
 
   // ============================================================
@@ -204,11 +40,11 @@ export class KnowledgeService extends BaseService {
     logger.info({ categoryId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
 
     try {
-      const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, knowledgeSections: input.knowledgeSections ?? [], order: input.order ?? 0, version: 1 }).returning();
+      const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, tags: input.knowledgeTags ?? [], order: input.order ?? 0, version: 1 }).returning();
 
       const createdCategory = category[0];
 
-      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, projectId: createdCategory.projectId, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeSections: createdCategory.knowledgeSections, order: createdCategory.order }, context?.adminId);
+      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, projectId: createdCategory.projectId, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeTags: createdCategory.tags, order: createdCategory.order }, context?.adminId);
 
       logger.info({ categoryId: createdCategory.id }, 'Knowledge category created successfully');
 
@@ -318,7 +154,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge category version mismatch. Expected ${expectedVersion}, got ${existingCategory.version}`);
       }
 
-      const updatedCategory = await db.update(knowledgeCategories).set({ name: updateData.name, promptTrigger: updateData.promptTrigger, knowledgeSections: updateData.knowledgeSections, order: updateData.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
+      const updatedCategory = await db.update(knowledgeCategories).set({ name: updateData.name, promptTrigger: updateData.promptTrigger, tags: updateData.knowledgeTags, order: updateData.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
 
       if (updatedCategory.length === 0) {
         throw new OptimisticLockError(`Failed to update knowledge category due to version conflict`);
@@ -326,7 +162,7 @@ export class KnowledgeService extends BaseService {
 
       const category = await db.query.knowledgeCategories.findFirst({ where: eq(knowledgeCategories.id, id), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
-      await this.auditService.logUpdate('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeSections: existingCategory.knowledgeSections, order: existingCategory.order }, { id: category!.id, name: category!.name, promptTrigger: category!.promptTrigger, knowledgeSections: category!.knowledgeSections, order: category!.order }, context?.adminId);
+      await this.auditService.logUpdate('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, { id: category!.id, name: category!.name, promptTrigger: category!.promptTrigger, knowledgeTags: category!.tags, order: category!.order }, context?.adminId);
 
       logger.info({ categoryId: category!.id, newVersion: category!.version }, 'Knowledge category updated successfully');
 
@@ -366,7 +202,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Failed to delete knowledge category due to version conflict`);
       }
 
-      await this.auditService.logDelete('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeSections: existingCategory.knowledgeSections, order: existingCategory.order }, context?.adminId);
+      await this.auditService.logDelete('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, context?.adminId);
 
       logger.info({ categoryId: id }, 'Knowledge category deleted successfully');
     } catch (error) {
@@ -582,24 +418,26 @@ export class KnowledgeService extends BaseService {
   }
 
   /**
-   * Gets categories for specific knowledge sections
-   * @param sectionIds - Array of section IDs
+   * Gets categories for specific knowledge tags
+   * @param tags - Array of section IDs
    * @returns Array of knowledge categories with their items
    */
-  async getCategoriesBySections(sectionIds: string[]): Promise<KnowledgeCategoryResponse[]> {
-    logger.debug({ sectionIds }, 'Fetching categories by sections');
+  async getCategoriesByTags(tags: string[]): Promise<KnowledgeCategoryResponse[]> {
+    logger.debug({ tagIds: tags }, 'Fetching categories by tags');
 
     try {
       const allCategories = await db.query.knowledgeCategories.findMany({ with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
+      // TODO: make it more efficient by doing filtering in the database instead of in memory
+
       const filteredCategories = allCategories.filter(category => {
-        const categorySections = category.knowledgeSections as string[];
-        return categorySections.some(section => sectionIds.includes(section));
+        const categoryTags = category.tags as string[];
+        return categoryTags.some(tag => tags.includes(tag));
       });
 
       return filteredCategories.map(category => knowledgeCategoryResponseSchema.parse(category));
     } catch (error) {
-      logger.error({ error, sectionIds }, 'Failed to fetch categories by sections');
+      logger.error({ error, tagIds: tags }, 'Failed to fetch categories by tags');
       throw error;
     }
   }
