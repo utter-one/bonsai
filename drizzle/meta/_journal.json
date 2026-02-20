@@ -64,6 +64,13 @@
       "when": 1771432020095,
       "tag": "0008_add_provider_field_to_tts_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1771578233134,
+      "tag": "0009_wild_charles_xavier",
+      "breakpoints": true
     }
   ]
 }

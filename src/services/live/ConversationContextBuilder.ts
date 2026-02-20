@@ -157,7 +157,12 @@ export class ConversationContextBuilder {
           name: action.name,
           trigger: action.classificationTrigger,
           examples: action.examples || undefined,
-          parameters: undefined, // Global actions don't have parameters array like stage actions
+          parameters: action.parameters?.map(p => ({
+            name: p.name,
+            type: p.type,
+            description: p.description,
+            required: p.required,
+          })),
         };
       });
 

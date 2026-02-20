@@ -36,11 +36,11 @@ export class GlobalActionService extends BaseService {
     logger.info({ globalActionId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating global action');
 
     try {
-      const globalAction = await db.insert(globalActions).values({ id: globalActionId, projectId: input.projectId, name: input.name, condition: input.condition ?? null, triggerOnUserInput: input.triggerOnUserInput ?? true, triggerOnClientCommand: input.triggerOnClientCommand ?? false, classificationTrigger: input.classificationTrigger ?? null, overrideClassifierId: input.overrideClassifierId ?? null, effects: input.effects ?? [], examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const globalAction = await db.insert(globalActions).values({ id: globalActionId, projectId: input.projectId, name: input.name, condition: input.condition ?? null, triggerOnUserInput: input.triggerOnUserInput ?? true, triggerOnClientCommand: input.triggerOnClientCommand ?? false, classificationTrigger: input.classificationTrigger ?? null, overrideClassifierId: input.overrideClassifierId ?? null, parameters: input.parameters ?? [], effects: input.effects ?? [], examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdGlobalAction = globalAction[0];
 
-      await this.auditService.logCreate('global_action', createdGlobalAction.id, { id: createdGlobalAction.id, projectId: createdGlobalAction.projectId, name: createdGlobalAction.name, condition: createdGlobalAction.condition, triggerOnUserInput: createdGlobalAction.triggerOnUserInput, triggerOnClientCommand: createdGlobalAction.triggerOnClientCommand, classificationTrigger: createdGlobalAction.classificationTrigger, overrideClassifierId: createdGlobalAction.overrideClassifierId, effects: createdGlobalAction.effects, examples: createdGlobalAction.examples, metadata: createdGlobalAction.metadata }, context?.adminId);
+      await this.auditService.logCreate('global_action', createdGlobalAction.id, { id: createdGlobalAction.id, projectId: createdGlobalAction.projectId, name: createdGlobalAction.name, condition: createdGlobalAction.condition, triggerOnUserInput: createdGlobalAction.triggerOnUserInput, triggerOnClientCommand: createdGlobalAction.triggerOnClientCommand, classificationTrigger: createdGlobalAction.classificationTrigger, overrideClassifierId: createdGlobalAction.overrideClassifierId, parameters: createdGlobalAction.parameters, effects: createdGlobalAction.effects, examples: createdGlobalAction.examples, metadata: createdGlobalAction.metadata }, context?.adminId);
 
       logger.info({ globalActionId: createdGlobalAction.id }, 'Global action created successfully');
 
@@ -174,6 +174,7 @@ export class GlobalActionService extends BaseService {
       if (updateData.triggerOnClientCommand !== undefined) updatePayload.triggerOnClientCommand = updateData.triggerOnClientCommand;
       if (updateData.classificationTrigger !== undefined) updatePayload.classificationTrigger = updateData.classificationTrigger;
       if (updateData.overrideClassifierId !== undefined) updatePayload.overrideClassifierId = updateData.overrideClassifierId;
+      if (updateData.parameters !== undefined) updatePayload.parameters = updateData.parameters;
       if (updateData.effects !== undefined) updatePayload.effects = updateData.effects;
       if (updateData.examples !== undefined) updatePayload.examples = updateData.examples;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
@@ -186,7 +187,7 @@ export class GlobalActionService extends BaseService {
 
       const globalAction = updatedGlobalAction[0];
 
-      await this.auditService.logUpdate('global_action', globalAction.id, { id: existingGlobalAction.id, name: existingGlobalAction.name, condition: existingGlobalAction.condition, triggerOnUserInput: existingGlobalAction.triggerOnUserInput, triggerOnClientCommand: existingGlobalAction.triggerOnClientCommand, classificationTrigger: existingGlobalAction.classificationTrigger, overrideClassifierId: existingGlobalAction.overrideClassifierId, effects: existingGlobalAction.effects, examples: existingGlobalAction.examples, metadata: existingGlobalAction.metadata }, { id: globalAction.id, name: globalAction.name, condition: globalAction.condition, triggerOnUserInput: globalAction.triggerOnUserInput, triggerOnClientCommand: globalAction.triggerOnClientCommand, classificationTrigger: globalAction.classificationTrigger, overrideClassifierId: globalAction.overrideClassifierId, effects: globalAction.effects, examples: globalAction.examples, metadata: globalAction.metadata }, context?.adminId);
+      await this.auditService.logUpdate('global_action', globalAction.id, { id: existingGlobalAction.id, name: existingGlobalAction.name, condition: existingGlobalAction.condition, triggerOnUserInput: existingGlobalAction.triggerOnUserInput, triggerOnClientCommand: existingGlobalAction.triggerOnClientCommand, classificationTrigger: existingGlobalAction.classificationTrigger, overrideClassifierId: existingGlobalAction.overrideClassifierId, parameters: existingGlobalAction.parameters, effects: existingGlobalAction.effects, examples: existingGlobalAction.examples, metadata: existingGlobalAction.metadata }, { id: globalAction.id, name: globalAction.name, condition: globalAction.condition, triggerOnUserInput: globalAction.triggerOnUserInput, triggerOnClientCommand: globalAction.triggerOnClientCommand, classificationTrigger: globalAction.classificationTrigger, overrideClassifierId: globalAction.overrideClassifierId, parameters: globalAction.parameters, effects: globalAction.effects, examples: globalAction.examples, metadata: globalAction.metadata }, context?.adminId);
 
       logger.info({ globalActionId: globalAction.id, newVersion: globalAction.version }, 'Global action updated successfully');
 
@@ -226,7 +227,7 @@ export class GlobalActionService extends BaseService {
         throw new OptimisticLockError(`Failed to delete global action due to version conflict`);
       }
 
-      await this.auditService.logDelete('global_action', id, { id: existingGlobalAction.id, name: existingGlobalAction.name, condition: existingGlobalAction.condition, triggerOnUserInput: existingGlobalAction.triggerOnUserInput, triggerOnClientCommand: existingGlobalAction.triggerOnClientCommand, classificationTrigger: existingGlobalAction.classificationTrigger, overrideClassifierId: existingGlobalAction.overrideClassifierId, effects: existingGlobalAction.effects, examples: existingGlobalAction.examples, metadata: existingGlobalAction.metadata }, context?.adminId);
+      await this.auditService.logDelete('global_action', id, { id: existingGlobalAction.id, name: existingGlobalAction.name, condition: existingGlobalAction.condition, triggerOnUserInput: existingGlobalAction.triggerOnUserInput, triggerOnClientCommand: existingGlobalAction.triggerOnClientCommand, classificationTrigger: existingGlobalAction.classificationTrigger, overrideClassifierId: existingGlobalAction.overrideClassifierId, parameters: existingGlobalAction.parameters, effects: existingGlobalAction.effects, examples: existingGlobalAction.examples, metadata: existingGlobalAction.metadata }, context?.adminId);
 
       logger.info({ globalActionId: id }, 'Global action deleted successfully');
     } catch (error) {
@@ -254,7 +255,7 @@ export class GlobalActionService extends BaseService {
         throw new NotFoundError(`Global action with id ${id} not found`);
       }
 
-      return await this.createGlobalAction({ id: input.id, projectId: existingAction.projectId, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, effects: existingAction.effects as any, examples: existingAction.examples as string[] ?? undefined, metadata: existingAction.metadata ?? undefined }, context);
+      return await this.createGlobalAction({ id: input.id, projectId: existingAction.projectId, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, parameters: existingAction.parameters as any, effects: existingAction.effects as any, examples: existingAction.examples as string[] ?? undefined, metadata: existingAction.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone global action');
       throw error;

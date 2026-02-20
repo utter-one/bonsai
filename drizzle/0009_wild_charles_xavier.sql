@@ -1,0 +1,1 @@
+ALTER TABLE "global_actions" ADD COLUMN "parameters" jsonb DEFAULT '[]'::jsonb NOT NULL;
