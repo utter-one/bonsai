@@ -28,6 +28,8 @@ import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
 import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { extractTextFromContent, getContentSize } from "../../utils/llm";
+import { KnowledgeService } from "../KnowledgeService";
+import type { FaqItem } from "./ConversationContextBuilder";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -55,6 +57,8 @@ export type StageRuntimeData = {
   shouldEndConversation: boolean;
   inputTurnId?: string;
   outputTurnId?: string;
+  /** FAQ items gathered from knowledge base, persisted between turns until new knowledge actions are detected */
+  faq: FaqItem[];
 }
 
 /** 
@@ -80,6 +84,7 @@ export class ConversationRunner {
     @inject(ToolExecutor) private toolExecutor: ToolExecutor,
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
+    @inject(KnowledgeService) private knowledgeService: KnowledgeService,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -127,6 +132,7 @@ export class ConversationRunner {
       asrProvider: undefined,
       ttsProvider: undefined,
       shouldEndConversation: false,
+      faq: [],
     };
 
     // Load completion LLM provider for the stage
@@ -1097,6 +1103,17 @@ export class ConversationRunner {
     await this.changeState('processing_user_input');
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
 
+    // Detect and handle knowledge actions - these are synthetic actions from the knowledge base
+    const knowledgeResults = classificationResults.filter(r => r.name.startsWith('__knowledge_'));
+    const nonKnowledgeResults = classificationResults.filter(r => !r.name.startsWith('__knowledge_'));
+
+    if (knowledgeResults.length > 0) {
+      const categoryIds = knowledgeResults.map(r => r.name.slice('__knowledge_'.length));
+      const itemArrays = await Promise.all(categoryIds.map(id => this.knowledgeService.getItemsByCategory(id)));
+      this.stageData.faq = itemArrays.flat().map(item => ({ question: item.question, answer: item.answer }));
+      logger.debug({ conversationId: this.conversation.id, categoryCount: categoryIds.length, itemCount: this.stageData.faq.length }, 'Updated FAQ from knowledge actions');
+    }
+
     // Filter out lifecycle actions from classification matching
     const lifecycleActionNames = Object.values(LIFECYCLE_ACTION_NAMES) as string[];
     const stageActions = Object.fromEntries(
@@ -1105,11 +1122,11 @@ export class ConversationRunner {
     );
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
 
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, classificationResults, userInput, userInputSource);
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.stageData.faq);
 
     // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
     const seenActionNames = new Set<string>();
-    const actions = classificationResults.map(r => {
+    const actions = nonKnowledgeResults.map(r => {
       // Skip if we've already processed this action
       if (seenActionNames.has(r.name)) {
         logger.debug({ conversationId: this.conversation.id, actionName: r.name }, `Skipping duplicate action ${r.name} detected by multiple classifiers`);
