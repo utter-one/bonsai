@@ -12,6 +12,7 @@ import {
   modifyVariablesEffectSchema,
   variableOperationSchema,
   callToolEffectSchema,
+  stageActionParameterSchema,
 } from '../../types/actions';
 import type {
   Effect,
@@ -23,6 +24,7 @@ import type {
   ModifyVariablesEffect,
   VariableOperation,
   CallToolEffect,
+  StageActionParameter,
 } from '../../types/actions';
 
 extendZodWithOpenApi(z);
@@ -43,6 +45,7 @@ export {
   modifyVariablesEffectSchema,
   variableOperationSchema,
   callToolEffectSchema,
+  stageActionParameterSchema,
 };
 export type {
   Effect,
@@ -54,6 +57,7 @@ export type {
   ModifyVariablesEffect,
   VariableOperation,
   CallToolEffect,
+  StageActionParameter,
 };
 
 /**
@@ -70,6 +74,7 @@ export const createGlobalActionSchema = z.object({
   triggerOnClientCommand: z.boolean().optional().default(false).describe('Whether this action should be triggered on client commands'),
   classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID - if set, this action is only enumerated for that specific classifier'),
+  parameters: z.array(stageActionParameterSchema).optional().describe('Optional array of parameters to extract from user input'),
   effects: z.array(effectSchema).optional().describe('Array of effects to execute when action is triggered'),
   examples: z.array(z.string()).optional().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional action-specific metadata'),
@@ -86,6 +91,7 @@ export const updateGlobalActionBodySchema = z.object({
   triggerOnClientCommand: z.boolean().optional().describe('Updated trigger on client command flag'),
   classificationTrigger: z.string().nullable().optional().describe('Updated classification trigger label'),
   overrideClassifierId: z.string().nullable().optional().describe('Updated override classifier ID'),
+  parameters: z.array(stageActionParameterSchema).optional().describe('Updated parameters array'),
   effects: z.array(effectSchema).optional().describe('Updated effects array'),
   examples: z.array(z.string()).optional().describe('Updated example phrases'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
@@ -113,6 +119,7 @@ export const globalActionResponseSchema = z.object({
   triggerOnClientCommand: z.boolean().describe('Whether this action should be triggered on client commands'),
   classificationTrigger: z.string().nullable().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().describe('Optional classifier ID - if set, this action is only enumerated for that specific classifier'),
+  parameters: z.array(stageActionParameterSchema).describe('Array of parameters to extract from user input'),
   effects: z.array(effectSchema).describe('Array of effects to execute'),
   examples: z.array(z.string()).nullable().describe('Example phrases that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
