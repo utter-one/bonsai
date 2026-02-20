@@ -42,26 +42,26 @@ export type ActionsExecutionOutcome = {
  * Outcome of an effect execution
  */
 export type EffectOutcome = {
-    shouldEndConversation: boolean;
-    endReason?: string;
-    shouldAbortConversation: boolean;
-    abortReason?: string;
-    shouldGenerateResponse?: boolean;
-    hasModifiedVars?: boolean;
-    hasModifiedUserInput?: boolean;
-    hasModifiedUserProfile?: boolean;
-    newStageId?: string;
-    toolCallEvent?: {
-      toolId: string;
-      toolName: string;
-      parameters: Record<string, any>;
-      success: boolean;
-      result?: any;
-      error?: string;
-      systemPrompt?: string;
-      llmSettings?: any;
-    };
+  shouldEndConversation: boolean;
+  endReason?: string;
+  shouldAbortConversation: boolean;
+  abortReason?: string;
+  shouldGenerateResponse?: boolean;
+  hasModifiedVars?: boolean;
+  hasModifiedUserInput?: boolean;
+  hasModifiedUserProfile?: boolean;
+  newStageId?: string;
+  toolCallEvent?: {
+    toolId: string;
+    toolName: string;
+    parameters: Record<string, any>;
+    success: boolean;
+    result?: any;
+    error?: string;
+    systemPrompt?: string;
+    llmSettings?: any;
   };
+};
 
 /**
  * Effect with its source action for tracking
@@ -85,7 +85,7 @@ export class ActionsExecutor {
     @inject(ToolExecutor) private readonly toolExecutor: ToolExecutor,
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
-  ) {}
+  ) { }
 
   /**
    * Helper method to extract action name from StageAction or GlobalAction
@@ -151,12 +151,12 @@ export class ActionsExecutor {
     if (goToStageOps.length > 1) {
       const stageIds = goToStageOps.map(op => (op.effect as Extract<Effect, { type: 'go_to_stage' }>).stageId);
       const uniqueStageIds = new Set(stageIds);
-      
+
       if (uniqueStageIds.size > 1) {
         // Multiple different stage IDs - keep only the first one
         const firstOp = goToStageOps[0];
         conflicts.push(`Multiple go_to_stage effects with different IDs detected (${Array.from(uniqueStageIds).join(', ')}). Using first: ${(firstOp.effect as Extract<Effect, { type: 'go_to_stage' }>).stageId} from action "${firstOp.actionName}"`);
-        
+
         // Remove all but the first go_to_stage effect
         const otherOps = effects.filter(op => op.effect.type !== 'go_to_stage');
         resolvedEffects.push(...otherOps, firstOp);
@@ -175,7 +175,7 @@ export class ActionsExecutor {
       // Abort takes precedence - remove all end_conversation effects
       const firstAbort = abortConversationOps[0];
       conflicts.push(`Both abort_conversation and end_conversation detected. Prioritizing abort_conversation from action "${firstAbort.actionName}" - conversation will abort immediately`);
-      
+
       resolvedEffects.splice(0, resolvedEffects.length);
       resolvedEffects.push(...effects.filter(op => op.effect.type !== 'end_conversation'));
     }
@@ -184,7 +184,7 @@ export class ActionsExecutor {
     if (abortConversationOps.length > 1) {
       const firstAbort = abortConversationOps[0];
       conflicts.push(`Multiple abort_conversation effects detected. Using first from action "${firstAbort.actionName}"`);
-      
+
       resolvedEffects.splice(0, resolvedEffects.length);
       const otherOps = effects.filter(op => op.effect.type !== 'abort_conversation');
       resolvedEffects.push(...otherOps, firstAbort);
@@ -194,7 +194,7 @@ export class ActionsExecutor {
     if (endConversationOps.length > 1 && abortConversationOps.length === 0) {
       const firstEnd = endConversationOps[0];
       conflicts.push(`Multiple end_conversation effects detected. Using first from action "${firstEnd.actionName}"`);
-      
+
       if (resolvedEffects.length === 0) {
         resolvedEffects.push(...effects);
       }
@@ -250,7 +250,7 @@ export class ActionsExecutor {
     for (let i = 0; i < actions.length; i++) {
       const action = actions[i];
       const actionName = this.getActionName(action);
-      
+
       for (const effect of action.effects) {
         allEffects.push({
           effect,
@@ -331,7 +331,7 @@ export class ActionsExecutor {
         if (effectResult.hasModifiedUserProfile) {
           outcome.hasModifiedUserProfile = true;
         }
-        
+
         // Add tool call event if present
         if (effectResult.toolCallEvent) {
           outcome.toolCallEvents.push(effectResult.toolCallEvent);
@@ -532,10 +532,7 @@ export class ActionsExecutor {
       for (const modification of effect.modifications) {
         const { variableName, operation: op } = modification;
         let { value } = modification;
-        if (typeof value === 'string') {
-          value = await this.templatingEngine.render(value, context);
-        }
-
+        value = await this.transformValue(value, context);
         switch (op) {
           case 'set': {
             context.vars[variableName] = value;
@@ -611,9 +608,7 @@ export class ActionsExecutor {
     try {
       for (const modification of effect.modifications) {
         let { fieldName, value } = modification;
-        if (typeof value === 'string') {
-          value = await this.templatingEngine.render(value, context);
-        }
+        value = await this.transformValue(value, context);
 
         switch (modification.operation) {
           case 'set': {
@@ -674,6 +669,22 @@ export class ActionsExecutor {
       shouldAbortConversation: false,
       hasModifiedUserProfile,
     };
+  }
+
+  private async transformValue(value: unknown, context: ConversationContext) {
+    if (typeof value === 'string') {
+      // check if the string is a reference to tool result {{results.tools.TOOL_ID.result}} and if so, skip templating
+      const toolResultPattern = /\{\{results\.tools\.([^.]+)\.result\}\}/;
+      const match = value.match(toolResultPattern);
+      if (match) {
+        logger.info({ conversationId: context.conversationId, toolId: match[1] }, `Resolving value from tool result reference for tool ID: ${match[1]}`);
+        const toolId = match[1];
+        value = context.results.tools[toolId]?.result;
+      } else {
+        value = await this.templatingEngine.render(value, context);
+      }
+    }
+    return value;
   }
 
   /**
@@ -834,7 +845,7 @@ export class ActionsExecutor {
       // 4. Validate output against tool.outputType
       // Check that the result format matches what we expect
       if (executionResult.result !== undefined && executionResult.result !== null) {
-        
+
         if (tool.outputType === 'text') {
           // For text output, result should be a string or easily convertible
           if (!executionResult.result.every(x => x.contentType === 'text')) {
@@ -867,7 +878,7 @@ export class ActionsExecutor {
       };
 
       logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name }, `Tool called successfully and result stored: ${tool.name}`);
-      
+
       // Return tool call event data so caller can save/send it
       return {
         shouldEndConversation: false,
@@ -946,13 +957,13 @@ export class ActionsExecutor {
       if (!context.results.webhooks) {
         context.results.webhooks = {};
       }
-      
+
       // Convert headers to plain object
       const headersObj: Record<string, string> = {};
       response.headers.forEach((value, key) => {
         headersObj[key] = value;
       });
-      
+
       context.results.webhooks[effect.resultKey] = {
         status: response.status,
         statusText: response.statusText,
