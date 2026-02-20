@@ -14,6 +14,7 @@ import { deepgramTtsProviderConfigSchema } from '../../services/providers/tts/De
 import { cartesiaTtsProviderConfigSchema } from '../../services/providers/tts/CartesiaTtsProvider';
 import { azureTtsProviderConfigSchema } from '../../services/providers/tts/AzureTtsProvider';
 import { azureAsrProviderConfigSchema } from '../../services/providers/asr/AzureAsrProvider';
+import { elevenLabsAsrProviderConfigSchema } from '../../services/providers/asr/ElevenLabsAsrProvider';
 import { s3StorageProviderConfigSchema } from '../../services/providers/storage/S3StorageProvider';
 import { azureBlobStorageProviderConfigSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
 import { gcsStorageProviderConfigSchema } from '../../services/providers/storage/GcsStorageProvider';
@@ -47,7 +48,10 @@ export const ttsProviderConfigSchema = z.union([
 /**
  * Union schema for all ASR provider configurations
  */
-export const asrProviderConfigSchema = azureAsrProviderConfigSchema.describe('ASR provider configuration');
+export const asrProviderConfigSchema = z.union([
+  azureAsrProviderConfigSchema,
+  elevenLabsAsrProviderConfigSchema,
+]).describe('ASR provider configuration');
 
 /**
  * Union schema for all storage provider configurations
