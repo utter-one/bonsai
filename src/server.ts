@@ -24,6 +24,7 @@ import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
+import { VersionController } from './http/controllers/VersionController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -87,6 +88,10 @@ export function createApp(): express.Application {
     const schemaPath = new URL('../schemas/websocket-contracts.json', import.meta.url);
     res.sendFile(schemaPath.pathname);
   });
+
+  // Unauthenticated system endpoints — registered before auth middleware intentionally
+  const versionController = container.resolve(VersionController);
+  versionController.registerRoutes(app);
 
   // Authentication middleware (optional - sets req.user if token is valid)
   app.use(optionalAuthMiddleware);
