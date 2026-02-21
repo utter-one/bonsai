@@ -144,6 +144,21 @@ export class MigrationService extends BaseService {
         upserted.push({ entity: 'stages', count: await this.upsertStages(tx, bundle.stages) });
         upserted.push({ entity: 'apiKeys', count: await this.upsertApiKeys(tx, bundle.apiKeys) });
       });
+
+      // Log a 'migrate' audit entry per entity instance after the transaction commits
+      await Promise.all([
+        ...bundle.providers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'provider', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.projects.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'project', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.personas.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'persona', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.classifiers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'classifier', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.contextTransformers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'contextTransformer', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.tools.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'tool', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.globalActions.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'globalAction', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.knowledgeCategories.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeCategory', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.knowledgeItems.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeItem', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.stages.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'stage', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.apiKeys.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'apiKey', entityId: row.id, userId: context.adminId, newEntity: row })),
+      ]);
     } else {
       upserted.push(
         { entity: 'providers', count: bundle.providers.length },
@@ -159,8 +174,6 @@ export class MigrationService extends BaseService {
         { entity: 'apiKeys', count: bundle.apiKeys.length },
       );
     }
-
-    await this.auditService.logChange({ action: dryRun ? 'migration:dry-run' : 'migration:import', entityId: 'bundle', entityType: 'migration', userId: context.adminId, newEntity: { sourceRestSchemaHash: bundle.restSchemaHash, dryRun, force, upserted } });
 
     const result: MigrationResult = {
       upserted,
@@ -600,7 +613,8 @@ export class MigrationService extends BaseService {
   // ---------------------------------------------------------------------------
   // Private: per-entity upsert helpers
   // All helpers batch-insert rows and update every column on id conflict.
-  // providers.createdBy is explicitly nulled — admin IDs differ between environments.
+  // On conflict, version is incremented (not replaced) to preserve local history.
+  // providers.createdBy is set to the importing admin ID since it differs between environments.
   // ---------------------------------------------------------------------------
 
   /**
@@ -631,9 +645,8 @@ export class MigrationService extends BaseService {
         config: sql`excluded.config`,
         createdBy: adminId,
         tags: sql`excluded.tags`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${providers.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -652,9 +665,8 @@ export class MigrationService extends BaseService {
         storageConfig: sql`excluded.storage_config`,
         constants: sql`excluded.constants`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${projects.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -672,9 +684,8 @@ export class MigrationService extends BaseService {
         ttsProviderId: sql`excluded.tts_provider_id`,
         ttsSettings: sql`excluded.tts_settings`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${personas.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -692,9 +703,8 @@ export class MigrationService extends BaseService {
         llmProviderId: sql`excluded.llm_provider_id`,
         llmSettings: sql`excluded.llm_settings`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${classifiers.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -713,9 +723,8 @@ export class MigrationService extends BaseService {
         llmProviderId: sql`excluded.llm_provider_id`,
         llmSettings: sql`excluded.llm_settings`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${contextTransformers.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -736,9 +745,8 @@ export class MigrationService extends BaseService {
         outputType: sql`excluded.output_type`,
         parameters: sql`excluded.parameters`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${tools.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -760,9 +768,8 @@ export class MigrationService extends BaseService {
         effects: sql`excluded.effects`,
         examples: sql`excluded.examples`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${globalActions.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -778,9 +785,8 @@ export class MigrationService extends BaseService {
         promptTrigger: sql`excluded.prompt_trigger`,
         tags: sql`excluded.tags`,
         order: sql`excluded.order`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${knowledgeCategories.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -795,9 +801,8 @@ export class MigrationService extends BaseService {
         question: sql`excluded.question`,
         answer: sql`excluded.answer`,
         order: sql`excluded.order`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${knowledgeItems.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -825,9 +830,8 @@ export class MigrationService extends BaseService {
         defaultClassifierId: sql`excluded.default_classifier_id`,
         transformerIds: sql`excluded.transformer_ids`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${stages.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
@@ -844,9 +848,8 @@ export class MigrationService extends BaseService {
         lastUsedAt: sql`excluded.last_used_at`,
         isActive: sql`excluded.is_active`,
         metadata: sql`excluded.metadata`,
-        version: sql`excluded.version`,
-        createdAt: sql`excluded.created_at`,
-        updatedAt: sql`excluded.updated_at`,
+        version: sql`${apiKeys.version} + 1`,
+        updatedAt: sql`now()`,
       },
     });
     return rows.length;
