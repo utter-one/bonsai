@@ -30,6 +30,16 @@ export class InvalidOperationError extends Error {
 }
 
 /**
+ * Error thrown when a remote service or environment is unreachable or returns an unexpected response
+ */
+export class RemoteConnectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RemoteConnectionError';
+  }
+}
+
+/**
  * Error thrown when access to a resource is denied
  */
 export class AccessDeniedError extends Error {

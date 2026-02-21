@@ -3,11 +3,14 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { EnvironmentService } from '../../services/EnvironmentService';
+import { MigrationService } from '../../services/MigrationService';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from '../contracts/environment';
 import type { CreateEnvironmentRequest, UpdateEnvironmentRequest, DeleteEnvironmentRequest } from '../contracts/environment';
+import { pullRequestSchema, migrationJobSchema, migrationJobRouteParamsSchema, migrationPreviewSchema, exportQuerySchema } from '../contracts/migration';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
+import { NotFoundError } from '../../errors';
 
 /**
  * Controller for environment management with explicit routing
@@ -15,7 +18,10 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class EnvironmentController {
-  constructor(@inject(EnvironmentService) private readonly environmentService: EnvironmentService) {}
+  constructor(
+    @inject(EnvironmentService) private readonly environmentService: EnvironmentService,
+    @inject(MigrationService) private readonly migrationService: MigrationService,
+  ) {}
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -161,6 +167,67 @@ export class EnvironmentController {
           404: { description: 'Environment not found' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/environments/{id}/migration/scope',
+        tags: ['Environments'],
+        summary: 'Preview remote migration scope',
+        description:
+          'Authenticates against the stored environment and returns lightweight stubs (id + name) ' +
+          'of all entities that would be pulled with the given selection — without writing any data. ' +
+          'Same query params as GET /api/migration/preview on the source instance.',
+        request: {
+          params: environmentRouteParamsSchema,
+          query: exportQuerySchema,
+        },
+        responses: {
+          200: {
+            description: 'Entity stubs grouped by type from the remote environment',
+            content: { 'application/json': { schema: migrationPreviewSchema } },
+          },
+          400: { description: 'Invalid query parameters' },
+          404: { description: 'Environment not found' },
+        },
+      },
+      {
+        method: 'post',
+        path: '/api/environments/{id}/migration/pull',
+        tags: ['Environments'],
+        summary: 'Pull data from environment',
+        description:
+          'Authenticates against the stored environment, checks schema compatibility, ' +
+          'fetches the remote export bundle, and imports it locally — all server-side. ' +
+          'Returns a job immediately with status "pending"; poll GET /api/environments/{id}/migration/jobs/{jobId} for progress.',
+        request: {
+          params: environmentRouteParamsSchema,
+          body: { content: { 'application/json': { schema: pullRequestSchema } } },
+        },
+        responses: {
+          202: {
+            description: 'Pull job started — poll the returned job ID for status',
+            content: { 'application/json': { schema: migrationJobSchema } },
+          },
+          400: { description: 'Invalid request body' },
+          404: { description: 'Environment not found' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/environments/{id}/migration/jobs/{jobId}',
+        tags: ['Environments'],
+        summary: 'Get migration job status',
+        description:
+          'Returns the current state of an async pull job scoped to this environment. ' +
+          'Jobs are held in process memory — a server restart clears all job history.',
+        request: { params: migrationJobRouteParamsSchema },
+        responses: {
+          200: {
+            description: 'Job status',
+            content: { 'application/json': { schema: migrationJobSchema } },
+          },
+          404: { description: 'Job not found or does not belong to this environment' },
+        },
+      },
     ];
   }
 
@@ -174,6 +241,9 @@ export class EnvironmentController {
     router.put('/api/environments/:id', asyncHandler(this.updateEnvironment.bind(this)));
     router.delete('/api/environments/:id', asyncHandler(this.deleteEnvironment.bind(this)));
     router.get('/api/environments/:id/audit-logs', asyncHandler(this.getEnvironmentAuditLogs.bind(this)));
+    router.post('/api/environments/:id/migration/pull', asyncHandler(this.startPull.bind(this)));
+    router.get('/api/environments/:id/migration/jobs/:jobId', asyncHandler(this.getJob.bind(this)));
+    router.get('/api/environments/:id/migration/scope', asyncHandler(this.previewScope.bind(this)));
   }
 
   /**
@@ -242,5 +312,42 @@ export class EnvironmentController {
     const params = environmentRouteParamsSchema.parse(req.params);
     const logs = await this.environmentService.getEnvironmentAuditLogs(params.id);
     res.status(200).json(logs);
+  }
+
+  /**
+   * POST /api/environments/:id/migration/pull
+   * Start a server-side pull from this environment
+   */
+  private async startPull(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.MIGRATION_IMPORT]);
+    const { id } = environmentRouteParamsSchema.parse(req.params);
+    const body = pullRequestSchema.parse(req.body);
+    const jobId = await this.migrationService.startPull(id, body, req.context);
+    const job = this.migrationService.getJob(jobId);
+    res.status(202).json(job);
+  }
+
+  /**
+   * GET /api/environments/:id/migration/jobs/:jobId
+   * Get the status of a migration pull job scoped to this environment
+   */
+  private async getJob(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.MIGRATION_IMPORT]);
+    const { id, jobId } = migrationJobRouteParamsSchema.parse(req.params);
+    const job = this.migrationService.getJob(jobId);
+    if (!job || job.environmentId !== id) throw new NotFoundError(`Migration job ${jobId} not found`);
+    res.status(200).json(job);
+  }
+
+  /**
+   * GET /api/environments/:id/migration/scope
+   * Preview what would be pulled from this environment without writing any data
+   */
+  private async previewScope(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.MIGRATION_IMPORT]);
+    const { id } = environmentRouteParamsSchema.parse(req.params);
+    const query = exportQuerySchema.parse(req.query);
+    const preview = await this.migrationService.previewRemote(id, query, req.context);
+    res.status(200).json(preview);
   }
 }

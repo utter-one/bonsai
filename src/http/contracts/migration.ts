@@ -92,18 +92,8 @@ export const exportQuerySchema = z.object({
 
 export type ExportQuery = z.infer<typeof exportQuerySchema>;
 
-/** Request body for POST /api/migration/import. */
-export const importRequestSchema = z.object({
-  bundle: exportBundleSchema.describe('The export bundle to import'),
-  force: z.boolean().optional().default(false).describe('If true, bypass the schema hash mismatch check and import anyway'),
-  dryRun: z.boolean().optional().default(false).describe('If true, validate and simulate the import without writing to the database'),
-});
-
-export type ImportRequest = z.infer<typeof importRequestSchema>;
-
-/** Request body for POST /api/migration/pull. */
+/** Request body for POST /api/environments/:id/migration/pull. */
 export const pullRequestSchema = z.object({
-  environmentId: z.string().describe('ID of the stored environment to pull from — credentials are read from the local environments table'),
   selection: migrationSelectionSchema.optional().default({}).describe('Granular entity selection. Omit or pass {} to pull everything.'),
   force: z.boolean().optional().default(false).describe('If true, bypass schema hash mismatch check'),
   dryRun: z.boolean().optional().default(false).describe('If true, simulate the pull without writing to the database'),
@@ -152,9 +142,10 @@ export const migrationJobSchema = z.object({
 
 export type MigrationJob = z.infer<typeof migrationJobSchema>;
 
-/** Route params for the migration job status endpoint. */
+/** Route params for the environment migration job status endpoint. */
 export const migrationJobRouteParamsSchema = z.object({
-  id: z.string().describe('Migration job ID'),
+  id: z.string().describe('Environment ID'),
+  jobId: z.string().describe('Migration job ID'),
 });
 
 /** Lightweight entity reference returned by the preview endpoint. */

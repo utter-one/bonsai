@@ -22,8 +22,8 @@ import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId } from '../utils/idGenerator';
 import { logger } from '../utils/logger';
-import { InvalidOperationError, NotFoundError } from '../errors';
-import type { ExportBundle, ExportQuery, ImportRequest, PullRequest, MigrationResult, MigrationJob, MigrationSelection, MigrationPreview, EntityStub } from '../http/contracts/migration';
+import { InvalidOperationError, NotFoundError, RemoteConnectionError } from '../errors';
+import type { ExportBundle, ExportQuery, PullRequest, MigrationResult, MigrationJob, MigrationSelection, MigrationPreview, EntityStub } from '../http/contracts/migration';
 
 /** Drizzle transaction type, inferred to avoid driver-specific imports. */
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -109,7 +109,7 @@ export class MigrationService extends BaseService {
    * @param input - Bundle, force flag, and dryRun flag.
    * @param context - Request context for permission checking and audit logging.
    */
-  async importBundle(input: ImportRequest, context: RequestContext): Promise<MigrationResult> {
+  async importBundle(input: { bundle: ExportBundle; force?: boolean; dryRun?: boolean }, context: RequestContext): Promise<MigrationResult> {
     this.requirePermission(context, PERMISSIONS.MIGRATION_IMPORT);
 
     const startedAt = Date.now();
@@ -177,6 +177,48 @@ export class MigrationService extends BaseService {
   }
 
   /**
+   * Returns lightweight entity stubs from a remote environment, showing what
+   * would be pulled if startPull were called with the same selection.
+   * Authenticates against the stored environment and calls its
+   * GET /api/migration/preview endpoint with the forwarded selection params.
+   *
+   * @param environmentId - ID of the stored environment to preview.
+   * @param query - Same query params accepted by previewExport.
+   * @param context - Request context for permission checking.
+   */
+  async previewRemote(environmentId: string, query: ExportQuery, context: RequestContext): Promise<MigrationPreview> {
+    this.requirePermission(context, PERMISSIONS.MIGRATION_IMPORT);
+
+    const env = await db.query.environments.findFirst({ where: eq(environments.id, environmentId) });
+    if (!env) throw new NotFoundError(`Environment with id ${environmentId} not found`);
+
+    const authRes = await this.safeFetch(`${env.url}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: env.login, password: env.password }),
+    });
+    if (!authRes.ok) throw new RemoteConnectionError(`Authentication against source failed: HTTP ${authRes.status}`);
+
+    const { accessToken } = await authRes.json() as { accessToken: string };
+
+    const previewUrl = new URL(`${env.url}/api/migration/preview`);
+    for (const [key, values] of Object.entries(query)) {
+      if (Array.isArray(values)) {
+        for (const v of values) previewUrl.searchParams.append(key, v);
+      }
+    }
+
+    const previewRes = await this.safeFetch(previewUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!previewRes.ok) throw new RemoteConnectionError(`Preview fetch from source failed: HTTP ${previewRes.status}`);
+
+    const preview = await previewRes.json() as MigrationPreview;
+
+    logger.info({ environmentId, totalCount: preview.totalCount, adminId: context.adminId }, 'Remote migration preview fetched');
+
+    return preview;
+  }
+
+  /**
    * Starts an async pull job from a stored remote environment.
    * Authenticates against the remote, checks schema compatibility, fetches the
    * export bundle via the granular selection query params, and imports it locally.
@@ -184,7 +226,7 @@ export class MigrationService extends BaseService {
    * @param context - Request context forwarded to importBundle.
    * @returns The job object (status: "pending") to poll with GET /api/migration/jobs/:id.
    */
-  async startPull(input: PullRequest, context: RequestContext): Promise<string> {
+  async startPull(environmentId: string, input: PullRequest, context: RequestContext): Promise<string> {
     this.requirePermission(context, PERMISSIONS.MIGRATION_IMPORT);
 
     const jobId = generateId('mjob');
@@ -192,7 +234,7 @@ export class MigrationService extends BaseService {
     const job: MigrationJob = {
       id: jobId,
       status: 'pending',
-      environmentId: input.environmentId,
+      environmentId,
       selection,
       dryRun: input.dryRun ?? false,
       startedAt: new Date().toISOString(),
@@ -200,11 +242,11 @@ export class MigrationService extends BaseService {
 
     this.jobs.set(jobId, job);
 
-    this.runPull(jobId, input, context).catch(err => {
+    this.runPull(jobId, environmentId, input, context).catch(err => {
       logger.error({ jobId, error: err.message }, 'Unexpected error in migration pull background task');
     });
 
-    logger.info({ jobId, environmentId: input.environmentId, selection, dryRun: input.dryRun }, 'Migration pull job queued');
+    logger.info({ jobId, environmentId, selection, dryRun: input.dryRun }, 'Migration pull job queued');
 
     return jobId;
   }
@@ -477,37 +519,42 @@ export class MigrationService extends BaseService {
   // Private: pull orchestration
   // ---------------------------------------------------------------------------
 
-  private async runPull(jobId: string, input: PullRequest, context: RequestContext): Promise<void> {
+  private async runPull(jobId: string, environmentId: string, input: PullRequest, context: RequestContext): Promise<void> {
     this.updateJob(jobId, { status: 'running' });
 
     try {
       // 1. Read credentials directly from DB
-      const env = await db.query.environments.findFirst({ where: eq(environments.id, input.environmentId) });
-      if (!env) throw new NotFoundError(`Environment with id ${input.environmentId} not found`);
+      const env = await db.query.environments.findFirst({ where: eq(environments.id, environmentId) });
+      if (!env) throw new NotFoundError(`Environment with id ${environmentId} not found`);
 
       // 2. Authenticate against source instance
-      const authRes = await fetch(`${env.url}/api/auth/login`, {
+      const authRes = await this.safeFetch(`${env.url}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: env.login, password: env.password }),
       });
-      if (!authRes.ok) throw new InvalidOperationError(`Authentication against source failed: HTTP ${authRes.status}`);
+      if (!authRes.ok) throw new RemoteConnectionError(`Authentication against source failed: HTTP ${authRes.status}`);
 
       const { accessToken } = await authRes.json() as { accessToken: string };
 
       // 3. Schema version check — non-fatal if /version is unreachable
-      const versionRes = await fetch(`${env.url}/version`);
-      if (versionRes.ok) {
-        const { restSchemaHash: sourceHash } = await versionRes.json() as { restSchemaHash: string };
-        const { restSchemaHash: localHash } = this.versionService.getVersion();
-        if (sourceHash !== localHash && !input.force) {
-          throw new InvalidOperationError(`Schema hash mismatch: source=${sourceHash}, local=${localHash}. Use force=true to pull anyway.`);
+      try {
+        const versionRes = await this.safeFetch(`${env.url}/version`);
+        if (versionRes.ok) {
+          const { restSchemaHash: sourceHash } = await versionRes.json() as { restSchemaHash: string };
+          const { restSchemaHash: localHash } = this.versionService.getVersion();
+          if (sourceHash !== localHash && !input.force) {
+            throw new InvalidOperationError(`Schema hash mismatch: source=${sourceHash}, local=${localHash}. Use force=true to pull anyway.`);
+          }
+          if (sourceHash !== localHash) {
+            logger.warn({ sourceHash, localHash, jobId }, 'Schema hash mismatch on pull (force=true)');
+          }
+        } else {
+          logger.warn({ jobId, status: versionRes.status }, 'Source /version endpoint unreachable — skipping schema hash check');
         }
-        if (sourceHash !== localHash) {
-          logger.warn({ sourceHash, localHash, jobId }, 'Schema hash mismatch on pull (force=true)');
-        }
-      } else {
-        logger.warn({ jobId, status: versionRes.status }, 'Source /version endpoint unreachable — skipping schema hash check');
+      } catch (err) {
+        if (err instanceof InvalidOperationError && err.message.includes('Schema hash mismatch')) throw err;
+        logger.warn({ jobId, error: err instanceof Error ? err.message : String(err) }, 'Source /version endpoint unreachable — skipping schema hash check');
       }
 
       // 4. Build export URL with all selection params forwarded as query strings
@@ -519,8 +566,8 @@ export class MigrationService extends BaseService {
         }
       }
 
-      const exportRes = await fetch(exportUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!exportRes.ok) throw new InvalidOperationError(`Export fetch from source failed: HTTP ${exportRes.status}`);
+      const exportRes = await this.safeFetch(exportUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!exportRes.ok) throw new RemoteConnectionError(`Export fetch from source failed: HTTP ${exportRes.status}`);
 
       const bundle = await exportRes.json() as ExportBundle;
 
@@ -538,6 +585,20 @@ export class MigrationService extends BaseService {
   private updateJob(jobId: string, patch: Partial<MigrationJob>): void {
     const job = this.jobs.get(jobId);
     if (job) this.jobs.set(jobId, { ...job, ...patch });
+  }
+
+  /**
+   * Wraps `fetch` and converts low-level network errors (ECONNREFUSED, DNS failures, etc.)
+   * into `InvalidOperationError` with a human-readable message that includes the root cause.
+   * Without this, undici throws `TypeError: fetch failed` with the real cause buried in `error.cause`.
+   */
+  private async safeFetch(url: string, init?: RequestInit): Promise<Response> {
+    try {
+      return await fetch(url, init);
+    } catch (err) {
+      const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : String(err);
+      throw new RemoteConnectionError(`Network request to ${url} failed: ${cause}`);
+    }
   }
 
   // ---------------------------------------------------------------------------
