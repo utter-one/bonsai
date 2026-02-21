@@ -30,8 +30,14 @@ import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
 import { getOpenAPISpec } from './swagger';
+import { setSpecProvider } from './services/VersionService';
 import { ConversationServer } from './websocket/ConversationServer';
 import logger from './utils/logger';
+
+// Register the OpenAPI spec provider before the IoC container is used.
+// This breaks the circular module dependency that would arise from VersionService
+// importing swagger.ts directly (swagger → MigrationController → MigrationService → VersionService).
+setSpecProvider(getOpenAPISpec);
 
 /**
  * Creates and configures the Express application
