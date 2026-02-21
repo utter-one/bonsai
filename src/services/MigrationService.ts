@@ -147,17 +147,17 @@ export class MigrationService extends BaseService {
 
       // Log a 'migrate' audit entry per entity instance after the transaction commits
       await Promise.all([
-        ...bundle.providers.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'provider', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.projects.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'project', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.personas.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'persona', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.classifiers.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'classifier', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.contextTransformers.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'contextTransformer', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.tools.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'tool', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.globalActions.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'globalAction', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.knowledgeCategories.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'knowledgeCategory', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.knowledgeItems.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'knowledgeItem', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.stages.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'stage', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.apiKeys.map(row => this.auditService.logChange({ action: 'migrate', entityType: 'apiKey', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.providers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'provider', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.projects.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'project', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.personas.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'persona', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.classifiers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'classifier', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.contextTransformers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'contextTransformer', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.tools.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'tool', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.globalActions.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'globalAction', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.knowledgeCategories.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeCategory', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.knowledgeItems.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeItem', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.stages.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'stage', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.apiKeys.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'apiKey', entityId: row.id, userId: context.adminId, newEntity: row })),
       ]);
     } else {
       upserted.push(
