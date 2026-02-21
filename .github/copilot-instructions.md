@@ -14,6 +14,7 @@
 - Always verify changes by running `npm run build` (this also regenerates WebSocket JSON Schema)
 - Place private methods AFTER the public ones
 - When modifying database entities (e.g. add, rename, remove fields), apply these changes to the corresponding contracts and services
+- Make sure that MigrationService is synchronized with the current state of the database schema
 
 ## Database Migrations
 
