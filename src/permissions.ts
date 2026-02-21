@@ -80,6 +80,10 @@ export const PERMISSIONS = {
   API_KEY_WRITE: 'api_key:write',
   API_KEY_DELETE: 'api_key:delete',
 
+  // Migration permissions
+  MIGRATION_EXPORT: 'migration:export',
+  MIGRATION_IMPORT: 'migration:import',
+
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',

@@ -59,6 +59,8 @@ import { AuditController } from './http/controllers/AuditController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
+import { MigrationController } from './http/controllers/MigrationController';
+import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema } from './http/contracts/migration';
 
 extendZodWithOpenApi(z);
 
@@ -346,6 +348,16 @@ export function getOpenAPISpec(): any {
   registry.register('VersionResponse', versionResponseSchema);
   const versionPaths = VersionController.getOpenAPIPaths();
   for (const path of versionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Migration routes from MigrationController
+  registry.register('MigrationEntityCount', migrationEntityCountSchema);
+  registry.register('MigrationResult', migrationResultSchema);
+  registry.register('MigrationJob', migrationJobSchema);
+  registry.register('ExportBundle', exportBundleSchema);
+  const migrationPaths = MigrationController.getOpenAPIPaths();
+  for (const path of migrationPaths) {
     registry.registerPath(path);
   }
 

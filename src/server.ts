@@ -25,6 +25,7 @@ import { ProviderCatalogController } from './http/controllers/ProviderCatalogCon
 import { AuditController } from './http/controllers/AuditController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
+import { MigrationController } from './http/controllers/MigrationController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -41,8 +42,8 @@ export function createApp(): express.Application {
   // Configure query parser to use qs for nested query parameters
   app.set('query parser', (str: string) => qs.parse(str, { allowDots: true, depth: 10 }));
 
-  // Parse JSON bodies
-  app.use(express.json());
+  // Parse JSON bodies (10mb limit accommodates migration import bundles)
+  app.use(express.json({ limit: '10mb' }));
 
   // CORS configuration
   app.use(cors({
@@ -156,6 +157,9 @@ export function createApp(): express.Application {
 
   const apiKeyController = container.resolve(ApiKeyController);
   apiKeyController.registerRoutes(app);
+
+  const migrationController = container.resolve(MigrationController);
+  migrationController.registerRoutes(app);
 
   app.use(errorHandler);
 
