@@ -24,12 +24,20 @@ import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
+import { VersionController } from './http/controllers/VersionController';
+import { MigrationController } from './http/controllers/MigrationController';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
 import { getOpenAPISpec } from './swagger';
+import { setSpecProvider } from './services/VersionService';
 import { ConversationServer } from './websocket/ConversationServer';
 import logger from './utils/logger';
+
+// Register the OpenAPI spec provider before the IoC container is used.
+// This breaks the circular module dependency that would arise from VersionService
+// importing swagger.ts directly (swagger → MigrationController → MigrationService → VersionService).
+setSpecProvider(getOpenAPISpec);
 
 /**
  * Creates and configures the Express application
@@ -40,8 +48,8 @@ export function createApp(): express.Application {
   // Configure query parser to use qs for nested query parameters
   app.set('query parser', (str: string) => qs.parse(str, { allowDots: true, depth: 10 }));
 
-  // Parse JSON bodies
-  app.use(express.json());
+  // Parse JSON bodies (10mb limit accommodates migration import bundles)
+  app.use(express.json({ limit: '10mb' }));
 
   // CORS configuration
   app.use(cors({
@@ -87,6 +95,10 @@ export function createApp(): express.Application {
     const schemaPath = new URL('../schemas/websocket-contracts.json', import.meta.url);
     res.sendFile(schemaPath.pathname);
   });
+
+  // Unauthenticated system endpoints — registered before auth middleware intentionally
+  const versionController = container.resolve(VersionController);
+  versionController.registerRoutes(app);
 
   // Authentication middleware (optional - sets req.user if token is valid)
   app.use(optionalAuthMiddleware);
@@ -151,6 +163,9 @@ export function createApp(): express.Application {
 
   const apiKeyController = container.resolve(ApiKeyController);
   apiKeyController.registerRoutes(app);
+
+  const migrationController = container.resolve(MigrationController);
+  migrationController.registerRoutes(app);
 
   app.use(errorHandler);
 

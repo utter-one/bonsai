@@ -57,13 +57,22 @@ import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
+import { VersionController } from './http/controllers/VersionController';
+import { versionResponseSchema } from './http/contracts/version';
+import { MigrationController } from './http/controllers/MigrationController';
+import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
 
 extendZodWithOpenApi(z);
 
+let cachedOpenAPISpec: any = null;
+
 /**
- * Generate OpenAPI specification from Zod schemas and controller decorators
+ * Generate (or return cached) OpenAPI specification from Zod schemas and controller decorators.
+ * The spec is built once per process lifetime and cached in module scope.
  */
 export function getOpenAPISpec(): any {
+  if (cachedOpenAPISpec) return cachedOpenAPISpec;
+
   const registry = new OpenAPIRegistry();
 
   // Register common/reusable sub-schemas first (these will be referenced by other schemas)
@@ -335,6 +344,25 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Version routes from VersionController
+  registry.register('VersionResponse', versionResponseSchema);
+  const versionPaths = VersionController.getOpenAPIPaths();
+  for (const path of versionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Migration routes from MigrationController
+  registry.register('EntityStub', entityStubSchema);
+  registry.register('MigrationEntityCount', migrationEntityCountSchema);
+  registry.register('MigrationResult', migrationResultSchema);
+  registry.register('MigrationJob', migrationJobSchema);
+  registry.register('MigrationPreview', migrationPreviewSchema);
+  registry.register('ExportBundle', exportBundleSchema);
+  const migrationPaths = MigrationController.getOpenAPIPaths();
+  for (const path of migrationPaths) {
+    registry.registerPath(path);
+  }
+
   const generator = new OpenApiGeneratorV3(registry.definitions);
 
   const document = generator.generateDocument({
@@ -366,5 +394,6 @@ export function getOpenAPISpec(): any {
   // Apply security globally (except for public routes which don't require it)
   document.security = [{ bearerAuth: [] }];
 
-  return document;
+  cachedOpenAPISpec = document;
+  return cachedOpenAPISpec;
 }
