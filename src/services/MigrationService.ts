@@ -132,7 +132,7 @@ export class MigrationService extends BaseService {
 
     if (!dryRun) {
       await db.transaction(async (tx) => {
-        upserted.push({ entity: 'providers', count: await this.upsertProviders(tx, bundle.providers) });
+        upserted.push({ entity: 'providers', count: await this.upsertProviders(tx, bundle.providers, context.adminId) });
         upserted.push({ entity: 'projects', count: await this.upsertProjects(tx, bundle.projects) });
         upserted.push({ entity: 'personas', count: await this.upsertPersonas(tx, bundle.personas) });
         upserted.push({ entity: 'classifiers', count: await this.upsertClassifiers(tx, bundle.classifiers) });
@@ -607,9 +607,25 @@ export class MigrationService extends BaseService {
   // providers.createdBy is explicitly nulled — admin IDs differ between environments.
   // ---------------------------------------------------------------------------
 
-  private async upsertProviders(tx: DbTx, rows: any[]): Promise<number> {
+  /**
+   * Converts ISO string timestamp fields to Date objects in a row object.
+   * Drizzle's timestamp() column mapper requires Date instances, but JSON-parsed
+   * bundle data delivers timestamps as strings.
+   */
+  private parseTimestamps(row: any): any {
+    const result = { ...row };
+    for (const field of ['createdAt', 'updatedAt', 'lastUsedAt']) {
+      if (typeof result[field] === 'string') {
+        result[field] = new Date(result[field]);
+      }
+    }
+    return result;
+  }
+
+  private async upsertProviders(tx: DbTx, rows: any[], adminId: string): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(providers).values(rows).onConflictDoUpdate({
+    // Replace source createdBy with the importing admin's ID since admin IDs differ between environments
+    await tx.insert(providers).values(rows.map(r => ({ ...this.parseTimestamps(r), createdBy: adminId }))).onConflictDoUpdate({
       target: providers.id,
       set: {
         name: sql`excluded.name`,
@@ -618,7 +634,7 @@ export class MigrationService extends BaseService {
         apiType: sql`excluded.api_type`,
         // config intentionally omitted — never overwrite existing credentials on the target.
         // New providers inserted with config={} must be reconfigured manually.
-        createdBy: null,
+        createdBy: adminId,
         tags: sql`excluded.tags`,
         version: sql`excluded.version`,
         createdAt: sql`excluded.created_at`,
@@ -630,7 +646,7 @@ export class MigrationService extends BaseService {
 
   private async upsertProjects(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(projects).values(rows).onConflictDoUpdate({
+    await tx.insert(projects).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: projects.id,
       set: {
         name: sql`excluded.name`,
@@ -651,7 +667,7 @@ export class MigrationService extends BaseService {
 
   private async upsertPersonas(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(personas).values(rows).onConflictDoUpdate({
+    await tx.insert(personas).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: personas.id,
       set: {
         projectId: sql`excluded.project_id`,
@@ -671,7 +687,7 @@ export class MigrationService extends BaseService {
 
   private async upsertClassifiers(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(classifiers).values(rows).onConflictDoUpdate({
+    await tx.insert(classifiers).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: classifiers.id,
       set: {
         projectId: sql`excluded.project_id`,
@@ -691,7 +707,7 @@ export class MigrationService extends BaseService {
 
   private async upsertContextTransformers(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(contextTransformers).values(rows).onConflictDoUpdate({
+    await tx.insert(contextTransformers).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: contextTransformers.id,
       set: {
         projectId: sql`excluded.project_id`,
@@ -712,7 +728,7 @@ export class MigrationService extends BaseService {
 
   private async upsertTools(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(tools).values(rows).onConflictDoUpdate({
+    await tx.insert(tools).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: tools.id,
       set: {
         projectId: sql`excluded.project_id`,
@@ -735,7 +751,7 @@ export class MigrationService extends BaseService {
 
   private async upsertGlobalActions(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(globalActions).values(rows).onConflictDoUpdate({
+    await tx.insert(globalActions).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: globalActions.id,
       set: {
         projectId: sql`excluded.project_id`,
@@ -759,7 +775,7 @@ export class MigrationService extends BaseService {
 
   private async upsertKnowledgeCategories(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(knowledgeCategories).values(rows).onConflictDoUpdate({
+    await tx.insert(knowledgeCategories).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: knowledgeCategories.id,
       set: {
         projectId: sql`excluded.project_id`,
@@ -777,7 +793,7 @@ export class MigrationService extends BaseService {
 
   private async upsertKnowledgeItems(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(knowledgeItems).values(rows).onConflictDoUpdate({
+    await tx.insert(knowledgeItems).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: knowledgeItems.id,
       set: {
         categoryId: sql`excluded.category_id`,
@@ -794,7 +810,7 @@ export class MigrationService extends BaseService {
 
   private async upsertStages(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(stages).values(rows).onConflictDoUpdate({
+    await tx.insert(stages).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: stages.id,
       set: {
         projectId: sql`excluded.project_id`,
@@ -824,7 +840,7 @@ export class MigrationService extends BaseService {
 
   private async upsertApiKeys(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(apiKeys).values(rows).onConflictDoUpdate({
+    await tx.insert(apiKeys).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
       target: apiKeys.id,
       set: {
         projectId: sql`excluded.project_id`,
