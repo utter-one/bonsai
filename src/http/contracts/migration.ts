@@ -34,8 +34,7 @@ export const migrationSelectionSchema = z.object({
   contextTransformerIds: z.array(z.string()).optional().describe('Specific context transformer IDs to include. Pulls in referenced LLM provider.'),
   toolIds: z.array(z.string()).optional().describe('Specific tool IDs to include. Pulls in referenced LLM provider.'),
   globalActionIds: z.array(z.string()).optional().describe('Specific global action IDs to include.'),
-  knowledgeCategoryIds: z.array(z.string()).optional().describe('Specific knowledge category IDs to include. Pulls all child knowledge items.'),
-  knowledgeItemIds: z.array(z.string()).optional().describe('Specific knowledge item IDs to include. Pulls in parent category.'),
+  knowledgeCategoryIds: z.array(z.string()).optional().describe('Specific knowledge category IDs to include. All child knowledge items are always included.'),
   providerIds: z.array(z.string()).optional().describe('Specific provider IDs to include (in addition to any transitively required ones).'),
   apiKeyIds: z.array(z.string()).optional().describe('Specific API key IDs to include.'),
 }).openapi('MigrationSelection').describe('Granular entity selection for export/pull. Omit all fields (empty object {}) to export everything.');
@@ -84,8 +83,7 @@ export const exportQuerySchema = z.object({
   contextTransformerIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific context transformer IDs to export.'),
   toolIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific tool IDs to export.'),
   globalActionIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific global action IDs to export.'),
-  knowledgeCategoryIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific knowledge category IDs to export.'),
-  knowledgeItemIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific knowledge item IDs to export.'),
+  knowledgeCategoryIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific knowledge category IDs to export. All child items are included.'),
   providerIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific provider IDs to export (added on top of transitively required ones).'),
   apiKeyIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific API key IDs to export.'),
 });
@@ -152,6 +150,7 @@ export const migrationJobRouteParamsSchema = z.object({
 export const entityStubSchema = z.object({
   id: z.string().describe('Entity ID'),
   name: z.string().describe('Entity name or display label'),
+  projectId: z.string().optional().describe('ID of the owning project — present for all project-scoped entities'),
 }).openapi('EntityStub');
 
 export type EntityStub = z.infer<typeof entityStubSchema>;

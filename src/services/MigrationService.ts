@@ -88,7 +88,6 @@ export class MigrationService extends BaseService {
       toolIds: query.toolIds,
       globalActionIds: query.globalActionIds,
       knowledgeCategoryIds: query.knowledgeCategoryIds,
-      knowledgeItemIds: query.knowledgeItemIds,
       providerIds: query.providerIds,
       apiKeyIds: query.apiKeyIds,
     };
@@ -292,7 +291,6 @@ export class MigrationService extends BaseService {
       toolIds: query.toolIds,
       globalActionIds: query.globalActionIds,
       knowledgeCategoryIds: query.knowledgeCategoryIds,
-      knowledgeItemIds: query.knowledgeItemIds,
       providerIds: query.providerIds,
       apiKeyIds: query.apiKeyIds,
     };
@@ -300,19 +298,20 @@ export class MigrationService extends BaseService {
     const bundle = await this.resolveBundle(selection, '', selection);
 
     const toStub = (r: Record<string, any>): EntityStub => ({ id: r.id as string, name: r.name as string });
+    const toProjectStub = (r: Record<string, any>): EntityStub => ({ id: r.id as string, name: r.name as string, projectId: r.projectId as string });
 
     const result: MigrationPreview = {
       providers: bundle.providers.map(toStub),
       projects: bundle.projects.map(toStub),
-      personas: bundle.personas.map(toStub),
-      classifiers: bundle.classifiers.map(toStub),
-      contextTransformers: bundle.contextTransformers.map(toStub),
-      tools: bundle.tools.map(toStub),
-      globalActions: bundle.globalActions.map(toStub),
-      knowledgeCategories: bundle.knowledgeCategories.map(toStub),
+      personas: bundle.personas.map(toProjectStub),
+      classifiers: bundle.classifiers.map(toProjectStub),
+      contextTransformers: bundle.contextTransformers.map(toProjectStub),
+      tools: bundle.tools.map(toProjectStub),
+      globalActions: bundle.globalActions.map(toProjectStub),
+      knowledgeCategories: bundle.knowledgeCategories.map(toProjectStub),
       knowledgeItems: bundle.knowledgeItems.map(r => ({ id: r.id as string, name: (r.question ?? r.id) as string })),
-      stages: bundle.stages.map(toStub),
-      apiKeys: bundle.apiKeys.map(toStub),
+      stages: bundle.stages.map(toProjectStub),
+      apiKeys: bundle.apiKeys.map(toProjectStub),
       totalCount: 0,
     };
     result.totalCount = [
@@ -354,14 +353,13 @@ export class MigrationService extends BaseService {
 
     // ── 2. Fetch explicitly selected leaf entities ────────────────────────────
 
-    const [explicitPersonaRows, explicitClassifierRows, explicitCtRows, explicitToolRows, explicitGaRows, explicitKcRows, explicitKiRows, explicitStageRows, explicitApiKeyRows] = await Promise.all([
+    const [explicitPersonaRows, explicitClassifierRows, explicitCtRows, explicitToolRows, explicitGaRows, explicitKcRows, explicitStageRows, explicitApiKeyRows] = await Promise.all([
       this.fetchOrAll(selectAll || !!selection.personaIds?.length, personas, selection.personaIds, personas.id),
       this.fetchOrAll(selectAll || !!selection.classifierIds?.length, classifiers, selection.classifierIds, classifiers.id),
       this.fetchOrAll(selectAll || !!selection.contextTransformerIds?.length, contextTransformers, selection.contextTransformerIds, contextTransformers.id),
       this.fetchOrAll(selectAll || !!selection.toolIds?.length, tools, selection.toolIds, tools.id),
       this.fetchOrAll(selectAll || !!selection.globalActionIds?.length, globalActions, selection.globalActionIds, globalActions.id),
       this.fetchOrAll(selectAll || !!selection.knowledgeCategoryIds?.length, knowledgeCategories, selection.knowledgeCategoryIds, knowledgeCategories.id),
-      this.fetchOrAll(selectAll || !!selection.knowledgeItemIds?.length, knowledgeItems, selection.knowledgeItemIds, knowledgeItems.id),
       this.fetchOrAll(selectAll || !!selection.stageIds?.length, stages, selection.stageIds, stages.id),
       this.fetchOrAll(selectAll || !!selection.apiKeyIds?.length, apiKeys, selection.apiKeyIds, apiKeys.id),
     ]);
@@ -393,25 +391,15 @@ export class MigrationService extends BaseService {
     const stageRows = this.dedup([...explicitStageRows, ...childrenOfProjects[6] as any[]], 'id');
     const apiKeyRows = this.dedup([...explicitApiKeyRows, ...childrenOfProjects[7] as any[]], 'id');
 
-    // ── 4. Knowledge items — pull parent categories for explicit items, then all items for merged categories ─
+    // ── 4. Knowledge items — fetch all items for every included category ─────
 
-    const explicitKiWithParentCategories: any[] = [];
-    const additionalKcIds = new Set<string>();
-    for (const ki of explicitKiRows) {
-      if (!kcRows.find(kc => kc.id === ki.categoryId)) {
-        additionalKcIds.add(ki.categoryId);
-      }
-    }
-    const additionalKcRows = additionalKcIds.size > 0
-      ? await db.select().from(knowledgeCategories).where(inArray(knowledgeCategories.id, [...additionalKcIds]))
-      : [];
-    const allKcRows = this.dedup([...kcRows, ...additionalKcRows], 'id');
+    const allKcRows = this.dedup([...kcRows], 'id');
 
     // All knowledge items for all categories we're including
     const allKcIds = allKcRows.map(kc => kc.id);
     const kiRows = allKcIds.length > 0
-      ? this.dedup([...explicitKiRows, ...explicitKiWithParentCategories, ...(await db.select().from(knowledgeItems).where(inArray(knowledgeItems.categoryId, allKcIds)))], 'id')
-      : explicitKiRows;
+      ? await db.select().from(knowledgeItems).where(inArray(knowledgeItems.categoryId, allKcIds))
+      : [];
 
     // ── 5. Collect parent projects missing from explicit project selection ─────
 
