@@ -175,8 +175,6 @@ export class MigrationService extends BaseService {
       );
     }
 
-    await this.auditService.logChange({ action: dryRun ? 'migration:dry-run' : 'migration:import', entityId: 'bundle', entityType: 'migration', userId: context.adminId, newEntity: { sourceRestSchemaHash: bundle.restSchemaHash, dryRun, force, upserted } });
-
     const result: MigrationResult = {
       upserted,
       sourceRestSchemaHash: bundle.restSchemaHash,
