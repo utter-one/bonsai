@@ -22,7 +22,7 @@ import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId } from '../utils/idGenerator';
 import { logger } from '../utils/logger';
-import { InvalidOperationError, NotFoundError } from '../errors';
+import { InvalidOperationError, NotFoundError, RemoteConnectionError } from '../errors';
 import type { ExportBundle, ExportQuery, PullRequest, MigrationResult, MigrationJob, MigrationSelection, MigrationPreview, EntityStub } from '../http/contracts/migration';
 
 /** Drizzle transaction type, inferred to avoid driver-specific imports. */
@@ -192,12 +192,12 @@ export class MigrationService extends BaseService {
     const env = await db.query.environments.findFirst({ where: eq(environments.id, environmentId) });
     if (!env) throw new NotFoundError(`Environment with id ${environmentId} not found`);
 
-    const authRes = await fetch(`${env.url}/api/auth/login`, {
+    const authRes = await this.safeFetch(`${env.url}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: env.login, password: env.password }),
     });
-    if (!authRes.ok) throw new InvalidOperationError(`Authentication against source failed: HTTP ${authRes.status}`);
+    if (!authRes.ok) throw new RemoteConnectionError(`Authentication against source failed: HTTP ${authRes.status}`);
 
     const { accessToken } = await authRes.json() as { accessToken: string };
 
@@ -208,8 +208,8 @@ export class MigrationService extends BaseService {
       }
     }
 
-    const previewRes = await fetch(previewUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!previewRes.ok) throw new InvalidOperationError(`Preview fetch from source failed: HTTP ${previewRes.status}`);
+    const previewRes = await this.safeFetch(previewUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!previewRes.ok) throw new RemoteConnectionError(`Preview fetch from source failed: HTTP ${previewRes.status}`);
 
     const preview = await previewRes.json() as MigrationPreview;
 
@@ -528,28 +528,33 @@ export class MigrationService extends BaseService {
       if (!env) throw new NotFoundError(`Environment with id ${environmentId} not found`);
 
       // 2. Authenticate against source instance
-      const authRes = await fetch(`${env.url}/api/auth/login`, {
+      const authRes = await this.safeFetch(`${env.url}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: env.login, password: env.password }),
       });
-      if (!authRes.ok) throw new InvalidOperationError(`Authentication against source failed: HTTP ${authRes.status}`);
+      if (!authRes.ok) throw new RemoteConnectionError(`Authentication against source failed: HTTP ${authRes.status}`);
 
       const { accessToken } = await authRes.json() as { accessToken: string };
 
       // 3. Schema version check — non-fatal if /version is unreachable
-      const versionRes = await fetch(`${env.url}/version`);
-      if (versionRes.ok) {
-        const { restSchemaHash: sourceHash } = await versionRes.json() as { restSchemaHash: string };
-        const { restSchemaHash: localHash } = this.versionService.getVersion();
-        if (sourceHash !== localHash && !input.force) {
-          throw new InvalidOperationError(`Schema hash mismatch: source=${sourceHash}, local=${localHash}. Use force=true to pull anyway.`);
+      try {
+        const versionRes = await this.safeFetch(`${env.url}/version`);
+        if (versionRes.ok) {
+          const { restSchemaHash: sourceHash } = await versionRes.json() as { restSchemaHash: string };
+          const { restSchemaHash: localHash } = this.versionService.getVersion();
+          if (sourceHash !== localHash && !input.force) {
+            throw new InvalidOperationError(`Schema hash mismatch: source=${sourceHash}, local=${localHash}. Use force=true to pull anyway.`);
+          }
+          if (sourceHash !== localHash) {
+            logger.warn({ sourceHash, localHash, jobId }, 'Schema hash mismatch on pull (force=true)');
+          }
+        } else {
+          logger.warn({ jobId, status: versionRes.status }, 'Source /version endpoint unreachable — skipping schema hash check');
         }
-        if (sourceHash !== localHash) {
-          logger.warn({ sourceHash, localHash, jobId }, 'Schema hash mismatch on pull (force=true)');
-        }
-      } else {
-        logger.warn({ jobId, status: versionRes.status }, 'Source /version endpoint unreachable — skipping schema hash check');
+      } catch (err) {
+        if (err instanceof InvalidOperationError && err.message.includes('Schema hash mismatch')) throw err;
+        logger.warn({ jobId, error: err instanceof Error ? err.message : String(err) }, 'Source /version endpoint unreachable — skipping schema hash check');
       }
 
       // 4. Build export URL with all selection params forwarded as query strings
@@ -561,8 +566,8 @@ export class MigrationService extends BaseService {
         }
       }
 
-      const exportRes = await fetch(exportUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
-      if (!exportRes.ok) throw new InvalidOperationError(`Export fetch from source failed: HTTP ${exportRes.status}`);
+      const exportRes = await this.safeFetch(exportUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!exportRes.ok) throw new RemoteConnectionError(`Export fetch from source failed: HTTP ${exportRes.status}`);
 
       const bundle = await exportRes.json() as ExportBundle;
 
@@ -580,6 +585,20 @@ export class MigrationService extends BaseService {
   private updateJob(jobId: string, patch: Partial<MigrationJob>): void {
     const job = this.jobs.get(jobId);
     if (job) this.jobs.set(jobId, { ...job, ...patch });
+  }
+
+  /**
+   * Wraps `fetch` and converts low-level network errors (ECONNREFUSED, DNS failures, etc.)
+   * into `InvalidOperationError` with a human-readable message that includes the root cause.
+   * Without this, undici throws `TypeError: fetch failed` with the real cause buried in `error.cause`.
+   */
+  private async safeFetch(url: string, init?: RequestInit): Promise<Response> {
+    try {
+      return await fetch(url, init);
+    } catch (err) {
+      const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : String(err);
+      throw new RemoteConnectionError(`Network request to ${url} failed: ${cause}`);
+    }
   }
 
   // ---------------------------------------------------------------------------
