@@ -156,3 +156,33 @@ export type MigrationJob = z.infer<typeof migrationJobSchema>;
 export const migrationJobRouteParamsSchema = z.object({
   id: z.string().describe('Migration job ID'),
 });
+
+/** Lightweight entity reference returned by the preview endpoint. */
+export const entityStubSchema = z.object({
+  id: z.string().describe('Entity ID'),
+  name: z.string().describe('Entity name or display label'),
+}).openapi('EntityStub');
+
+export type EntityStub = z.infer<typeof entityStubSchema>;
+
+/**
+ * Lightweight preview of all entities that would be included in an export/pull.
+ * Returned by GET /api/migration/preview with the same query params as /api/migration/export.
+ * Use this to review what will be migrated before committing to an actual import.
+ */
+export const migrationPreviewSchema = z.object({
+  totalCount: z.number().int().describe('Total number of entities across all types'),
+  providers: z.array(entityStubSchema).describe('Provider stubs that would be included'),
+  projects: z.array(entityStubSchema).describe('Project stubs that would be included'),
+  personas: z.array(entityStubSchema).describe('Persona stubs that would be included'),
+  classifiers: z.array(entityStubSchema).describe('Classifier stubs that would be included'),
+  contextTransformers: z.array(entityStubSchema).describe('Context transformer stubs that would be included'),
+  tools: z.array(entityStubSchema).describe('Tool stubs that would be included'),
+  globalActions: z.array(entityStubSchema).describe('Global action stubs that would be included'),
+  knowledgeCategories: z.array(entityStubSchema).describe('Knowledge category stubs that would be included'),
+  knowledgeItems: z.array(entityStubSchema).describe('Knowledge item stubs that would be included — name is the question text'),
+  stages: z.array(entityStubSchema).describe('Stage stubs that would be included'),
+  apiKeys: z.array(entityStubSchema).describe('API key stubs that would be included'),
+}).openapi('MigrationPreview');
+
+export type MigrationPreview = z.infer<typeof migrationPreviewSchema>;

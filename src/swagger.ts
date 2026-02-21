@@ -60,7 +60,7 @@ import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
 import { MigrationController } from './http/controllers/MigrationController';
-import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema } from './http/contracts/migration';
+import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
 
 extendZodWithOpenApi(z);
 
@@ -352,9 +352,11 @@ export function getOpenAPISpec(): any {
   }
 
   // Register Migration routes from MigrationController
+  registry.register('EntityStub', entityStubSchema);
   registry.register('MigrationEntityCount', migrationEntityCountSchema);
   registry.register('MigrationResult', migrationResultSchema);
   registry.register('MigrationJob', migrationJobSchema);
+  registry.register('MigrationPreview', migrationPreviewSchema);
   registry.register('ExportBundle', exportBundleSchema);
   const migrationPaths = MigrationController.getOpenAPIPaths();
   for (const path of migrationPaths) {

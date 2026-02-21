@@ -11,6 +11,7 @@ import {
   migrationResultSchema,
   migrationJobSchema,
   migrationJobRouteParamsSchema,
+  migrationPreviewSchema,
 } from '../contracts/migration';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -26,6 +27,25 @@ export class MigrationController {
 
   static getOpenAPIPaths(): RouteConfig[] {
     return [
+      {
+        method: 'get',
+        path: '/api/migration/preview',
+        tags: ['Migration'],
+        summary: 'Preview migration scope',
+        description:
+          'Returns lightweight stubs (id + name) for every entity that would be included in an export ' +
+          'with the given selection — same query params as GET /api/migration/export. ' +
+          'Use this to review what will be migrated before committing to an actual import. ' +
+          'No data is written and the full entity records are never serialised.',
+        request: { query: exportQuerySchema },
+        responses: {
+          200: {
+            description: 'Entity stubs grouped by type',
+            content: { 'application/json': { schema: migrationPreviewSchema } },
+          },
+          400: { description: 'Invalid query parameters' },
+        },
+      },
       {
         method: 'get',
         path: '/api/migration/export',
@@ -105,10 +125,18 @@ export class MigrationController {
   }
 
   registerRoutes(router: Router): void {
+    router.get('/api/migration/preview', asyncHandler(this.previewExport.bind(this)));
     router.get('/api/migration/export', asyncHandler(this.exportBundle.bind(this)));
     router.post('/api/migration/import', asyncHandler(this.importBundle.bind(this)));
     router.post('/api/migration/pull', asyncHandler(this.startPull.bind(this)));
     router.get('/api/migration/jobs/:id', asyncHandler(this.getJob.bind(this)));
+  }
+
+  private async previewExport(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.MIGRATION_EXPORT]);
+    const query = exportQuerySchema.parse(req.query);
+    const preview = await this.migrationService.previewExport(query, req.context);
+    res.status(200).json(preview);
   }
 
   private async exportBundle(req: Request, res: Response): Promise<void> {

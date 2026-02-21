@@ -23,7 +23,7 @@ import { PERMISSIONS } from '../permissions';
 import { generateId } from '../utils/idGenerator';
 import { logger } from '../utils/logger';
 import { InvalidOperationError, NotFoundError } from '../errors';
-import type { ExportBundle, ExportQuery, ImportRequest, PullRequest, MigrationResult, MigrationJob, MigrationSelection } from '../http/contracts/migration';
+import type { ExportBundle, ExportQuery, ImportRequest, PullRequest, MigrationResult, MigrationJob, MigrationSelection, MigrationPreview, EntityStub } from '../http/contracts/migration';
 
 /** Drizzle transaction type, inferred to avoid driver-specific imports. */
 type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -215,6 +215,59 @@ export class MigrationService extends BaseService {
    */
   getJob(jobId: string): MigrationJob | undefined {
     return this.jobs.get(jobId);
+  }
+
+  /**
+   * Returns lightweight stubs (id + name) for every entity that would be included
+   * in an export with the given selection, without producing the full bundle.
+   * Useful for reviewing the scope of a migration before committing to it.
+   *
+   * @param query - Same query params accepted by exportBundle.
+   * @param context - Request context for permission checking.
+   */
+  async previewExport(query: ExportQuery, context: RequestContext): Promise<MigrationPreview> {
+    this.requirePermission(context, PERMISSIONS.MIGRATION_EXPORT);
+
+    const selection: MigrationSelection = {
+      projectIds: query.projectIds,
+      stageIds: query.stageIds,
+      personaIds: query.personaIds,
+      classifierIds: query.classifierIds,
+      contextTransformerIds: query.contextTransformerIds,
+      toolIds: query.toolIds,
+      globalActionIds: query.globalActionIds,
+      knowledgeCategoryIds: query.knowledgeCategoryIds,
+      knowledgeItemIds: query.knowledgeItemIds,
+      providerIds: query.providerIds,
+      apiKeyIds: query.apiKeyIds,
+    };
+
+    const bundle = await this.resolveBundle(selection, '', selection);
+
+    const toStub = (r: Record<string, any>): EntityStub => ({ id: r.id as string, name: r.name as string });
+
+    const result: MigrationPreview = {
+      providers: bundle.providers.map(toStub),
+      projects: bundle.projects.map(toStub),
+      personas: bundle.personas.map(toStub),
+      classifiers: bundle.classifiers.map(toStub),
+      contextTransformers: bundle.contextTransformers.map(toStub),
+      tools: bundle.tools.map(toStub),
+      globalActions: bundle.globalActions.map(toStub),
+      knowledgeCategories: bundle.knowledgeCategories.map(toStub),
+      knowledgeItems: bundle.knowledgeItems.map(r => ({ id: r.id as string, name: (r.question ?? r.id) as string })),
+      stages: bundle.stages.map(toStub),
+      apiKeys: bundle.apiKeys.map(toStub),
+      totalCount: 0,
+    };
+    result.totalCount = [
+      result.providers, result.projects, result.personas, result.classifiers,
+      result.contextTransformers, result.tools, result.globalActions,
+      result.knowledgeCategories, result.knowledgeItems, result.stages, result.apiKeys,
+    ].reduce((sum, arr) => sum + arr.length, 0);
+
+    logger.info({ totalCount: result.totalCount, selection, adminId: context.adminId }, 'Migration preview computed');
+    return result;
   }
 
   // ---------------------------------------------------------------------------
