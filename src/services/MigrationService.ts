@@ -467,15 +467,11 @@ export class MigrationService extends BaseService {
         ? await db.select().from(providers).where(inArray(providers.id, [...referencedProviderIds]))
         : [];
 
-    // Strip sensitive config (API keys/credentials) from providers — they must be
-    // reconfigured manually on the target instance after import.
-    const safeProviderRows = providerRows.map(({ config: _config, ...rest }) => ({ ...rest, config: {} }));
-
     return {
       exportedAt: new Date().toISOString(),
       restSchemaHash,
       selection: originalSelection,
-      providers: safeProviderRows,
+      providers: providerRows,
       projects: allProjectRows,
       personas: allPersonaRows,
       classifiers: allClassifierRows,
@@ -632,8 +628,7 @@ export class MigrationService extends BaseService {
         description: sql`excluded.description`,
         providerType: sql`excluded.provider_type`,
         apiType: sql`excluded.api_type`,
-        // config intentionally omitted — never overwrite existing credentials on the target.
-        // New providers inserted with config={} must be reconfigured manually.
+        config: sql`excluded.config`,
         createdBy: adminId,
         tags: sql`excluded.tags`,
         version: sql`excluded.version`,
