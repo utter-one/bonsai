@@ -1226,8 +1226,12 @@ export class ConversationRunner {
       if (this.stageData.ttsProvider) {
         await this.stageData.ttsProvider.start();
       }
-      this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
-      await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
+      if (executionOutcome.prescriptedResponse !== undefined) {
+        await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
+      } else {
+        this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
+      }
     } else if (executionOutcome.shouldEndConversation) {
       // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
@@ -1247,6 +1251,64 @@ export class ConversationRunner {
     } else {
       // If no response generation, go back to awaiting user input
       await this.changeState('awaiting_user_input');
+    }
+  }
+
+  /**
+   * Delivers a prescripted response text directly to the client and TTS pipeline,
+   * bypassing LLM generation. Mirrors the chunk + complete callback flow used by
+   * the completion LLM provider so that TTS, WebSocket messages, and conversation
+   * events are handled identically to AI-generated responses.
+   * @param text - The prescripted response text to deliver
+   */
+  private async deliverPrescriptedResponse(text: string): Promise<void> {
+    const conversationId = this.conversation.id;
+    const ttsProvider = this.stageData.ttsProvider;
+
+    logger.info({ conversationId, responseLength: text.length }, `Delivering prescripted response for conversation ${conversationId}`);
+
+    if (ttsProvider) {
+      await ttsProvider.sendText(text);
+    }
+
+    if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+      const chunkMessage = {
+        type: 'ai_transcribed_chunk',
+        conversationId,
+        outputTurnId: this.stageData.outputTurnId,
+        chunkId: generateId(ID_PREFIXES.CHUNK),
+        chunkText: text,
+        ordinal: 0,
+        isFinal: true,
+        sessionId: this.session.id,
+        requestId: null,
+      } as AiTranscribedChunkMessage;
+      this.ws.send(JSON.stringify(chunkMessage));
+    }
+
+    const messageEventData: MessageEventData = {
+      text,
+      role: 'assistant',
+      originalText: text,
+      metadata: {
+        prescripted: true,
+      },
+    };
+    await this.saveAndSendEvent('message', messageEventData);
+
+    if (!ttsProvider) {
+      const endMessage = {
+        type: 'end_ai_generation_output',
+        conversationId,
+        outputTurnId: this.stageData.outputTurnId,
+        sessionId: this.session.id,
+        requestId: null,
+        fullText: text,
+      } as EndAiGenerationOutputMessage;
+      this.ws.send(JSON.stringify(endMessage));
+      await this.changeState('awaiting_user_input');
+    } else {
+      await ttsProvider.end();
     }
   }
 
