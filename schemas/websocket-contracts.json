@@ -1503,6 +1503,31 @@
             "generate_response"
           ],
           "description": "Effect type"
+        },
+        "responseMode": {
+          "type": "string",
+          "enum": [
+            "generated",
+            "prescripted"
+          ],
+          "default": "generated",
+          "description": "Type of response to generate: generated (AI-generated), prescripted (predefined response), best_match (choose the best match from predefined responses)"
+        },
+        "prescriptedSelectionStrategy": {
+          "type": "string",
+          "enum": [
+            "random",
+            "round_robin"
+          ],
+          "default": "random",
+          "description": "Strategy to select prescripted response when multiple are provided"
+        },
+        "prescriptedResponses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional array of prescripted responses to use"
         }
       },
       "required": [

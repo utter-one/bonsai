@@ -116,6 +116,9 @@ export const callWebhookEffectSchema = z.object({
  */
 export const generateResponseEffectSchema = z.object({
   type: z.literal('generate_response').describe('Effect type'),
+  responseMode: z.enum(['generated', 'prescripted']).optional().default('generated').describe('Type of response to generate: generated (AI-generated), prescripted (predefined response), best_match (choose the best match from predefined responses)'),
+  prescriptedSelectionStrategy: z.enum(['random', 'round_robin']).optional().default('random').describe('Strategy to select prescripted response when multiple are provided'),
+  prescriptedResponses: z.array(z.string()).optional().describe('Optional array of prescripted responses to use'),
 }).openapi('GenerateResponseEffect');
 
 /**
