@@ -10,6 +10,12 @@ import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
 import { TransformerRuntimeData } from './ConversationRunner';
 import { TemplatingEngine } from './TemplatingEngine';
+import type { ActionClassificationResult } from '../../types/classification';
+
+/**
+ * Map of variable names to their change event type after a transformer run.
+ */
+type VariableChangeEvents = Record<string, 'new' | 'changed' | 'removed'>;
 
 /**
  * Internal result of a single context transformer execution.
@@ -46,16 +52,19 @@ export class ContextTransformerExecutor {
    * Results are applied sequentially to stage variables after all transformers complete,
    * then flushed to the database in a single update.
    * A `transformation` conversation event is saved and broadcast over WebSocket per transformer.
+   * After updating variables, any stage actions with `triggerOnTransformation: true` whose
+   * `watchedVariables` conditions are satisfied are returned for upstream processing.
    *
    * @param session - The active connection/session
    * @param userInput - The processed user input text
    * @param originalUserInput - The original user input before any processing
+   * @returns Triggered stage actions based on variable changes
    */
-  async executeTransformers(session: Connection, userInput: string, originalUserInput: string): Promise<void> {
+  async executeTransformers(session: Connection, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
     const { transformers, stage, conversation, globalActions } = session.runner.getRuntimeData();
 
     if (transformers.length === 0) {
-      return;
+      return [];
     }
 
     logger.debug({ sessionId: session.id, conversationId: conversation.id, transformerCount: transformers.length }, 'Executing context transformers');
@@ -76,8 +85,11 @@ export class ContextTransformerExecutor {
 
     const results = await Promise.all(transformerPromises);
 
+    // Snapshot variables before applying transformer results
+    const prevStageVars = { ...(conversation.stageVars[stage.id] || {}) };
+
     // Apply results sequentially to stage variables (respects order of transformers)
-    const stageVars = { ...(conversation.stageVars[stage.id] || {}) };
+    const stageVars = { ...prevStageVars };
     for (const result of results) {
       for (const [key, value] of Object.entries(result.parsedValues)) {
         stageVars[key] = value;
@@ -91,6 +103,9 @@ export class ContextTransformerExecutor {
       .where(eq(conversations.id, conversation.id));
 
     logger.debug({ sessionId: session.id, conversationId: conversation.id, updatedFields: Object.keys(stageVars) }, 'Stage variables updated after context transformer execution');
+
+    // Compute variable change events (new / changed / removed)
+    const variableChangeEvents = this.computeVariableChangeEvents(prevStageVars, stageVars);
 
     // Save a transformation event and notify over WebSocket for each transformer
     for (const result of results) {
@@ -110,6 +125,73 @@ export class ContextTransformerExecutor {
       await this.conversationService.saveConversationEvent(conversation.id, 'transformation', eventData);
       this.connectionManager.sendConversationEvent(conversation.id, 'transformation', eventData);
     }
+
+    // Find and return stage actions triggered by variable changes
+    const triggeredActions = this.findTriggeredActions(session, variableChangeEvents, stage.actions || {});
+    return triggeredActions;
+  }
+
+  /**
+   * Computes which variables were created, changed, or removed between two stage variable snapshots.
+   *
+   * @param prev - Variable map before transformer execution
+   * @param next - Variable map after transformer execution
+   * @returns Map of variable name to change event type
+   */
+  private computeVariableChangeEvents(prev: Record<string, any>, next: Record<string, any>): VariableChangeEvents {
+    const events: VariableChangeEvents = {};
+    const allKeys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+
+    for (const key of allKeys) {
+      const prevVal = prev[key];
+      const nextVal = next[key];
+      const prevExists = prevVal !== undefined && prevVal !== null;
+      const nextExists = nextVal !== undefined && nextVal !== null;
+
+      if (!prevExists && nextExists) {
+        events[key] = 'new';
+      } else if (prevExists && !nextExists) {
+        events[key] = 'removed';
+      } else if (prevExists && nextExists && JSON.stringify(prevVal) !== JSON.stringify(nextVal)) {
+        events[key] = 'changed';
+      }
+    }
+
+    return events;
+  }
+
+  /**
+   * Determines which stage actions should be triggered based on variable change events.
+   * An action is triggered when `triggerOnTransformation` is true and at least one of its
+   * `watchedVariables` entries matches the corresponding change event type.
+   *
+   * @param session - The active connection/session (used for logging)
+   * @param changeEvents - Map of variable name to change event type
+   * @param stageActions - Map of action ID to action definition
+   * @returns Array of triggered action classification results
+   */
+  private findTriggeredActions(session: Connection, changeEvents: VariableChangeEvents, stageActions: Record<string, import('../../types/actions').StageAction>): ActionClassificationResult[] {
+    if (Object.keys(changeEvents).length === 0) {
+      return [];
+    }
+
+    const triggered: ActionClassificationResult[] = [];
+
+    for (const [actionId, action] of Object.entries(stageActions)) {
+      if (!action.triggerOnTransformation) continue;
+      if (!action.watchedVariables || Object.keys(action.watchedVariables).length === 0) continue;
+
+      const isTriggered = Object.entries(action.watchedVariables).some(
+        ([varName, expectedEvent]) => changeEvents[varName] === expectedEvent,
+      );
+
+      if (isTriggered) {
+        logger.debug({ sessionId: session.id, actionId, changeEvents }, 'Action triggered by context transformer variable change');
+        triggered.push({ name: actionId, parameters: {} });
+      }
+    }
+
+    return triggered;
   }
 
   /**

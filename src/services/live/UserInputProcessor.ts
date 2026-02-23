@@ -72,7 +72,7 @@ export class UserInputProcessor {
       });
 
       // Run all classifiers and all context transformers in parallel
-      const [classificationResultsWithClassifiers] = await Promise.all([
+      const [classificationResultsWithClassifiers, transformerTriggeredActions] = await Promise.all([
         Promise.all(actionPromises),
         this.transformerExecutor.executeTransformers(session, userInput, originalUserInput),
       ]);
@@ -96,7 +96,10 @@ export class UserInputProcessor {
         this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
       }
 
-      const allActions = classificationResultsWithClassifiers.map(x => x.actions).flat();
+      const allActions = [
+        ...classificationResultsWithClassifiers.map(x => x.actions).flat(),
+        ...transformerTriggeredActions,
+      ];
       const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.id, ga]));
 
       const knowledgeCategoryIds = new Set(knowledgeCategories.map(c => `__knowledge_${c.id}`));
