@@ -27,7 +27,7 @@ export const azureAsrSettingsSchema = z.object({
   language: z.string().optional().describe('The language code for speech recognition (e.g., \'en-US\')'),
   dictionaryPhrases: z.array(z.string()).optional().describe('The phrases to add to the speech recognition dictionary'),
   audioFormat: z.enum(audioFormatValues).optional().describe('Audio input format for speech recognition (e.g., "pcm_16000")'),
-});
+}).openapi('AzureAsrSettings').describe('Azure Speech Recognition settings');
 
 export type AzureAsrSettings = z.infer<typeof azureAsrSettingsSchema>;
 
