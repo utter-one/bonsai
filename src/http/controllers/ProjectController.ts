@@ -8,13 +8,14 @@ import type { UpdateProjectRequest } from '../contracts/project';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
+import logger from '../../utils/logger';
 
 /**
  * Controller for project management with explicit routing
  */
 @singleton()
 export class ProjectController {
-  constructor(@inject(ProjectService) private readonly projectService: ProjectService) {}
+  constructor(@inject(ProjectService) private readonly projectService: ProjectService) { }
 
   /**
    * Get OpenAPI path definitions for this controller

@@ -20,7 +20,7 @@ export type ElevenLabsAsrProviderConfig = z.infer<typeof elevenLabsAsrProviderCo
 /**
  * Schema for ElevenLabs ASR settings
  */
-export const elevenLabsAsrSettingsSchema = z.object({
+export const elevenLabsAsrSettingsSchema = z.looseObject({
   modelId: z.string().default('scribe_v2_realtime').describe('Model ID to use for transcription (e.g., "scribe_v2_realtime"), defaults to scribe_v2_realtime'),
   audioFormat: z.enum(['pcm_16000', 'pcm_8000', 'pcm_22050', 'pcm_24000', 'pcm_44100']).default('pcm_16000').describe('Audio encoding format for speech-to-text, defaults to pcm_16000'),
   languageCode: z.string().optional().describe('Language code in ISO 639-1 or ISO 639-3 format (e.g., "en", "es")'),
@@ -264,7 +264,10 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         break;
 
       case 'committed_transcript':
-        if (message.text) {
+        // Only use committed_transcript if timestamps and language detection are disabled
+        if (this.settings.includeTimestamps || this.settings.includeLanguageDetection) {
+          logger.debug(`[ElevenLabs ASR] Received committed_transcript but Include Timestamps or Include Language Detection was set - ignoring in favor of committed_transcript_with_timestamps`);
+        } else if (message.text) {
           logger.info(`[ElevenLabs ASR] Committed transcript received: ${message.text}`);
           this.handleRecognized(this.currentChunkId, message.text);
           this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
@@ -272,7 +275,11 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         break;
 
       case 'committed_transcript_with_timestamps':
-        if (message.text) {
+        // Only use committed_transcript_with_timestamps if timestamps or language detection are enabled
+        if (!this.settings.includeTimestamps && !this.settings.includeLanguageDetection) {
+          logger.debug(`[ElevenLabs ASR] Received committed_transcript_with_timestamps but Include Timestamps and Include Language Detection were not set - ignoring`);
+        } else if (message.text) {
+          logger.info(`[ElevenLabs ASR] Committed transcript with timestamps received: ${message.text}`);
           this.handleRecognized(this.currentChunkId, message.text);
           this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
           if (message.language_code) {
