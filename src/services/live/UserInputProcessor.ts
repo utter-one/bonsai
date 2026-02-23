@@ -13,6 +13,7 @@ import { Conversation, GlobalAction } from "../../types/models";
 import { extractTextFromContent } from "../../utils/llm";
 import { StageAction } from "../../types/actions";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
+import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
 
 /**
  * Service responsible for processing user input during live sessions.
@@ -24,7 +25,8 @@ export class UserInputProcessor {
     @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private conversationService: ConversationService,
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
-    @inject(KnowledgeService) private knowledgeService: KnowledgeService
+    @inject(KnowledgeService) private knowledgeService: KnowledgeService,
+    @inject(ContextTransformerExecutor) private transformerExecutor: ContextTransformerExecutor,
   ) {}
 
   /** Processes text input from the user within a session.
@@ -69,7 +71,11 @@ export class UserInputProcessor {
         return this.classifyTextInput(session, classifier, classifierContext);
       });
 
-      const classificationResultsWithClassifiers = await Promise.all(actionPromises);
+      // Run all classifiers and all context transformers in parallel
+      const [classificationResultsWithClassifiers, transformerTriggeredActions] = await Promise.all([
+        Promise.all(actionPromises),
+        this.transformerExecutor.executeTransformers(session, userInput, originalUserInput),
+      ]);
       
       // Register classification events for each classifier
       for (const result of classificationResultsWithClassifiers) {
@@ -90,7 +96,10 @@ export class UserInputProcessor {
         this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
       }
 
-      const allActions = classificationResultsWithClassifiers.map(x => x.actions).flat();
+      const allActions = [
+        ...classificationResultsWithClassifiers.map(x => x.actions).flat(),
+        ...transformerTriggeredActions,
+      ];
       const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.id, ga]));
 
       const knowledgeCategoryIds = new Set(knowledgeCategories.map(c => `__knowledge_${c.id}`));
