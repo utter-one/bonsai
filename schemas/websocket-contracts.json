@@ -397,6 +397,9 @@
           "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
         }
       },
+      "additionalProperties": {
+        "nullable": true
+      },
       "description": "Azure Speech Recognition settings"
     },
     "ElevenLabsAsrSettings": {
@@ -475,6 +478,9 @@
           "default": true,
           "description": "When false, zero retention mode is used (enterprise only), defaults to true"
         }
+      },
+      "additionalProperties": {
+        "nullable": true
       },
       "description": "ElevenLabs Scribe settings"
     },
