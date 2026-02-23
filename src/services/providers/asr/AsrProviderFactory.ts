@@ -2,8 +2,8 @@ import { singleton } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IAsrProvider } from './IAsrProvider';
-import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema, AzureAsrSettings } from './AzureAsrProvider';
-import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProviderConfigSchema, ElevenLabsAsrSettings } from './ElevenLabsAsrProvider';
+import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema, AzureAsrSettings, azureAsrSettingsSchema } from './AzureAsrProvider';
+import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProviderConfigSchema, ElevenLabsAsrSettings, elevenLabsAsrSettingsSchema } from './ElevenLabsAsrProvider';
 
 /**
  * Supported ASR provider API types
@@ -63,7 +63,7 @@ export class AsrProviderFactory {
    */
   private createAzureProvider(provider: Provider, settings: AzureAsrSettings): AzureAsrProvider {
     const config = azureAsrProviderConfigSchema.parse(provider.config);
-    const safeSettings = (settings ?? {}) as AzureAsrSettings;
+    const safeSettings = azureAsrSettingsSchema.parse(settings);
 
     logger.info(`Creating Azure ASR provider for provider ${provider.id} with region ${config.region}`);
     return new AzureAsrProvider(config, safeSettings);
@@ -77,7 +77,7 @@ export class AsrProviderFactory {
    */
   private createElevenLabsProvider(provider: Provider, settings: ElevenLabsAsrSettings): ElevenLabsAsrProvider {
     const config = elevenLabsAsrProviderConfigSchema.parse(provider.config);
-    const safeSettings = (settings ?? {}) as ElevenLabsAsrSettings;
+    const safeSettings = elevenLabsAsrSettingsSchema.parse(settings);
 
     logger.info(`Creating ElevenLabs ASR provider for provider ${provider.id}`);
     return new ElevenLabsAsrProvider(config, safeSettings);

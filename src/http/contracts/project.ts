@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { audioFormatValues } from '../../types/audio';
 import { s3StorageSettingsSchema } from '../../services/providers/storage/S3StorageProvider';
 import { azureBlobStorageSettingsSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
 import { gcsStorageSettingsSchema } from '../../services/providers/storage/GcsStorageProvider';
 import { localStorageSettingsSchema } from '../../services/providers/storage/LocalStorageProvider';
+import { azureAsrSettingsSchema } from '../../services/providers/asr/AzureAsrProvider';
+import { elevenLabsAsrSettingsSchema } from '../../services/providers/asr/ElevenLabsAsrProvider';
 import { parameterValueSchema } from '../../types/parameters';
 
 extendZodWithOpenApi(z);
@@ -37,14 +38,12 @@ export const storageConfigSchema = z.object({
 export type StorageConfig = z.infer<typeof storageConfigSchema>;
 
 /**
- * Schema for ASR configuration settings
- * Provides configuration for automatic speech recognition
+ * Schema for ASR provider settings (union of all ASR provider settings)
  */
-export const asrSettingsSchema = z.object({
-  language: z.string().optional().describe('The language code for speech recognition (e.g., "en-US")'),
-  dictionaryPhrases: z.array(z.string()).optional().describe('The phrases to add to the speech recognition dictionary'),
-  audioFormat: z.enum(audioFormatValues).optional().describe('Audio input format for speech recognition (e.g., "pcm_16000")'),
-}).openapi('AsrSettings').describe('ASR provider settings');
+export const asrSettingsSchema = z.union([
+  azureAsrSettingsSchema,
+  elevenLabsAsrSettingsSchema,
+]).describe('ASR provider settings');
 
 export const asrConfigSchema = z.object({
   asrProviderId: z.string().optional().describe('ID of the ASR provider (e.g., "azure-speech", "openai-whisper")'),
