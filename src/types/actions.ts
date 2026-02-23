@@ -176,6 +176,8 @@ export const toolParameterSchema = z.object({
   required: z.boolean().describe('Whether this parameter must be provided when invoking the tool'),
 }).openapi('ToolParameter');
 
+export const fieldWatchTriggerSchema = z.enum(['new', 'changed', 'removed']).describe('Condition for triggering an action based on variable changes: new (variable is created), changed (variable value changes), removed (variable is deleted)');
+
 /**
  * Schema for a single stage action
  * Defines an action available within a conversation stage
@@ -190,6 +192,8 @@ export const stageActionSchema = z.object({
   parameters: z.array(stageActionParameterSchema).describe('Optional array of parameters to extract from user input'),
   effects: z.array(effectSchema).describe('Array of effects to execute when action is triggered'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
+  triggerOnTransformation: z.boolean().optional().default(false).describe('Whether this action should be triggered on variable transformations'),
+  watchedVariables: z.record(z.string(), fieldWatchTriggerSchema).optional().describe('Optional map of variable paths to watch for changes that trigger this action'),  
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
 }).openapi('StageAction');
 

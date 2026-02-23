@@ -3,12 +3,58 @@ import { conversationEvents, db, projects, stages, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { inject, singleton } from "tsyringe";
 import { Conversation, GlobalAction, Stage } from "../../types/models";
+import { FieldDescriptor } from "../../types/parameters";
 import { StageAction } from "../../types/actions";
 import { MessageEventData } from "../../types/conversationEvents";
 import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
 import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
+
+/**
+ * Recursively converts a single FieldDescriptor into a pseudo-JSON value.
+ * Primitives become their type label string (e.g. "string"), arrays are wrapped in a
+ * single-element array, and objects are expanded into key→value maps.
+ */
+function buildSchemaValue(descriptor: FieldDescriptor): unknown {
+  if (descriptor.objectSchema?.length) {
+    const obj: Record<string, unknown> = {};
+    for (const child of descriptor.objectSchema) {
+      obj[child.name] = buildSchemaValue(child);
+    }
+    return descriptor.isArray ? [obj] : obj;
+  }
+  // Strip trailing [] from type name — isArray already controls the array wrapper
+  const typeName = descriptor.type.replace(/\[\]$/, '');
+  return descriptor.isArray ? [typeName] : typeName;
+}
+
+/**
+ * Converts an array of FieldDescriptors into a pseudo-JSON string that shows field names,
+ * types, array shapes and nested object structures. Intended for inclusion in LLM prompts.
+ *
+ * Example output:
+ * ```json
+ * {
+ *   "name": "string",
+ *   "age": "number",
+ *   "tags": ["string"],
+ *   "address": {
+ *     "street": "string",
+ *     "city": "string"
+ *   },
+ *   "contacts": [{ "name": "string" }]
+ * }
+ * ```
+ */
+function fieldDescriptorsToPseudoJson(descriptors: FieldDescriptor[]): string {
+  if (!descriptors.length) return '{}';
+  const obj: Record<string, unknown> = {};
+  for (const d of descriptors) {
+    obj[d.name] = buildSchemaValue(d);
+  }
+  return JSON.stringify(obj, null, 2);
+}
 
 /**
  * A single FAQ item consisting of a question and its answer, sourced from the knowledge base.
@@ -59,6 +105,17 @@ export type ConversationContext = {
 
   /** FAQ items gathered from knowledge base categories triggered during this conversation turn */
   faq?: FaqItem[];
+
+  /**
+   * Pseudo-JSON schema descriptions of context variables, populated for transformer contexts.
+   */
+  schema?: string;
+
+  /**
+   * Current values of the stage variable fields selected for transformation.
+   * Only populated in transformer contexts. Use the `json` helper in templates to render it.
+   */
+  context?: Record<string, any>;
 
   /** Stage configuration and available actions (optional, included for classification and processing contexts) */
   stage?: {
@@ -336,6 +393,82 @@ export class ConversationContextBuilder {
         tools: {},
       },
       stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext, knowledgeCategories),
+    };
+
+    // Get history from database
+    const messages = await db.query.conversationEvents.findMany({
+      where: and(
+        eq(conversationEvents.conversationId, conversation.id),
+        eq(conversationEvents.eventType, 'message')
+      ),
+      orderBy: asc(conversationEvents.timestamp),
+    });
+    context.history = messages.map(msg => {
+      const eventData = msg.eventData as MessageEventData;
+      return {
+        role: eventData.role,
+        content: eventData.text,
+      };
+    });
+
+    return context;
+  }
+
+  /**
+   * Builds context specifically for a context transformer with the full stage context.
+   * Unlike the classifier context, no action filtering is applied — transformers receive the complete stage view.
+   * Also populates a special `schema` variable describing the shape of stage variables and the transformer's expected output fields.
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity with persona relation
+   * @param globalActions - Array of global actions for the stage
+   * @param transformerId - ID of the transformer being executed (reserved for future per-transformer filtering)
+   * @param contextFields - The list of field names this transformer is expected to output (from transformer.contextFields)
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   */
+  async buildContextForTransformer(conversation: Conversation, stage: Stage, globalActions: GlobalAction[], transformerId: string, contextFields: string[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+    // Load user data
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, conversation.userId),
+    });
+
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {});
+    rawContext.userInput = userInput;
+    rawContext.originalUserInput = originalUserInput;
+
+    // Build pseudo-JSON schema strings from stage variableDescriptors
+    const stageVarDescriptors: FieldDescriptor[] = stage.variableDescriptors ?? [];
+    const stageVarDescriptorMap = new Map(stageVarDescriptors.map(d => [d.name, d]));
+
+    // Cross-reference contextFields against stage descriptors; fall back to a minimal string descriptor for unknown fields
+    const outputFieldDescriptors: FieldDescriptor[] = (contextFields ?? []).map(fieldName => (
+      stageVarDescriptorMap.get(fieldName) ?? { name: fieldName, type: 'string', isArray: false }
+    ));
+
+    const stageVars = conversation.stageVars[conversation.stageId] || {};
+
+    // Pick current values for the fields this transformer is expected to output
+    const transformerContext: Record<string, any> = {};
+    for (const fieldName of contextFields ?? []) {
+      transformerContext[fieldName] = stageVars[fieldName];
+    }
+
+    const context: ConversationContext = {
+      conversationId: conversation.id,
+      vars: stageVars,
+      userProfile: user?.profile || {},
+      persona: (stage as any).persona?.prompt,
+      history: [],
+      actions: {},
+      userInput,
+      originalUserInput,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      schema: fieldDescriptorsToPseudoJson(outputFieldDescriptors),
+      context: transformerContext,
+      stage: await this.buildStageContext(stage, rawContext),
     };
 
     // Get history from database
