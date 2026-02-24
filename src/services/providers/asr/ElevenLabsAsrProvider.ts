@@ -20,19 +20,19 @@ export type ElevenLabsAsrProviderConfig = z.infer<typeof elevenLabsAsrProviderCo
 /**
  * Schema for ElevenLabs ASR settings
  */
-export const elevenLabsAsrSettingsSchema = z.object({
-  modelId: z.string().optional().describe('Model ID to use for transcription (e.g., "scribe_v2_realtime"), defaults to scribe_v2_realtime'),
-  audioFormat: z.enum(['pcm_16000', 'pcm_8000', 'pcm_22050', 'pcm_24000', 'pcm_44100']).optional().describe('Audio encoding format for speech-to-text, defaults to pcm_16000'),
+export const elevenLabsAsrSettingsSchema = z.looseObject({
+  modelId: z.string().default('scribe_v2_realtime').describe('Model ID to use for transcription (e.g., "scribe_v2_realtime"), defaults to scribe_v2_realtime'),
+  audioFormat: z.enum(['pcm_16000', 'pcm_8000', 'pcm_22050', 'pcm_24000', 'pcm_44100']).default('pcm_16000').describe('Audio encoding format for speech-to-text, defaults to pcm_16000'),
   languageCode: z.string().optional().describe('Language code in ISO 639-1 or ISO 639-3 format (e.g., "en", "es")'),
-  includeTimestamps: z.boolean().optional().describe('Whether to receive word-level timestamps in transcription results, defaults to false'),
-  includeLanguageDetection: z.boolean().optional().describe('Whether to include detected language code in transcription results, defaults to false'),
-  commitStrategy: z.enum(['manual', 'vad']).optional().describe('Strategy for committing transcriptions - manual or voice activity detection, defaults to manual'),
-  vadSilenceThresholdSecs: z.number().min(0.3).max(3).optional().describe('Silence threshold in seconds for VAD (0.3-3), defaults to 1.5'),
-  vadThreshold: z.number().min(0.1).max(0.9).optional().describe('Threshold for voice activity detection (0.1-0.9), defaults to 0.4'),
-  minSpeechDurationMs: z.number().int().min(50).max(2000).optional().describe('Minimum speech duration in milliseconds (50-2000), defaults to 100'),
-  minSilenceDurationMs: z.number().int().min(50).max(2000).optional().describe('Minimum silence duration in milliseconds (50-2000), defaults to 100'),
-  enableLogging: z.boolean().optional().describe('When false, zero retention mode is used (enterprise only), defaults to true'),
-});
+  includeTimestamps: z.boolean().default(false).describe('Whether to receive word-level timestamps in transcription results, defaults to false'),
+  includeLanguageDetection: z.boolean().default(false).describe('Whether to include detected language code in transcription results, defaults to false'),
+  commitStrategy: z.enum(['manual', 'vad']).default('manual').describe('Strategy for committing transcriptions - manual or voice activity detection, defaults to manual'),
+  vadSilenceThresholdSecs: z.number().min(0.3).max(3).default(1.5).describe('Silence threshold in seconds for VAD (0.3-3), defaults to 1.5'),
+  vadThreshold: z.number().min(0.1).max(0.9).default(0.4).describe('Threshold for voice activity detection (0.1-0.9), defaults to 0.4'),
+  minSpeechDurationMs: z.number().int().min(50).max(2000).default(100).describe('Minimum speech duration in milliseconds (50-2000), defaults to 100'),
+  minSilenceDurationMs: z.number().int().min(50).max(2000).default(100).describe('Minimum silence duration in milliseconds (50-2000), defaults to 100'),
+  enableLogging: z.boolean().default(true).describe('When false, zero retention mode is used (enterprise only), defaults to true'),
+}).openapi('ElevenLabsAsrSettings').describe('ElevenLabs Scribe settings');
 
 export type ElevenLabsAsrSettings = z.infer<typeof elevenLabsAsrSettingsSchema>;
 
@@ -105,47 +105,23 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
     this.sessionId = null;
 
     // Build WebSocket URL with query parameters
-    const modelId = this.settings.modelId ?? 'scribe_v2_realtime';
+    const modelId = this.settings.modelId;
     const audioFormat = this.audioFormat;
     const params = new URLSearchParams({
       model_id: modelId,
       audio_format: audioFormat,
+      include_timestamps: this.settings.includeTimestamps.toString(),
+      include_language_detection: this.settings.includeLanguageDetection.toString(),
+      commit_strategy: this.settings.commitStrategy,
+      vad_silence_threshold_secs: this.settings.vadSilenceThresholdSecs.toString(),
+      vad_threshold: this.settings.vadThreshold.toString(),
+      min_speech_duration_ms: this.settings.minSpeechDurationMs.toString(),
+      min_silence_duration_ms: this.settings.minSilenceDurationMs.toString(),
+      enable_logging: this.settings.enableLogging.toString(),
     });
 
     if (this.settings.languageCode) {
       params.append('language_code', this.settings.languageCode);
-    }
-
-    if (this.settings.includeTimestamps !== undefined) {
-      params.append('include_timestamps', this.settings.includeTimestamps.toString());
-    }
-
-    if (this.settings.includeLanguageDetection !== undefined) {
-      params.append('include_language_detection', this.settings.includeLanguageDetection.toString());
-    }
-
-    if (this.settings.commitStrategy) {
-      params.append('commit_strategy', this.settings.commitStrategy);
-    }
-
-    if (this.settings.vadSilenceThresholdSecs !== undefined) {
-      params.append('vad_silence_threshold_secs', this.settings.vadSilenceThresholdSecs.toString());
-    }
-
-    if (this.settings.vadThreshold !== undefined) {
-      params.append('vad_threshold', this.settings.vadThreshold.toString());
-    }
-
-    if (this.settings.minSpeechDurationMs !== undefined) {
-      params.append('min_speech_duration_ms', this.settings.minSpeechDurationMs.toString());
-    }
-
-    if (this.settings.minSilenceDurationMs !== undefined) {
-      params.append('min_silence_duration_ms', this.settings.minSilenceDurationMs.toString());
-    }
-
-    if (this.settings.enableLogging !== undefined) {
-      params.append('enable_logging', this.settings.enableLogging.toString());
     }
 
     const wsUrl = `wss://api.elevenlabs.io/v1/speech-to-text/realtime?${params.toString()}`;
@@ -288,7 +264,10 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         break;
 
       case 'committed_transcript':
-        if (message.text) {
+        // Only use committed_transcript if timestamps and language detection are disabled
+        if (this.settings.includeTimestamps || this.settings.includeLanguageDetection) {
+          logger.debug(`[ElevenLabs ASR] Received committed_transcript but Include Timestamps or Include Language Detection was set - ignoring in favor of committed_transcript_with_timestamps`);
+        } else if (message.text) {
           logger.info(`[ElevenLabs ASR] Committed transcript received: ${message.text}`);
           this.handleRecognized(this.currentChunkId, message.text);
           this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
@@ -296,7 +275,11 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         break;
 
       case 'committed_transcript_with_timestamps':
-        if (message.text) {
+        // Only use committed_transcript_with_timestamps if timestamps or language detection are enabled
+        if (!this.settings.includeTimestamps && !this.settings.includeLanguageDetection) {
+          logger.debug(`[ElevenLabs ASR] Received committed_transcript_with_timestamps but Include Timestamps and Include Language Detection were not set - ignoring`);
+        } else if (message.text) {
+          logger.info(`[ElevenLabs ASR] Committed transcript with timestamps received: ${message.text}`);
           this.handleRecognized(this.currentChunkId, message.text);
           this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
           if (message.language_code) {

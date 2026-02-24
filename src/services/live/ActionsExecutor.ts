@@ -21,6 +21,7 @@ export type ActionsExecutionOutcome = {
   shouldAbortConversation: boolean;
   abortReason?: string;
   shouldGenerateResponse: boolean;
+  prescriptedResponse?: string;
   hasModifiedVars: boolean;
   hasModifiedUserInput: boolean;
   hasModifiedUserProfile: boolean;
@@ -47,6 +48,7 @@ export type EffectOutcome = {
   shouldAbortConversation: boolean;
   abortReason?: string;
   shouldGenerateResponse?: boolean;
+  prescriptedResponse?: string;
   hasModifiedVars?: boolean;
   hasModifiedUserInput?: boolean;
   hasModifiedUserProfile?: boolean;
@@ -315,7 +317,7 @@ export class ActionsExecutor {
       logger.debug({ conversationId: context.conversationId, actionName, effectType: effect.type }, `Executing effect: ${effect.type} from action: ${actionName}`);
 
       try {
-        const effectResult = await this.executeEffect(effect, currentContext);
+        const effectResult = await this.executeEffect(effect, currentContext, actionName);
 
         // Update context with modified user input if applicable
         if (effectResult.hasModifiedUserInput) {
@@ -353,7 +355,10 @@ export class ActionsExecutor {
 
         if (effectResult.shouldGenerateResponse) {
           outcome.shouldGenerateResponse = true;
-          logger.info({ conversationId: context.conversationId, actionName }, `AI response generation triggered by effect`);
+          if (effectResult.prescriptedResponse !== undefined) {
+            outcome.prescriptedResponse = effectResult.prescriptedResponse;
+          }
+          logger.info({ conversationId: context.conversationId, actionName, prescripted: effectResult.prescriptedResponse !== undefined }, `AI response generation triggered by effect`);
         }
 
         if (effectResult.shouldAbortConversation) {
@@ -384,6 +389,7 @@ export class ActionsExecutor {
   private async executeEffect(
     effect: Effect,
     context: ConversationContext,
+    actionName: string,
   ): Promise<EffectOutcome> {
     switch (effect.type) {
       case 'end_conversation':
@@ -414,7 +420,7 @@ export class ActionsExecutor {
         return await this.executeCallWebhook(effect, context);
 
       case 'generate_response':
-        return await this.executeGenerateResponse(effect, context);
+        return await this.executeGenerateResponse(effect, context, actionName);
 
       default:
         throw new Error(`Unknown effect`);
@@ -680,6 +686,9 @@ export class ActionsExecutor {
         logger.info({ conversationId: context.conversationId, toolId: match[1] }, `Resolving value from tool result reference for tool ID: ${match[1]}`);
         const toolId = match[1];
         value = context.results.tools[toolId]?.result;
+        if (Array.isArray(value)) value = value[0];
+      } else if (value[0] === '=') { // if the string starts with "=", treat it as a script to execute
+        value = await this.scriptRunner.executeScript(value.slice(1).trim(), context);
       } else {
         value = await this.templatingEngine.render(value, context);
       }
@@ -984,15 +993,53 @@ export class ActionsExecutor {
   }
 
   /**
-   * Executes generate_response effect
-   * Sets flag to trigger AI response generation
+   * Executes generate_response effect.
+   * For 'generated' mode, sets the flag to trigger AI response generation.
+   * For 'prescripted' mode, selects a response from prescriptedResponses using the configured strategy
+   * (random or round_robin) and stores the selected text on the outcome to bypass LLM generation.
+   * Round-robin state is persisted in stage variables using a reserved key.
    */
   private async executeGenerateResponse(
     effect: GenerateResponseEffect,
     context: ConversationContext,
+    actionName: string,
   ): Promise<EffectOutcome> {
-    logger.info({ conversationId: context.conversationId }, `Setting flag to generate AI response`);
+    const responseMode = effect.responseMode ?? 'generated';
 
+    if (responseMode === 'prescripted') {
+      const responses = effect.prescriptedResponses;
+      if (!responses || responses.length === 0) {
+        logger.warn({ conversationId: context.conversationId }, `Prescripted response mode is set but no prescriptedResponses provided — falling back to AI generation`);
+        return { shouldEndConversation: false, shouldAbortConversation: false, shouldGenerateResponse: true };
+      }
+
+      const strategy = effect.prescriptedSelectionStrategy ?? 'random';
+      let selectedIndex: number;
+      let hasModifiedVars = false;
+
+      if (strategy === 'round_robin') {
+        const rrKey = `__prescripted_rr_${actionName}`;
+        const currentIndex = typeof context.vars[rrKey] === 'number' ? (context.vars[rrKey] as number) : -1;
+        selectedIndex = (currentIndex + 1) % responses.length;
+        context.vars[rrKey] = selectedIndex;
+        hasModifiedVars = true;
+        logger.info({ conversationId: context.conversationId, strategy, actionName, selectedIndex, total: responses.length }, `Prescripted response selected via round_robin`);
+      } else {
+        selectedIndex = Math.floor(Math.random() * responses.length);
+        logger.info({ conversationId: context.conversationId, strategy, actionName, selectedIndex, total: responses.length }, `Prescripted response selected via random`);
+      }
+
+      const prescriptedResponse = responses[selectedIndex];
+      return {
+        shouldEndConversation: false,
+        shouldAbortConversation: false,
+        shouldGenerateResponse: true,
+        prescriptedResponse,
+        hasModifiedVars,
+      };
+    }
+
+    logger.info({ conversationId: context.conversationId }, `Setting flag to generate AI response`);
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,

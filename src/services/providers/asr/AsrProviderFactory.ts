@@ -2,23 +2,24 @@ import { singleton } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IAsrProvider } from './IAsrProvider';
-import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema, AzureAsrSettings } from './AzureAsrProvider';
-import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProviderConfigSchema, ElevenLabsAsrSettings } from './ElevenLabsAsrProvider';
+import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema, AzureAsrSettings, azureAsrSettingsSchema } from './AzureAsrProvider';
+import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProviderConfigSchema, ElevenLabsAsrSettings, elevenLabsAsrSettingsSchema } from './ElevenLabsAsrProvider';
+import { DeepgramAsrProvider, DeepgramAsrProviderConfig, deepgramAsrProviderConfigSchema, DeepgramAsrSettings, deepgramAsrSettingsSchema } from './DeepgramAsrProvider';
 
 /**
  * Supported ASR provider API types
  */
-export type AsrProviderApiType = 'azure' | 'elevenlabs';
+export type AsrProviderApiType = 'azure' | 'elevenlabs' | 'deepgram';
 
 /** 
  * Union type for all ASR provider settings
  */
-export type AsrSettings = AzureAsrSettings | ElevenLabsAsrSettings;
+export type AsrSettings = AzureAsrSettings | ElevenLabsAsrSettings | DeepgramAsrSettings;
 
 /**
  * Union type for all ASR provider configurations
  */
-export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderConfig;
+export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderConfig | DeepgramAsrProviderConfig;
 
 /**
  * Factory service for creating ASR provider instances based on provider entity configuration
@@ -48,8 +49,11 @@ export class AsrProviderFactory {
       case 'elevenlabs':
         return this.createElevenLabsProvider(provider, settings as ElevenLabsAsrSettings);
 
+      case 'deepgram':
+        return this.createDeepgramProvider(provider, settings as DeepgramAsrSettings);
+
       default:
-        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs`;
+        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -63,7 +67,7 @@ export class AsrProviderFactory {
    */
   private createAzureProvider(provider: Provider, settings: AzureAsrSettings): AzureAsrProvider {
     const config = azureAsrProviderConfigSchema.parse(provider.config);
-    const safeSettings = (settings ?? {}) as AzureAsrSettings;
+    const safeSettings = azureAsrSettingsSchema.parse(settings);
 
     logger.info(`Creating Azure ASR provider for provider ${provider.id} with region ${config.region}`);
     return new AzureAsrProvider(config, safeSettings);
@@ -77,10 +81,24 @@ export class AsrProviderFactory {
    */
   private createElevenLabsProvider(provider: Provider, settings: ElevenLabsAsrSettings): ElevenLabsAsrProvider {
     const config = elevenLabsAsrProviderConfigSchema.parse(provider.config);
-    const safeSettings = (settings ?? {}) as ElevenLabsAsrSettings;
+    const safeSettings = elevenLabsAsrSettingsSchema.parse(settings);
 
     logger.info(`Creating ElevenLabs ASR provider for provider ${provider.id}`);
     return new ElevenLabsAsrProvider(config, safeSettings);
+  }
+
+  /**
+   * Creates a Deepgram ASR provider instance from provider entity
+   * @param provider - Provider entity with Deepgram-specific configuration
+   * @returns Configured Deepgram ASR provider
+   * @throws {Error} When required Deepgram configuration fields are missing
+   */
+  private createDeepgramProvider(provider: Provider, settings: DeepgramAsrSettings): DeepgramAsrProvider {
+    const config = deepgramAsrProviderConfigSchema.parse(provider.config);
+    const safeSettings = deepgramAsrSettingsSchema.parse(settings);
+
+    logger.info(`Creating Deepgram ASR provider for provider ${provider.id}`);
+    return new DeepgramAsrProvider(config, safeSettings);
   }
 
   /**
@@ -93,7 +111,7 @@ export class AsrProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: AsrProviderApiType[] = ['azure', 'elevenlabs'];
+    const supportedApiTypes: AsrProviderApiType[] = ['azure', 'elevenlabs', 'deepgram'];
     return supportedApiTypes.includes(provider.apiType as AsrProviderApiType);
   }
 
@@ -102,6 +120,6 @@ export class AsrProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): AsrProviderApiType[] {
-    return ['azure', 'elevenlabs'];
+    return ['azure', 'elevenlabs', 'deepgram'];
   }
 }

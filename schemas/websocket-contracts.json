@@ -323,40 +323,17 @@
                   "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")"
                 },
                 "settings": {
-                  "type": "object",
-                  "properties": {
-                    "language": {
-                      "type": "string",
-                      "description": "The language code for speech recognition (e.g., \"en-US\")"
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/AzureAsrSettings"
                     },
-                    "dictionaryPhrases": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      },
-                      "description": "The phrases to add to the speech recognition dictionary"
+                    {
+                      "$ref": "#/definitions/ElevenLabsAsrSettings"
                     },
-                    "audioFormat": {
-                      "type": "string",
-                      "enum": [
-                        "mp3",
-                        "opus",
-                        "aac",
-                        "flac",
-                        "wav",
-                        "pcm_8000",
-                        "pcm_16000",
-                        "pcm_22050",
-                        "pcm_24000",
-                        "pcm_44100",
-                        "pcm_48000",
-                        "mulaw",
-                        "alaw",
-                        "linear16"
-                      ],
-                      "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
+                    {
+                      "$ref": "#/definitions/DeepgramAsrSettings"
                     }
-                  },
+                  ],
                   "description": "ASR-specific settings including model, language preferences, etc."
                 },
                 "unintelligiblePlaceholder": {
@@ -388,6 +365,201 @@
         "success"
       ]
     },
+    "AzureAsrSettings": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "The language code for speech recognition (e.g., 'en-US')"
+        },
+        "dictionaryPhrases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The phrases to add to the speech recognition dictionary"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "mp3",
+            "opus",
+            "aac",
+            "flac",
+            "wav",
+            "pcm_8000",
+            "pcm_16000",
+            "pcm_22050",
+            "pcm_24000",
+            "pcm_44100",
+            "pcm_48000",
+            "mulaw",
+            "alaw",
+            "linear16"
+          ],
+          "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
+        }
+      },
+      "additionalProperties": {
+        "nullable": true
+      },
+      "description": "Azure Speech Recognition settings"
+    },
+    "ElevenLabsAsrSettings": {
+      "type": "object",
+      "properties": {
+        "modelId": {
+          "type": "string",
+          "default": "scribe_v2_realtime",
+          "description": "Model ID to use for transcription (e.g., \"scribe_v2_realtime\"), defaults to scribe_v2_realtime"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "pcm_16000",
+            "pcm_8000",
+            "pcm_22050",
+            "pcm_24000",
+            "pcm_44100"
+          ],
+          "default": "pcm_16000",
+          "description": "Audio encoding format for speech-to-text, defaults to pcm_16000"
+        },
+        "languageCode": {
+          "type": "string",
+          "description": "Language code in ISO 639-1 or ISO 639-3 format (e.g., \"en\", \"es\")"
+        },
+        "includeTimestamps": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to receive word-level timestamps in transcription results, defaults to false"
+        },
+        "includeLanguageDetection": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to include detected language code in transcription results, defaults to false"
+        },
+        "commitStrategy": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "vad"
+          ],
+          "default": "manual",
+          "description": "Strategy for committing transcriptions - manual or voice activity detection, defaults to manual"
+        },
+        "vadSilenceThresholdSecs": {
+          "type": "number",
+          "minimum": 0.3,
+          "maximum": 3,
+          "default": 1.5,
+          "description": "Silence threshold in seconds for VAD (0.3-3), defaults to 1.5"
+        },
+        "vadThreshold": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 0.9,
+          "default": 0.4,
+          "description": "Threshold for voice activity detection (0.1-0.9), defaults to 0.4"
+        },
+        "minSpeechDurationMs": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 2000,
+          "default": 100,
+          "description": "Minimum speech duration in milliseconds (50-2000), defaults to 100"
+        },
+        "minSilenceDurationMs": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 2000,
+          "default": 100,
+          "description": "Minimum silence duration in milliseconds (50-2000), defaults to 100"
+        },
+        "enableLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "When false, zero retention mode is used (enterprise only), defaults to true"
+        }
+      },
+      "additionalProperties": {
+        "nullable": true
+      },
+      "description": "ElevenLabs Scribe settings"
+    },
+    "DeepgramAsrSettings": {
+      "type": "object",
+      "properties": {
+        "modelId": {
+          "type": "string",
+          "default": "nova-3",
+          "description": "Model ID to use for transcription (e.g., \"nova-3\", \"nova-2\", \"base\", \"enhanced\"), defaults to nova-3"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "pcm_16000",
+            "pcm_8000",
+            "pcm_22050",
+            "pcm_24000",
+            "pcm_44100"
+          ],
+          "default": "pcm_16000",
+          "description": "Audio encoding format for speech-to-text, defaults to pcm_16000"
+        },
+        "language": {
+          "type": "string",
+          "description": "BCP-47 language tag (e.g., \"en-US\", \"es\", \"fr\")"
+        },
+        "interimResults": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable interim (partial) transcription results during streaming, defaults to false"
+        },
+        "endpointing": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 10
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "default": 300,
+          "description": "Milliseconds of silence to wait before finalizing speech (10+) or false to disable, defaults to 300"
+        },
+        "smartFormat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Apply formatting (punctuation, capitalization, currency, etc.) to improve readability, defaults to true"
+        },
+        "punctuate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Add punctuation and capitalization to transcript, defaults to true"
+        },
+        "diarize": {
+          "type": "boolean",
+          "default": false,
+          "description": "Recognize and label different speakers in the audio, defaults to false"
+        },
+        "utteranceEndMs": {
+          "type": "integer",
+          "minimum": 10,
+          "description": "Milliseconds to wait before sending UtteranceEnd event (use with interim_results)"
+        },
+        "vadEvents": {
+          "type": "boolean",
+          "default": false,
+          "description": "Send SpeechStarted events when speech is detected, defaults to false"
+        }
+      },
+      "additionalProperties": {
+        "nullable": true
+      },
+      "description": "Deepgram speech-to-text settings"
+    },
     "project-settings": {
       "type": "object",
       "properties": {
@@ -412,40 +584,17 @@
               "description": "ID of the ASR provider (e.g., \"azure-speech\", \"openai-whisper\")"
             },
             "settings": {
-              "type": "object",
-              "properties": {
-                "language": {
-                  "type": "string",
-                  "description": "The language code for speech recognition (e.g., \"en-US\")"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/AzureAsrSettings"
                 },
-                "dictionaryPhrases": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "The phrases to add to the speech recognition dictionary"
+                {
+                  "$ref": "#/definitions/ElevenLabsAsrSettings"
                 },
-                "audioFormat": {
-                  "type": "string",
-                  "enum": [
-                    "mp3",
-                    "opus",
-                    "aac",
-                    "flac",
-                    "wav",
-                    "pcm_8000",
-                    "pcm_16000",
-                    "pcm_22050",
-                    "pcm_24000",
-                    "pcm_44100",
-                    "pcm_48000",
-                    "mulaw",
-                    "alaw",
-                    "linear16"
-                  ],
-                  "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
+                {
+                  "$ref": "#/definitions/DeepgramAsrSettings"
                 }
-              },
+              ],
               "description": "ASR-specific settings including model, language preferences, etc."
             },
             "unintelligiblePlaceholder": {
@@ -707,6 +856,7 @@
           "enum": [
             "message",
             "classification",
+            "transformation",
             "action",
             "command",
             "tool_call",
@@ -810,6 +960,34 @@
                 "classifierId",
                 "input",
                 "actions"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "transformerId": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "string"
+                },
+                "appliedFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "transformerId",
+                "input",
+                "appliedFields"
               ]
             },
             {
@@ -1503,6 +1681,31 @@
             "generate_response"
           ],
           "description": "Effect type"
+        },
+        "responseMode": {
+          "type": "string",
+          "enum": [
+            "generated",
+            "prescripted"
+          ],
+          "default": "generated",
+          "description": "Type of response to generate: generated (AI-generated), prescripted (predefined response), best_match (choose the best match from predefined responses)"
+        },
+        "prescriptedSelectionStrategy": {
+          "type": "string",
+          "enum": [
+            "random",
+            "round_robin"
+          ],
+          "default": "random",
+          "description": "Strategy to select prescripted response when multiple are provided"
+        },
+        "prescriptedResponses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional array of prescripted responses to use"
         }
       },
       "required": [

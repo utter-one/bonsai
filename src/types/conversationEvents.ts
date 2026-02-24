@@ -22,6 +22,7 @@ export type ConversationState = z.infer<typeof conversationStateSchema>;
 export const conversationEventTypeSchema = z.enum([
   'message',
   'classification',
+  'transformation',
   'action',
   'command',
   'tool_call',
@@ -53,6 +54,23 @@ export const classificationEventDataSchema = z.object({
 });
 
 export type ClassificationEventData = z.infer<typeof classificationEventDataSchema>;
+
+/**
+ * Schema for context transformer execution event data.
+ * Recorded once per transformer after it runs and writes fields to stage variables.
+ */
+export const transformationEventDataSchema = z.object({
+  /** ID of the context transformer that was executed */
+  transformerId: z.string(),
+  /** The user input that triggered the transformer */
+  input: z.string(),
+  /** Names of the stage variable fields that were written by this transformer */
+  appliedFields: z.array(z.string()),
+  /** Optional metadata including transformer name, rendered prompt, LLM settings, and updated variable snapshot */
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type TransformationEventData = z.infer<typeof transformationEventDataSchema>;
 
 export const actionEventDataSchema = z.object({
   actionName: z.string(),
@@ -134,6 +152,7 @@ export type ConversationFailedEventData = z.infer<typeof conversationFailedEvent
 export const conversationEventDataSchema = z.union([
   messageEventDataSchema,
   classificationEventDataSchema,
+  transformationEventDataSchema,
   actionEventDataSchema,
   commandEventDataSchema,
   toolCallEventDataSchema,
