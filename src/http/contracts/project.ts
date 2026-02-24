@@ -7,6 +7,7 @@ import { localStorageSettingsSchema } from '../../services/providers/storage/Loc
 import { azureAsrSettingsSchema } from '../../services/providers/asr/AzureAsrProvider';
 import { elevenLabsAsrSettingsSchema } from '../../services/providers/asr/ElevenLabsAsrProvider';
 import { parameterValueSchema } from '../../types/parameters';
+import { deepgramAsrSettingsSchema } from '../../services/providers/asr/DeepgramAsrProvider';
 
 extendZodWithOpenApi(z);
 
@@ -43,6 +44,7 @@ export type StorageConfig = z.infer<typeof storageConfigSchema>;
 export const asrSettingsSchema = z.union([
   azureAsrSettingsSchema,
   elevenLabsAsrSettingsSchema,
+  deepgramAsrSettingsSchema,
 ]).describe('ASR provider settings');
 
 export const asrConfigSchema = z.object({
