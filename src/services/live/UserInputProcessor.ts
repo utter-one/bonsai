@@ -50,8 +50,8 @@ export class UserInputProcessor {
       let knowledgeCategories: KnowledgeCategoryResponse[] = [];
       if (stage.useKnowledge && stage.defaultClassifierId) {
         knowledgeCategories = stage.knowledgeTags.length > 0
-          ? await this.knowledgeService.getCategoriesByTags(stage.knowledgeTags)
-          : (await this.knowledgeService.listKnowledgeCategories({ filters: { projectId: session.runner.getRuntimeData().conversation.projectId } , offset: 0, limit: 100 })).items;
+          ? await this.knowledgeService.getCategoriesByTags(conversation.projectId, stage.knowledgeTags)
+          : (await this.knowledgeService.listKnowledgeCategories(conversation.projectId, { offset: 0, limit: 100 })).items;
         logger.debug({ conversationId: conversation.id, categoryCount: knowledgeCategories.length, classifierId: stage.defaultClassifierId }, 'Fetched knowledge categories for default classifier');
       }
       
@@ -92,7 +92,7 @@ export class UserInputProcessor {
             currentVariables: conversation?.stageVars[stage.id] || {},
           },
         };
-        await this.conversationService.saveConversationEvent(conversation.id, 'classification', eventData);
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
         this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
       }
 

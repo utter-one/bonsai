@@ -51,25 +51,25 @@ export class ApiKeyService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created API key with the full secret key (only returned once)
    */
-  async createApiKey(input: CreateApiKeyRequest, context: RequestContext): Promise<ApiKeyResponse> {
+  async createApiKey(projectId: string, input: CreateApiKeyRequest, context: RequestContext): Promise<ApiKeyResponse> {
     this.requirePermission(context, PERMISSIONS.API_KEY_WRITE);
-    logger.info({ projectId: input.projectId, name: input.name, adminId: context.adminId }, 'Creating API key');
+    logger.info({ projectId, name: input.name, adminId: context.adminId }, 'Creating API key');
 
     try {
       const id = generateId(ID_PREFIXES.API_KEY);
       const key = this.generateApiKey();
 
-      const apiKey = await db.insert(apiKeys).values({ id, projectId: input.projectId, name: input.name, key, isActive: true, metadata: input.metadata, version: 1 }).returning();
+      const apiKey = await db.insert(apiKeys).values({ id, projectId, name: input.name, key, isActive: true, metadata: input.metadata, version: 1 }).returning();
 
       const createdApiKey = apiKey[0];
 
       await this.auditService.logCreate('api_key', createdApiKey.id, { id: createdApiKey.id, projectId: createdApiKey.projectId, name: createdApiKey.name, keyPreview: this.getKeyPreview(key), isActive: createdApiKey.isActive, metadata: createdApiKey.metadata }, context.adminId);
 
-      logger.info({ apiKeyId: createdApiKey.id, projectId: input.projectId }, 'API key created successfully');
+      logger.info({ apiKeyId: createdApiKey.id, projectId }, 'API key created successfully');
 
       return apiKeyResponseSchema.parse({ ...createdApiKey, key, keyPreview: this.getKeyPreview(key), lastUsedAt: createdApiKey.lastUsedAt?.toISOString() ?? null, createdAt: createdApiKey.createdAt.toISOString(), updatedAt: createdApiKey.updatedAt.toISOString() });
     } catch (error) {
-      logger.error({ error, projectId: input.projectId, name: input.name }, 'Failed to create API key');
+      logger.error({ error, projectId, name: input.name }, 'Failed to create API key');
       throw error;
     }
   }
@@ -81,11 +81,11 @@ export class ApiKeyService extends BaseService {
    * @returns The API key if found
    * @throws {NotFoundError} When API key is not found
    */
-  async getApiKeyById(id: string): Promise<ApiKeyResponse> {
+  async getApiKeyById(projectId: string, id: string): Promise<ApiKeyResponse> {
     logger.debug({ apiKeyId: id }, 'Fetching API key by ID');
 
     try {
-      const apiKey = await db.query.apiKeys.findFirst({ where: eq(apiKeys.id, id) });
+      const apiKey = await db.query.apiKeys.findFirst({ where: and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id)) });
 
       if (!apiKey) {
         throw new NotFoundError(`API key with id ${id} not found`);
@@ -129,14 +129,14 @@ export class ApiKeyService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of API keys matching the criteria
    */
-  async listApiKeys(params?: ListParams): Promise<ApiKeyListResponse> {
+  async listApiKeys(projectId: string, params?: ListParams): Promise<ApiKeyListResponse> {
     logger.debug({ params }, 'Listing API keys');
 
     try {
       const offset = params?.offset || 0;
       const limit = params?.limit ?? null;
 
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(apiKeys.projectId, projectId)];
       const columnMap = { id: apiKeys.id, projectId: apiKeys.projectId, name: apiKeys.name, isActive: apiKeys.isActive, createdAt: apiKeys.createdAt, updatedAt: apiKeys.updatedAt };
 
       if (params?.filters) {
@@ -174,12 +174,12 @@ export class ApiKeyService extends BaseService {
    * @throws {NotFoundError} When API key is not found
    * @throws {OptimisticLockError} When version mismatch occurs
    */
-  async updateApiKey(id: string, input: UpdateApiKeyRequest, context: RequestContext): Promise<ApiKeyResponse> {
+  async updateApiKey(projectId: string, id: string, input: UpdateApiKeyRequest, context: RequestContext): Promise<ApiKeyResponse> {
     this.requirePermission(context, PERMISSIONS.API_KEY_WRITE);
     logger.info({ apiKeyId: id, adminId: context.adminId }, 'Updating API key');
 
     try {
-      const existingApiKey = await db.query.apiKeys.findFirst({ where: eq(apiKeys.id, id) });
+      const existingApiKey = await db.query.apiKeys.findFirst({ where: and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id)) });
 
       if (!existingApiKey) {
         throw new NotFoundError(`API key with id ${id} not found`);
@@ -189,7 +189,7 @@ export class ApiKeyService extends BaseService {
         throw new OptimisticLockError(`API key version mismatch. Expected ${input.version}, got ${existingApiKey.version}`);
       }
 
-      const updatedApiKey = await db.update(apiKeys).set({ name: input.name ?? existingApiKey.name, isActive: input.isActive ?? existingApiKey.isActive, metadata: input.metadata ?? existingApiKey.metadata, version: existingApiKey.version + 1, updatedAt: new Date() }).where(eq(apiKeys.id, id)).returning();
+      const updatedApiKey = await db.update(apiKeys).set({ name: input.name ?? existingApiKey.name, isActive: input.isActive ?? existingApiKey.isActive, metadata: input.metadata ?? existingApiKey.metadata, version: existingApiKey.version + 1, updatedAt: new Date() }).where(and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id))).returning();
 
       const updated = updatedApiKey[0];
 
@@ -212,12 +212,12 @@ export class ApiKeyService extends BaseService {
    * @throws {NotFoundError} When API key is not found
    * @throws {OptimisticLockError} When version mismatch occurs
    */
-  async deleteApiKey(id: string, version: number, context: RequestContext): Promise<void> {
+  async deleteApiKey(projectId: string, id: string, version: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.API_KEY_DELETE);
     logger.info({ apiKeyId: id, adminId: context.adminId }, 'Deleting API key');
 
     try {
-      const existingApiKey = await db.query.apiKeys.findFirst({ where: eq(apiKeys.id, id) });
+      const existingApiKey = await db.query.apiKeys.findFirst({ where: and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id)) });
 
       if (!existingApiKey) {
         throw new NotFoundError(`API key with id ${id} not found`);
@@ -227,7 +227,7 @@ export class ApiKeyService extends BaseService {
         throw new OptimisticLockError(`API key version mismatch. Expected ${version}, got ${existingApiKey.version}`);
       }
 
-      await db.delete(apiKeys).where(eq(apiKeys.id, id));
+      await db.delete(apiKeys).where(and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id)));
 
       await this.auditService.logDelete('api_key', id, { id: existingApiKey.id, projectId: existingApiKey.projectId, name: existingApiKey.name, isActive: existingApiKey.isActive, keyPreview: this.getKeyPreview(existingApiKey.key), metadata: existingApiKey.metadata }, context.adminId);
 

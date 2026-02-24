@@ -10,6 +10,7 @@ export { listParamsSchema, type ListParams };
 
 // Route param schema
 export const personaRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Persona ID'),
 });
 
@@ -20,7 +21,6 @@ export const personaRouteParamsSchema = z.object({
  */
 export const createPersonaSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the persona (auto-generated if not provided)'),
-  projectId: z.string().min(1).describe('ID of the project this persona belongs to'),
   name: z.string().min(1).describe('Display name of the persona'),
   description: z.string().optional().describe('Detailed description of the persona purpose'),
   prompt: z.string().min(1).describe('Detailed prompt defining the persona\'s characteristics and behavior'),

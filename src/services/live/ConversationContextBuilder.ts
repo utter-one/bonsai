@@ -68,6 +68,9 @@ export type ConversationContext = {
   /** ID of the conversation */
   conversationId: string;
 
+  /** ID of the project the conversation belongs to */
+  projectId: string;
+
   /** Stage variables */
   vars: Record<string, any>;
 
@@ -342,6 +345,7 @@ export class ConversationContextBuilder {
 
     const context: ConversationContext = {
       conversationId: conversation.id,
+      projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
@@ -381,6 +385,7 @@ export class ConversationContextBuilder {
 
     const context = {
       conversationId: conversation.id,
+      projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
@@ -455,6 +460,7 @@ export class ConversationContextBuilder {
 
     const context: ConversationContext = {
       conversationId: conversation.id,
+      projectId: conversation.projectId,
       vars: stageVars,
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
@@ -509,6 +515,7 @@ export class ConversationContextBuilder {
 
     const context = {
       conversationId: conversation.id,
+      projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
@@ -557,6 +564,7 @@ export class ConversationContextBuilder {
   public buildRawContext(conversation: Conversation, stage: Stage, userProfile: Record<string, any>): ConversationContext {
     return {
       conversationId: conversation.id,
+      projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
       userProfile: userProfile || {}, // Not loaded in raw context
       history: [], // Not loaded in raw context

@@ -30,13 +30,13 @@ export class ToolService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created tool
    */
-  async createTool(input: CreateToolRequest, context: RequestContext): Promise<ToolResponse> {
+  async createTool(projectId: string, input: CreateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
     const toolId = input.id ?? generateId(ID_PREFIXES.TOOL);
-    logger.info({ toolId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating tool');
+    logger.info({ toolId, projectId, name: input.name, adminId: context?.adminId }, 'Creating tool');
 
     try {
-      const tool = await db.insert(tools).values({ id: toolId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, inputType: input.inputType, outputType: input.outputType, parameters: input.parameters ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const tool = await db.insert(tools).values({ id: toolId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, inputType: input.inputType, outputType: input.outputType, parameters: input.parameters ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTool = tool[0];
 
@@ -57,11 +57,11 @@ export class ToolService extends BaseService {
    * @returns The tool if found
    * @throws {NotFoundError} When tool is not found
    */
-  async getToolById(id: string): Promise<ToolResponse> {
+  async getToolById(projectId: string, id: string): Promise<ToolResponse> {
     logger.debug({ toolId: id }, 'Fetching tool by ID');
 
     try {
-      const tool = await db.query.tools.findFirst({ where: eq(tools.id, id) });
+      const tool = await db.query.tools.findFirst({ where: and(eq(tools.projectId, projectId), eq(tools.id, id)) });
 
       if (!tool) {
         throw new NotFoundError(`Tool with id ${id} not found`);
@@ -79,11 +79,11 @@ export class ToolService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of tools matching the criteria
    */
-  async listTools(params?: ListParams): Promise<ToolListResponse> {
+  async listTools(projectId: string, params?: ListParams): Promise<ToolListResponse> {
     logger.debug({ params }, 'Listing tools');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(tools.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -154,13 +154,13 @@ export class ToolService extends BaseService {
    * @throws {NotFoundError} When tool is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateTool(id: string, input: UpdateToolRequest, context: RequestContext): Promise<ToolResponse> {
+  async updateTool(projectId: string, id: string, input: UpdateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ toolId: id, expectedVersion, adminId: context?.adminId }, 'Updating tool');
 
     try {
-      const existingTool = await db.query.tools.findFirst({ where: eq(tools.id, id) });
+      const existingTool = await db.query.tools.findFirst({ where: and(eq(tools.projectId, projectId), eq(tools.id, id)) });
 
       if (!existingTool) {
         throw new NotFoundError(`Tool with id ${id} not found`);
@@ -181,7 +181,7 @@ export class ToolService extends BaseService {
       if (updateData.parameters !== undefined) updatePayload.parameters = updateData.parameters;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedTool = await db.update(tools).set(updatePayload).where(and(eq(tools.id, id), eq(tools.version, expectedVersion))).returning();
+      const updatedTool = await db.update(tools).set(updatePayload).where(and(eq(tools.projectId, projectId), eq(tools.id, id), eq(tools.version, expectedVersion))).returning();
 
       if (updatedTool.length === 0) {
         throw new OptimisticLockError(`Failed to update tool due to version conflict`);
@@ -208,12 +208,12 @@ export class ToolService extends BaseService {
    * @throws {NotFoundError} When tool is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deleteTool(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+  async deleteTool(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.TOOL_DELETE);
     logger.info({ toolId: id, expectedVersion, adminId: context?.adminId }, 'Deleting tool');
 
     try {
-      const existingTool = await db.query.tools.findFirst({ where: eq(tools.id, id) });
+      const existingTool = await db.query.tools.findFirst({ where: and(eq(tools.projectId, projectId), eq(tools.id, id)) });
 
       if (!existingTool) {
         throw new NotFoundError(`Tool with id ${id} not found`);
@@ -223,7 +223,7 @@ export class ToolService extends BaseService {
         throw new OptimisticLockError(`Tool version mismatch. Expected ${expectedVersion}, got ${existingTool.version}`);
       }
 
-      const deleted = await db.delete(tools).where(and(eq(tools.id, id), eq(tools.version, expectedVersion))).returning();
+      const deleted = await db.delete(tools).where(and(eq(tools.projectId, projectId), eq(tools.id, id), eq(tools.version, expectedVersion))).returning();
 
       if (deleted.length === 0) {
         throw new OptimisticLockError(`Failed to delete tool due to version conflict`);
@@ -246,18 +246,18 @@ export class ToolService extends BaseService {
    * @returns The newly created cloned tool
    * @throws {NotFoundError} When the source tool is not found
    */
-  async cloneTool(id: string, input: CloneToolRequest, context: RequestContext): Promise<ToolResponse> {
+  async cloneTool(projectId: string, id: string, input: CloneToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
     logger.info({ id, adminId: context?.adminId }, 'Cloning tool');
 
     try {
-      const existingTool = await db.query.tools.findFirst({ where: eq(tools.id, id) });
+      const existingTool = await db.query.tools.findFirst({ where: and(eq(tools.projectId, projectId), eq(tools.id, id)) });
 
       if (!existingTool) {
         throw new NotFoundError(`Tool with id ${id} not found`);
       }
 
-      return await this.createTool({ id: input.id, projectId: existingTool.projectId, name: input.name ?? `${existingTool.name} (Clone)`, description: existingTool.description ?? undefined, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings as any, inputType: existingTool.inputType as 'text' | 'image' | 'multi-modal', outputType: existingTool.outputType as 'text' | 'image' | 'multi-modal', parameters: existingTool.parameters as any, metadata: existingTool.metadata ?? undefined }, context);
+      return await this.createTool(projectId, { id: input.id, name: input.name ?? `${existingTool.name} (Clone)`, description: existingTool.description ?? undefined, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings as any, inputType: existingTool.inputType as 'text' | 'image' | 'multi-modal', outputType: existingTool.outputType as 'text' | 'image' | 'multi-modal', parameters: existingTool.parameters as any, metadata: existingTool.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone tool');
       throw error;

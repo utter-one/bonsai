@@ -76,6 +76,7 @@ export type {
  * Schema for stage route parameters
  */
 export const stageRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().min(1).describe('Stage ID'),
 });
 
@@ -124,7 +125,6 @@ export const actionsSchema = z.record(z.string(), stageActionSchema).describe('A
  */
 export const createStageSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the stage (auto-generated if not provided)'),
-  projectId: z.string().min(1).describe('ID of the project this stage belongs to'),
   name: z.string().min(1).describe('Display name for the stage'),
   description: z.string().optional().describe('Detailed description of the stage purpose'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),

@@ -34,13 +34,13 @@ export class KnowledgeService extends BaseService {
    * @param context - Request context for auditing
    * @returns The created knowledge category
    */
-  async createKnowledgeCategory(input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
+  async createKnowledgeCategory(projectId: string, input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const categoryId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_CATEGORY);
-    logger.info({ categoryId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
+    logger.info({ categoryId, projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
 
     try {
-      const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId: input.projectId, name: input.name, promptTrigger: input.promptTrigger, tags: input.tags ?? [], order: input.order ?? 0, version: 1 }).returning();
+      const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId, name: input.name, promptTrigger: input.promptTrigger, tags: input.tags ?? [], order: input.order ?? 0, version: 1 }).returning();
 
       const createdCategory = category[0];
 
@@ -61,11 +61,11 @@ export class KnowledgeService extends BaseService {
    * @returns The knowledge category with related items
    * @throws {NotFoundError} When category is not found
    */
-  async getKnowledgeCategoryById(id: string): Promise<KnowledgeCategoryResponse> {
+  async getKnowledgeCategoryById(projectId: string, id: string): Promise<KnowledgeCategoryResponse> {
     logger.debug({ categoryId: id }, 'Fetching knowledge category by ID');
 
     try {
-      const category = await db.query.knowledgeCategories.findFirst({ where: eq(knowledgeCategories.id, id), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
+      const category = await db.query.knowledgeCategories.findFirst({ where: and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id)), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
       if (!category) {
         throw new NotFoundError(`Knowledge category with id ${id} not found`);
@@ -83,11 +83,11 @@ export class KnowledgeService extends BaseService {
    * @param params - List parameters
    * @returns Paginated array of knowledge categories with their items
    */
-  async listKnowledgeCategories(params?: ListParams): Promise<KnowledgeCategoryListResponse> {
+  async listKnowledgeCategories(projectId: string, params?: ListParams): Promise<KnowledgeCategoryListResponse> {
     logger.debug({ params }, 'Listing knowledge categories');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(knowledgeCategories.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -138,13 +138,13 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When category is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async updateKnowledgeCategory(id: string, input: UpdateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
+  async updateKnowledgeCategory(projectId: string, id: string, input: UpdateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ categoryId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge category');
 
     try {
-      const existingCategory = await db.query.knowledgeCategories.findFirst({ where: eq(knowledgeCategories.id, id), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
+      const existingCategory = await db.query.knowledgeCategories.findFirst({ where: and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id)), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
       if (!existingCategory) {
         throw new NotFoundError(`Knowledge category with id ${id} not found`);
@@ -154,7 +154,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge category version mismatch. Expected ${expectedVersion}, got ${existingCategory.version}`);
       }
 
-      const updatedCategory = await db.update(knowledgeCategories).set({ name: updateData.name, promptTrigger: updateData.promptTrigger, tags: updateData.tags, order: updateData.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
+      const updatedCategory = await db.update(knowledgeCategories).set({ name: updateData.name, promptTrigger: updateData.promptTrigger, tags: updateData.tags, order: updateData.order, version: existingCategory.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
 
       if (updatedCategory.length === 0) {
         throw new OptimisticLockError(`Failed to update knowledge category due to version conflict`);
@@ -181,12 +181,12 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When category is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async deleteKnowledgeCategory(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+  async deleteKnowledgeCategory(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
     logger.info({ categoryId: id, expectedVersion, adminId: context?.adminId }, 'Deleting knowledge category');
 
     try {
-      const existingCategory = await db.query.knowledgeCategories.findFirst({ where: eq(knowledgeCategories.id, id) });
+      const existingCategory = await db.query.knowledgeCategories.findFirst({ where: and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id)) });
 
       if (!existingCategory) {
         throw new NotFoundError(`Knowledge category with id ${id} not found`);
@@ -196,7 +196,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge category version mismatch. Expected ${expectedVersion}, got ${existingCategory.version}`);
       }
 
-      const deleted = await db.delete(knowledgeCategories).where(and(eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
+      const deleted = await db.delete(knowledgeCategories).where(and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id), eq(knowledgeCategories.version, expectedVersion))).returning();
 
       if (deleted.length === 0) {
         throw new OptimisticLockError(`Failed to delete knowledge category due to version conflict`);
@@ -221,13 +221,13 @@ export class KnowledgeService extends BaseService {
    * @param context - Request context for auditing
    * @returns The created knowledge item
    */
-  async createKnowledgeItem(input: CreateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
+  async createKnowledgeItem(projectId: string, input: CreateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const itemId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_ITEM);
     logger.info({ itemId, categoryId: input.categoryId, adminId: context?.adminId }, 'Creating knowledge item');
 
     try {
-      const item = await db.insert(knowledgeItems).values({ id: itemId, categoryId: input.categoryId, question: input.question, answer: input.answer, order: input.order ?? 0, version: 1 }).returning();
+      const item = await db.insert(knowledgeItems).values({ id: itemId, projectId, categoryId: input.categoryId, question: input.question, answer: input.answer, order: input.order ?? 0, version: 1 }).returning();
 
       const createdItem = item[0];
 
@@ -248,11 +248,11 @@ export class KnowledgeService extends BaseService {
    * @returns The knowledge item if found
    * @throws {NotFoundError} When item is not found
    */
-  async getKnowledgeItemById(id: string): Promise<KnowledgeItemResponse> {
+  async getKnowledgeItemById(projectId: string, id: string): Promise<KnowledgeItemResponse> {
     logger.debug({ itemId: id }, 'Fetching knowledge item by ID');
 
     try {
-      const item = await db.query.knowledgeItems.findFirst({ where: eq(knowledgeItems.id, id) });
+      const item = await db.query.knowledgeItems.findFirst({ where: and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id)) });
 
       if (!item) {
         throw new NotFoundError(`Knowledge item with id ${id} not found`);
@@ -270,16 +270,17 @@ export class KnowledgeService extends BaseService {
    * @param params - List parameters with optional categoryId filter
    * @returns Paginated array of knowledge items
    */
-  async listKnowledgeItems(params?: ListParams): Promise<KnowledgeItemListResponse> {
+  async listKnowledgeItems(projectId: string, params?: ListParams): Promise<KnowledgeItemListResponse> {
     logger.debug({ params }, 'Listing knowledge items');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(knowledgeItems.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
       const columnMap = {
         id: knowledgeItems.id,
+        projectId: knowledgeItems.projectId,
         categoryId: knowledgeItems.categoryId,
         question: knowledgeItems.question,
         answer: knowledgeItems.answer,
@@ -326,13 +327,13 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When item is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async updateKnowledgeItem(id: string, input: UpdateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
+  async updateKnowledgeItem(projectId: string, id: string, input: UpdateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ itemId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge item');
 
     try {
-      const existingItem = await db.query.knowledgeItems.findFirst({ where: eq(knowledgeItems.id, id) });
+      const existingItem = await db.query.knowledgeItems.findFirst({ where: and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id)) });
 
       if (!existingItem) {
         throw new NotFoundError(`Knowledge item with id ${id} not found`);
@@ -342,7 +343,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge item version mismatch. Expected ${expectedVersion}, got ${existingItem.version}`);
       }
 
-      const updatedItem = await db.update(knowledgeItems).set({ categoryId: updateData.categoryId, question: updateData.question, answer: updateData.answer, order: updateData.order, version: existingItem.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
+      const updatedItem = await db.update(knowledgeItems).set({ categoryId: updateData.categoryId, question: updateData.question, answer: updateData.answer, order: updateData.order, version: existingItem.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
 
       if (updatedItem.length === 0) {
         throw new OptimisticLockError(`Failed to update knowledge item due to version conflict`);
@@ -369,12 +370,12 @@ export class KnowledgeService extends BaseService {
    * @throws {NotFoundError} When item is not found
    * @throws {OptimisticLockError} When version doesn't match
    */
-  async deleteKnowledgeItem(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+  async deleteKnowledgeItem(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
     logger.info({ itemId: id, expectedVersion, adminId: context?.adminId }, 'Deleting knowledge item');
 
     try {
-      const existingItem = await db.query.knowledgeItems.findFirst({ where: eq(knowledgeItems.id, id) });
+      const existingItem = await db.query.knowledgeItems.findFirst({ where: and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id)) });
 
       if (!existingItem) {
         throw new NotFoundError(`Knowledge item with id ${id} not found`);
@@ -384,7 +385,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge item version mismatch. Expected ${expectedVersion}, got ${existingItem.version}`);
       }
 
-      const deleted = await db.delete(knowledgeItems).where(and(eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
+      const deleted = await db.delete(knowledgeItems).where(and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
 
       if (deleted.length === 0) {
         throw new OptimisticLockError(`Failed to delete knowledge item due to version conflict`);
@@ -404,11 +405,11 @@ export class KnowledgeService extends BaseService {
    * @param categoryId - The unique identifier of the category
    * @returns Array of knowledge items in the category
    */
-  async getItemsByCategory(categoryId: string): Promise<KnowledgeItemResponse[]> {
+  async getItemsByCategory(projectId: string, categoryId: string): Promise<KnowledgeItemResponse[]> {
     logger.debug({ categoryId }, 'Fetching items by category');
 
     try {
-      const items = await db.query.knowledgeItems.findMany({ where: eq(knowledgeItems.categoryId, categoryId), orderBy: (items, { asc }) => [asc(items.order)] });
+      const items = await db.query.knowledgeItems.findMany({ where: and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.categoryId, categoryId)), orderBy: (items, { asc }) => [asc(items.order)] });
 
       return items.map(item => knowledgeItemResponseSchema.parse(item));
     } catch (error) {
@@ -422,11 +423,11 @@ export class KnowledgeService extends BaseService {
    * @param tags - Array of section IDs
    * @returns Array of knowledge categories with their items
    */
-  async getCategoriesByTags(tags: string[]): Promise<KnowledgeCategoryResponse[]> {
-    logger.debug({ tagIds: tags }, 'Fetching categories by tags');
+  async getCategoriesByTags(projectId: string, tags: string[]): Promise<KnowledgeCategoryResponse[]> {
+    logger.debug({ tagIds: tags, projectId }, 'Fetching categories by tags');
 
     try {
-      const allCategories = await db.query.knowledgeCategories.findMany({ with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
+      const allCategories = await db.query.knowledgeCategories.findMany({ where: eq(knowledgeCategories.projectId, projectId), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
       // TODO: make it more efficient by doing filtering in the database instead of in memory
 

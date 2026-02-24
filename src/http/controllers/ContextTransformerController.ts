@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../permissions';
 import { ContextTransformerService } from '../../services/ContextTransformerService';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema, contextTransformerRouteParamsSchema, cloneContextTransformerSchema } from '../contracts/contextTransformer';
 import type { CloneContextTransformerRequest } from '../contracts/contextTransformer';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -23,7 +23,7 @@ export class ContextTransformerController {
     return [
       {
         method: 'post',
-        path: '/api/context-transformers',
+        path: '/api/projects/{projectId}/context-transformers',
         tags: ['Context Transformers'],
         summary: 'Create a new context transformer',
         description: 'Creates a new context transformer with specified name, prompt, and configuration',
@@ -51,7 +51,7 @@ export class ContextTransformerController {
       },
       {
         method: 'get',
-        path: '/api/context-transformers/{id}',
+        path: '/api/projects/{projectId}/context-transformers/{id}',
         tags: ['Context Transformers'],
         summary: 'Get context transformer by ID',
         description: 'Retrieves a single context transformer by its unique identifier',
@@ -72,7 +72,7 @@ export class ContextTransformerController {
       },
       {
         method: 'get',
-        path: '/api/context-transformers',
+        path: '/api/projects/{projectId}/context-transformers',
         tags: ['Context Transformers'],
         summary: 'List context transformers',
         description: 'Retrieves a paginated list of context transformers with optional filtering and sorting',
@@ -93,7 +93,7 @@ export class ContextTransformerController {
       },
       {
         method: 'put',
-        path: '/api/context-transformers/{id}',
+        path: '/api/projects/{projectId}/context-transformers/{id}',
         tags: ['Context Transformers'],
         summary: 'Update context transformer',
         description: 'Updates an existing context transformer with optimistic locking',
@@ -123,7 +123,7 @@ export class ContextTransformerController {
       },
       {
         method: 'delete',
-        path: '/api/context-transformers/{id}',
+        path: '/api/projects/{projectId}/context-transformers/{id}',
         tags: ['Context Transformers'],
         summary: 'Delete context transformer',
         description: 'Deletes a context transformer with optimistic locking',
@@ -146,7 +146,7 @@ export class ContextTransformerController {
       },
       {
         method: 'get',
-        path: '/api/context-transformers/{id}/audit-logs',
+        path: '/api/projects/{projectId}/context-transformers/{id}/audit-logs',
         tags: ['Context Transformers'],
         summary: 'Get context transformer audit logs',
         description: 'Retrieves audit logs for a specific context transformer',
@@ -162,7 +162,7 @@ export class ContextTransformerController {
       },
       {
         method: 'post',
-        path: '/api/context-transformers/{id}/clone',
+        path: '/api/projects/{projectId}/context-transformers/{id}/clone',
         tags: ['Context Transformers'],
         summary: 'Clone context transformer',
         description: 'Creates a copy of an existing context transformer with a new ID and optional name override',
@@ -196,13 +196,13 @@ export class ContextTransformerController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/context-transformers', asyncHandler(this.createContextTransformer.bind(this)));
-    router.get('/api/context-transformers/:id', asyncHandler(this.getContextTransformerById.bind(this)));
-    router.get('/api/context-transformers', asyncHandler(this.listContextTransformers.bind(this)));
-    router.put('/api/context-transformers/:id', asyncHandler(this.updateContextTransformer.bind(this)));
-    router.delete('/api/context-transformers/:id', asyncHandler(this.deleteContextTransformer.bind(this)));
-    router.get('/api/context-transformers/:id/audit-logs', asyncHandler(this.getContextTransformerAuditLogs.bind(this)));
-    router.post('/api/context-transformers/:id/clone', asyncHandler(this.cloneContextTransformer.bind(this)));
+    router.post('/api/projects/:projectId/context-transformers', asyncHandler(this.createContextTransformer.bind(this)));
+    router.get('/api/projects/:projectId/context-transformers/:id', asyncHandler(this.getContextTransformerById.bind(this)));
+    router.get('/api/projects/:projectId/context-transformers', asyncHandler(this.listContextTransformers.bind(this)));
+    router.put('/api/projects/:projectId/context-transformers/:id', asyncHandler(this.updateContextTransformer.bind(this)));
+    router.delete('/api/projects/:projectId/context-transformers/:id', asyncHandler(this.deleteContextTransformer.bind(this)));
+    router.get('/api/projects/:projectId/context-transformers/:id/audit-logs', asyncHandler(this.getContextTransformerAuditLogs.bind(this)));
+    router.post('/api/projects/:projectId/context-transformers/:id/clone', asyncHandler(this.cloneContextTransformer.bind(this)));
   }
 
   /**
@@ -211,8 +211,9 @@ export class ContextTransformerController {
    */
   private async createContextTransformer(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createContextTransformerSchema.parse(req.body);
-    const transformer = await this.contextTransformerService.createContextTransformer(body, req.context);
+    const transformer = await this.contextTransformerService.createContextTransformer(projectId, body, req.context);
     res.status(201).json(transformer);
   }
 
@@ -223,7 +224,7 @@ export class ContextTransformerController {
   private async getContextTransformerById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_READ]);
     const params = contextTransformerRouteParamsSchema.parse(req.params);
-    const transformer = await this.contextTransformerService.getContextTransformerById(params.id);
+    const transformer = await this.contextTransformerService.getContextTransformerById(params.projectId, params.id);
     res.status(200).json(transformer);
   }
 
@@ -233,8 +234,9 @@ export class ContextTransformerController {
    */
   private async listContextTransformers(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const transformers = await this.contextTransformerService.listContextTransformers(query);
+    const transformers = await this.contextTransformerService.listContextTransformers(projectId, query);
     res.status(200).json(transformers);
   }
 
@@ -246,7 +248,7 @@ export class ContextTransformerController {
     checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_WRITE]);
     const params = contextTransformerRouteParamsSchema.parse(req.params);
     const body = updateContextTransformerBodySchema.parse(req.body);
-    const transformer = await this.contextTransformerService.updateContextTransformer(params.id, body, req.context);
+    const transformer = await this.contextTransformerService.updateContextTransformer(params.projectId, params.id, body, req.context);
     res.status(200).json(transformer);
   }
 
@@ -258,7 +260,7 @@ export class ContextTransformerController {
     checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_DELETE]);
     const params = contextTransformerRouteParamsSchema.parse(req.params);
     const body = deleteContextTransformerBodySchema.parse(req.body);
-    await this.contextTransformerService.deleteContextTransformer(params.id, body.version, req.context);
+    await this.contextTransformerService.deleteContextTransformer(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -281,7 +283,7 @@ export class ContextTransformerController {
     checkPermissions(req, [PERMISSIONS.CONTEXT_TRANSFORMER_WRITE]);
     const params = contextTransformerRouteParamsSchema.parse(req.params);
     const body = cloneContextTransformerSchema.parse(req.body);
-    const transformer = await this.contextTransformerService.cloneContextTransformer(params.id, body, req.context);
+    const transformer = await this.contextTransformerService.cloneContextTransformer(params.projectId, params.id, body, req.context);
     res.status(201).json(transformer);
   }
 }

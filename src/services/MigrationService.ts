@@ -663,7 +663,7 @@ export class MigrationService extends BaseService {
   private async upsertPersonas(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(personas).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: personas.id,
+      target: [personas.projectId, personas.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -682,7 +682,7 @@ export class MigrationService extends BaseService {
   private async upsertClassifiers(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(classifiers).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: classifiers.id,
+      target: [classifiers.projectId, classifiers.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -701,7 +701,7 @@ export class MigrationService extends BaseService {
   private async upsertContextTransformers(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(contextTransformers).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: contextTransformers.id,
+      target: [contextTransformers.projectId, contextTransformers.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -721,7 +721,7 @@ export class MigrationService extends BaseService {
   private async upsertTools(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(tools).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: tools.id,
+      target: [tools.projectId, tools.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -743,7 +743,7 @@ export class MigrationService extends BaseService {
   private async upsertGlobalActions(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(globalActions).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: globalActions.id,
+      target: [globalActions.projectId, globalActions.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -766,7 +766,7 @@ export class MigrationService extends BaseService {
   private async upsertKnowledgeCategories(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(knowledgeCategories).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: knowledgeCategories.id,
+      target: [knowledgeCategories.projectId, knowledgeCategories.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -783,7 +783,7 @@ export class MigrationService extends BaseService {
   private async upsertKnowledgeItems(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(knowledgeItems).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: knowledgeItems.id,
+      target: [knowledgeItems.projectId, knowledgeItems.id],
       set: {
         categoryId: sql`excluded.category_id`,
         question: sql`excluded.question`,
@@ -799,7 +799,7 @@ export class MigrationService extends BaseService {
   private async upsertStages(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(stages).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: stages.id,
+      target: [stages.projectId, stages.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -828,7 +828,7 @@ export class MigrationService extends BaseService {
   private async upsertApiKeys(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(apiKeys).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: apiKeys.id,
+      target: [apiKeys.projectId, apiKeys.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,

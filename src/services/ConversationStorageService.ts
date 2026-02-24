@@ -33,7 +33,7 @@ export class ConversationStorageService {
    * @returns Artifact ID and URL of the uploaded artifact
    * @throws NotConfiguredError if storage is not configured for the project
    */
-  async uploadArtifact(storageConfig: { storageProviderId?: string; settings?: unknown } | null | undefined, conversationId: string, artifactType: ArtifactType, data: Buffer, metadata?: StorageMetadata, eventId?: string, inputTurnId?: string, outputTurnId?: string, errorCallback?: ErrorCallback): Promise<{ id: string; url: string }> {
+  async uploadArtifact(storageConfig: { storageProviderId?: string; settings?: unknown } | null | undefined, projectId: string, conversationId: string, artifactType: ArtifactType, data: Buffer, metadata?: StorageMetadata, eventId?: string, inputTurnId?: string, outputTurnId?: string, errorCallback?: ErrorCallback): Promise<{ id: string; url: string }> {
     if (!storageConfig?.storageProviderId || !storageConfig?.settings) {
       throw new NotConfiguredError('Storage provider not configured for this project');
     }
@@ -46,6 +46,7 @@ export class ConversationStorageService {
     const artifactId = generateId(ID_PREFIXES.ARTIFACT);
     await db.insert(conversationArtifacts).values({
       id: artifactId,
+      projectId,
       conversationId,
       artifactType,
       eventId: eventId ?? null,

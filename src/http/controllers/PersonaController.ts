@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../permissions';
 import { PersonaService } from '../../services/PersonaService';
 import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaRouteParamsSchema, personaResponseSchema, personaListResponseSchema, clonePersonaSchema } from '../contracts/persona';
 import type { CreatePersonaRequest, UpdatePersonaRequest, DeletePersonaRequest, ClonePersonaRequest } from '../contracts/persona';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 import logger from '../../utils/logger';
@@ -24,7 +24,7 @@ export class PersonaController {
     return [
       {
         method: 'post',
-        path: '/api/personas',
+        path: '/api/projects/{projectId}/personas',
         tags: ['Personas'],
         summary: 'Create a new persona',
         description: 'Creates a new AI persona with specified characteristics and voice configuration',
@@ -52,7 +52,7 @@ export class PersonaController {
       },
       {
         method: 'get',
-        path: '/api/personas/{id}',
+        path: '/api/projects/{projectId}/personas/{id}',
         tags: ['Personas'],
         summary: 'Get persona by ID',
         description: 'Retrieves a single persona by their unique identifier',
@@ -73,7 +73,7 @@ export class PersonaController {
       },
       {
         method: 'get',
-        path: '/api/personas',
+        path: '/api/projects/{projectId}/personas',
         tags: ['Personas'],
         summary: 'List personas',
         description: 'Retrieves a paginated list of personas with optional filtering',
@@ -94,7 +94,7 @@ export class PersonaController {
       },
       {
         method: 'put',
-        path: '/api/personas/{id}',
+        path: '/api/projects/{projectId}/personas/{id}',
         tags: ['Personas'],
         summary: 'Update persona',
         description: 'Updates an existing persona with optimistic locking',
@@ -124,7 +124,7 @@ export class PersonaController {
       },
       {
         method: 'delete',
-        path: '/api/personas/{id}',
+        path: '/api/projects/{projectId}/personas/{id}',
         tags: ['Personas'],
         summary: 'Delete persona',
         description: 'Deletes a persona with optimistic locking',
@@ -147,7 +147,7 @@ export class PersonaController {
       },
       {
         method: 'get',
-        path: '/api/personas/{id}/audit-logs',
+        path: '/api/projects/{projectId}/personas/{id}/audit-logs',
         tags: ['Personas'],
         summary: 'Get persona audit logs',
         description: 'Retrieves audit logs for a specific persona',
@@ -163,7 +163,7 @@ export class PersonaController {
       },
       {
         method: 'post',
-        path: '/api/personas/{id}/clone',
+        path: '/api/projects/{projectId}/personas/{id}/clone',
         tags: ['Personas'],
         summary: 'Clone persona',
         description: 'Creates a copy of an existing persona with a new ID and optional name override',
@@ -197,13 +197,13 @@ export class PersonaController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/personas', asyncHandler(this.createPersona.bind(this)));
-    router.get('/api/personas/:id', asyncHandler(this.getPersonaById.bind(this)));
-    router.get('/api/personas', asyncHandler(this.listPersonas.bind(this)));
-    router.put('/api/personas/:id', asyncHandler(this.updatePersona.bind(this)));
-    router.delete('/api/personas/:id', asyncHandler(this.deletePersona.bind(this)));
-    router.get('/api/personas/:id/audit-logs', asyncHandler(this.getPersonaAuditLogs.bind(this)));
-    router.post('/api/personas/:id/clone', asyncHandler(this.clonePersona.bind(this)));
+    router.post('/api/projects/:projectId/personas', asyncHandler(this.createPersona.bind(this)));
+    router.get('/api/projects/:projectId/personas/:id', asyncHandler(this.getPersonaById.bind(this)));
+    router.get('/api/projects/:projectId/personas', asyncHandler(this.listPersonas.bind(this)));
+    router.put('/api/projects/:projectId/personas/:id', asyncHandler(this.updatePersona.bind(this)));
+    router.delete('/api/projects/:projectId/personas/:id', asyncHandler(this.deletePersona.bind(this)));
+    router.get('/api/projects/:projectId/personas/:id/audit-logs', asyncHandler(this.getPersonaAuditLogs.bind(this)));
+    router.post('/api/projects/:projectId/personas/:id/clone', asyncHandler(this.clonePersona.bind(this)));
   }
 
   /**
@@ -212,8 +212,9 @@ export class PersonaController {
    */
   private async createPersona(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.PERSONA_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createPersonaSchema.parse(req.body);
-    const persona = await this.personaService.createPersona(body, req.context);
+    const persona = await this.personaService.createPersona(projectId, body, req.context);
     res.status(201).json(persona);
   }
 
@@ -224,7 +225,7 @@ export class PersonaController {
   private async getPersonaById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.PERSONA_READ]);
     const params = personaRouteParamsSchema.parse(req.params);
-    const persona = await this.personaService.getPersonaById(params.id);
+    const persona = await this.personaService.getPersonaById(params.projectId, params.id);
     res.status(200).json(persona);
   }
 
@@ -235,8 +236,9 @@ export class PersonaController {
   private async listPersonas(req: Request, res: Response): Promise<void> {
     logger.info({ query: req.query }, 'Listing personas with query');
     checkPermissions(req, [PERMISSIONS.PERSONA_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const personas = await this.personaService.listPersonas(query);
+    const personas = await this.personaService.listPersonas(projectId, query);
     res.status(200).json(personas);
   }
 
@@ -248,7 +250,7 @@ export class PersonaController {
     checkPermissions(req, [PERMISSIONS.PERSONA_WRITE]);
     const params = personaRouteParamsSchema.parse(req.params);
     const body = updatePersonaBodySchema.parse(req.body);
-    const persona = await this.personaService.updatePersona(params.id, body, req.context);
+    const persona = await this.personaService.updatePersona(params.projectId, params.id, body, req.context);
     res.status(200).json(persona);
   }
 
@@ -260,7 +262,7 @@ export class PersonaController {
     checkPermissions(req, [PERMISSIONS.PERSONA_DELETE]);
     const params = personaRouteParamsSchema.parse(req.params);
     const body = deletePersonaBodySchema.parse(req.body);
-    await this.personaService.deletePersona(params.id, body.version, req.context);
+    await this.personaService.deletePersona(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -283,7 +285,7 @@ export class PersonaController {
     checkPermissions(req, [PERMISSIONS.PERSONA_WRITE]);
     const params = personaRouteParamsSchema.parse(req.params);
     const body = clonePersonaSchema.parse(req.body);
-    const persona = await this.personaService.clonePersona(params.id, body, req.context);
+    const persona = await this.personaService.clonePersona(params.projectId, params.id, body, req.context);
     res.status(201).json(persona);
   }
 }
