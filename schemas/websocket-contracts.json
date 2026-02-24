@@ -329,6 +329,9 @@
                     },
                     {
                       "$ref": "#/definitions/ElevenLabsAsrSettings"
+                    },
+                    {
+                      "$ref": "#/definitions/DeepgramAsrSettings"
                     }
                   ],
                   "description": "ASR-specific settings including model, language preferences, etc."
@@ -484,6 +487,79 @@
       },
       "description": "ElevenLabs Scribe settings"
     },
+    "DeepgramAsrSettings": {
+      "type": "object",
+      "properties": {
+        "modelId": {
+          "type": "string",
+          "default": "nova-3",
+          "description": "Model ID to use for transcription (e.g., \"nova-3\", \"nova-2\", \"base\", \"enhanced\"), defaults to nova-3"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "pcm_16000",
+            "pcm_8000",
+            "pcm_22050",
+            "pcm_24000",
+            "pcm_44100"
+          ],
+          "default": "pcm_16000",
+          "description": "Audio encoding format for speech-to-text, defaults to pcm_16000"
+        },
+        "language": {
+          "type": "string",
+          "description": "BCP-47 language tag (e.g., \"en-US\", \"es\", \"fr\")"
+        },
+        "interimResults": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable interim (partial) transcription results during streaming, defaults to false"
+        },
+        "endpointing": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 10
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "default": 300,
+          "description": "Milliseconds of silence to wait before finalizing speech (10+) or false to disable, defaults to 300"
+        },
+        "smartFormat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Apply formatting (punctuation, capitalization, currency, etc.) to improve readability, defaults to true"
+        },
+        "punctuate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Add punctuation and capitalization to transcript, defaults to true"
+        },
+        "diarize": {
+          "type": "boolean",
+          "default": false,
+          "description": "Recognize and label different speakers in the audio, defaults to false"
+        },
+        "utteranceEndMs": {
+          "type": "integer",
+          "minimum": 10,
+          "description": "Milliseconds to wait before sending UtteranceEnd event (use with interim_results)"
+        },
+        "vadEvents": {
+          "type": "boolean",
+          "default": false,
+          "description": "Send SpeechStarted events when speech is detected, defaults to false"
+        }
+      },
+      "additionalProperties": {
+        "nullable": true
+      },
+      "description": "Deepgram speech-to-text settings"
+    },
     "project-settings": {
       "type": "object",
       "properties": {
@@ -514,6 +590,9 @@
                 },
                 {
                   "$ref": "#/definitions/ElevenLabsAsrSettings"
+                },
+                {
+                  "$ref": "#/definitions/DeepgramAsrSettings"
                 }
               ],
               "description": "ASR-specific settings including model, language preferences, etc."

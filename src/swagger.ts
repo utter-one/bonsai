@@ -40,6 +40,7 @@ import { localStorageProviderConfigSchema, localStorageSettingsSchema } from './
 import { cartesiaTtsSettingsSchema } from './services/providers/tts/CartesiaTtsProvider';
 import { azureAsrSettingsSchema } from './services/providers/asr/AzureAsrProvider';
 import { elevenLabsAsrSettingsSchema } from './services/providers/asr/ElevenLabsAsrProvider';
+import { deepgramAsrSettingsSchema } from './services/providers/asr/DeepgramAsrProvider';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -103,6 +104,7 @@ export function getOpenAPISpec(): any {
   // ASR provider settings schemas
   registry.register('AzureAsrSettings', azureAsrSettingsSchema);
   registry.register('ElevenLabsAsrSettings', elevenLabsAsrSettingsSchema);
+  registry.register('DeepgramAsrSettings', deepgramAsrSettingsSchema);
 
   // Storage provider schemas
   registry.register('S3StorageConfig', s3StorageProviderConfigSchema);
