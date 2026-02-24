@@ -32,6 +32,7 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 export const globalActionRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Global Action ID'),
 });
 
@@ -67,7 +68,6 @@ export type {
  */
 export const createGlobalActionSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the global action (auto-generated if not provided)'),
-  projectId: z.string().min(1).describe('ID of the project this global action belongs to'),
   name: z.string().min(1).describe('Display name of the global action'),
   condition: z.string().nullable().optional().describe('Optional condition expression for action activation'),
   triggerOnUserInput: z.boolean().optional().default(true).describe('Whether this action should be triggered on user input'),

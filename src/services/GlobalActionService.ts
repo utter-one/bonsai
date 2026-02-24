@@ -30,13 +30,13 @@ export class GlobalActionService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created global action
    */
-  async createGlobalAction(input: CreateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
+  async createGlobalAction(projectId: string, input: CreateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
     const globalActionId = input.id ?? generateId(ID_PREFIXES.GLOBAL_ACTION);
-    logger.info({ globalActionId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating global action');
+    logger.info({ globalActionId, projectId, name: input.name, adminId: context?.adminId }, 'Creating global action');
 
     try {
-      const globalAction = await db.insert(globalActions).values({ id: globalActionId, projectId: input.projectId, name: input.name, condition: input.condition ?? null, triggerOnUserInput: input.triggerOnUserInput ?? true, triggerOnClientCommand: input.triggerOnClientCommand ?? false, classificationTrigger: input.classificationTrigger ?? null, overrideClassifierId: input.overrideClassifierId ?? null, parameters: input.parameters ?? [], effects: input.effects ?? [], examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const globalAction = await db.insert(globalActions).values({ id: globalActionId, projectId, name: input.name, condition: input.condition ?? null, triggerOnUserInput: input.triggerOnUserInput ?? true, triggerOnClientCommand: input.triggerOnClientCommand ?? false, classificationTrigger: input.classificationTrigger ?? null, overrideClassifierId: input.overrideClassifierId ?? null, parameters: input.parameters ?? [], effects: input.effects ?? [], examples: input.examples ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdGlobalAction = globalAction[0];
 
@@ -57,11 +57,11 @@ export class GlobalActionService extends BaseService {
    * @returns The global action if found
    * @throws {NotFoundError} When global action is not found
    */
-  async getGlobalActionById(id: string): Promise<GlobalActionResponse> {
+  async getGlobalActionById(projectId: string, id: string): Promise<GlobalActionResponse> {
     logger.debug({ globalActionId: id }, 'Fetching global action by ID');
 
     try {
-      const globalAction = await db.query.globalActions.findFirst({ where: eq(globalActions.id, id) });
+      const globalAction = await db.query.globalActions.findFirst({ where: and(eq(globalActions.projectId, projectId), eq(globalActions.id, id)) });
 
       if (!globalAction) {
         throw new NotFoundError(`Global action with id ${id} not found`);
@@ -79,11 +79,11 @@ export class GlobalActionService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of global actions matching the criteria
    */
-  async listGlobalActions(params?: ListParams): Promise<GlobalActionListResponse> {
+  async listGlobalActions(projectId: string, params?: ListParams): Promise<GlobalActionListResponse> {
     logger.debug({ params }, 'Listing global actions');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(globalActions.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -151,13 +151,13 @@ export class GlobalActionService extends BaseService {
    * @throws {NotFoundError} When global action is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateGlobalAction(id: string, input: UpdateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
+  async updateGlobalAction(projectId: string, id: string, input: UpdateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ globalActionId: id, expectedVersion, adminId: context?.adminId }, 'Updating global action');
 
     try {
-      const existingGlobalAction = await db.query.globalActions.findFirst({ where: eq(globalActions.id, id) });
+      const existingGlobalAction = await db.query.globalActions.findFirst({ where: and(eq(globalActions.projectId, projectId), eq(globalActions.id, id)) });
 
       if (!existingGlobalAction) {
         throw new NotFoundError(`Global action with id ${id} not found`);
@@ -179,7 +179,7 @@ export class GlobalActionService extends BaseService {
       if (updateData.examples !== undefined) updatePayload.examples = updateData.examples;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedGlobalAction = await db.update(globalActions).set(updatePayload).where(and(eq(globalActions.id, id), eq(globalActions.version, expectedVersion))).returning();
+      const updatedGlobalAction = await db.update(globalActions).set(updatePayload).where(and(eq(globalActions.projectId, projectId), eq(globalActions.id, id), eq(globalActions.version, expectedVersion))).returning();
 
       if (updatedGlobalAction.length === 0) {
         throw new OptimisticLockError(`Failed to update global action due to version conflict`);
@@ -206,12 +206,12 @@ export class GlobalActionService extends BaseService {
    * @throws {NotFoundError} When global action is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deleteGlobalAction(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+  async deleteGlobalAction(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_DELETE);
     logger.info({ globalActionId: id, expectedVersion, adminId: context?.adminId }, 'Deleting global action');
 
     try {
-      const existingGlobalAction = await db.query.globalActions.findFirst({ where: eq(globalActions.id, id) });
+      const existingGlobalAction = await db.query.globalActions.findFirst({ where: and(eq(globalActions.projectId, projectId), eq(globalActions.id, id)) });
 
       if (!existingGlobalAction) {
         throw new NotFoundError(`Global action with id ${id} not found`);
@@ -221,7 +221,7 @@ export class GlobalActionService extends BaseService {
         throw new OptimisticLockError(`Global action version mismatch. Expected ${expectedVersion}, got ${existingGlobalAction.version}`);
       }
 
-      const deleted = await db.delete(globalActions).where(and(eq(globalActions.id, id), eq(globalActions.version, expectedVersion))).returning();
+      const deleted = await db.delete(globalActions).where(and(eq(globalActions.projectId, projectId), eq(globalActions.id, id), eq(globalActions.version, expectedVersion))).returning();
 
       if (deleted.length === 0) {
         throw new OptimisticLockError(`Failed to delete global action due to version conflict`);
@@ -244,18 +244,18 @@ export class GlobalActionService extends BaseService {
    * @returns The newly created cloned global action
    * @throws {NotFoundError} When the source global action is not found
    */
-  async cloneGlobalAction(id: string, input: CloneGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
+  async cloneGlobalAction(projectId: string, id: string, input: CloneGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
     logger.info({ id, adminId: context?.adminId }, 'Cloning global action');
 
     try {
-      const existingAction = await db.query.globalActions.findFirst({ where: eq(globalActions.id, id) });
+      const existingAction = await db.query.globalActions.findFirst({ where: and(eq(globalActions.projectId, projectId), eq(globalActions.id, id)) });
 
       if (!existingAction) {
         throw new NotFoundError(`Global action with id ${id} not found`);
       }
 
-      return await this.createGlobalAction({ id: input.id, projectId: existingAction.projectId, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, parameters: existingAction.parameters as any, effects: existingAction.effects as any, examples: existingAction.examples as string[] ?? undefined, metadata: existingAction.metadata ?? undefined }, context);
+      return await this.createGlobalAction(projectId, { id: input.id, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, parameters: existingAction.parameters as any, effects: existingAction.effects as any, examples: existingAction.examples as string[] ?? undefined, metadata: existingAction.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone global action');
       throw error;

@@ -4,7 +4,7 @@ import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ConversationService } from '../../services/ConversationService';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema, conversationRouteParamsSchema, conversationEventRouteParamsSchema } from '../contracts/conversation';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -23,7 +23,7 @@ export class ConversationController {
     return [
       {
         method: 'get',
-        path: '/api/conversations/{id}',
+        path: '/api/projects/{projectId}/conversations/{id}',
         tags: ['Conversations'],
         summary: 'Get conversation by ID',
         description: 'Retrieves a single conversation by its unique identifier',
@@ -44,7 +44,7 @@ export class ConversationController {
       },
       {
         method: 'get',
-        path: '/api/conversations',
+        path: '/api/projects/{projectId}/conversations',
         tags: ['Conversations'],
         summary: 'List conversations',
         description: 'Retrieves a paginated list of conversations with optional filtering, sorting, and search. Supports filtering by userId, clientId, stageId, status, and timestamps.',
@@ -65,7 +65,7 @@ export class ConversationController {
       },
       {
         method: 'delete',
-        path: '/api/conversations/{id}',
+        path: '/api/projects/{projectId}/conversations/{id}',
         tags: ['Conversations'],
         summary: 'Delete conversation',
         description: 'Deletes a conversation and all its associated events (via cascade delete)',
@@ -79,7 +79,7 @@ export class ConversationController {
       },
       {
         method: 'get',
-        path: '/api/conversations/{id}/events',
+        path: '/api/projects/{projectId}/conversations/{id}/events',
         tags: ['Conversations'],
         summary: 'List conversation events',
         description: 'Retrieves a paginated list of events for a specific conversation with optional filtering and sorting',
@@ -102,7 +102,7 @@ export class ConversationController {
       },
       {
         method: 'get',
-        path: '/api/conversations/{id}/events/{eventId}',
+        path: '/api/projects/{projectId}/conversations/{id}/events/{eventId}',
         tags: ['Conversations'],
         summary: 'Get conversation event by ID',
         description: 'Retrieves a specific event for a conversation by its unique identifier',
@@ -123,7 +123,7 @@ export class ConversationController {
       },
       {
         method: 'get',
-        path: '/api/conversations/{id}/audit-logs',
+        path: '/api/projects/{projectId}/conversations/{id}/audit-logs',
         tags: ['Conversations'],
         summary: 'Get conversation audit logs',
         description: 'Retrieves audit logs for a specific conversation',
@@ -144,12 +144,12 @@ export class ConversationController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.get('/api/conversations/:id', asyncHandler(this.getConversationById.bind(this)));
-    router.get('/api/conversations', asyncHandler(this.listConversations.bind(this)));
-    router.delete('/api/conversations/:id', asyncHandler(this.deleteConversation.bind(this)));
-    router.get('/api/conversations/:id/events', asyncHandler(this.getConversationEvents.bind(this)));
-    router.get('/api/conversations/:id/events/:eventId', asyncHandler(this.getConversationEventById.bind(this)));
-    router.get('/api/conversations/:id/audit-logs', asyncHandler(this.getConversationAuditLogs.bind(this)));
+    router.get('/api/projects/:projectId/conversations/:id', asyncHandler(this.getConversationById.bind(this)));
+    router.get('/api/projects/:projectId/conversations', asyncHandler(this.listConversations.bind(this)));
+    router.delete('/api/projects/:projectId/conversations/:id', asyncHandler(this.deleteConversation.bind(this)));
+    router.get('/api/projects/:projectId/conversations/:id/events', asyncHandler(this.getConversationEvents.bind(this)));
+    router.get('/api/projects/:projectId/conversations/:id/events/:eventId', asyncHandler(this.getConversationEventById.bind(this)));
+    router.get('/api/projects/:projectId/conversations/:id/audit-logs', asyncHandler(this.getConversationAuditLogs.bind(this)));
   }
 
   /**
@@ -159,7 +159,7 @@ export class ConversationController {
   private async getConversationById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CONVERSATION_READ]);
     const params = conversationRouteParamsSchema.parse(req.params);
-    const conversation = await this.conversationService.getConversationById(params.id);
+    const conversation = await this.conversationService.getConversationById(params.projectId, params.id);
     res.status(200).json(conversation);
   }
 
@@ -169,8 +169,9 @@ export class ConversationController {
    */
   private async listConversations(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CONVERSATION_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const conversations = await this.conversationService.listConversations(query);
+    const conversations = await this.conversationService.listConversations(projectId, query);
     res.status(200).json(conversations);
   }
 
@@ -181,7 +182,7 @@ export class ConversationController {
   private async deleteConversation(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CONVERSATION_DELETE]);
     const params = conversationRouteParamsSchema.parse(req.params);
-    await this.conversationService.deleteConversation(params.id, req.context);
+    await this.conversationService.deleteConversation(params.projectId, params.id, req.context);
     res.status(204).send();
   }
 
@@ -193,7 +194,7 @@ export class ConversationController {
     checkPermissions(req, [PERMISSIONS.CONVERSATION_READ]);
     const params = conversationRouteParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const events = await this.conversationService.getConversationEvents(params.id, query);
+    const events = await this.conversationService.getConversationEvents(params.projectId, params.id, query);
     res.status(200).json(events);
   }
 
@@ -204,7 +205,7 @@ export class ConversationController {
   private async getConversationEventById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CONVERSATION_READ]);
     const params = conversationEventRouteParamsSchema.parse(req.params);
-    const event = await this.conversationService.getConversationEventById(params.id, params.eventId);
+    const event = await this.conversationService.getConversationEventById(params.projectId, params.id, params.eventId);
     res.status(200).json(event);
   }
 

@@ -8,6 +8,7 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 export const issueRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Issue ID'),
 });
 
@@ -17,7 +18,6 @@ export const issueRouteParamsSchema = z.object({
  * Optional fields: beat, sessionId, eventIndex, userId, comments
  */
 export const createIssueSchema = z.object({
-  projectId: z.string().min(1).describe('ID of the project this issue belongs to'),
   environment: z.string().min(1).describe('Environment where issue occurred (e.g., production, staging, development)'),
   buildVersion: z.string().min(1).describe('Application build version where the issue was encountered'),
   beat: z.string().optional().describe('Beat/sprint identifier for tracking purposes'),

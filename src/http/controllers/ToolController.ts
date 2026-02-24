@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../permissions';
 import { ToolService } from '../../services/ToolService';
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolRouteParamsSchema, cloneToolSchema } from '../contracts/tool';
 import type { UpdateToolRequest, CloneToolRequest } from '../contracts/tool';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -24,7 +24,7 @@ export class ToolController {
     return [
       {
         method: 'post',
-        path: '/api/tools',
+        path: '/api/projects/{projectId}/tools',
         tags: ['Tools'],
         summary: 'Create a new tool',
         description: 'Creates a new tool with specified name, prompt, input/output types, and configuration',
@@ -52,7 +52,7 @@ export class ToolController {
       },
       {
         method: 'get',
-        path: '/api/tools/{id}',
+        path: '/api/projects/{projectId}/tools/{id}',
         tags: ['Tools'],
         summary: 'Get tool by ID',
         description: 'Retrieves a single tool by its unique identifier',
@@ -73,7 +73,7 @@ export class ToolController {
       },
       {
         method: 'get',
-        path: '/api/tools',
+        path: '/api/projects/{projectId}/tools',
         tags: ['Tools'],
         summary: 'List tools',
         description: 'Retrieves a paginated list of tools with optional filtering and sorting',
@@ -94,7 +94,7 @@ export class ToolController {
       },
       {
         method: 'put',
-        path: '/api/tools/{id}',
+        path: '/api/projects/{projectId}/tools/{id}',
         tags: ['Tools'],
         summary: 'Update tool',
         description: 'Updates an existing tool with optimistic locking',
@@ -124,7 +124,7 @@ export class ToolController {
       },
       {
         method: 'delete',
-        path: '/api/tools/{id}',
+        path: '/api/projects/{projectId}/tools/{id}',
         tags: ['Tools'],
         summary: 'Delete tool',
         description: 'Deletes a tool with optimistic locking',
@@ -147,7 +147,7 @@ export class ToolController {
       },
       {
         method: 'get',
-        path: '/api/tools/{id}/audit-logs',
+        path: '/api/projects/{projectId}/tools/{id}/audit-logs',
         tags: ['Tools'],
         summary: 'Get tool audit logs',
         description: 'Retrieves audit logs for a specific tool',
@@ -163,7 +163,7 @@ export class ToolController {
       },
       {
         method: 'post',
-        path: '/api/tools/{id}/clone',
+        path: '/api/projects/{projectId}/tools/{id}/clone',
         tags: ['Tools'],
         summary: 'Clone tool',
         description: 'Creates a copy of an existing tool with a new ID and optional name override',
@@ -197,13 +197,13 @@ export class ToolController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/tools', asyncHandler(this.createTool.bind(this)));
-    router.get('/api/tools/:id', asyncHandler(this.getToolById.bind(this)));
-    router.get('/api/tools', asyncHandler(this.listTools.bind(this)));
-    router.put('/api/tools/:id', asyncHandler(this.updateTool.bind(this)));
-    router.delete('/api/tools/:id', asyncHandler(this.deleteTool.bind(this)));
-    router.get('/api/tools/:id/audit-logs', asyncHandler(this.getToolAuditLogs.bind(this)));
-    router.post('/api/tools/:id/clone', asyncHandler(this.cloneTool.bind(this)));
+    router.post('/api/projects/:projectId/tools', asyncHandler(this.createTool.bind(this)));
+    router.get('/api/projects/:projectId/tools/:id', asyncHandler(this.getToolById.bind(this)));
+    router.get('/api/projects/:projectId/tools', asyncHandler(this.listTools.bind(this)));
+    router.put('/api/projects/:projectId/tools/:id', asyncHandler(this.updateTool.bind(this)));
+    router.delete('/api/projects/:projectId/tools/:id', asyncHandler(this.deleteTool.bind(this)));
+    router.get('/api/projects/:projectId/tools/:id/audit-logs', asyncHandler(this.getToolAuditLogs.bind(this)));
+    router.post('/api/projects/:projectId/tools/:id/clone', asyncHandler(this.cloneTool.bind(this)));
   }
 
   /**
@@ -212,8 +212,9 @@ export class ToolController {
    */
   private async createTool(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.TOOL_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createToolSchema.parse(req.body);
-    const tool = await this.toolService.createTool(body, req.context);
+    const tool = await this.toolService.createTool(projectId, body, req.context);
     res.status(201).json(tool);
   }
 
@@ -224,7 +225,7 @@ export class ToolController {
   private async getToolById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.TOOL_READ]);
     const params = toolRouteParamsSchema.parse(req.params);
-    const tool = await this.toolService.getToolById(params.id);
+    const tool = await this.toolService.getToolById(params.projectId, params.id);
     res.status(200).json(tool);
   }
 
@@ -234,8 +235,9 @@ export class ToolController {
    */
   private async listTools(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.TOOL_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const tools = await this.toolService.listTools(query);
+    const tools = await this.toolService.listTools(projectId, query);
     res.status(200).json(tools);
   }
 
@@ -247,7 +249,7 @@ export class ToolController {
     checkPermissions(req, [PERMISSIONS.TOOL_WRITE]);
     const params = toolRouteParamsSchema.parse(req.params);
     const body = updateToolBodySchema.parse(req.body);
-    const tool = await this.toolService.updateTool(params.id, body, req.context);
+    const tool = await this.toolService.updateTool(params.projectId, params.id, body, req.context);
     res.status(200).json(tool);
   }
 
@@ -259,7 +261,7 @@ export class ToolController {
     checkPermissions(req, [PERMISSIONS.TOOL_DELETE]);
     const params = toolRouteParamsSchema.parse(req.params);
     const body = deleteToolBodySchema.parse(req.body);
-    await this.toolService.deleteTool(params.id, body.version, req.context);
+    await this.toolService.deleteTool(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -282,7 +284,7 @@ export class ToolController {
     checkPermissions(req, [PERMISSIONS.TOOL_WRITE]);
     const params = toolRouteParamsSchema.parse(req.params);
     const body = cloneToolSchema.parse(req.body);
-    const tool = await this.toolService.cloneTool(params.id, body, req.context);
+    const tool = await this.toolService.cloneTool(params.projectId, params.id, body, req.context);
     res.status(201).json(tool);
   }
 }

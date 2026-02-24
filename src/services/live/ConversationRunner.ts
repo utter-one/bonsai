@@ -212,7 +212,7 @@ export class ConversationRunner {
     }
 
     // Initialize TTS provider if configured and client wants voice output
-    const persona = await this.personaService.getPersonaById(stageData.stage.personaId);
+    const persona = await this.personaService.getPersonaById(stageData.project.id, stageData.stage.personaId);
     if (!persona) {
       throw new NotFoundError(`Persona with ID ${stageData.stage.personaId} not found`);
     }
@@ -1080,7 +1080,7 @@ export class ConversationRunner {
   private async markAsFailed(reason: string): Promise<void> {
     this.conversation.status = 'failed';
     this.conversation.statusDetails = reason;
-    await this.conversationService.saveConversationState(this.conversation.id, 'failed', reason);
+    await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, 'failed', reason);
     logger.error({ conversationId: this.stageData.conversation.id, reason }, `Conversation ${this.stageData.conversation.id} marked as failed: ${reason}`);
 
     // Save event and send WebSocket message
@@ -1089,7 +1089,7 @@ export class ConversationRunner {
 
     // Update conversation status via ConversationService
     try {
-      await this.conversationService.failConversation(this.stageData.conversation.id, reason);
+      await this.conversationService.failConversation(this.conversation.projectId, this.stageData.conversation.id, reason);
     } catch (error) {
       logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to update conversation status in database via ConversationService`);
     }
@@ -1109,7 +1109,7 @@ export class ConversationRunner {
 
     if (knowledgeResults.length > 0) {
       const categoryIds = knowledgeResults.map(r => r.name.slice('__knowledge_'.length));
-      const itemArrays = await Promise.all(categoryIds.map(id => this.knowledgeService.getItemsByCategory(id)));
+      const itemArrays = await Promise.all(categoryIds.map(id => this.knowledgeService.getItemsByCategory(this.conversation.projectId, id)));
       this.stageData.faq = itemArrays.flat().map(item => ({ question: item.question, answer: item.answer }));
       logger.debug({ conversationId: this.conversation.id, categoryCount: categoryIds.length, itemCount: this.stageData.faq.length }, 'Updated FAQ from knowledge actions');
     }
@@ -1328,7 +1328,7 @@ export class ConversationRunner {
 
   private async changeState(newState: ConversationState) {
     this.conversation.status = newState;
-    await this.conversationService.saveConversationState(this.conversation.id, newState);
+    await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, newState);
   }
 
   /**
@@ -1342,7 +1342,7 @@ export class ConversationRunner {
     }
     eventData.metadata['currentVariables'] = this.conversation.stageVars?.[this.stageData.id] || {};
 
-    await this.conversationService.saveConversationEvent(this.conversation.id, eventType, eventData);
+    await this.conversationService.saveConversationEvent(this.conversation.projectId, this.conversation.id, eventType, eventData);
     this.connectionManager.sendConversationEvent(this.conversation.id, eventType, eventData, inputTurnId, outputTurnId);
   }
 

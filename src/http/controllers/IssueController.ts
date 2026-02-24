@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../permissions';
 import { IssueService } from '../../services/IssueService';
 import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema, issueRouteParamsSchema } from '../contracts/issue';
 import type { CreateIssueRequest, UpdateIssueRequest } from '../contracts/issue';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -23,7 +23,7 @@ export class IssueController {
     return [
       {
         method: 'post',
-        path: '/api/issues',
+        path: '/api/projects/{projectId}/issues',
         tags: ['Issues'],
         summary: 'Create a new issue',
         description: 'Creates a new issue report with bug details, environment, and severity information',
@@ -50,7 +50,7 @@ export class IssueController {
       },
       {
         method: 'get',
-        path: '/api/issues/{id}',
+        path: '/api/projects/{projectId}/issues/{id}',
         tags: ['Issues'],
         summary: 'Get issue by ID',
         description: 'Retrieves a single issue by its unique identifier',
@@ -71,7 +71,7 @@ export class IssueController {
       },
       {
         method: 'get',
-        path: '/api/issues',
+        path: '/api/projects/{projectId}/issues',
         tags: ['Issues'],
         summary: 'List issues',
         description: 'Retrieves a paginated list of issues with optional filtering by status, severity, environment, and text search in bug descriptions',
@@ -92,7 +92,7 @@ export class IssueController {
       },
       {
         method: 'put',
-        path: '/api/issues/{id}',
+        path: '/api/projects/{projectId}/issues/{id}',
         tags: ['Issues'],
         summary: 'Update issue',
         description: 'Updates an existing issue with new information, typically used to change status, add comments, or update severity',
@@ -121,7 +121,7 @@ export class IssueController {
       },
       {
         method: 'delete',
-        path: '/api/issues/{id}',
+        path: '/api/projects/{projectId}/issues/{id}',
         tags: ['Issues'],
         summary: 'Delete issue',
         description: 'Deletes an issue from the system',
@@ -135,7 +135,7 @@ export class IssueController {
       },
       {
         method: 'get',
-        path: '/api/issues/{id}/audit-logs',
+        path: '/api/projects/{projectId}/issues/{id}/audit-logs',
         tags: ['Issues'],
         summary: 'Get issue audit logs',
         description: 'Retrieves audit logs for a specific issue showing its change history',
@@ -156,12 +156,12 @@ export class IssueController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/issues', asyncHandler(this.createIssue.bind(this)));
-    router.get('/api/issues/:id', asyncHandler(this.getIssueById.bind(this)));
-    router.get('/api/issues', asyncHandler(this.listIssues.bind(this)));
-    router.put('/api/issues/:id', asyncHandler(this.updateIssue.bind(this)));
-    router.delete('/api/issues/:id', asyncHandler(this.deleteIssue.bind(this)));
-    router.get('/api/issues/:id/audit-logs', asyncHandler(this.getIssueAuditLogs.bind(this)));
+    router.post('/api/projects/:projectId/issues', asyncHandler(this.createIssue.bind(this)));
+    router.get('/api/projects/:projectId/issues/:id', asyncHandler(this.getIssueById.bind(this)));
+    router.get('/api/projects/:projectId/issues', asyncHandler(this.listIssues.bind(this)));
+    router.put('/api/projects/:projectId/issues/:id', asyncHandler(this.updateIssue.bind(this)));
+    router.delete('/api/projects/:projectId/issues/:id', asyncHandler(this.deleteIssue.bind(this)));
+    router.get('/api/projects/:projectId/issues/:id/audit-logs', asyncHandler(this.getIssueAuditLogs.bind(this)));
   }
 
   /**
@@ -170,8 +170,9 @@ export class IssueController {
    */
   private async createIssue(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ISSUE_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createIssueSchema.parse(req.body);
-    const issue = await this.issueService.createIssue(body, req.context);
+    const issue = await this.issueService.createIssue(projectId, body, req.context);
     res.status(201).json(issue);
   }
 
@@ -182,7 +183,7 @@ export class IssueController {
   private async getIssueById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ISSUE_READ]);
     const params = issueRouteParamsSchema.parse(req.params);
-    const issue = await this.issueService.getIssueById(parseInt(params.id, 10));
+    const issue = await this.issueService.getIssueById(params.projectId, parseInt(params.id, 10));
     res.status(200).json(issue);
   }
 
@@ -192,8 +193,9 @@ export class IssueController {
    */
   private async listIssues(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ISSUE_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const issues = await this.issueService.listIssues(query);
+    const issues = await this.issueService.listIssues(projectId, query);
     res.status(200).json(issues);
   }
 
@@ -205,7 +207,7 @@ export class IssueController {
     checkPermissions(req, [PERMISSIONS.ISSUE_WRITE]);
     const params = issueRouteParamsSchema.parse(req.params);
     const body = updateIssueBodySchema.parse(req.body);
-    const issue = await this.issueService.updateIssue(parseInt(params.id, 10), body, req.context);
+    const issue = await this.issueService.updateIssue(params.projectId, parseInt(params.id, 10), body, req.context);
     res.status(200).json(issue);
   }
 
@@ -216,7 +218,7 @@ export class IssueController {
   private async deleteIssue(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ISSUE_DELETE]);
     const params = issueRouteParamsSchema.parse(req.params);
-    await this.issueService.deleteIssue(parseInt(params.id, 10), req.context);
+    await this.issueService.deleteIssue(params.projectId, parseInt(params.id, 10), req.context);
     res.status(204).send();
   }
 

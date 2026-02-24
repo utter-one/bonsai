@@ -11,6 +11,7 @@ export { listParamsSchema, type ListParams };
  * Schema for context transformer route params
  */
 export const contextTransformerRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Context transformer ID'),
 });
 
@@ -21,7 +22,6 @@ export const contextTransformerRouteParamsSchema = z.object({
  */
 export const createContextTransformerSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the context transformer (auto-generated if not provided)'),
-  projectId: z.string().min(1).describe('ID of the project this context transformer belongs to'),
   name: z.string().min(1).describe('Display name of the context transformer'),
   description: z.string().nullable().optional().describe('Detailed description of the transformer\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the transformation logic and instructions'),

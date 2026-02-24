@@ -26,6 +26,7 @@ export const toolOutputTypeSchema = z.enum(['text', 'image', 'multi-modal']).des
  * Schema for tool route parameters
  */
 export const toolRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().min(1).describe('Tool ID'),
 });
 
@@ -38,7 +39,6 @@ export type ToolRouteParams = z.infer<typeof toolRouteParamsSchema>;
  */
 export const createToolSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the tool (auto-generated if not provided)'),
-  projectId: z.string().min(1).describe('ID of the project this tool belongs to'),
   name: z.string().min(1).describe('Display name of the tool'),
   description: z.string().nullable().optional().describe('Detailed description of the tool\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Handlebars template for tool invocation'),

@@ -817,7 +817,7 @@ export class ActionsExecutor {
 
     try {
       // 1. Load the tool
-      const tool = await this.toolService.getToolById(effect.toolId);
+      const tool = await this.toolService.getToolById(context.projectId, effect.toolId);
       if (!tool) {
         throw new NotFoundError(`Tool with ID ${effect.toolId} not found`);
       }

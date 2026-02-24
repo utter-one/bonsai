@@ -9,18 +9,22 @@ export { listParamsSchema, type ListParams };
 
 // Route param schemas
 export const knowledgeSectionRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Knowledge section ID'),
 });
 
 export const knowledgeCategoryRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Knowledge category ID'),
 });
 
 export const knowledgeItemRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Knowledge item ID'),
 });
 
 export const knowledgeCategoryItemsRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   categoryId: z.string().describe('Knowledge category ID'),
 });
 
@@ -35,7 +39,6 @@ export const knowledgeCategoryItemsRouteParamsSchema = z.object({
  */
 export const createKnowledgeCategorySchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the knowledge category (auto-generated if not provided)'),
-  projectId: z.string().min(1).describe('ID of the project this knowledge category belongs to'),
   name: z.string().min(1).describe('Name of the knowledge category'),
   promptTrigger: z.string().min(1).describe('Trigger phrase that activates this category in conversations'),
   tags: z.array(z.string()).optional().describe('Array of knowledge tags this category belongs to'),
@@ -68,6 +71,7 @@ export const deleteKnowledgeCategoryBodySchema = z.object({
  */
 export const knowledgeItemInCategorySchema = z.object({
   id: z.string().describe('Unique identifier for the knowledge item'),
+  projectId: z.string().describe('ID of the project this item belongs to'),
   categoryId: z.string().describe('ID of the category this item belongs to'),
   question: z.string().describe('Question text for this knowledge item'),
   answer: z.string().describe('Answer text for this knowledge item'),
@@ -163,6 +167,7 @@ export const deleteKnowledgeItemBodySchema = z.object({
  */
 export const knowledgeItemResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the knowledge item'),
+  projectId: z.string().describe('ID of the project this item belongs to'),
   categoryId: z.string().describe('ID of the category this item belongs to'),
   question: z.string().describe('Question text for this knowledge item'),
   answer: z.string().describe('Answer text for this knowledge item'),

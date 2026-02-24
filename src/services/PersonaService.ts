@@ -29,13 +29,13 @@ export class PersonaService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created persona
    */
-  async createPersona(input: CreatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
+  async createPersona(projectId: string, input: CreatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
     this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
     const personaId = input.id ?? generateId(ID_PREFIXES.PERSONA);
-    logger.info({ personaId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
+    logger.info({ personaId, projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
-      const persona = await db.insert(personas).values({ id: personaId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, metadata: input.metadata, version: 1 }).returning();
+      const persona = await db.insert(personas).values({ id: personaId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, metadata: input.metadata, version: 1 }).returning();
 
       const createdPersona = persona[0];
 
@@ -56,11 +56,11 @@ export class PersonaService extends BaseService {
    * @returns The persona if found
    * @throws {NotFoundError} When persona is not found
    */
-  async getPersonaById(id: string): Promise<PersonaResponse> {
+  async getPersonaById(projectId: string, id: string): Promise<PersonaResponse> {
     logger.debug({ personaId: id }, 'Fetching persona by ID');
 
     try {
-      const persona = await db.query.personas.findFirst({ where: eq(personas.id, id) });
+      const persona = await db.query.personas.findFirst({ where: and(eq(personas.projectId, projectId), eq(personas.id, id)) });
 
       if (!persona) {
         throw new NotFoundError(`Persona with id ${id} not found`);
@@ -78,11 +78,11 @@ export class PersonaService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of personas matching the criteria
    */
-  async listPersonas(params?: ListParams): Promise<PersonaListResponse> {
+  async listPersonas(projectId: string, params?: ListParams): Promise<PersonaListResponse> {
     logger.debug({ params }, 'Listing personas');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(personas.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -150,13 +150,13 @@ export class PersonaService extends BaseService {
    * @throws {NotFoundError} When persona is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updatePersona(id: string, input: UpdatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
+  async updatePersona(projectId: string, id: string, input: UpdatePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
     this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ personaId: id, expectedVersion, adminId: context?.adminId }, 'Updating persona');
 
     try {
-      const existingPersona = await db.query.personas.findFirst({ where: eq(personas.id, id) });
+      const existingPersona = await db.query.personas.findFirst({ where: and(eq(personas.projectId, projectId), eq(personas.id, id)) });
 
       if (!existingPersona) {
         throw new NotFoundError(`Persona with id ${id} not found`);
@@ -166,7 +166,7 @@ export class PersonaService extends BaseService {
         throw new OptimisticLockError(`Persona version mismatch. Expected ${expectedVersion}, got ${existingPersona.version}`);
       }
 
-      const updatedPersona = await db.update(personas).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, metadata: updateData.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
+      const updatedPersona = await db.update(personas).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, metadata: updateData.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.projectId, projectId), eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
 
       if (updatedPersona.length === 0) {
         throw new OptimisticLockError(`Failed to update persona due to version conflict`);
@@ -193,12 +193,12 @@ export class PersonaService extends BaseService {
    * @throws {NotFoundError} When persona is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deletePersona(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+  async deletePersona(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.PERSONA_DELETE);
     logger.info({ personaId: id, expectedVersion, adminId: context?.adminId }, 'Deleting persona');
 
     try {
-      const existingPersona = await db.query.personas.findFirst({ where: eq(personas.id, id) });
+      const existingPersona = await db.query.personas.findFirst({ where: and(eq(personas.projectId, projectId), eq(personas.id, id)) });
 
       if (!existingPersona) {
         throw new NotFoundError(`Persona with id ${id} not found`);
@@ -208,7 +208,7 @@ export class PersonaService extends BaseService {
         throw new OptimisticLockError(`Persona version mismatch. Expected ${expectedVersion}, got ${existingPersona.version}`);
       }
 
-      const deleted = await db.delete(personas).where(and(eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
+      const deleted = await db.delete(personas).where(and(eq(personas.projectId, projectId), eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
 
       if (deleted.length === 0) {
         throw new OptimisticLockError(`Failed to delete persona due to version conflict`);
@@ -231,18 +231,18 @@ export class PersonaService extends BaseService {
    * @returns The newly created cloned persona
    * @throws {NotFoundError} When the source persona is not found
    */
-  async clonePersona(id: string, input: ClonePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
+  async clonePersona(projectId: string, id: string, input: ClonePersonaRequest, context: RequestContext): Promise<PersonaResponse> {
     this.requirePermission(context, PERMISSIONS.PERSONA_WRITE);
     logger.info({ id, adminId: context?.adminId }, 'Cloning persona');
 
     try {
-      const existingPersona = await db.query.personas.findFirst({ where: eq(personas.id, id) });
+      const existingPersona = await db.query.personas.findFirst({ where: and(eq(personas.projectId, projectId), eq(personas.id, id)) });
 
       if (!existingPersona) {
         throw new NotFoundError(`Persona with id ${id} not found`);
       }
 
-      return await this.createPersona({ id: input.id, projectId: existingPersona.projectId, name: input.name ?? `${existingPersona.name} (Clone)`, description: existingPersona.description ?? undefined, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId ?? undefined, ttsSettings: existingPersona.ttsSettings as any, metadata: existingPersona.metadata ?? undefined }, context);
+      return await this.createPersona(projectId, { id: input.id, name: input.name ?? `${existingPersona.name} (Clone)`, description: existingPersona.description ?? undefined, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId ?? undefined, ttsSettings: existingPersona.ttsSettings as any, metadata: existingPersona.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone persona');
       throw error;
