@@ -686,6 +686,7 @@ export class ActionsExecutor {
         logger.info({ conversationId: context.conversationId, toolId: match[1] }, `Resolving value from tool result reference for tool ID: ${match[1]}`);
         const toolId = match[1];
         value = context.results.tools[toolId]?.result;
+        if (Array.isArray(value)) value = value[0];
       } else if (value[0] === '=') { // if the string starts with "=", treat it as a script to execute
         value = await this.scriptRunner.executeScript(value.slice(1).trim(), context);
       } else {
