@@ -78,6 +78,13 @@
       "when": 1771599295015,
       "tag": "0010_sturdy_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1771944044660,
+      "tag": "0011_goofy_professor_monster",
+      "breakpoints": true
     }
   ]
 }
