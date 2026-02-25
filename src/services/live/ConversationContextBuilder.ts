@@ -74,6 +74,9 @@ export type ConversationContext = {
   /** Stage variables */
   vars: Record<string, any>;
 
+  /** Full stage variables for referencing in other stages */
+  stageVars?: Record<string, Record<string, any>>; 
+
   /** User profile data */
   userProfile: Record<string, any>;
 
@@ -293,6 +296,7 @@ export class ConversationContextBuilder {
       projectId: conversation.projectId,
       stageId: conversation.stageId,
       vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
       history: [],
@@ -347,6 +351,7 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
       history: [],
@@ -387,6 +392,7 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
@@ -462,6 +468,7 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       vars: stageVars,
+      stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
@@ -517,6 +524,7 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
@@ -566,6 +574,7 @@ export class ConversationContextBuilder {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
       userProfile: userProfile || {}, // Not loaded in raw context
       history: [], // Not loaded in raw context
       actions: {}, // Not loaded in raw context

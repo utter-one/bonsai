@@ -111,7 +111,7 @@ export class StageService extends BaseService {
    * @throws {NotFoundError} When stage is not found
    */
   async getStageById(projectId: string, id: string): Promise<StageResponse> {
-    logger.debug({ id }, 'Fetching stage by ID');
+    logger.debug({ projectId, id }, 'Fetching stage by ID');
 
     try {
       const stage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });
