@@ -17,6 +17,37 @@ export default defineConfig({
             { text: 'Introduction', link: '/guide/' },
             { text: 'Installation', link: '/guide/installation' },
             { text: 'Configuration', link: '/guide/configuration' },
+            { text: 'Core Concepts', link: '/guide/concepts' },
+          ],
+        },
+        {
+          text: 'Entities',
+          items: [
+            { text: 'Projects', link: '/guide/projects' },
+            { text: 'Stages', link: '/guide/stages' },
+            { text: 'Personas', link: '/guide/personas' },
+            { text: 'Classifiers', link: '/guide/classifiers' },
+            { text: 'Context Transformers', link: '/guide/context-transformers' },
+            { text: 'Tools', link: '/guide/tools' },
+            { text: 'Knowledge Base', link: '/guide/knowledge' },
+            { text: 'Global Actions', link: '/guide/global-actions' },
+            { text: 'Providers', link: '/guide/providers' },
+          ],
+        },
+        {
+          text: 'Conversation',
+          items: [
+            { text: 'Conversations', link: '/guide/conversations' },
+            { text: 'Actions & Effects', link: '/guide/actions-and-effects' },
+            { text: 'WebSocket Protocol', link: '/guide/websocket' },
+            { text: 'Templating', link: '/guide/templating' },
+            { text: 'Scripting', link: '/guide/scripting' },
+          ],
+        },
+        {
+          text: 'Security',
+          items: [
+            { text: 'Authentication', link: '/guide/authentication' },
           ],
         },
       ],
