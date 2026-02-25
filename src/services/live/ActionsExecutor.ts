@@ -5,7 +5,8 @@ import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
 import { ToolExecutor } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
-import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, ModifyUserProfileEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
+import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
+import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
@@ -89,6 +90,7 @@ export class ActionsExecutor {
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
     @inject(ModifyVariablesEffectExecutor) private readonly modifyVariablesExecutor: ModifyVariablesEffectExecutor,
+    @inject(ModifyUserProfileEffectExecutor) private readonly modifyUserProfileExecutor: ModifyUserProfileEffectExecutor,
   ) { }
 
   /**
@@ -413,7 +415,7 @@ export class ActionsExecutor {
         return await this.modifyVariablesExecutor.execute(effect, context);
 
       case 'modify_user_profile':
-        return await this.executeModifyUserProfile(effect, context);
+        return await this.modifyUserProfileExecutor.execute(effect, context);
 
       case 'call_tool':
         return await this.executeCallTool(effect, context);
@@ -523,102 +525,6 @@ export class ActionsExecutor {
       logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user input`);
       throw error;
     }
-  }
-
-  /**
-   * Executes modify_user_profile effect
-   * Updates user profile fields using specific operations (set, reset, add, remove)
-   */
-  private async executeModifyUserProfile(
-    effect: ModifyUserProfileEffect,
-    context: ConversationContext,
-  ): Promise<EffectOutcome> {
-    logger.info({ conversationId: context.conversationId, modificationCount: effect.modifications.length }, `Modifying user profile`);
-    let hasModifiedUserProfile = false;
-
-    try {
-      for (const modification of effect.modifications) {
-        let { fieldName, value } = modification;
-        value = await this.transformValue(value, context);
-
-        switch (modification.operation) {
-          case 'set': {
-            context.userProfile[fieldName] = value;
-            hasModifiedUserProfile = true;
-            logger.debug({ conversationId: context.conversationId, fieldName, value }, `Set user profile field: ${fieldName}`);
-            break;
-          }
-
-          case 'reset': {
-            context.userProfile[fieldName] = undefined;
-            hasModifiedUserProfile = true;
-            logger.debug({ conversationId: context.conversationId, fieldName }, `Reset user profile field: ${fieldName}`);
-            break;
-          }
-
-          case 'add': {
-            const currentValue = context.userProfile[fieldName];
-            if (!Array.isArray(currentValue)) {
-              logger.warn({ conversationId: context.conversationId, fieldName, currentValue }, `User profile field ${fieldName} is not an array, initializing as array`);
-              context.userProfile[fieldName] = [value];
-            } else {
-              context.userProfile[fieldName] = [...currentValue, value];
-            }
-            hasModifiedUserProfile = true;
-            logger.debug({ conversationId: context.conversationId, fieldName, value }, `Added to user profile array field: ${fieldName}`);
-            break;
-          }
-
-          case 'remove': {
-            const currentValue = context.userProfile[fieldName];
-            if (!Array.isArray(currentValue)) {
-              logger.warn({ conversationId: context.conversationId, fieldName, currentValue }, `User profile field ${fieldName} is not an array, cannot remove value`);
-            } else {
-              const newValue = currentValue.filter(item => JSON.stringify(item) !== JSON.stringify(value));
-              context.userProfile[fieldName] = newValue;
-              hasModifiedUserProfile = true;
-              logger.debug({ conversationId: context.conversationId, fieldName, value, removedCount: currentValue.length - newValue.length }, `Removed from user profile array field: ${fieldName}`);
-            }
-            break;
-          }
-
-          default: {
-            const exhaustiveCheck: never = modification.operation;
-            throw new Error(`Unknown user profile operation: ${exhaustiveCheck}`);
-          }
-        }
-      }
-
-      logger.info({ conversationId: context.conversationId, modificationCount: effect.modifications.length }, `User profile modified successfully`);
-    } catch (error) {
-      logger.error({ conversationId: context.conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to modify user profile`);
-      throw error;
-    }
-
-    return {
-      shouldEndConversation: false,
-      shouldAbortConversation: false,
-      hasModifiedUserProfile,
-    };
-  }
-
-  private async transformValue(value: unknown, context: ConversationContext) {
-    if (typeof value === 'string') {
-      // check if the string is a reference to tool result {{results.tools.TOOL_ID.result}} and if so, skip templating
-      const toolResultPattern = /\{\{results\.tools\.([^.]+)\.result\}\}/;
-      const match = value.match(toolResultPattern);
-      if (match) {
-        logger.info({ conversationId: context.conversationId, toolId: match[1] }, `Resolving value from tool result reference for tool ID: ${match[1]}`);
-        const toolId = match[1];
-        value = context.results.tools[toolId]?.result;
-        if (Array.isArray(value)) value = value[0];
-      } else if (value[0] === '=') { // if the string starts with "=", treat it as a script to execute
-        value = await this.scriptRunner.executeScript(value.slice(1).trim(), context);
-      } else {
-        value = await this.templatingEngine.render(value, context);
-      }
-    }
-    return value;
   }
 
   /**
