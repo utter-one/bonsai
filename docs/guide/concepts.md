@@ -1,10 +1,10 @@
 # Core Concepts
 
-This page provides an architectural overview of Nexus Backend and explains how its entities relate to each other.
+This page provides an architectural overview of Bonsai Backed and explains how its entities relate to each other.
 
 ## Architecture
 
-Nexus Backend is built on:
+Bonsai Backed is built on:
 
 - **Express** — HTTP REST API server with Swagger UI documentation
 - **WebSocket (ws)** — Real-time bidirectional communication for live conversations
@@ -14,7 +14,7 @@ Nexus Backend is built on:
 
 ## Entity Hierarchy
 
-Everything in Nexus Backend revolves around **Projects**. A project is a self-contained conversational AI experience. Here is the full entity hierarchy:
+Everything in Bonsai Backed revolves around **Projects**. A project is a self-contained conversational AI experience. Here is the full entity hierarchy:
 
 ```
 Project
@@ -124,7 +124,7 @@ All mutable entities use a `version` field for optimistic concurrency control. U
 
 ## Two APIs
 
-Nexus Backend exposes two APIs:
+Bonsai Backed exposes two APIs:
 
 1. **REST API** — For administration: create and manage projects, stages, personas, providers, and all other entities. Protected by JWT authentication with role-based permissions.
 

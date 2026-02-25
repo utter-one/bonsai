@@ -1,6 +1,6 @@
 # Authentication & Permissions
 
-Nexus Backend uses two authentication mechanisms: **JWT tokens** for admin REST API access, and **API keys** for WebSocket conversation sessions.
+Bonsai Backed uses two authentication mechanisms: **JWT tokens** for admin REST API access, and **API keys** for WebSocket conversation sessions.
 
 ## Admin Authentication (JWT)
 

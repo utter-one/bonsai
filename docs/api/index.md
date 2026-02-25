@@ -1,6 +1,6 @@
 # API Reference
 
-This section covers the full HTTP REST API and WebSocket API provided by the Nexus Backend.
+This section covers the full HTTP REST API and WebSocket API provided by the Bonsai Backed.
 
 ## Base URL
 

@@ -1,6 +1,6 @@
 # Prompt Templating
 
-Nexus Backend uses **Handlebars** as its templating engine for all prompts — stage system prompts, persona prompts, tool prompts, and various effect templates. This allows dynamic content injection based on conversation state.
+Bonsai Backed uses **Handlebars** as its templating engine for all prompts — stage system prompts, persona prompts, tool prompts, and various effect templates. This allows dynamic content injection based on conversation state.
 
 ## Available Variables
 
@@ -31,7 +31,7 @@ Your order {{vars.order.id}} is currently {{vars.order.status}}.
 
 ## Built-in Helpers
 
-Nexus Backend registers custom Handlebars helpers for common operations:
+Bonsai Backed registers custom Handlebars helpers for common operations:
 
 ### `get` — Safe Nested Access
 

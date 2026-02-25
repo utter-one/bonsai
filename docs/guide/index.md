@@ -1,10 +1,10 @@
 # Introduction
 
-Nexus Backend is a powerful, extensible backend service for building conversational AI applications. It provides a complete platform for designing, deploying, and managing AI-powered voice and text conversations at scale.
+Bonsai Backed is a powerful, extensible backend service for building conversational AI applications. It provides a complete platform for designing, deploying, and managing AI-powered voice and text conversations at scale.
 
 ## Overview
 
-Nexus Backend provides:
+Bonsai Backed provides:
 
 - **REST API** — Manage projects, personas, stages, classifiers, knowledge bases, and more
 - **WebSocket API** — Real-time bidirectional communication for live conversational AI sessions with streaming audio and text support
@@ -15,7 +15,7 @@ Nexus Backend provides:
 
 ## How It Works
 
-At a high level, Nexus Backend lets you design **Projects** — self-contained conversational AI experiences. Each project is composed of **Stages** (conversation phases), **Personas** (AI personalities with voice settings), **Classifiers** (intent detectors), **Knowledge** (FAQ data), and **Actions** (behaviors triggered by user input).
+At a high level, Bonsai Backed lets you design **Projects** — self-contained conversational AI experiences. Each project is composed of **Stages** (conversation phases), **Personas** (AI personalities with voice settings), **Classifiers** (intent detectors), **Knowledge** (FAQ data), and **Actions** (behaviors triggered by user input).
 
 When an end user connects via WebSocket and starts a conversation, the system:
 

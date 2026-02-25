@@ -1,6 +1,6 @@
 # Projects
 
-A **Project** is the top-level container in Nexus Backend. It represents a complete conversational AI experience and contains all the entities needed to power conversations.
+A **Project** is the top-level container in Bonsai Backed. It represents a complete conversational AI experience and contains all the entities needed to power conversations.
 
 ## Structure
 

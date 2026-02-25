@@ -37,7 +37,7 @@ function isSelectAll(sel: MigrationSelection): boolean {
 }
 
 /**
- * Service for migrating config data between Nexus Backend instances.
+ * Service for migrating config data between Bonsai Backed instances.
  *
  * Export entity order (FK-safe):
  *   providers → projects → personas → classifiers → contextTransformers

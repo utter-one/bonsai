@@ -1,6 +1,6 @@
 # Configuration
 
-Nexus Backend is configured through environment variables. Copy the `.env.example` file to `.env` and adjust the values for your deployment.
+Bonsai Backed is configured through environment variables. Copy the `.env.example` file to `.env` and adjust the values for your deployment.
 
 ## Environment Variables
 
@@ -44,11 +44,11 @@ When running with Docker, configure environment variables in `docker-compose.yml
 
 ```bash
 docker run -d \
-  -e DB_CONNECTION_STRING=postgresql://user:pass@db:5432/nexus \
+  -e DB_CONNECTION_STRING=postgresql://user:pass@db:5432/bonsai \
   -e JWT_SECRET=your-secret-key \
   -e PORT=3000 \
   -p 3000:3000 \
-  nexus-backend
+  bonsai-backend
 ```
 
 Migrations run automatically on container startup before the application starts.

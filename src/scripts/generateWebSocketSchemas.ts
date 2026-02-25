@@ -139,9 +139,9 @@ function generateWebSocketSchemas(): void {
     JSON.stringify(
       {
         $schema: 'https://json-schema.org/draft/2020-12/schema',
-        $id: 'https://nexus-backend.utter.one/schemas/websocket-contracts.json',
+        $id: 'https://bonsai-backend.utter.one/schemas/websocket-contracts.json',
         title: 'WebSocket Message Contracts',
-        description: 'JSON Schema definitions for all WebSocket message types in the Nexus Backend API',
+        description: 'JSON Schema definitions for all WebSocket message types in the Bonsai Backed API',
         version: '1.0.0',
         definitions: convertedSchemas,
       },

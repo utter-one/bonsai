@@ -1,6 +1,6 @@
 # Environments
 
-Environments represent remote Nexus Backend instances that can be used as sources for configuration migration. You can connect to another instance, preview its data, and pull configurations.
+Environments represent remote Bonsai Backed instances that can be used as sources for configuration migration. You can connect to another instance, preview its data, and pull configurations.
 
 **Tag:** `Environments`
 

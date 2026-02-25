@@ -1,7 +1,7 @@
 {
   "name": "bonsai-docs",
   "version": "0.1.0",
-  "description": "Nexus Backend Documentation",
+  "description": "Bonsai Backed Documentation",
   "type": "module",
   "scripts": {
     "dev": "vitepress dev",

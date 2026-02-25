@@ -1,6 +1,6 @@
 # Authentication
 
-Nexus Backend uses **JWT-based authentication** for admin access and **API key authentication** for programmatic access.
+Bonsai Backed uses **JWT-based authentication** for admin access and **API key authentication** for programmatic access.
 
 ## Login
 
