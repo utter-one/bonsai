@@ -20,21 +20,35 @@ This guide explains how entities in Nexus work together to power real-time AI co
   - [Knowledge Base Integration](#knowledge-base-integration)
 - [Classifier](#classifier)
 - [Context Transformer](#context-transformer)
+  - [Transformer-Triggered Actions](#transformer-triggered-actions)
 - [Tool](#tool)
 - [Provider](#provider)
 - [Effects](#effects)
+  - [Prescripted Responses](#prescripted-responses)
+  - [Effect Value Resolution](#effect-value-resolution)
 - [Conversation Lifecycle](#conversation-lifecycle)
   - [1. Connection and Authentication](#1-connection-and-authentication)
   - [2. Starting a Conversation](#2-starting-a-conversation)
-  - [3. User Input Processing](#3-user-input-processing)
-  - [4. Classification](#4-classification)
-  - [5. Action Execution](#5-action-execution)
-  - [6. Response Generation](#6-response-generation)
-  - [7. Stage Transitions](#7-stage-transitions)
-  - [8. Ending a Conversation](#8-ending-a-conversation)
+  - [3. Resuming a Conversation](#3-resuming-a-conversation)
+  - [4. User Input Processing](#4-user-input-processing)
+  - [5. Classification and Transformation (Parallel)](#5-classification-and-transformation-parallel)
+  - [6. Action Execution](#6-action-execution)
+  - [7. Response Generation](#7-response-generation)
+  - [8. Stage Transitions](#8-stage-transitions)
+  - [9. Ending a Conversation](#9-ending-a-conversation)
 - [Conversation State Machine](#conversation-state-machine)
 - [Context — What the AI Sees](#context--what-the-ai-sees)
 - [Effect Execution Order](#effect-execution-order)
+- [WebSocket Commands](#websocket-commands)
+- [Session Settings](#session-settings)
+- [Multimodal Support](#multimodal-support)
+- [Conversation Events](#conversation-events)
+- [Administration and Operations](#administration-and-operations)
+  - [RBAC Permissions](#rbac-permissions)
+  - [Cross-Instance Migration](#cross-instance-migration)
+  - [Issue Tracking](#issue-tracking)
+  - [API Versioning](#api-versioning)
+  - [Audit Logging](#audit-logging)
 - [Design Patterns and Best Practices](#design-patterns-and-best-practices)
 - [End-to-End Example](#end-to-end-example)
 - [Related Documentation](#related-documentation)
@@ -56,21 +70,26 @@ User Input (text or voice)
 └─────────┬───────────┘
           │
           ▼
+┌─────────────────────────────────────────────┐
+│  Classification + Context Transformation    │
+│  (run in parallel)                          │
+│                                             │
+│  ┌───────────────────┐  ┌────────────────┐  │
+│  │ Classification    │  │ Transformers   │  │
+│  │ (intent + params) │  │ (enrich vars)  │  │
+│  └───────────────────┘  └────────────────┘  │
+└─────────────────┬───────────────────────────┘
+                  │
+                  ▼
 ┌─────────────────────┐
-│  Classification     │  Determine which actions match the user's intent
-│  (per classifier)   │  Extract parameters from the user's message
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│  Action Execution   │  Execute matched action effects in priority order
+│  Action Execution   │  Execute matched + transformer-triggered actions
 │  (effects pipeline) │  (webhooks, tools, scripts, variable changes, etc.)
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────┐
 │  Response Generation │  Render system prompt with context, call LLM
-│  (streamed)         │  Stream text chunks to TTS and/or client
+│  (streamed)         │  Stream text/image/audio chunks to client
 └─────────┬───────────┘
           │
           ▼
@@ -83,7 +102,7 @@ User Input (text or voice)
 
 ## Entity Hierarchy
 
-All design-time entities are organized under a **Project**. Here is the ownership hierarchy:
+All design-time entities are organized under a **Project**. All project-scoped entities use composite primary keys `(projectId, id)`. Here is the ownership hierarchy:
 
 ```
 Project
@@ -91,16 +110,20 @@ Project
 ├── Stages            (conversation flow nodes)
 │   ├── → Persona     (each stage references one persona)
 │   ├── → Classifier  (optional default classifier for the stage)
+│   ├── → LLM Provider (optional per-stage LLM for response generation)
 │   ├── → Transformers (optional context transformers)
 │   ├── Actions       (stage-specific actions, stored inline on the stage)
-│   └── → Knowledge   (optional knowledge sections to include)
+│   └── → Knowledge   (optional knowledge tags to include)
 ├── Classifiers       (reusable LLM-based intent classifiers)
 ├── Context Transformers (reusable LLM-based data transformers)
 ├── Tools             (reusable LLM-powered tools, callable from actions)
-├── Global Actions    (actions available across multiple stages)
-├── Knowledge Sections / Categories / Items
+├── Global Actions    (actions available across multiple stages, with parameters)
+├── Knowledge Categories / Items (organized by tags)
 ├── API Keys          (authentication for WebSocket clients)
-└── Providers         (LLM, TTS, ASR, Storage credentials — shared across projects)
+├── Users             (user profiles, persistent across conversations)
+├── Conversations     (conversation state, variables, events, artifacts)
+├── Issues            (bug tracking per project)
+└── Providers         (LLM, TTS, ASR, Storage, Embeddings credentials — shared across projects)
 ```
 
 ---
@@ -111,11 +134,14 @@ A **Project** is the top-level container. It groups all entities that belong to 
 
 | Setting | Purpose |
 |---------|---------|
+| `name` | Display name of the project |
+| `description` | Optional description |
 | `acceptVoice` | Whether clients can send voice input |
 | `generateVoice` | Whether the system produces voice output |
-| `asrConfig` | ASR provider and settings (language, dictionary phrases, audio format) |
-| `storageConfig` | Storage provider for conversation artifacts |
+| `asrConfig` | ASR provider and settings (language, dictionary phrases, audio format, unintelligible placeholder, voice activity detection) |
+| `storageConfig` | Storage provider for conversation artifacts (recordings, transcriptions, etc.) |
 | `constants` | Project-wide constant values (available in templates) |
+| `metadata` | Custom project-level metadata |
 
 When a client authenticates with an API key, the key is tied to a project. All subsequent conversations happen within that project's configuration.
 
@@ -128,13 +154,14 @@ A **Persona** defines the AI character. Each stage references exactly one person
 | Field | Purpose |
 |-------|---------|
 | `name` | Display name (e.g., "Customer Support Agent") |
+| `description` | Optional human-readable description of the persona |
 | `prompt` | The persona prompt injected into context as `{{persona}}` — defines personality, tone, background |
 | `ttsProviderId` | Which TTS provider to use for this persona's voice |
 | `ttsSettings` | Voice configuration (voice ID, model, speed, stability, etc.) |
 
 **How it's used at runtime:** When the system builds the context for response generation, the persona's `prompt` field is available as `{{persona}}` in the stage's system prompt template. The TTS settings determine how the AI's text responses are converted to speech.
 
-**Design tip:** You can have multiple personas in a project and assign different ones to different stages. For example, a "Receptionist" persona for a greeting stage and a "Technical Expert" persona for a troubleshooting stage — each with different voice, tone, and behavior.
+**Design tip:** You can have multiple personas in a project and assign different ones to different stages. For example, a "Receptionist" persona for a greeting stage and a "Technical Expert" persona for a troubleshooting stage — each with different voice, tone, and behavior. Personas support cloning via a dedicated API endpoint.
 
 ---
 
@@ -167,6 +194,8 @@ Use the knowledge base to answer product questions accurately.
 
 The prompt is rendered fresh on every response generation, so it always reflects the latest variable values, user profile, and conversation history. See [TEMPLATING.md](./TEMPLATING.md) for the full template reference.
 
+Each stage can optionally specify its own **LLM provider** via `llmProviderId` and `llmSettings`, allowing different stages to use different models for response generation (e.g., a simpler model for greetings and a more capable one for complex reasoning).
+
 ### Enter Behavior
 
 When a conversation enters a stage (either at start or via a `go_to_stage` effect), the `enterBehavior` setting controls what happens next:
@@ -182,9 +211,11 @@ Each stage can define **variable descriptors** — a schema of variables that th
 
 Variables are:
 - **Accessible in templates** as `{{vars.myVariable}}`
-- **Modifiable** through `modify_variables` effects, `run_script` effects, or WebSocket commands
+- **Cross-stage accessible** via `{{stageVars.otherStageId.variableName}}` in templates
+- **Modifiable** through `modify_variables` effects, `run_script` effects, or WebSocket commands (`set_var`)
 - **Scoped per stage** — each stage has its own variable namespace stored as `stageVars[stageId]`
 - **Persistent** — saved to the database after each turn
+- **Watchable** — transformers can write to variables, and actions can trigger on variable changes via `watchedVariables`
 
 Common uses for variables:
 - Tracking conversation progress (step counters, form fields)
@@ -202,21 +233,27 @@ Actions are the primary mechanism for the system to **react to user input beyond
 | `classificationTrigger` | Description of when this action should fire — the classifier uses this to determine intent |
 | `triggerOnUserInput` | Whether this action can be triggered by user input classification |
 | `triggerOnClientCommand` | Whether this action can be triggered by WebSocket commands |
+| `triggerOnTransformation` | Whether this action can be triggered by context transformer variable changes |
+| `watchedVariables` | Map of variable paths to watch conditions (`new`, `changed`, `removed`) — used with `triggerOnTransformation` |
 | `condition` | Optional JavaScript expression that must return truthy for the action to be active |
 | `overrideClassifierId` | If set, this action is only evaluated by that specific classifier |
 | `parameters` | Array of parameters to extract from user input (name, type, description, required) |
 | `effects` | Array of effects to execute when the action triggers |
 | `examples` | Example phrases that trigger this action (helps the classifier) |
+| `metadata` | Optional action-specific metadata |
 
 **How actions work at runtime:**
 
 1. User input arrives
 2. The classifier sees the list of active actions (filtered by `triggerOnUserInput`, `condition`, and `overrideClassifierId`)
 3. The classifier determines which action(s) match and extracts parameters
-4. Matched actions' effects are gathered, sorted by priority, conflict-resolved, and executed
-5. If no action matches and `__on_fallback` is defined, the fallback action runs instead
+4. Simultaneously, context transformers may write to variables and trigger `watchedVariables`-based actions
+5. All matched actions' effects are gathered, sorted by priority, conflict-resolved, and executed
+6. If no action matches and `__on_fallback` is defined, the fallback action runs instead
 
 **Parameter extraction:** When an action has parameters, the classifier extracts them from the user's message. For example, an action "Transfer Call" with parameter `department (string, required)` will extract the department name from "Transfer me to billing." Parameters are then available in templates as `{{actions.transfer_call.parameters.department}}`.
+
+**Supported parameter types:** `string`, `number`, `boolean`, `object`, `string[]`, `number[]`, `boolean[]`, `object[]`, `image`, `image[]`, `audio`, `audio[]`
 
 ### Lifecycle Actions (Special Actions)
 
@@ -247,17 +284,17 @@ Global actions are defined at the project level and can be active across multipl
 | `useGlobalActions` | Master toggle — enables or disables all global actions for this stage |
 | `globalActions` | Array of specific global action IDs to include. Empty array = include all. |
 
-Global actions work the same as stage actions in terms of classification and effect execution. They are useful for cross-cutting concerns like "end conversation", "go to main menu", or "speak to a human" that should be available regardless of which stage the user is in.
+Global actions work the same as stage actions in terms of classification and effect execution. They support parameters for extracting structured data from user input, just like stage actions. They are useful for cross-cutting concerns like "end conversation", "go to main menu", or "speak to a human" that should be available regardless of which stage the user is in.
 
 ### Knowledge Base Integration
 
-When `useKnowledge` is true and `knowledgeSections` is configured, the stage can use a structured knowledge base:
+When `useKnowledge` is true and `knowledgeTags` is configured, the stage includes knowledge from matching categories:
 
-- **Knowledge Sections** group categories together
-- **Knowledge Categories** define topics with a `promptTrigger` (when to surface this knowledge)
+- **Knowledge Categories** define topics with a `promptTrigger` (when to surface this knowledge) and are organized by `tags`
 - **Knowledge Items** are individual Q&A pairs within a category
+- Stages select knowledge by specifying `knowledgeTags` — all categories with matching tags are included
 
-This structured knowledge is injected into the context so the LLM can provide accurate, factual answers on specific topics.
+This structured knowledge is injected into the context (as `faq` items) so the LLM can provide accurate, factual answers on specific topics. FAQ data is cached per stage and persisted between turns until new knowledge actions are detected.
 
 ---
 
@@ -277,7 +314,7 @@ A **Classifier** is a reusable LLM-based component that analyzes user input and 
 2. Individual actions can override the classifier using `overrideClassifierId` — causing them to be evaluated by a different classifier
 3. All unique classifier IDs are collected from the stage's default and action overrides
 4. For each classifier, the system builds a context with only the actions assigned to that classifier
-5. Each classifier runs in parallel — calling its LLM with the classification prompt and user input
+5. Each classifier runs **in parallel** — calling its LLM with the classification prompt and user input
 6. Results from all classifiers are merged and deduplicated (same action detected by multiple classifiers is only processed once)
 
 **Design tip:** Use a single classifier for most stages. Use `overrideClassifierId` when you have specialized actions that need a different LLM or prompt (e.g., a cheaper, faster model for simple yes/no detection alongside a more capable model for complex intent extraction).
@@ -286,7 +323,7 @@ A **Classifier** is a reusable LLM-based component that analyzes user input and 
 
 ## Context Transformer
 
-A **Context Transformer** is a reusable LLM-based component that transforms or enriches conversation data before it reaches the main response generation.
+A **Context Transformer** is a reusable LLM-based component that transforms or enriches conversation data before it reaches the main response generation. Transformers run **in parallel with classification** — this is an important architectural detail.
 
 | Field | Purpose |
 |-------|---------|
@@ -295,13 +332,27 @@ A **Context Transformer** is a reusable LLM-based component that transforms or e
 | `llmProviderId` | Which LLM provider to use |
 | `llmSettings` | LLM settings |
 
-Stages reference transformers via the `transformerIds` array. Multiple transformers can be chained on a single stage.
+Stages reference transformers via the `transformerIds` array. Multiple transformers can be chained on a single stage. After execution, transformers write their extracted fields to stage variables (`stageVars`), and a `transformation` event is recorded with the list of applied fields.
+
+### Transformer-Triggered Actions
+
+Transformers can indirectly trigger actions through the **watched variables** mechanism:
+
+1. A transformer runs and writes fields to stage variables
+2. Actions with `triggerOnTransformation: true` and matching `watchedVariables` are evaluated
+3. `watchedVariables` maps variable names to conditions:
+   - `new` — triggers when the variable is created for the first time
+   - `changed` — triggers when the variable's value changes
+   - `removed` — triggers when the variable is deleted
+4. If any watched variable condition matches, the action's effects are executed
+
+This allows building reactive pipelines where transformers extract structured data from user input and actions automatically fire based on the extracted values.
 
 ---
 
 ## Tool
 
-A **Tool** is a reusable LLM-powered utility that can be invoked during conversation processing via the `call_tool` effect.
+A **Tool** is a reusable LLM-powered utility that can be invoked during conversation processing via the `call_tool` effect or the `call_tool` WebSocket command.
 
 | Field | Purpose |
 |-------|---------|
@@ -319,8 +370,9 @@ A **Tool** is a reusable LLM-powered utility that can be invoked during conversa
 3. The tool's prompt template is rendered with the full conversation context plus the tool parameters
 4. The LLM is called (non-streaming) with the rendered prompt
 5. The result is stored in `context.results.tools[toolId]` and available in subsequent templates
+6. A `tool_call` event is recorded with the tool name, parameters, success status, and result
 
-**Design tip:** Tools are ideal for tasks that need a separate LLM call with a specialized prompt — sentiment analysis, data extraction, summarization, image generation, etc. Keep tool prompts focused on a single task.
+**Design tip:** Tools are ideal for tasks that need a separate LLM call with a specialized prompt — sentiment analysis, data extraction, summarization, image generation, etc. Keep tool prompts focused on a single task. Tools can also be invoked directly from WebSocket clients using the `call_tool` command.
 
 ---
 
@@ -328,14 +380,17 @@ A **Tool** is a reusable LLM-powered utility that can be invoked during conversa
 
 **Providers** are credential configurations for external services. They are not project-scoped — they can be shared across projects.
 
-| Provider Type | Purpose | Examples |
-|--------------|---------|----------|
-| `llm` | Language model inference | OpenAI, Anthropic, Google Gemini, Groq |
-| `tts` | Text-to-speech synthesis | ElevenLabs, Cartesia |
-| `asr` | Automatic speech recognition | Azure Speech |
-| `storage` | Artifact storage | S3, Azure Blob, GCS, Local |
+| Provider Type | Purpose | Supported API Types |
+|--------------|---------|---------------------|
+| `llm` | Language model inference | `openai`, `openai-legacy`, `anthropic`, `gemini`, `groq`, `vertex` |
+| `tts` | Text-to-speech synthesis | `elevenlabs`, `openai`, `deepgram`, `cartesia`, `azure` |
+| `asr` | Automatic speech recognition | `azure`, `elevenlabs`, `deepgram` |
+| `storage` | Artifact storage | `s3`, `azure-blob`, `gcs`, `local` |
+| `embeddings` | Embedding generation | (reserved for future use) |
 
-Each provider stores its API type (e.g., `openai`, `anthropic`, `elevenlabs`) and credentials in its `config` field. Entities like stages, classifiers, tools, and personas reference providers by ID.
+Each provider stores its API type and credentials in its `config` field. Entities like stages, classifiers, tools, and personas reference providers by ID.
+
+A **Provider Catalog** API is available that lists all supported provider capabilities — models, voices, languages, and features — without requiring valid credentials.
 
 ---
 
@@ -365,6 +420,36 @@ Effects are the building blocks of action behavior. When an action triggers, its
 - `run_script` executes arbitrary JavaScript in a sandboxed VM with access to `vars`, `userProfile`, `userInput`, `history`, `actions`, and `results` — see [SCRIPTING.md](./SCRIPTING.md)
 - If no action explicitly includes `generate_response`, the system will still generate a response by default (when no actions match, or after actions complete without ending/aborting the conversation)
 
+### Prescripted Responses
+
+The `generate_response` effect supports a `responseMode` field that controls how the response is produced:
+
+| Mode | Behavior |
+|------|----------|
+| `generated` (default) | Standard AI-generated response via LLM |
+| `prescripted` | Select from a list of predefined responses — no LLM call |
+
+When using `prescripted` mode, provide `prescriptedResponses` (array of strings) and optionally `prescriptedSelectionStrategy`:
+- `random` (default) — pick a random response from the list
+- `round_robin` — cycle through responses in order
+
+This is useful for deterministic responses like greetings, confirmations, or error messages where LLM variability is undesirable.
+
+### Effect Value Resolution
+
+Effect values in `modify_variables` and `modify_user_profile` support special resolution patterns beyond plain values:
+
+| Pattern | Behavior |
+|---------|----------|
+| `{{results.tools.toolId.result}}` | Resolve from tool execution results |
+| `{{vars.variableName}}` | Resolve from current stage variables |
+| `{{stageVars.stageName.variableName}}` | Resolve from another stage's variables |
+| `{{userProfile.fieldName}}` | Resolve from user profile fields |
+| `= <expression>` | Evaluate as inline JavaScript expression |
+| Any other string | Rendered through Handlebars template engine |
+
+Non-string values (numbers, booleans, objects) are passed through unchanged.
+
 ---
 
 ## Conversation Lifecycle
@@ -372,89 +457,115 @@ Effects are the building blocks of action behavior. When an action triggers, its
 ### 1. Connection and Authentication
 
 1. Client connects to `ws://host/ws`
-2. Client sends `auth` message with API key
+2. Client sends `auth` message with API key and optional `sessionSettings`
 3. Server validates the key, creates a session, and returns `projectSettings` (voice capabilities, ASR config)
 
 ### 2. Starting a Conversation
 
-1. Client sends `start_conversation` with `userId` and `stageId`
+1. Client sends `start_conversation` with `userId`, `stageId`, and optional `personaId`
 2. Server creates a Conversation record in the database (status: `initialized`)
 3. Server loads the stage and all its dependencies (persona, classifiers, transformers, global actions, providers)
 4. Server initializes providers (ASR, TTS, LLM) and wires up event callbacks
-5. **`__on_enter` runs** (if defined on the stage)
+5. A `conversation_start` event is recorded
+6. **`__on_enter` runs** (if defined on the stage)
    - Effects execute in priority order
    - If `__on_enter` ends or aborts the conversation, stop here
-6. **`enterBehavior` is processed:**
+7. **`enterBehavior` is processed:**
    - `generate_response` → The stage prompt is rendered with context and the LLM generates a response (e.g., a greeting). Response is streamed as text chunks and optionally as audio chunks via TTS.
    - `await_user_input` → Conversation silently waits for the user
 
-### 3. User Input Processing
+### 3. Resuming a Conversation
+
+Existing conversations can be resumed using the `resume_conversation` WebSocket message:
+
+1. Client sends `resume_conversation` with `conversationId`
+2. Server loads the existing conversation state, stage, and all dependencies
+3. Providers are re-initialized for the current stage
+4. A `conversation_resume` event is recorded (including previous status)
+5. Conversation returns to `awaiting_user_input` state
+
+This enables reconnecting after disconnects or switching between conversations.
+
+### 4. User Input Processing
 
 User input arrives in one of two ways:
 
 **Text input:**
-1. Client sends `send_text` message
+1. Client sends `send_user_text_input` message
 2. Server immediately processes the text
 
 **Voice input:**
 1. Client sends `start_user_voice_input`
 2. Client streams audio data via `send_user_voice_chunk` messages
-3. Client sends `stop_user_voice_input`
-4. ASR provider transcribes audio chunks in real-time, sending interim and final transcriptions back to the client
+3. Client sends `end_user_voice_input`
+4. ASR provider transcribes audio chunks in real-time, sending interim and final transcriptions back to the client (`user_transcribed_chunk`)
 5. Once ASR completes, the full transcribed text enters the same processing pipeline as text input
 
-### 4. Classification
+### 5. Classification and Transformation (Parallel)
 
-Once user input text is available:
+Once user input text is available, classification and context transformation run **simultaneously**:
 
+**Classification path:**
 1. The system collects all unique classifier IDs for the current stage (from `defaultClassifierId` and action-level `overrideClassifierId`)
 2. For each classifier, a context is built with only the actions relevant to that classifier
 3. Each classifier receives the rendered classification prompt (which lists available actions with triggers, examples, and parameters) plus the user input
 4. The LLM returns a structured JSON result indicating which action(s) matched and extracted parameter values
 5. Results from all classifiers are merged; duplicate action detections are removed
-6. Classification event is saved and sent to the client via WebSocket
+6. A `classification` event is recorded and sent to the client
 
-### 5. Action Execution
+**Transformation path (parallel):**
+1. All transformers referenced by the stage's `transformerIds` execute in parallel
+2. Each transformer calls its LLM with a specialized prompt and the user input
+3. Transformer results are written to stage variables
+4. `transformation` events are recorded with the list of applied fields
+5. Actions with `triggerOnTransformation: true` are evaluated against watched variable conditions
+6. Any triggered transformer-actions are added to the action pool
 
-After classification determines which actions fired:
+### 6. Action Execution
+
+After classification and transformation complete:
 
 1. Stage actions and global actions are matched by name against classifier results
-2. Extracted parameters are injected into the context (`context.actions[actionName].parameters`)
-3. If **no actions matched** and `__on_fallback` is defined, the fallback action is executed instead
-4. All matched action effects are pooled together
-5. Effects restricted by lifecycle context (if applicable) are filtered out
-6. Effects are sorted by priority (webhooks first, stage navigation last)
-7. Conflicts are resolved (multiple `go_to_stage` → keep first; `abort` overrides `end`)
-8. Effects execute sequentially in priority order:
+2. Transformer-triggered actions are added to the match pool
+3. Extracted parameters are injected into the context (`context.actions[actionName].parameters`)
+4. If **no actions matched** and `__on_fallback` is defined, the fallback action is executed instead
+5. All matched action effects are pooled together
+6. Effects restricted by lifecycle context (if applicable) are filtered out
+7. Effects are sorted by priority (webhooks first, stage navigation last)
+8. Conflicts are resolved (multiple `go_to_stage` → keep first; `abort` overrides `end`)
+9. Effects execute sequentially in priority order:
    - Webhooks and tools call external services, storing results in context
-   - Variable and profile modifications update the context in place
+   - Variable and profile modifications update the context in place (with value resolution)
    - Scripts run in an isolated VM with access to the full mutable context
    - `generate_response` sets a flag for response generation
    - `end_conversation` / `abort_conversation` set termination flags
    - `go_to_stage` records the target stage for navigation
-9. After all effects complete:
-   - Modified variables are persisted to the database
-   - Modified user profile is persisted to the database
-   - If `go_to_stage` was flagged, the stage transition happens (see [Stage Transitions](#7-stage-transitions))
-   - If conversation was ended or aborted, appropriate events are saved
+10. After all effects complete:
+    - An `action` event is recorded for each matched action
+    - Modified variables are persisted to the database
+    - Modified user profile is persisted to the database
+    - If `go_to_stage` was flagged, the stage transition happens (see [Stage Transitions](#8-stage-transitions))
+    - If conversation was ended or aborted, appropriate events are saved
 
-### 6. Response Generation
+### 7. Response Generation
 
 If effects completed without ending/aborting the conversation and a response should be generated:
 
-1. The stage's `prompt` template is rendered with the full context (variables, user profile, persona, history, actions with parameters, webhook/tool results)
+1. The stage's `prompt` template is rendered with the full context (variables, user profile, persona, history, actions with parameters, webhook/tool results, FAQ items)
 2. The rendered prompt becomes the LLM's system message
 3. Conversation history (all previous user and assistant messages) is sent as message context
 4. The current user input is sent as the final user message
-5. The LLM generates a streaming response:
+5. `start_ai_generation_output` is sent to the client (includes `outputTurnId` and `expectVoice` flag)
+6. The LLM generates a streaming response:
    - Each text chunk is sent to the client via WebSocket (`ai_transcribed_chunk`)
    - Each text chunk is simultaneously fed to the TTS provider (if configured)
    - TTS generates audio chunks that are sent to the client (`send_ai_voice_chunk`)
-6. When generation completes, the full text is saved as a message event
-7. When TTS completes (or immediately if no TTS), `end_ai_generation_output` is sent to the client
-8. Conversation state returns to `awaiting_user_input`
+   - For multimodal responses, `send_ai_image_output` or `send_ai_audio_output` messages are sent
+7. When generation completes, the full text is saved as a `message` event
+8. When TTS completes (or immediately if no TTS), `end_ai_generation_output` is sent to the client
+9. Conversation state returns to `awaiting_user_input`
 
-### 7. Stage Transitions
+### 8. Stage Transitions
 
 When a `go_to_stage` effect fires (or a client sends a `go_to_stage` WebSocket command):
 
@@ -464,7 +575,7 @@ When a `go_to_stage` effect fires (or a client sends a `go_to_stage` WebSocket c
 2. New stage is loaded from the database with all dependencies
 3. Conversation's `stageId` is updated in the database
 4. Providers are re-initialized for the new stage (new LLM, TTS, ASR as needed)
-5. A `jump_to_stage` event is saved
+5. A `jump_to_stage` event is saved (with `fromStageId` and `toStageId`)
 6. **`__on_enter` runs on the new stage** (if defined)
    - Initialization effects execute
    - If `__on_enter` ends or aborts the conversation, stop here
@@ -472,15 +583,15 @@ When a `go_to_stage` effect fires (or a client sends a `go_to_stage` WebSocket c
    - `generate_response` → AI generates a response using the new stage's prompt
    - `await_user_input` → Wait for the user
 
-### 8. Ending a Conversation
+### 9. Ending a Conversation
 
 Conversations can end in three ways:
 
 | End Type | Trigger | Behavior |
 |----------|---------|----------|
-| **Finished** | `end_conversation` effect | Graceful end — conversation status becomes `finished` |
-| **Aborted** | `abort_conversation` effect or client disconnect | Immediate stop — status becomes `aborted` |
-| **Failed** | System error (LLM failure, ASR error, etc.) | Error state — status becomes `failed` with a reason |
+| **Finished** | `end_conversation` effect or client `end_conversation` message | Graceful end — conversation status becomes `finished`; `conversation_end` event recorded |
+| **Aborted** | `abort_conversation` effect or client disconnect | Immediate stop — status becomes `aborted`; `conversation_aborted` event recorded |
+| **Failed** | System error (LLM failure, ASR error, etc.) | Error state — status becomes `failed` with a reason; `conversation_failed` event recorded |
 
 ---
 
@@ -512,7 +623,7 @@ initialized ──────────────► awaiting_user_input �
 | `initialized` | Conversation created but not yet started |
 | `awaiting_user_input` | Ready for user text or voice input |
 | `receiving_user_voice` | Streaming voice audio from client to ASR |
-| `processing_user_input` | Classifying input and executing action effects |
+| `processing_user_input` | Classifying input, running transformers, and executing action effects |
 | `generating_response` | LLM is generating and streaming a response |
 | `finished` | Conversation ended gracefully |
 | `aborted` | Conversation was aborted |
@@ -527,16 +638,19 @@ Every time the system renders a prompt template, builds a classification prompt,
 | Context Field | Type | Description |
 |--------------|------|-------------|
 | `conversationId` | string | Unique conversation identifier |
+| `projectId` | string | Project identifier |
 | `persona` | string | The persona's prompt text |
 | `vars` | object | Stage variables (from `stageVars[currentStageId]`) |
+| `stageVars` | object | All stage variables indexed by stage ID — allows cross-stage variable access |
 | `userProfile` | object | User's profile data (persistent across conversations) |
-| `history` | array | All previous messages: `[{ role: 'user'|'assistant', content: '...' }]` |
+| `history` | array | All previous messages: `[{ role: 'user'\|'assistant', content: '...' }]` |
 | `userInput` | string | Current user input text (can be modified by effects) |
 | `originalUserInput` | string | Original user input before any modifications |
 | `userInputSource` | string | `'text'` or `'voice'` |
 | `actions` | object | Triggered actions with extracted parameters: `{ actionName: { parameters: {...} } }` |
 | `results.webhooks` | object | Webhook call results keyed by `resultKey` |
 | `results.tools` | object | Tool execution results keyed by `toolId` |
+| `faq` | array | Knowledge base FAQ items from matching categories (persisted between turns) |
 | `stage.id` | string | Current stage ID |
 | `stage.name` | string | Current stage display name |
 | `stage.availableActions` | array | Actions available for user input (with trigger descriptions, examples, parameters) |
@@ -553,11 +667,11 @@ When multiple actions fire simultaneously, all their effects are pooled and exec
 ```
 1. call_webhook       ← Fetch external data first
 2. call_tool          ← Run LLM-powered tools
-3. modify_variables   ← Update stage variables
-4. modify_user_profile ← Update user profile
+3. modify_variables   ← Update stage variables (with value resolution)
+4. modify_user_profile ← Update user profile (with value resolution)
 5. modify_user_input  ← Transform the user's input
 6. run_script         ← Run custom logic (can access everything above)
-7. generate_response  ← Flag AI response generation
+7. generate_response  ← Flag AI response generation (or use prescripted response)
 8. end_conversation   ← Graceful termination
 9. abort_conversation ← Immediate termination
 10. go_to_stage       ← Stage navigation (always last)
@@ -568,6 +682,137 @@ This ordering is intentional:
 - **State mutations** (variables, profiles, input) happen in the middle
 - **Flow control** (response generation, conversation ending, stage changes) happens last
 - **Stage navigation** is always last because it triggers a full stage reload with its own lifecycle
+
+---
+
+## WebSocket Commands
+
+Beyond regular user input, WebSocket clients can send commands to interact with conversations programmatically:
+
+| Command | Purpose |
+|---------|---------|
+| `go_to_stage` | Navigate to a specific stage (triggers full stage transition lifecycle) |
+| `set_var` | Set a variable value on a specific stage |
+| `get_var` | Get a variable value from a specific stage |
+| `get_all_vars` | Get all variables from a specific stage |
+| `run_action` | Execute a named action with parameters (records a `command` event) |
+| `call_tool` | Invoke a tool directly with parameters (returns multimodal content blocks) |
+
+These commands enable rich client integrations where the UI can drive conversation flow, inspect state, and invoke tools independently of user speech/text input.
+
+---
+
+## Session Settings
+
+When authenticating, clients can provide `sessionSettings` to configure their session behavior:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `sendVoiceInput` | `true` | Whether the client can send voice input |
+| `sendTextInput` | `true` | Whether the client can send text input |
+| `receiveVoiceOutput` | `true` | Whether the client wants to receive voice output |
+| `receiveTranscriptionUpdates` | `true` | Whether the client wants interim transcription updates for voice input and output |
+| `receiveEvents` | `true` | Whether the client wants to receive all conversation events |
+
+This allows clients to opt out of features they don't need — for example, a text-only client can set `sendVoiceInput: false` and `receiveVoiceOutput: false` to skip all audio processing.
+
+---
+
+## Multimodal Support
+
+Nexus supports multimodal content across several features:
+
+- **Tool parameters** can have `image`, `image[]`, `audio`, or `audio[]` types
+- **Tool input/output** supports `text`, `image`, or `multi-modal` modes
+- **LLM content blocks** can be `text`, `image`, or `json`
+- **WebSocket output** includes `send_ai_image_output` and `send_ai_audio_output` messages for non-text responses
+- **Tool and action results** via WebSocket return arrays of multimodal content blocks
+
+Image parameters include `data` (base64), `mimeType`, and optional dimension metadata. Audio parameters include `data` (base64), `format`, `mimeType`, and optional sample rate/channel metadata.
+
+---
+
+## Conversation Events
+
+Every significant occurrence during a conversation is recorded as a typed event:
+
+| Event Type | When Recorded |
+|------------|--------------|
+| `message` | User or assistant message (includes original and modified text) |
+| `classification` | Classifier results with matched actions |
+| `transformation` | Context transformer execution with applied fields |
+| `action` | Action execution with effects list |
+| `command` | WebSocket client command execution |
+| `tool_call` | Tool invocation with parameters, result, and success status |
+| `conversation_start` | Conversation creation with initial stage and variables |
+| `conversation_resume` | Conversation resumed (with previous status) |
+| `conversation_end` | Graceful conversation end with reason |
+| `conversation_aborted` | Conversation aborted with reason |
+| `conversation_failed` | Conversation failure with error reason |
+| `jump_to_stage` | Stage transition (with from/to stage IDs) |
+
+Events are correlated via `inputTurnId` and `outputTurnId` for linking related events within a single turn. If `receiveEvents` is enabled in session settings, events are also pushed to the client in real-time via the `conversation_event` WebSocket message.
+
+---
+
+## Administration and Operations
+
+### RBAC Permissions
+
+Nexus uses role-based access control with fine-grained permissions. Permissions follow an `entity:action` pattern:
+
+| Role | Description |
+|------|-------------|
+| `super_admin` | Full access to all resources and operations |
+| `content_manager` | CRUD on content entities (projects, stages, personas, etc.) |
+| `support` | User and issue management, project and conversation viewing |
+| `developer` | Read-only access plus system configuration |
+| `viewer` | Read-only access across all entities |
+
+Security is enforced at both the **controller layer** (HTTP middleware) and the **service layer** (method-level checks), providing defense-in-depth.
+
+### Cross-Instance Migration
+
+The **MigrationService** enables exporting and importing project configurations between Nexus instances:
+
+- **Export** — Generate a bundle containing a project and all its entities (stages, personas, classifiers, etc.)
+- **Import** — Apply a bundle to create or update entities on the target instance
+- **Pull** — Fetch a project bundle directly from a remote Nexus instance (via **Environments**)
+- **Preview** — Dry-run an import to see what would change before committing
+- **Compatibility** — Schema hash comparison ensures source and target instances are compatible
+
+Environments store remote server credentials (`url`, `login`, `password`) and are used as pull targets.
+
+### Issue Tracking
+
+Project-scoped issue/bug tracking with:
+
+| Field | Purpose |
+|-------|---------|
+| `severity` | Issue severity level |
+| `category` | Issue category |
+| `bugDescription` | Description of the bug |
+| `expectedBehaviour` | What should happen instead |
+| `sessionId` / `eventIndex` | Link to specific conversation events |
+| `environment` / `buildVersion` | Deployment context |
+| `status` | Current issue status |
+
+### API Versioning
+
+The `GET /version` endpoint returns:
+- `restSchemaHash` — SHA-256 hash (12 hex chars) of the OpenAPI spec
+- `wsSchemaHash` — SHA-256 hash (12 hex chars) of the WebSocket JSON Schema
+- `gitCommit` — Git commit hash from the `GIT_COMMIT` environment variable
+
+These hashes are used by the migration system to verify schema compatibility between instances.
+
+### Audit Logging
+
+All write operations on entities are recorded in the audit log with:
+- `userId` — Who performed the action
+- `action` — What was done (create, update, delete)
+- `entityId` / `entityType` — Which entity was affected
+- `oldEntity` / `newEntity` — Before/after snapshots for change tracking
 
 ---
 
@@ -654,6 +899,21 @@ A common pattern is to fetch data, store it in variables, and use it in the prom
 2. **Stage prompt**: Reference `{{vars.extractedField}}` in the system prompt
 3. **User action**: `call_webhook` to submit data, using `{{vars.field}}` in the request body
 
+### Cross-Stage Variable Access
+
+Use `{{stageVars.otherStageId.variableName}}` in templates to read variables from other stages. This enables passing data between stages without webhooks:
+
+1. **Stage A** sets `vars.selectedProduct = "Widget Pro"`
+2. **Stage B** prompt references `{{stageVars.stageA.selectedProduct}}`
+
+### Transformer + Watched Variables Pattern
+
+Use context transformers with watched variables for reactive data extraction:
+
+1. **Transformer** extracts structured fields from free-form user input (e.g., name, email, phone)
+2. **Action** with `triggerOnTransformation: true` and `watchedVariables: { "email": "new" }` fires when the transformer first extracts an email
+3. **Effect** calls a webhook to validate the email, stores result in a variable
+
 ### Parameter Extraction
 
 Define parameters on actions to extract structured data from user input:
@@ -681,6 +941,32 @@ Define parameters on actions to extract structured data from user input:
 ```
 
 The classifier LLM will extract `destination`, `date`, and `passengers` from the user's message and make them available in `actions.book_flight.parameters.*`.
+
+### Prescripted Response Pattern
+
+Use prescripted responses for deterministic outputs:
+
+```json
+{
+  "greet_user": {
+    "name": "Greet User",
+    "triggerOnUserInput": true,
+    "classificationTrigger": "User says hello or greets",
+    "effects": [
+      {
+        "type": "generate_response",
+        "responseMode": "prescripted",
+        "prescriptedSelectionStrategy": "random",
+        "prescriptedResponses": [
+          "Hello! How can I help you today?",
+          "Hi there! What can I do for you?",
+          "Welcome! How may I assist you?"
+        ]
+      }
+    ]
+  }
+}
+```
 
 ### Fallback Handling
 
@@ -721,3 +1007,8 @@ The user seems confused. Offer to connect them with a human agent.
 - [SPECIAL_ACTIONS.md](./SPECIAL_ACTIONS.md) — Lifecycle actions (`__on_enter`, `__on_leave`, `__on_fallback`)
 - [LLM-SETTINGS.md](./LLM-SETTINGS.md) — LLM provider configuration (reasoning, thinking modes)
 - [WEBSOCKET.md](./WEBSOCKET.md) — WebSocket API reference for client integration
+- [AUTHENTICATION.md](./AUTHENTICATION.md) — Authentication and authorization guide
+
+---
+
+<sub>**Nexus Backend** v0.1.0 · Generated 2025-02-25 · Commit `8e997e8` · This document reflects the current state of the codebase and may change as features evolve.</sub>
