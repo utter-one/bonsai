@@ -31,7 +31,9 @@ export class ModifyVariablesEffectExecutor {
       for (const modification of effect.modifications) {
         const { variableName, operation: op } = modification;
         let { value } = modification;
+        logger.info({ conversationId: context.conversationId, variableName, operation: op, value }, `Processing variable modification`);
         value = await this.transformValue(value, context);
+        
         switch (op) {
           case 'set': {
             context.vars[variableName] = value;
@@ -102,13 +104,29 @@ export class ModifyVariablesEffectExecutor {
    */
   private async transformValue(value: unknown, context: ConversationContext): Promise<unknown> {
     if (typeof value === 'string') {
-      const toolResultPattern = /\{\{results\.tools\.([^.]+)\.result\}\}/;
-      const match = value.match(toolResultPattern);
+      // support for referencing tool results using {{results.tools.toolId.result}}
+      const toolResultPattern = /^\{\{results\.tools\.([^.]+)\.result\}\}$/;
+      // support for referencing variables using {{vars.variableName}}
+      const varSimpleReferencePattern = /^\{\{vars\.([^.]+)\}\}$/;
+      // support for referencing variables using {{stageVars.stageName.variableName}}
+      const varStageReferencePattern = /^\{\{stageVars\.([^.]+)\.([^.]+)\}\}$/;
+      const match = value.trim().match(toolResultPattern);
+      const varSimpleMatch = value.trim().match(varSimpleReferencePattern);
+      const varStageMatch = value.trim().match(varStageReferencePattern);
       if (match) {
-        logger.info({ conversationId: context.conversationId, toolId: match[1] }, `Resolving value from tool result reference for tool ID: ${match[1]}`);
+        // Tool Result Reference
         const toolId = match[1];
         value = context.results.tools[toolId]?.result;
         if (Array.isArray(value)) value = value[0];
+      } else if (varSimpleMatch) {
+        // Simple Variable Reference
+        const variableName = varSimpleMatch[1];
+        value = context.vars[variableName];
+      } else if (varStageMatch) {
+        // Stage Variable Reference
+        const stageName = varStageMatch[1];
+        const variableName = varStageMatch[2];
+        value = context.stageVars[stageName]?.[variableName];
       } else if (value[0] === '=') {
         value = await this.scriptRunner.executeScript(value.slice(1).trim(), context);
       } else {
