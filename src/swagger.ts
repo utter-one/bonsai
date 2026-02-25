@@ -376,8 +376,8 @@ export function getOpenAPISpec(): any {
   const document = generator.generateDocument({
     openapi: '3.0.0',
     info: {
-      title: 'Nexus Admin API',
-      description: 'API documentation for Nexus Admin API with JWT authentication',
+      title: 'Bonsai Admin API',
+      description: 'API documentation for Bonsai Admin API with JWT authentication',
       version: '0.1.0',
     },
     servers: [

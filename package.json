@@ -1,7 +1,7 @@
 {
-  "name": "nexus-backend",
+  "name": "bonsai-backend",
   "version": "0.1.0",
-  "description": "Nexus Backend",
+  "description": "Bonsai Backed",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
