@@ -4,6 +4,8 @@ Projects are the top-level organizational unit. All conversation resources (stag
 
 **Tag:** `Projects`
 
+For more information, see the [Projects](../guide/projects) guide and [Core Concepts](../guide/concepts).
+
 ## Create Project
 
 ```http

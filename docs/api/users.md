@@ -4,6 +4,8 @@ Users represent end-users who participate in conversations. Users have flexible 
 
 **Tag:** `Users`
 
+For more information, see [Core Concepts](../guide/concepts).
+
 ## Create User
 
 ```http

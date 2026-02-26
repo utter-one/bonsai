@@ -4,6 +4,8 @@ Global actions are reusable action handlers that can be triggered across multipl
 
 **Tag:** `Global Actions` | **Scoped to:** Project
 
+For more information, see the [Global Actions](../guide/global-actions) and [Actions & Effects](../guide/actions-and-effects) guides.
+
 ## Create Global Action
 
 ```http

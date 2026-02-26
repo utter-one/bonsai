@@ -4,6 +4,8 @@ Stages define the conversational flow within a project. Each stage has its own p
 
 **Tag:** `Stages` | **Scoped to:** Project
 
+For more information, see the [Stages](../guide/stages) and [Actions & Effects](../guide/actions-and-effects) guides.
+
 ## Create Stage
 
 ```http

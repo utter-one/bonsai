@@ -4,6 +4,8 @@ Manage admin user accounts and the authenticated admin's own profile.
 
 **Tag:** `Admins`, `Profile`
 
+For more information, see the [Authentication & Permissions](../guide/authentication) guide.
+
 ## Create Admin
 
 ```http

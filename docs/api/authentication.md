@@ -2,6 +2,8 @@
 
 Bonsai Backed uses **JWT-based authentication** for admin access and **API key authentication** for programmatic access.
 
+For more information, see the [Authentication & Permissions](../guide/authentication) guide.
+
 ## Login
 
 Authenticate with admin credentials to receive a JWT token pair.

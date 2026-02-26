@@ -4,6 +4,8 @@ Providers configure external service integrations for LLM, TTS, ASR, and storage
 
 **Tag:** `Providers`
 
+For more information, see the [Providers](../guide/providers) guide.
+
 ## Create Provider
 
 ```http

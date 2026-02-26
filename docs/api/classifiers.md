@@ -4,6 +4,8 @@ Classifiers use LLMs to categorize user input into actions. They are used by sta
 
 **Tag:** `Classifiers` | **Scoped to:** Project
 
+For more information, see the [Classifiers](../guide/classifiers) guide.
+
 ## Create Classifier
 
 ```http

@@ -4,6 +4,8 @@ The Provider Catalog API returns metadata about all available provider implement
 
 **Tag:** `Provider Catalog` | **Authentication:** None required
 
+For more information, see the [Providers](../guide/providers) guide.
+
 
 ## Get Full Catalog
 

@@ -4,6 +4,8 @@ Conversations represent active or completed conversational AI sessions. They are
 
 **Tag:** `Conversations` | **Scoped to:** Project
 
+For more information, see the [Conversations](../guide/conversations) guide.
+
 ::: info
 Conversations are created internally through the WebSocket session protocol. The REST API provides read and delete access only.
 :::

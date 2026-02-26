@@ -4,6 +4,8 @@ The Knowledge API manages a hierarchical knowledge base organized into categorie
 
 **Tag:** `Knowledge` | **Scoped to:** Project
 
+For more information, see the [Knowledge Base](../guide/knowledge) guide.
+
 ## Create Category
 
 ```http

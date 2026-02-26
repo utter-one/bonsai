@@ -4,6 +4,8 @@ Tools are LLM-powered processing units that can be invoked during conversations.
 
 **Tag:** `Tools` | **Scoped to:** Project
 
+For more information, see the [Tools](../guide/tools), [Scripting](../guide/scripting), and [Prompt Templating](../guide/templating) guides.
+
 ## Create Tool
 
 ```http

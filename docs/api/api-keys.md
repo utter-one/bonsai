@@ -4,6 +4,8 @@ API keys provide authentication for WebSocket real-time conversations. Each key 
 
 **Tag:** `API Keys` | **Scoped to:** Project
 
+For more information, see the [Authentication & Permissions](../guide/authentication) and [WebSocket Protocol](../guide/websocket) guides.
+
 ## Create API Key
 
 ```http

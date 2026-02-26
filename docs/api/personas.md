@@ -4,6 +4,8 @@ Personas define the AI character's voice and behavior in conversations. Each per
 
 **Tag:** `Personas` | **Scoped to:** Project
 
+For more information, see the [Personas](../guide/personas) guide.
+
 ## Create Persona
 
 ```http

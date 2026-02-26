@@ -4,6 +4,8 @@ Context transformers process and transform conversation context before it's sent
 
 **Tag:** `Context Transformers` | **Scoped to:** Project
 
+For more information, see the [Context Transformers](../guide/context-transformers) guide.
+
 ## Create Context Transformer
 
 ```http
