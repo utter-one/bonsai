@@ -12,7 +12,7 @@ extendZodWithOpenApi(z);
 /**
  * Local storage provider configuration schema
  */
-export const localStorageProviderConfigSchema = z.object({
+export const localStorageProviderConfigSchema = z.strictObject({
   basePath: z.string().describe('Base directory path for local storage'),
   baseUrl: z.string().optional().describe('Base URL for generating file URLs (if files are served via HTTP)'),
 }).openapi('LocalStorageConfig');

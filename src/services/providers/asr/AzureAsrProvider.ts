@@ -13,7 +13,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for Azure Speech Recognition service configuration
  */
-export const azureAsrProviderConfigSchema = z.object({
+export const azureAsrProviderConfigSchema = z.strictObject({
   region: z.string().describe('The Azure region to use for the speech recognition service'),
   subscriptionKey: z.string().describe('The subscription key to use for the speech recognition service'),
 });

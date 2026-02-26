@@ -11,7 +11,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for ElevenLabs ASR provider configuration
  */
-export const elevenLabsAsrProviderConfigSchema = z.object({
+export const elevenLabsAsrProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with ElevenLabs'),
 });
 

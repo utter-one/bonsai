@@ -8,6 +8,7 @@ import { azureAsrSettingsSchema } from '../../services/providers/asr/AzureAsrPro
 import { elevenLabsAsrSettingsSchema } from '../../services/providers/asr/ElevenLabsAsrProvider';
 import { parameterValueSchema } from '../../types/parameters';
 import { deepgramAsrSettingsSchema } from '../../services/providers/asr/DeepgramAsrProvider';
+import { assemblyAiAsrSettingsSchema } from '../../services/providers/asr/AssemblyAiAsrProvider';
 
 extendZodWithOpenApi(z);
 
@@ -45,6 +46,7 @@ export const asrSettingsSchema = z.union([
   azureAsrSettingsSchema,
   elevenLabsAsrSettingsSchema,
   deepgramAsrSettingsSchema,
+  assemblyAiAsrSettingsSchema,
 ]).describe('ASR provider settings');
 
 export const asrConfigSchema = z.object({

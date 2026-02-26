@@ -11,7 +11,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for OpenAI TTS provider configuration
  */
-export const openAiTtsProviderConfigSchema = z.object({
+export const openAiTtsProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with OpenAI'),
 });
 

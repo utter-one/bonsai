@@ -12,7 +12,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for Cartesia TTS provider configuration
  */
-export const cartesiaTtsProviderConfigSchema = z.object({
+export const cartesiaTtsProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with Cartesia'),
 });
 
