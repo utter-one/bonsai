@@ -799,9 +799,10 @@ export class MigrationService extends BaseService {
   private async upsertStages(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(stages).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: [stages.projectId, stages.id],
+      target: [stages.id, stages.projectId, stages.flowId],
       set: {
         projectId: sql`excluded.project_id`,
+        flowId: sql`excluded.flow_id`,
         name: sql`excluded.name`,
         description: sql`excluded.description`,
         prompt: sql`excluded.prompt`,

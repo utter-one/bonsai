@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../permissions';
 import { StageService } from '../../services/StageService';
 import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema, stageRouteParamsSchema, cloneStageSchema } from '../contracts/stage';
 import type { UpdateStageRequest, CloneStageRequest } from '../contracts/stage';
-import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
+import { listParamsSchema, flowScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -24,7 +24,7 @@ export class StageController {
     return [
       {
         method: 'post',
-        path: '/api/projects/{projectId}/stages',
+        path: '/api/projects/{projectId}/flows/{flowId}/stages',
         tags: ['Stages'],
         summary: 'Create a new stage',
         description: 'Creates a new stage with specified behavior, prompts, and configuration',
@@ -52,7 +52,7 @@ export class StageController {
       },
       {
         method: 'get',
-        path: '/api/projects/{projectId}/stages/{id}',
+        path: '/api/projects/{projectId}/flows/{flowId}/stages/{id}',
         tags: ['Stages'],
         summary: 'Get stage by ID',
         description: 'Retrieves a single stage by its unique identifier',
@@ -73,7 +73,7 @@ export class StageController {
       },
       {
         method: 'get',
-        path: '/api/projects/{projectId}/stages',
+        path: '/api/projects/{projectId}/flows/{flowId}/stages',
         tags: ['Stages'],
         summary: 'List stages',
         description: 'Retrieves a paginated list of stages with optional filtering and sorting',
@@ -94,7 +94,7 @@ export class StageController {
       },
       {
         method: 'put',
-        path: '/api/projects/{projectId}/stages/{id}',
+        path: '/api/projects/{projectId}/flows/{flowId}/stages/{id}',
         tags: ['Stages'],
         summary: 'Update stage',
         description: 'Updates an existing stage with optimistic locking',
@@ -124,7 +124,7 @@ export class StageController {
       },
       {
         method: 'delete',
-        path: '/api/projects/{projectId}/stages/{id}',
+        path: '/api/projects/{projectId}/flows/{flowId}/stages/{id}',
         tags: ['Stages'],
         summary: 'Delete stage',
         description: 'Deletes a stage with optimistic locking',
@@ -147,7 +147,7 @@ export class StageController {
       },
       {
         method: 'get',
-        path: '/api/projects/{projectId}/stages/{id}/audit-logs',
+        path: '/api/projects/{projectId}/flows/{flowId}/stages/{id}/audit-logs',
         tags: ['Stages'],
         summary: 'Get stage audit logs',
         description: 'Retrieves audit logs for a specific stage',
@@ -163,7 +163,7 @@ export class StageController {
       },
       {
         method: 'post',
-        path: '/api/projects/{projectId}/stages/{id}/clone',
+        path: '/api/projects/{projectId}/flows/{flowId}/stages/{id}/clone',
         tags: ['Stages'],
         summary: 'Clone stage',
         description: 'Creates a copy of an existing stage with a new ID and optional name override',
@@ -197,13 +197,13 @@ export class StageController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/projects/:projectId/stages', asyncHandler(this.createStage.bind(this)));
-    router.get('/api/projects/:projectId/stages/:id', asyncHandler(this.getStageById.bind(this)));
-    router.get('/api/projects/:projectId/stages', asyncHandler(this.listStages.bind(this)));
-    router.put('/api/projects/:projectId/stages/:id', asyncHandler(this.updateStage.bind(this)));
-    router.delete('/api/projects/:projectId/stages/:id', asyncHandler(this.deleteStage.bind(this)));
-    router.get('/api/projects/:projectId/stages/:id/audit-logs', asyncHandler(this.getStageAuditLogs.bind(this)));
-    router.post('/api/projects/:projectId/stages/:id/clone', asyncHandler(this.cloneStage.bind(this)));
+    router.post('/api/projects/:projectId/flows/:flowId/stages', asyncHandler(this.createStage.bind(this)));
+    router.get('/api/projects/:projectId/flows/:flowId/stages/:id', asyncHandler(this.getStageById.bind(this)));
+    router.get('/api/projects/:projectId/flows/:flowId/stages', asyncHandler(this.listStages.bind(this)));
+    router.put('/api/projects/:projectId/flows/:flowId/stages/:id', asyncHandler(this.updateStage.bind(this)));
+    router.delete('/api/projects/:projectId/flows/:flowId/stages/:id', asyncHandler(this.deleteStage.bind(this)));
+    router.get('/api/projects/:projectId/flows/:flowId/stages/:id/audit-logs', asyncHandler(this.getStageAuditLogs.bind(this)));
+    router.post('/api/projects/:projectId/flows/:flowId/stages/:id/clone', asyncHandler(this.cloneStage.bind(this)));
   }
 
   /**
@@ -212,9 +212,9 @@ export class StageController {
    */
   private async createStage(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.STAGE_WRITE]);
-    const { projectId } = projectScopedParamsSchema.parse(req.params);
+    const { projectId, flowId } = flowScopedParamsSchema.parse(req.params);
     const body = createStageSchema.parse(req.body);
-    const stage = await this.stageService.createStage(projectId, body, req.context);
+    const stage = await this.stageService.createStage(projectId, flowId, body, req.context);
     res.status(201).json(stage);
   }
 
@@ -225,7 +225,7 @@ export class StageController {
   private async getStageById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.STAGE_READ]);
     const params = stageRouteParamsSchema.parse(req.params);
-    const stage = await this.stageService.getStageById(params.projectId, params.id);
+    const stage = await this.stageService.getStageById(params.projectId, params.flowId, params.id);
     res.status(200).json(stage);
   }
 
@@ -235,9 +235,9 @@ export class StageController {
    */
   private async listStages(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.STAGE_READ]);
-    const { projectId } = projectScopedParamsSchema.parse(req.params);
+    const { projectId, flowId } = flowScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const stages = await this.stageService.listStages(projectId, query);
+    const stages = await this.stageService.listStages(projectId, flowId, query);
     res.status(200).json(stages);
   }
 
@@ -249,7 +249,7 @@ export class StageController {
     checkPermissions(req, [PERMISSIONS.STAGE_WRITE]);
     const params = stageRouteParamsSchema.parse(req.params);
     const body = updateStageBodySchema.parse(req.body);
-    const stage = await this.stageService.updateStage(params.projectId, params.id, body, req.context);
+    const stage = await this.stageService.updateStage(params.projectId, params.flowId, params.id, body, req.context);
     res.status(200).json(stage);
   }
 
@@ -261,7 +261,7 @@ export class StageController {
     checkPermissions(req, [PERMISSIONS.STAGE_DELETE]);
     const params = stageRouteParamsSchema.parse(req.params);
     const body = deleteStageBodySchema.parse(req.body);
-    await this.stageService.deleteStage(params.projectId, params.id, body.version, req.context);
+    await this.stageService.deleteStage(params.projectId, params.flowId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -284,7 +284,7 @@ export class StageController {
     checkPermissions(req, [PERMISSIONS.STAGE_WRITE]);
     const params = stageRouteParamsSchema.parse(req.params);
     const body = cloneStageSchema.parse(req.body);
-    const stage = await this.stageService.cloneStage(params.projectId, params.id, body, req.context);
+    const stage = await this.stageService.cloneStage(params.projectId, params.flowId, params.id, body, req.context);
     res.status(201).json(stage);
   }
 }

@@ -8,6 +8,7 @@ export const startConversationRequestSchema = sessionInputMessageSchema.extend({
   sessionId: z.string().describe('Session ID in which to start the conversation'),
   userId: z.string().describe('User ID initiating the conversation'),
   personaId: z.string().optional().describe('Optional persona ID for the conversation'),
+  flowId: z.string().describe('Flow ID containing the target stage'),
   stageId: z.string().describe('Stage ID to initiate the conversation at a specific stage'),
 });
 

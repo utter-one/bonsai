@@ -77,6 +77,7 @@ export type {
  */
 export const stageRouteParamsSchema = z.object({
   projectId: z.string().min(1).describe('Project ID'),
+  flowId: z.string().min(1).describe('Flow ID'),
   id: z.string().min(1).describe('Stage ID'),
 });
 
@@ -182,6 +183,7 @@ export const deleteStageBodySchema = z.object({
 export const stageResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the stage'),
   projectId: z.string().describe('ID of the project this stage belongs to'),
+  flowId: z.string().describe('ID of the flow this stage belongs to'),
   name: z.string().describe('Display name for the stage'),
   description: z.string().nullable().describe('Detailed description of the stage purpose'),
   prompt: z.string().describe('System prompt defining the stage behavior'),

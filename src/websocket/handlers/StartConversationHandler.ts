@@ -45,7 +45,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       }
       
       // Get stage to extract projectId
-      const stage = await this.stageService.getStageById(context.connection.projectId, message.stageId);
+      const stage = await this.stageService.getStageById(context.connection.projectId, message.flowId, message.stageId);
 
       // Validate that the stage belongs to the project the API key is authorized for
       if (stage.projectId !== context.connection.projectId) {

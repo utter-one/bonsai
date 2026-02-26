@@ -714,6 +714,10 @@
           "type": "string",
           "description": "Optional persona ID for the conversation"
         },
+        "flowId": {
+          "type": "string",
+          "description": "Flow ID containing the target stage"
+        },
         "stageId": {
           "type": "string",
           "description": "Stage ID to initiate the conversation at a specific stage"
@@ -724,6 +728,7 @@
         "type",
         "sessionId",
         "userId",
+        "flowId",
         "stageId"
       ]
     },

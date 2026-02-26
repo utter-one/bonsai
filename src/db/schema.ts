@@ -168,6 +168,7 @@ export type StageEnterBehavior = 'generate_response' | 'await_user_input';
 export const stages = pgTable('stages', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
+  flowId: text('flow_id').notNull(),
   name: text('name').notNull(),
   description: text('description'),
   prompt: text('prompt').notNull(),
@@ -188,7 +189,8 @@ export const stages = pgTable('stages', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
-  primaryKey({ columns: [table.projectId, table.id] }),
+  primaryKey({ columns: [table.id, table.projectId, table.flowId] }),
+  foreignKey({ columns: [table.projectId, table.flowId], foreignColumns: [flows.projectId, flows.id] }).onDelete('cascade'),
   foreignKey({ columns: [table.projectId, table.personaId], foreignColumns: [personas.projectId, personas.id] }),
   foreignKey({ columns: [table.projectId, table.defaultClassifierId], foreignColumns: [classifiers.projectId, classifiers.id] }),
 ]);
@@ -325,7 +327,7 @@ export const stageTools = pgTable('stage_tools', {
 }, (table) => [
   primaryKey({ columns: [table.id, table.projectId, table.flowId, table.stageId] }),
   foreignKey({ columns: [table.projectId, table.flowId], foreignColumns: [flows.projectId, flows.id] }).onDelete('cascade'),
-  foreignKey({ columns: [table.projectId, table.stageId], foreignColumns: [stages.projectId, stages.id] }).onDelete('cascade'),
+  foreignKey({ columns: [table.stageId, table.projectId, table.flowId], foreignColumns: [stages.id, stages.projectId, stages.flowId] }).onDelete('cascade'),
 ]);
 
 // Issue table
@@ -483,6 +485,10 @@ export const stagesRelations = relations(stages, ({ one, many }) => ({
     fields: [stages.projectId],
     references: [projects.id],
   }),
+  flow: one(flows, {
+    fields: [stages.projectId, stages.flowId],
+    references: [flows.projectId, flows.id],
+  }),
   persona: one(personas, {
     fields: [stages.personaId],
     references: [personas.id],
@@ -525,6 +531,7 @@ export const flowsRelations = relations(flows, ({ one, many }) => ({
   }),
   actions: many(flowActions),
   tools: many(flowTools),
+  stages: many(stages),
 }));
 
 export const flowActionsRelations = relations(flowActions, ({ one }) => ({
