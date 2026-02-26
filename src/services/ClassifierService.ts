@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, and, like, SQL, desc, sql } from 'drizzle-orm';
 import { db } from '../db/index';
 import { classifiers } from '../db/schema';
 import type { CreateClassifierRequest, UpdateClassifierRequest, ClassifierResponse, ClassifierListResponse, CloneClassifierRequest } from '../http/contracts/classifier';
@@ -36,11 +36,11 @@ export class ClassifierService extends BaseService {
     logger.info({ classifierId, projectId, name: input.name, adminId: context?.adminId }, 'Creating classifier');
 
     try {
-      const classifier = await db.insert(classifiers).values({ id: classifierId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const classifier = await db.insert(classifiers).values({ id: classifierId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdClassifier = classifier[0];
 
-      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, projectId: createdClassifier.projectId, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, llmSettings: createdClassifier.llmSettings, metadata: createdClassifier.metadata }, context?.adminId);
+      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, projectId: createdClassifier.projectId, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, llmSettings: createdClassifier.llmSettings, tags: createdClassifier.tags, metadata: createdClassifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: createdClassifier.id }, 'Classifier created successfully');
 
@@ -101,6 +101,11 @@ export class ClassifierService extends BaseService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
+          if (field === 'tags') {
+            const tagsArray = Array.isArray(filter) ? filter as string[] : [filter as string];
+            conditions.push(sql`${classifiers.tags} @> ${JSON.stringify(tagsArray)}::jsonb`);
+            continue;
+          }
           const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
@@ -174,6 +179,7 @@ export class ClassifierService extends BaseService {
       if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
       if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
       if (updateData.llmSettings !== undefined) updatePayload.llmSettings = updateData.llmSettings;
+      if (updateData.tags !== undefined) updatePayload.tags = updateData.tags;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
       const updatedClassifier = await db.update(classifiers).set(updatePayload).where(and(eq(classifiers.projectId, projectId), eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
@@ -184,7 +190,7 @@ export class ClassifierService extends BaseService {
 
       const classifier = updatedClassifier[0];
 
-      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, llmSettings: classifier.llmSettings, metadata: classifier.metadata }, context?.adminId);
+      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, llmSettings: classifier.llmSettings, tags: classifier.tags, metadata: classifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: classifier.id, newVersion: classifier.version }, 'Classifier updated successfully');
 
@@ -224,7 +230,7 @@ export class ClassifierService extends BaseService {
         throw new OptimisticLockError(`Failed to delete classifier due to version conflict`);
       }
 
-      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, metadata: existingClassifier.metadata }, context?.adminId);
+      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: id }, 'Classifier deleted successfully');
     } catch (error) {
@@ -252,7 +258,7 @@ export class ClassifierService extends BaseService {
         throw new NotFoundError(`Classifier with id ${id} not found`);
       }
 
-      return await this.createClassifier(projectId, { id: input.id, name: input.name ?? `${existingClassifier.name} (Clone)`, description: existingClassifier.description ?? undefined, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings as any, metadata: existingClassifier.metadata ?? undefined }, context);
+      return await this.createClassifier(projectId, { id: input.id, name: input.name ?? `${existingClassifier.name} (Clone)`, description: existingClassifier.description ?? undefined, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings as any, tags: existingClassifier.tags as string[], metadata: existingClassifier.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone classifier');
       throw error;

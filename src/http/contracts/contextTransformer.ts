@@ -28,6 +28,7 @@ export const createContextTransformerSchema = z.object({
   contextFields: z.array(z.string()).optional().describe('List of context field names to be transformed'),
   llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this transformer'),
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this transformer'),
+  tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this context transformer'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional transformer-specific metadata'),
 });
 
@@ -42,6 +43,7 @@ export const updateContextTransformerBodySchema = z.object({
   contextFields: z.array(z.string()).optional().describe('Updated context field names'),
   llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
   llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
+  tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -67,6 +69,7 @@ export const contextTransformerResponseSchema = z.object({
   contextFields: z.array(z.string()).nullable().describe('Context field names to be transformed'),
   llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
+  tags: z.array(z.string()).describe('Tags for categorizing and filtering this context transformer'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the transformer was created'),

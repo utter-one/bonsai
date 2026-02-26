@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, and, like, SQL, desc, sql } from 'drizzle-orm';
 import { db } from '../db/index';
 import { personas } from '../db/schema';
 import type { CreatePersonaRequest, UpdatePersonaRequest, PersonaResponse, PersonaListResponse, ClonePersonaRequest } from '../http/contracts/persona';
@@ -35,11 +35,11 @@ export class PersonaService extends BaseService {
     logger.info({ personaId, projectId, name: input.name, adminId: context?.adminId }, 'Creating persona');
 
     try {
-      const persona = await db.insert(personas).values({ id: personaId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, metadata: input.metadata, version: 1 }).returning();
+      const persona = await db.insert(personas).values({ id: personaId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, tags: input.tags ?? [], metadata: input.metadata, version: 1 }).returning();
 
       const createdPersona = persona[0];
 
-      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, projectId: createdPersona.projectId, name: createdPersona.name, description: createdPersona.description, prompt: createdPersona.prompt, ttsProviderId: createdPersona.ttsProviderId, ttsSettings: createdPersona.ttsSettings, metadata: createdPersona.metadata }, context?.adminId);
+      await this.auditService.logCreate('persona', createdPersona.id, { id: createdPersona.id, projectId: createdPersona.projectId, name: createdPersona.name, description: createdPersona.description, prompt: createdPersona.prompt, ttsProviderId: createdPersona.ttsProviderId, ttsSettings: createdPersona.ttsSettings, tags: createdPersona.tags, metadata: createdPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: createdPersona.id }, 'Persona created successfully');
 
@@ -99,6 +99,11 @@ export class PersonaService extends BaseService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
+          if (field === 'tags') {
+            const tagsArray = Array.isArray(filter) ? filter as string[] : [filter as string];
+            conditions.push(sql`${personas.tags} @> ${JSON.stringify(tagsArray)}::jsonb`);
+            continue;
+          }
           const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
@@ -166,7 +171,7 @@ export class PersonaService extends BaseService {
         throw new OptimisticLockError(`Persona version mismatch. Expected ${expectedVersion}, got ${existingPersona.version}`);
       }
 
-      const updatedPersona = await db.update(personas).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, metadata: updateData.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.projectId, projectId), eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
+      const updatedPersona = await db.update(personas).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, tags: updateData.tags, metadata: updateData.metadata, version: existingPersona.version + 1, updatedAt: new Date() }).where(and(eq(personas.projectId, projectId), eq(personas.id, id), eq(personas.version, expectedVersion))).returning();
 
       if (updatedPersona.length === 0) {
         throw new OptimisticLockError(`Failed to update persona due to version conflict`);
@@ -174,7 +179,7 @@ export class PersonaService extends BaseService {
 
       const persona = updatedPersona[0];
 
-      await this.auditService.logUpdate('persona', persona.id, { id: existingPersona.id, name: existingPersona.name, description: existingPersona.description, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId, ttsSettings: existingPersona.ttsSettings, metadata: existingPersona.metadata }, { id: persona.id, name: persona.name, description: persona.description, prompt: persona.prompt, ttsProviderId: persona.ttsProviderId, ttsSettings: persona.ttsSettings, metadata: persona.metadata }, context?.adminId);
+      await this.auditService.logUpdate('persona', persona.id, { id: existingPersona.id, name: existingPersona.name, description: existingPersona.description, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId, ttsSettings: existingPersona.ttsSettings, tags: existingPersona.tags, metadata: existingPersona.metadata }, { id: persona.id, name: persona.name, description: persona.description, prompt: persona.prompt, ttsProviderId: persona.ttsProviderId, ttsSettings: persona.ttsSettings, tags: persona.tags, metadata: persona.metadata }, context?.adminId);
 
       logger.info({ personaId: persona.id, newVersion: persona.version }, 'Persona updated successfully');
 
@@ -214,7 +219,7 @@ export class PersonaService extends BaseService {
         throw new OptimisticLockError(`Failed to delete persona due to version conflict`);
       }
 
-      await this.auditService.logDelete('persona', id, { id: existingPersona.id, name: existingPersona.name, description: existingPersona.description, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId, ttsSettings: existingPersona.ttsSettings, metadata: existingPersona.metadata }, context?.adminId);
+      await this.auditService.logDelete('persona', id, { id: existingPersona.id, name: existingPersona.name, description: existingPersona.description, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId, ttsSettings: existingPersona.ttsSettings, tags: existingPersona.tags, metadata: existingPersona.metadata }, context?.adminId);
 
       logger.info({ personaId: id }, 'Persona deleted successfully');
     } catch (error) {
@@ -242,7 +247,7 @@ export class PersonaService extends BaseService {
         throw new NotFoundError(`Persona with id ${id} not found`);
       }
 
-      return await this.createPersona(projectId, { id: input.id, name: input.name ?? `${existingPersona.name} (Clone)`, description: existingPersona.description ?? undefined, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId ?? undefined, ttsSettings: existingPersona.ttsSettings as any, metadata: existingPersona.metadata ?? undefined }, context);
+      return await this.createPersona(projectId, { id: input.id, name: input.name ?? `${existingPersona.name} (Clone)`, description: existingPersona.description ?? undefined, prompt: existingPersona.prompt, ttsProviderId: existingPersona.ttsProviderId ?? undefined, ttsSettings: existingPersona.ttsSettings as any, tags: existingPersona.tags as string[], metadata: existingPersona.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone persona');
       throw error;
