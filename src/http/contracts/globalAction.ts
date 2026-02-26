@@ -77,6 +77,7 @@ export const createGlobalActionSchema = z.object({
   parameters: z.array(stageActionParameterSchema).optional().describe('Optional array of parameters to extract from user input'),
   effects: z.array(effectSchema).optional().describe('Array of effects to execute when action is triggered'),
   examples: z.array(z.string()).optional().describe('Example phrases that trigger this action'),
+  tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this global action'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional action-specific metadata'),
 });
 
@@ -94,6 +95,7 @@ export const updateGlobalActionBodySchema = z.object({
   parameters: z.array(stageActionParameterSchema).optional().describe('Updated parameters array'),
   effects: z.array(effectSchema).optional().describe('Updated effects array'),
   examples: z.array(z.string()).optional().describe('Updated example phrases'),
+  tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -122,6 +124,7 @@ export const globalActionResponseSchema = z.object({
   parameters: z.array(stageActionParameterSchema).describe('Array of parameters to extract from user input'),
   effects: z.array(effectSchema).describe('Array of effects to execute'),
   examples: z.array(z.string()).nullable().describe('Example phrases that trigger this action'),
+  tags: z.array(z.string()).describe('Tags for categorizing and filtering this global action'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the global action was created'),

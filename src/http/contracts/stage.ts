@@ -140,6 +140,7 @@ export const createStageSchema = z.object({
   actions: actionsSchema.optional().describe('Action definitions for this stage'),
   defaultClassifierId: z.string().nullable().optional().describe('ID of the default classifier to use for this stage (can be overridden per action)'),
   transformerIds: z.array(z.string()).optional().default([]).describe('List of context transformer IDs to use in this stage'),
+  tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this stage'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional stage-specific metadata'),
 });
 
@@ -163,6 +164,7 @@ export const updateStageBodySchema = z.object({
   actions: actionsSchema.optional().describe('Updated action definitions'),
   defaultClassifierId: z.string().nullable().optional().describe('Updated default classifier ID'),
   transformerIds: z.array(z.string()).optional().describe('Updated transformer IDs'),
+  tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -197,6 +199,7 @@ export const stageResponseSchema = z.object({
   actions: actionsSchema.describe('Action definitions'),
   defaultClassifierId: z.string().nullable().describe('Default classifier ID used in this stage (actions can override with overrideClassifierId)'),
   transformerIds: z.array(z.string()).describe('Context transformer IDs used in this stage'),
+  tags: z.array(z.string()).describe('Tags for categorizing and filtering this stage'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the stage was created'),
