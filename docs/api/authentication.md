@@ -106,13 +106,9 @@ Content-Type: application/json
 
 ## API Keys
 
-API keys can be created per project and used as an alternative to JWT tokens for programmatic access:
+API keys are scoped to a project and are used **exclusively for WebSocket real-time conversation authentication**. They are not a substitute for JWT tokens and cannot be used to access the REST API.
 
-```http
-Authorization: Bearer <apiKey>
-```
-
-See [API Keys](./api-keys) for managing API keys.
+See [API Keys](./api-keys) for managing API keys and [WebSocket](./websocket) for how they are used during connection authentication.
 
 ## Roles & Permissions
 
