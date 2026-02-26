@@ -4,11 +4,7 @@ Audit logs track all create, update, and delete operations performed on entities
 
 **Tag:** `Audit Logs`
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `GET` | `/api/audit-logs` | List audit logs | `audit:read` |
+All audit log endpoints require the `audit:read` permission.
 
 In addition, most entity types expose audit logs at their own path:
 
@@ -32,6 +28,8 @@ GET /api/users/:id/audit-logs
 ```http
 GET /api/audit-logs
 ```
+
+**Required permission:** `audit:read`
 
 Supports [pagination & filtering](./pagination).
 

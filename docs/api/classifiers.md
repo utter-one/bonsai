@@ -4,24 +4,14 @@ Classifiers use LLMs to categorize user input into actions. They are used by sta
 
 **Tag:** `Classifiers` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/classifiers` | Create classifier | `classifier:write` |
-| `GET` | `/api/projects/:projectId/classifiers/:id` | Get by ID | `classifier:read` |
-| `GET` | `/api/projects/:projectId/classifiers` | List classifiers | `classifier:read` |
-| `PUT` | `/api/projects/:projectId/classifiers/:id` | Update classifier | `classifier:write` |
-| `DELETE` | `/api/projects/:projectId/classifiers/:id` | Delete classifier | `classifier:delete` |
-| `GET` | `/api/projects/:projectId/classifiers/:id/audit-logs` | Get audit logs | `audit:read` |
-| `POST` | `/api/projects/:projectId/classifiers/:id/clone` | Clone classifier | `classifier:write` |
-
 ## Create Classifier
 
 ```http
 POST /api/projects/:projectId/classifiers
 Content-Type: application/json
 ```
+
+**Required permission:** `classifier:write`
 
 **Request Body**
 
@@ -45,6 +35,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/classifiers/:id
 ```
 
+**Required permission:** `classifier:read`
+
 **Response** `200 OK` — [Classifier Response](#classifier-response)
 
 ## List Classifiers
@@ -52,6 +44,8 @@ GET /api/projects/:projectId/classifiers/:id
 ```http
 GET /api/projects/:projectId/classifiers
 ```
+
+**Required permission:** `classifier:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -61,6 +55,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/classifiers/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `classifier:write`
 
 All create fields are optional plus `version` (required).
 
@@ -75,6 +71,8 @@ DELETE /api/projects/:projectId/classifiers/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `classifier:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
@@ -88,12 +86,24 @@ POST /api/projects/:projectId/classifiers/:id/clone
 Content-Type: application/json
 ```
 
+**Required permission:** `classifier:write`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | New ID (auto-generated if omitted) |
 | `name` | `string` | No | New name (defaults to "{original name} (Clone)") |
 
 **Response** `201 Created` — [Classifier Response](#classifier-response)
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/classifiers/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified classifier. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

@@ -4,23 +4,14 @@ Providers configure external service integrations for LLM, TTS, ASR, and storage
 
 **Tag:** `Providers`
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/providers` | Create provider | `provider:write` |
-| `GET` | `/api/providers/:id` | Get provider by ID | `provider:read` |
-| `GET` | `/api/providers` | List providers | `provider:read` |
-| `PUT` | `/api/providers/:id` | Update provider | `provider:write` |
-| `DELETE` | `/api/providers/:id` | Delete provider | `provider:delete` |
-| `GET` | `/api/providers/:id/audit-logs` | Get audit logs | `audit:read` |
-
 ## Create Provider
 
 ```http
 POST /api/providers
 Content-Type: application/json
 ```
+
+**Required permission:** `provider:write`
 
 **Request Body**
 
@@ -45,6 +36,8 @@ Content-Type: application/json
 GET /api/providers/:id
 ```
 
+**Required permission:** `provider:read`
+
 **Response** `200 OK` — [Provider Response](#provider-response)
 
 ## List Providers
@@ -52,6 +45,8 @@ GET /api/providers/:id
 ```http
 GET /api/providers
 ```
+
+**Required permission:** `provider:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -61,6 +56,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/providers/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `provider:write`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -83,11 +80,23 @@ DELETE /api/providers/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `provider:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (positive) | Yes | Current version for optimistic locking |
 
 **Response** `204 No Content`
+
+## Get Audit Logs
+
+```http
+GET /api/providers/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified provider. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

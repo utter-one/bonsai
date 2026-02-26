@@ -4,37 +4,14 @@ The Knowledge API manages a hierarchical knowledge base organized into categorie
 
 **Tag:** `Knowledge` | **Scoped to:** Project
 
-## Endpoints
-
-### Categories
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/knowledge/categories` | Create category | `knowledge:write` |
-| `GET` | `/api/projects/:projectId/knowledge/categories/:id` | Get category by ID | `knowledge:read` |
-| `GET` | `/api/projects/:projectId/knowledge/categories` | List categories | `knowledge:read` |
-| `PUT` | `/api/projects/:projectId/knowledge/categories/:id` | Update category | `knowledge:write` |
-| `DELETE` | `/api/projects/:projectId/knowledge/categories/:id` | Delete category | `knowledge:delete` |
-
-### Items
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/knowledge/items` | Create item | `knowledge:write` |
-| `GET` | `/api/projects/:projectId/knowledge/items/:id` | Get item by ID | `knowledge:read` |
-| `GET` | `/api/projects/:projectId/knowledge/items` | List items | `knowledge:read` |
-| `PUT` | `/api/projects/:projectId/knowledge/items/:id` | Update item | `knowledge:write` |
-| `DELETE` | `/api/projects/:projectId/knowledge/items/:id` | Delete item | `knowledge:delete` |
-| `GET` | `/api/projects/:projectId/knowledge/categories/:categoryId/items` | Get items by category | `knowledge:read` |
-
----
-
 ## Create Category
 
 ```http
 POST /api/projects/:projectId/knowledge/categories
 Content-Type: application/json
 ```
+
+**Required permission:** `knowledge:write`
 
 **Request Body**
 
@@ -54,6 +31,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/knowledge/categories/:id
 ```
 
+**Required permission:** `knowledge:read`
+
 **Response** `200 OK` — [Category Response](#category-response) (includes nested items)
 
 ## List Categories
@@ -61,6 +40,8 @@ GET /api/projects/:projectId/knowledge/categories/:id
 ```http
 GET /api/projects/:projectId/knowledge/categories
 ```
+
+**Required permission:** `knowledge:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -70,6 +51,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/knowledge/categories/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `knowledge:write`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -88,6 +71,8 @@ DELETE /api/projects/:projectId/knowledge/categories/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `knowledge:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
@@ -102,6 +87,8 @@ Content-Type: application/json
 POST /api/projects/:projectId/knowledge/items
 Content-Type: application/json
 ```
+
+**Required permission:** `knowledge:write`
 
 **Request Body**
 
@@ -121,6 +108,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/knowledge/items/:id
 ```
 
+**Required permission:** `knowledge:read`
+
 **Response** `200 OK` — [Item Response](#item-response)
 
 ## List Items
@@ -128,6 +117,8 @@ GET /api/projects/:projectId/knowledge/items/:id
 ```http
 GET /api/projects/:projectId/knowledge/items
 ```
+
+**Required permission:** `knowledge:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -137,6 +128,8 @@ Supports [pagination & filtering](./pagination).
 GET /api/projects/:projectId/knowledge/categories/:categoryId/items
 ```
 
+**Required permission:** `knowledge:read`
+
 Returns all items belonging to a specific category.
 
 ## Update Item
@@ -145,6 +138,8 @@ Returns all items belonging to a specific category.
 PUT /api/projects/:projectId/knowledge/items/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `knowledge:write`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -162,6 +157,8 @@ Content-Type: application/json
 DELETE /api/projects/:projectId/knowledge/items/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `knowledge:delete`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|

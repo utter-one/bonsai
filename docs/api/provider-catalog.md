@@ -4,16 +4,6 @@ The Provider Catalog API returns metadata about all available provider implement
 
 **Tag:** `Provider Catalog` | **Authentication:** None required
 
-## Endpoints
-
-| Method | Path | Summary |
-|--------|------|---------|
-| `GET` | `/api/provider-catalog` | Get complete provider catalog |
-| `GET` | `/api/provider-catalog/asr` | Get ASR providers |
-| `GET` | `/api/provider-catalog/tts` | Get TTS providers |
-| `GET` | `/api/provider-catalog/llm` | Get LLM providers |
-| `GET` | `/api/provider-catalog/storage` | Get storage providers |
-| `GET` | `/api/provider-catalog/:type/:apiType` | Get specific provider info |
 
 ## Get Full Catalog
 

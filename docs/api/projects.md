@@ -4,22 +4,14 @@ Projects are the top-level organizational unit. All conversation resources (stag
 
 **Tag:** `Projects`
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects` | Create project | `project:write` |
-| `GET` | `/api/projects/:id` | Get project by ID | `project:read` |
-| `GET` | `/api/projects` | List projects | `project:read` |
-| `PUT` | `/api/projects/:id` | Update project | `project:write` |
-| `DELETE` | `/api/projects/:id` | Delete project | `project:delete` |
-
 ## Create Project
 
 ```http
 POST /api/projects
 Content-Type: application/json
 ```
+
+**Required permission:** `project:write`
 
 **Request Body**
 
@@ -44,6 +36,8 @@ Content-Type: application/json
 GET /api/projects/:id
 ```
 
+**Required permission:** `project:read`
+
 **Response** `200 OK` — [Project Response](#project-response)
 
 **Errors:** `404` Not found
@@ -53,6 +47,8 @@ GET /api/projects/:id
 ```http
 GET /api/projects
 ```
+
+**Required permission:** `project:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -71,6 +67,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `project:write`
 
 All fields from the create body are optional. `version` is required for optimistic locking.
 
@@ -96,6 +94,8 @@ All fields from the create body are optional. `version` is required for optimist
 DELETE /api/projects/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `project:delete`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|

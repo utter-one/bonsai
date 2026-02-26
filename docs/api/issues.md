@@ -4,17 +4,6 @@ Track bugs, feature requests, and performance issues related to conversations.
 
 **Tag:** `Issues` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/issues` | Create issue | `issue:write` |
-| `GET` | `/api/projects/:projectId/issues/:id` | Get issue by ID | `issue:read` |
-| `GET` | `/api/projects/:projectId/issues` | List issues | `issue:read` |
-| `PUT` | `/api/projects/:projectId/issues/:id` | Update issue | `issue:write` |
-| `DELETE` | `/api/projects/:projectId/issues/:id` | Delete issue | `issue:delete` |
-| `GET` | `/api/projects/:projectId/issues/:id/audit-logs` | Get audit logs | `audit:read` |
-
 ::: info
 Issues use auto-incrementing integer IDs, not string UUIDs.
 :::
@@ -25,6 +14,8 @@ Issues use auto-incrementing integer IDs, not string UUIDs.
 POST /api/projects/:projectId/issues
 Content-Type: application/json
 ```
+
+**Required permission:** `issue:write`
 
 **Request Body**
 
@@ -53,6 +44,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/issues/:id
 ```
 
+**Required permission:** `issue:read`
+
 **Response** `200 OK` — [Issue Response](#issue-response)
 
 **Errors:** `404` Not found
@@ -63,6 +56,8 @@ GET /api/projects/:projectId/issues/:id
 GET /api/projects/:projectId/issues
 ```
 
+**Required permission:** `issue:read`
+
 Supports [pagination & filtering](./pagination).
 
 ## Update Issue
@@ -71,6 +66,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/issues/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `issue:write`
 
 All create fields are optional (no version-based optimistic locking for issues).
 
@@ -84,9 +81,21 @@ All create fields are optional (no version-based optimistic locking for issues).
 DELETE /api/projects/:projectId/issues/:id
 ```
 
+**Required permission:** `issue:delete`
+
 **Response** `204 No Content`
 
 **Errors:** `404` Not found
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/issues/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified issue. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

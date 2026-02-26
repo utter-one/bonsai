@@ -4,24 +4,14 @@ Context transformers process and transform conversation context before it's sent
 
 **Tag:** `Context Transformers` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/context-transformers` | Create | `context_transformer:write` |
-| `GET` | `/api/projects/:projectId/context-transformers/:id` | Get by ID | `context_transformer:read` |
-| `GET` | `/api/projects/:projectId/context-transformers` | List | `context_transformer:read` |
-| `PUT` | `/api/projects/:projectId/context-transformers/:id` | Update | `context_transformer:write` |
-| `DELETE` | `/api/projects/:projectId/context-transformers/:id` | Delete | `context_transformer:delete` |
-| `GET` | `/api/projects/:projectId/context-transformers/:id/audit-logs` | Get audit logs | `audit:read` |
-| `POST` | `/api/projects/:projectId/context-transformers/:id/clone` | Clone | `context_transformer:write` |
-
 ## Create Context Transformer
 
 ```http
 POST /api/projects/:projectId/context-transformers
 Content-Type: application/json
 ```
+
+**Required permission:** `context_transformer:write`
 
 **Request Body**
 
@@ -46,6 +36,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/context-transformers/:id
 ```
 
+**Required permission:** `context_transformer:read`
+
 **Response** `200 OK` — [Context Transformer Response](#context-transformer-response)
 
 ## List Context Transformers
@@ -53,6 +45,8 @@ GET /api/projects/:projectId/context-transformers/:id
 ```http
 GET /api/projects/:projectId/context-transformers
 ```
+
+**Required permission:** `context_transformer:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -62,6 +56,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/context-transformers/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `context_transformer:write`
 
 All create fields are optional plus `version` (required).
 
@@ -76,6 +72,8 @@ DELETE /api/projects/:projectId/context-transformers/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `context_transformer:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
@@ -89,12 +87,24 @@ POST /api/projects/:projectId/context-transformers/:id/clone
 Content-Type: application/json
 ```
 
+**Required permission:** `context_transformer:write`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | New ID (auto-generated if omitted) |
 | `name` | `string` | No | New name (defaults to "{original name} (Clone)") |
 
 **Response** `201 Created` — [Context Transformer Response](#context-transformer-response)
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/context-transformers/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified context transformer. See [Audit Logs](./audit-logs) for response format.
 
 ---
 
