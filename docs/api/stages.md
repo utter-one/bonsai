@@ -4,17 +4,7 @@ Stages define the conversational flow within a project. Each stage has its own p
 
 **Tag:** `Stages` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/stages` | Create stage | `stage:write` |
-| `GET` | `/api/projects/:projectId/stages/:id` | Get stage by ID | `stage:read` |
-| `GET` | `/api/projects/:projectId/stages` | List stages | `stage:read` |
-| `PUT` | `/api/projects/:projectId/stages/:id` | Update stage | `stage:write` |
-| `DELETE` | `/api/projects/:projectId/stages/:id` | Delete stage | `stage:delete` |
-| `GET` | `/api/projects/:projectId/stages/:id/audit-logs` | Get audit logs | `audit:read` |
-| `POST` | `/api/projects/:projectId/stages/:id/clone` | Clone stage | `stage:write` |
+For more information, see the [Stages](../guide/stages) and [Actions & Effects](../guide/actions-and-effects) guides.
 
 ## Create Stage
 
@@ -22,6 +12,8 @@ Stages define the conversational flow within a project. Each stage has its own p
 POST /api/projects/:projectId/stages
 Content-Type: application/json
 ```
+
+**Required permission:** `stage:write`
 
 **Request Body**
 
@@ -55,6 +47,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/stages/:id
 ```
 
+**Required permission:** `stage:read`
+
 **Response** `200 OK` — [Stage Response](#stage-response)
 
 **Errors:** `404` Not found
@@ -64,6 +58,8 @@ GET /api/projects/:projectId/stages/:id
 ```http
 GET /api/projects/:projectId/stages
 ```
+
+**Required permission:** `stage:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -75,6 +71,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/stages/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `stage:write`
 
 All create fields are optional plus `version` (required for optimistic locking).
 
@@ -89,6 +87,8 @@ DELETE /api/projects/:projectId/stages/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `stage:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
@@ -102,12 +102,24 @@ POST /api/projects/:projectId/stages/:id/clone
 Content-Type: application/json
 ```
 
+**Required permission:** `stage:write`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` (min 1) | No | New ID (auto-generated if omitted) |
 | `name` | `string` (min 1) | No | New name (defaults to "{original name} (Clone)") |
 
 **Response** `201 Created` — [Stage Response](#stage-response)
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/stages/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified stage. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

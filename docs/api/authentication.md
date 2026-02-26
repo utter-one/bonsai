@@ -2,6 +2,8 @@
 
 Bonsai Backed uses **JWT-based authentication** for admin access and **API key authentication** for programmatic access.
 
+For more information, see the [Authentication & Permissions](../guide/authentication) guide.
+
 ## Login
 
 Authenticate with admin credentials to receive a JWT token pair.
@@ -106,17 +108,15 @@ Content-Type: application/json
 
 ## API Keys
 
-API keys can be created per project and used as an alternative to JWT tokens for programmatic access:
+API keys are scoped to a project and are used **exclusively for WebSocket real-time conversation authentication**. They are not a substitute for JWT tokens and cannot be used to access the REST API.
 
-```http
-Authorization: Bearer <apiKey>
-```
-
-See [API Keys](./api-keys) for managing API keys.
+See [API Keys](./api-keys) for managing API keys and [WebSocket](./websocket) for how they are used during connection authentication.
 
 ## Roles & Permissions
 
-The system uses role-based access control (RBAC). Available roles:
+The system uses role-based access control (RBAC). Permissions follow the `entity:action` format (e.g., `project:read`, `stage:write`, `admin:delete`).
+
+### Available Roles
 
 | Role | Description |
 |------|-------------|
@@ -126,4 +126,104 @@ The system uses role-based access control (RBAC). Available roles:
 | `developer` | Technical access for development and debugging |
 | `viewer` | Read-only access to most entities |
 
-Permissions follow the `entity:action` format (e.g., `project:read`, `stage:write`, `admin:delete`).
+### Role Permissions
+
+#### `super_admin`
+
+Has every permission in the system.
+
+| Entity | Permissions |
+|--------|-------------|
+| `admin` | `read`, `write`, `delete` |
+| `user` | `read`, `write`, `delete` |
+| `project` | `read`, `write`, `delete` |
+| `persona` | `read`, `write`, `delete` |
+| `conversation` | `read`, `write`, `delete` |
+| `stage` | `read`, `write`, `delete` |
+| `classifier` | `read`, `write`, `delete` |
+| `context_transformer` | `read`, `write`, `delete` |
+| `tool` | `read`, `write`, `delete` |
+| `global_action` | `read`, `write`, `delete` |
+| `environment` | `read`, `write`, `delete` |
+| `knowledge` | `read`, `write`, `delete` |
+| `issue` | `read`, `write`, `delete` |
+| `provider` | `read`, `write`, `delete` |
+| `api_key` | `read`, `write`, `delete` |
+| `migration` | `export`, `import` |
+| `system` | `config` |
+| `audit` | `read` |
+
+#### `content_manager`
+
+Manages content entities. Has read/write across most entities but cannot delete projects, personas, users, conversations, or stages, and has no admin or system access.
+
+| Entity | Permissions |
+|--------|-------------|
+| `user` | `read`, `write` |
+| `project` | `read`, `write` |
+| `persona` | `read`, `write` |
+| `conversation` | `read`, `write` |
+| `stage` | `read`, `write` |
+| `classifier` | `read`, `write` |
+| `context_transformer` | `read`, `write` |
+| `tool` | `read`, `write` |
+| `global_action` | `read`, `write` |
+| `knowledge` | `read`, `write` |
+| `provider` | `read`, `write` |
+| `api_key` | `read`, `write`, `delete` |
+| `audit` | `read` |
+
+#### `support`
+
+Limited write access focused on users and issues. Primarily a read role with write on users and issues.
+
+| Entity | Permissions |
+|--------|-------------|
+| `user` | `read`, `write` |
+| `project` | `read` |
+| `conversation` | `read` |
+| `issue` | `read`, `write` |
+| `audit` | `read` |
+
+#### `developer`
+
+Read-only access across all technical entities plus system configuration. No write or delete permissions except `system:config`.
+
+| Entity | Permissions |
+|--------|-------------|
+| `user` | `read` |
+| `project` | `read` |
+| `persona` | `read` |
+| `conversation` | `read` |
+| `stage` | `read` |
+| `classifier` | `read` |
+| `context_transformer` | `read` |
+| `tool` | `read` |
+| `global_action` | `read` |
+| `knowledge` | `read` |
+| `issue` | `read` |
+| `provider` | `read` |
+| `api_key` | `read` |
+| `system` | `config` |
+| `audit` | `read` |
+
+#### `viewer`
+
+Strictly read-only access. Same entity coverage as `developer` but without `system:config`.
+
+| Entity | Permissions |
+|--------|-------------|
+| `user` | `read` |
+| `project` | `read` |
+| `persona` | `read` |
+| `conversation` | `read` |
+| `stage` | `read` |
+| `classifier` | `read` |
+| `context_transformer` | `read` |
+| `tool` | `read` |
+| `global_action` | `read` |
+| `knowledge` | `read` |
+| `issue` | `read` |
+| `provider` | `read` |
+| `api_key` | `read` |
+| `audit` | `read` |

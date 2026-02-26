@@ -4,17 +4,7 @@ Personas define the AI character's voice and behavior in conversations. Each per
 
 **Tag:** `Personas` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/personas` | Create persona | `persona:write` |
-| `GET` | `/api/projects/:projectId/personas/:id` | Get persona by ID | `persona:read` |
-| `GET` | `/api/projects/:projectId/personas` | List personas | `persona:read` |
-| `PUT` | `/api/projects/:projectId/personas/:id` | Update persona | `persona:write` |
-| `DELETE` | `/api/projects/:projectId/personas/:id` | Delete persona | `persona:delete` |
-| `GET` | `/api/projects/:projectId/personas/:id/audit-logs` | Get audit logs | `audit:read` |
-| `POST` | `/api/projects/:projectId/personas/:id/clone` | Clone persona | `persona:write` |
+For more information, see the [Personas](../guide/personas) guide.
 
 ## Create Persona
 
@@ -22,6 +12,8 @@ Personas define the AI character's voice and behavior in conversations. Each per
 POST /api/projects/:projectId/personas
 Content-Type: application/json
 ```
+
+**Required permission:** `persona:write`
 
 **Request Body**
 
@@ -45,6 +37,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/personas/:id
 ```
 
+**Required permission:** `persona:read`
+
 **Response** `200 OK` — [Persona Response](#persona-response)
 
 ## List Personas
@@ -52,6 +46,8 @@ GET /api/projects/:projectId/personas/:id
 ```http
 GET /api/projects/:projectId/personas
 ```
+
+**Required permission:** `persona:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -61,6 +57,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/personas/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `persona:write`
 
 All create fields are optional plus `version` (required).
 
@@ -75,6 +73,8 @@ DELETE /api/projects/:projectId/personas/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `persona:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
@@ -88,12 +88,24 @@ POST /api/projects/:projectId/personas/:id/clone
 Content-Type: application/json
 ```
 
+**Required permission:** `persona:write`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | New ID (auto-generated if omitted) |
 | `name` | `string` | No | New name (defaults to "{original name} (Clone)") |
 
 **Response** `201 Created` — [Persona Response](#persona-response)
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/personas/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified persona. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

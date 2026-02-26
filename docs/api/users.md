@@ -4,16 +4,7 @@ Users represent end-users who participate in conversations. Users have flexible 
 
 **Tag:** `Users`
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/users` | Create user | `user:write` |
-| `GET` | `/api/users/:id` | Get user by ID | `user:read` |
-| `GET` | `/api/users` | List users | `user:read` |
-| `PUT` | `/api/users/:id` | Update user | `user:write` |
-| `DELETE` | `/api/users/:id` | Delete user | `user:delete` |
-| `GET` | `/api/users/:id/audit-logs` | Get audit logs | `audit:read` |
+For more information, see [Core Concepts](../guide/concepts).
 
 ## Create User
 
@@ -21,6 +12,8 @@ Users represent end-users who participate in conversations. Users have flexible 
 POST /api/users
 Content-Type: application/json
 ```
+
+**Required permission:** `user:write`
 
 **Request Body**
 
@@ -50,6 +43,8 @@ Content-Type: application/json
 GET /api/users/:id
 ```
 
+**Required permission:** `user:read`
+
 **Response** `200 OK` — [User Response](#user-response)
 
 **Errors:** `404` Not found
@@ -59,6 +54,8 @@ GET /api/users/:id
 ```http
 GET /api/users
 ```
+
+**Required permission:** `user:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -70,6 +67,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/users/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `user:write`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -85,9 +84,21 @@ Content-Type: application/json
 DELETE /api/users/:id
 ```
 
+**Required permission:** `user:delete`
+
 **Response** `204 No Content`
 
 **Errors:** `404` Not found
+
+## Get Audit Logs
+
+```http
+GET /api/users/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified user. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

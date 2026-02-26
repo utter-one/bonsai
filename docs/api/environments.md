@@ -4,26 +4,14 @@ Environments represent remote Bonsai Backed instances that can be used as source
 
 **Tag:** `Environments`
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/environments` | Create environment | `environment:write` |
-| `GET` | `/api/environments/:id` | Get by ID | `environment:read` |
-| `GET` | `/api/environments` | List environments | `environment:read` |
-| `PUT` | `/api/environments/:id` | Update environment | `environment:write` |
-| `DELETE` | `/api/environments/:id` | Delete environment | `environment:delete` |
-| `GET` | `/api/environments/:id/audit-logs` | Get audit logs | `audit:read` |
-| `GET` | `/api/environments/:id/migration/scope` | Preview remote migration scope | `migration:import` |
-| `POST` | `/api/environments/:id/migration/pull` | Pull data from environment | `migration:import` |
-| `GET` | `/api/environments/:id/migration/jobs/:jobId` | Get migration job status | `migration:import` |
-
 ## Create Environment
 
 ```http
 POST /api/environments
 Content-Type: application/json
 ```
+
+**Required permission:** `environment:write`
 
 **Request Body**
 
@@ -45,6 +33,8 @@ Content-Type: application/json
 GET /api/environments/:id
 ```
 
+**Required permission:** `environment:read`
+
 **Response** `200 OK` — [Environment Response](#environment-response)
 
 ::: info
@@ -57,6 +47,8 @@ The password is excluded from response for security.
 GET /api/environments
 ```
 
+**Required permission:** `environment:read`
+
 Supports [pagination & filtering](./pagination).
 
 ## Update Environment
@@ -65,6 +57,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/environments/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `environment:write`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -83,11 +77,23 @@ DELETE /api/environments/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `environment:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
 
 **Response** `204 No Content`
+
+## Get Audit Logs
+
+```http
+GET /api/environments/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified environment. See [Audit Logs](./audit-logs) for response format.
 
 ---
 
@@ -100,6 +106,8 @@ Preview what data is available to pull from a remote environment.
 ```http
 GET /api/environments/:id/migration/scope
 ```
+
+**Required permission:** `migration:import`
 
 **Response** `200 OK`
 
@@ -129,6 +137,8 @@ POST /api/environments/:id/migration/pull
 Content-Type: application/json
 ```
 
+**Required permission:** `migration:import`
+
 **Request Body**
 
 | Field | Type | Required | Description |
@@ -144,6 +154,8 @@ Content-Type: application/json
 ```http
 GET /api/environments/:id/migration/jobs/:jobId
 ```
+
+**Required permission:** `migration:import`
 
 **Response** `200 OK` — [Migration Job Response](#migration-job-response)
 

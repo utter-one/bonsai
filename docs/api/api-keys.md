@@ -1,18 +1,10 @@
 # API Keys
 
-API keys provide programmatic access to project resources. Each key is scoped to a project and can be used as an alternative to JWT authentication.
+API keys provide authentication for WebSocket real-time conversations. Each key is scoped to a project and is used exclusively by client applications (web apps, mobile apps, kiosks) to authenticate WebSocket sessions — they are not a substitute for JWT-based admin authentication.
 
 **Tag:** `API Keys` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/api-keys` | Create API key | `api_key:write` |
-| `GET` | `/api/projects/:projectId/api-keys/:id` | Get API key by ID | `api_key:read` |
-| `GET` | `/api/projects/:projectId/api-keys` | List API keys | `api_key:read` |
-| `PUT` | `/api/projects/:projectId/api-keys/:id` | Update API key | `api_key:write` |
-| `DELETE` | `/api/projects/:projectId/api-keys/:id` | Delete API key | `api_key:delete` |
+For more information, see the [Authentication & Permissions](../guide/authentication) and [WebSocket Protocol](../guide/websocket) guides.
 
 ## Create API Key
 
@@ -20,6 +12,8 @@ API keys provide programmatic access to project resources. Each key is scoped to
 POST /api/projects/:projectId/api-keys
 Content-Type: application/json
 ```
+
+**Required permission:** `api_key:write`
 
 **Request Body**
 
@@ -42,6 +36,8 @@ The full `key` value is **only returned once** at creation time. Store it secure
 GET /api/projects/:projectId/api-keys/:id
 ```
 
+**Required permission:** `api_key:read`
+
 **Response** `200 OK` — [API Key Response](#api-key-response) (without `key`, only `keyPreview`)
 
 ## List API Keys
@@ -49,6 +45,8 @@ GET /api/projects/:projectId/api-keys/:id
 ```http
 GET /api/projects/:projectId/api-keys
 ```
+
+**Required permission:** `api_key:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -58,6 +56,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/api-keys/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `api_key:write`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -76,6 +76,8 @@ Content-Type: application/json
 DELETE /api/projects/:projectId/api-keys/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `api_key:delete`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -100,11 +102,3 @@ Content-Type: application/json
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
-
-## Usage
-
-Use the API key in the `Authorization` header:
-
-```http
-Authorization: Bearer <apiKey>
-```

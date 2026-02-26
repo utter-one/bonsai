@@ -4,17 +4,7 @@ Tools are LLM-powered processing units that can be invoked during conversations.
 
 **Tag:** `Tools` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/tools` | Create tool | `tool:write` |
-| `GET` | `/api/projects/:projectId/tools/:id` | Get tool by ID | `tool:read` |
-| `GET` | `/api/projects/:projectId/tools` | List tools | `tool:read` |
-| `PUT` | `/api/projects/:projectId/tools/:id` | Update tool | `tool:write` |
-| `DELETE` | `/api/projects/:projectId/tools/:id` | Delete tool | `tool:delete` |
-| `GET` | `/api/projects/:projectId/tools/:id/audit-logs` | Get audit logs | `audit:read` |
-| `POST` | `/api/projects/:projectId/tools/:id/clone` | Clone tool | `tool:write` |
+For more information, see the [Tools](../guide/tools), [Scripting](../guide/scripting), and [Prompt Templating](../guide/templating) guides.
 
 ## Create Tool
 
@@ -22,6 +12,8 @@ Tools are LLM-powered processing units that can be invoked during conversations.
 POST /api/projects/:projectId/tools
 Content-Type: application/json
 ```
+
+**Required permission:** `tool:write`
 
 **Request Body**
 
@@ -48,6 +40,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/tools/:id
 ```
 
+**Required permission:** `tool:read`
+
 **Response** `200 OK` — [Tool Response](#tool-response)
 
 ## List Tools
@@ -55,6 +49,8 @@ GET /api/projects/:projectId/tools/:id
 ```http
 GET /api/projects/:projectId/tools
 ```
+
+**Required permission:** `tool:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -64,6 +60,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/tools/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `tool:write`
 
 All create fields are optional plus `version` (required).
 
@@ -78,6 +76,8 @@ DELETE /api/projects/:projectId/tools/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `tool:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
@@ -91,12 +91,24 @@ POST /api/projects/:projectId/tools/:id/clone
 Content-Type: application/json
 ```
 
+**Required permission:** `tool:write`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | New ID (auto-generated if omitted) |
 | `name` | `string` | No | New name (defaults to "{original name} (Clone)") |
 
 **Response** `201 Created` — [Tool Response](#tool-response)
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/tools/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified tool. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

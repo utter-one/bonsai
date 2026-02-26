@@ -2,6 +2,8 @@
 
 The Setup API provides endpoints for initial system configuration. These endpoints are **public** (no authentication required) and are used to bootstrap the first admin account.
 
+For more information, see the [Installation](../guide/installation) guide.
+
 ## Check Setup Status
 
 Check whether the system has been initialized with at least one admin account.

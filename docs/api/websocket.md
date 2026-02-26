@@ -2,6 +2,8 @@
 
 The WebSocket API provides real-time bidirectional communication for conversational AI sessions.
 
+For more information, see the [WebSocket Protocol](../guide/websocket) guide.
+
 ## Endpoint
 
 ```

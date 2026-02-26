@@ -4,17 +4,7 @@ Global actions are reusable action handlers that can be triggered across multipl
 
 **Tag:** `Global Actions` | **Scoped to:** Project
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/projects/:projectId/global-actions` | Create | `global_action:write` |
-| `GET` | `/api/projects/:projectId/global-actions/:id` | Get by ID | `global_action:read` |
-| `GET` | `/api/projects/:projectId/global-actions` | List | `global_action:read` |
-| `PUT` | `/api/projects/:projectId/global-actions/:id` | Update | `global_action:write` |
-| `DELETE` | `/api/projects/:projectId/global-actions/:id` | Delete | `global_action:delete` |
-| `GET` | `/api/projects/:projectId/global-actions/:id/audit-logs` | Get audit logs | `audit:read` |
-| `POST` | `/api/projects/:projectId/global-actions/:id/clone` | Clone | `global_action:write` |
+For more information, see the [Global Actions](../guide/global-actions) and [Actions & Effects](../guide/actions-and-effects) guides.
 
 ## Create Global Action
 
@@ -22,6 +12,8 @@ Global actions are reusable action handlers that can be triggered across multipl
 POST /api/projects/:projectId/global-actions
 Content-Type: application/json
 ```
+
+**Required permission:** `global_action:write`
 
 **Request Body**
 
@@ -49,6 +41,8 @@ Content-Type: application/json
 GET /api/projects/:projectId/global-actions/:id
 ```
 
+**Required permission:** `global_action:read`
+
 **Response** `200 OK` — [Global Action Response](#global-action-response)
 
 ## List Global Actions
@@ -56,6 +50,8 @@ GET /api/projects/:projectId/global-actions/:id
 ```http
 GET /api/projects/:projectId/global-actions
 ```
+
+**Required permission:** `global_action:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -65,6 +61,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/projects/:projectId/global-actions/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `global_action:write`
 
 All create fields are optional plus `version` (required).
 
@@ -79,6 +77,8 @@ DELETE /api/projects/:projectId/global-actions/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `global_action:delete`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
@@ -92,12 +92,24 @@ POST /api/projects/:projectId/global-actions/:id/clone
 Content-Type: application/json
 ```
 
+**Required permission:** `global_action:write`
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | New ID (auto-generated if omitted) |
 | `name` | `string` | No | New name (defaults to "{original name} (Clone)") |
 
 **Response** `201 Created` — [Global Action Response](#global-action-response)
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/global-actions/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified global action. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

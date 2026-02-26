@@ -4,18 +4,7 @@ Manage admin user accounts and the authenticated admin's own profile.
 
 **Tag:** `Admins`, `Profile`
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `POST` | `/api/admins` | Create admin | `admin:write` |
-| `GET` | `/api/admins/:id` | Get admin by ID | `admin:read` |
-| `GET` | `/api/admins` | List admins | `admin:read` |
-| `PUT` | `/api/admins/:id` | Update admin | `admin:write` |
-| `DELETE` | `/api/admins/:id` | Delete admin | `admin:delete` |
-| `GET` | `/api/admins/:id/audit-logs` | Get admin audit logs | `audit:read` |
-| `GET` | `/api/profile` | Get own profile | Authenticated |
-| `POST` | `/api/profile` | Update own profile | Authenticated |
+For more information, see the [Authentication & Permissions](../guide/authentication) guide.
 
 ## Create Admin
 
@@ -23,6 +12,8 @@ Manage admin user accounts and the authenticated admin's own profile.
 POST /api/admins
 Content-Type: application/json
 ```
+
+**Required permission:** `admin:write`
 
 **Request Body**
 
@@ -46,6 +37,8 @@ Available roles: `super_admin`, `content_manager`, `support`, `developer`, `view
 GET /api/admins/:id
 ```
 
+**Required permission:** `admin:read`
+
 **Response** `200 OK` — [Admin Response](#admin-response)
 
 **Errors:** `404` Not found
@@ -55,6 +48,8 @@ GET /api/admins/:id
 ```http
 GET /api/admins
 ```
+
+**Required permission:** `admin:read`
 
 Supports [pagination & filtering](./pagination).
 
@@ -75,6 +70,8 @@ Supports [pagination & filtering](./pagination).
 PUT /api/admins/:id
 Content-Type: application/json
 ```
+
+**Required permission:** `admin:write`
 
 **Request Body**
 
@@ -97,6 +94,8 @@ DELETE /api/admins/:id
 Content-Type: application/json
 ```
 
+**Required permission:** `admin:delete`
+
 **Request Body**
 
 | Field | Type | Required | Description |
@@ -113,6 +112,8 @@ Content-Type: application/json
 GET /api/admins/:id/audit-logs
 ```
 
+**Required permission:** `audit:read`
+
 Returns audit logs for the specified admin. See [Audit Logs](./audit-logs) for response format.
 
 ---
@@ -125,6 +126,8 @@ Returns audit logs for the specified admin. See [Audit Logs](./audit-logs) for r
 GET /api/profile
 ```
 
+**Authentication:** Required (any authenticated admin)
+
 Returns the authenticated admin's own profile.
 
 **Response** `200 OK` — [Admin Response](#admin-response)
@@ -135,6 +138,8 @@ Returns the authenticated admin's own profile.
 POST /api/profile
 Content-Type: application/json
 ```
+
+**Authentication:** Required (any authenticated admin)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|

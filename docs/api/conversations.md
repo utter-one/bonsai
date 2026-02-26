@@ -4,26 +4,19 @@ Conversations represent active or completed conversational AI sessions. They are
 
 **Tag:** `Conversations` | **Scoped to:** Project
 
+For more information, see the [Conversations](../guide/conversations) guide.
+
 ::: info
 Conversations are created internally through the WebSocket session protocol. The REST API provides read and delete access only.
 :::
-
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `GET` | `/api/projects/:projectId/conversations/:id` | Get conversation by ID | `conversation:read` |
-| `GET` | `/api/projects/:projectId/conversations` | List conversations | `conversation:read` |
-| `DELETE` | `/api/projects/:projectId/conversations/:id` | Delete conversation | `conversation:delete` |
-| `GET` | `/api/projects/:projectId/conversations/:id/events` | List conversation events | `conversation:read` |
-| `GET` | `/api/projects/:projectId/conversations/:id/events/:eventId` | Get event by ID | `conversation:read` |
-| `GET` | `/api/projects/:projectId/conversations/:id/audit-logs` | Get audit logs | `audit:read` |
 
 ## Get Conversation
 
 ```http
 GET /api/projects/:projectId/conversations/:id
 ```
+
+**Required permission:** `conversation:read`
 
 **Response** `200 OK` — [Conversation Response](#conversation-response)
 
@@ -35,6 +28,8 @@ GET /api/projects/:projectId/conversations/:id
 GET /api/projects/:projectId/conversations
 ```
 
+**Required permission:** `conversation:read`
+
 Supports [pagination & filtering](./pagination).
 
 ## Delete Conversation
@@ -42,6 +37,8 @@ Supports [pagination & filtering](./pagination).
 ```http
 DELETE /api/projects/:projectId/conversations/:id
 ```
+
+**Required permission:** `conversation:delete`
 
 **Response** `204 No Content`
 
@@ -52,6 +49,8 @@ DELETE /api/projects/:projectId/conversations/:id
 ```http
 GET /api/projects/:projectId/conversations/:id/events
 ```
+
+**Required permission:** `conversation:read`
 
 Returns all events for a conversation, ordered chronologically.
 
@@ -65,9 +64,21 @@ Supports [pagination & filtering](./pagination).
 GET /api/projects/:projectId/conversations/:id/events/:eventId
 ```
 
+**Required permission:** `conversation:read`
+
 **Response** `200 OK` — [Event Response](#event-response)
 
 **Errors:** `404` Not found
+
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/conversations/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified conversation. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

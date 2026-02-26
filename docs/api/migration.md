@@ -4,13 +4,6 @@ The Migration API provides endpoints for exporting configuration bundles from th
 
 **Tag:** `Migration`
 
-## Endpoints
-
-| Method | Path | Summary | Permission |
-|--------|------|---------|------------|
-| `GET` | `/api/migration/preview` | Preview migration scope | `migration:export` |
-| `GET` | `/api/migration/export` | Export configuration bundle | `migration:export` |
-
 ## Preview Migration Scope
 
 Preview the entities that would be included in an export.
@@ -18,6 +11,8 @@ Preview the entities that would be included in an export.
 ```http
 GET /api/migration/preview
 ```
+
+**Required permission:** `migration:export`
 
 **Query Parameters** (all optional)
 
@@ -68,6 +63,8 @@ Export a full configuration bundle as JSON.
 ```http
 GET /api/migration/export
 ```
+
+**Required permission:** `migration:export`
 
 Accepts the same query parameters as the preview endpoint.
 
