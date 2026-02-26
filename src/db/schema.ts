@@ -96,6 +96,7 @@ export const personas = pgTable('personas', {
   prompt: text('prompt').notNull(),
   ttsProviderId: text('tts_provider_id').references(() => providers.id),
   ttsSettings: jsonb('tts_settings').$type<TtsSettings>(),
+  tags: jsonb('tags').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

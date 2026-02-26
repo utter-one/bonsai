@@ -26,6 +26,7 @@ export const createPersonaSchema = z.object({
   prompt: z.string().min(1).describe('Detailed prompt defining the persona\'s characteristics and behavior'),
   ttsProviderId: z.string().optional().describe('ID of the TTS provider (e.g., "eleven-labs")'),
   ttsSettings: ttsSettingsSchema.describe('TTS provider-specific settings'),
+  tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this persona'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional persona-specific metadata'),
 });
 
@@ -40,6 +41,7 @@ export const updatePersonaBodySchema = z.object({
   prompt: z.string().min(1).optional().describe('Updated prompt defining behavior'),
   ttsProviderId: z.string().optional().describe('Updated TTS provider ID'),
   ttsSettings: ttsSettingsSchema.describe('Updated TTS provider-specific settings'),
+  tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -64,6 +66,7 @@ export const personaResponseSchema = z.object({
   prompt: z.string().describe('Prompt defining the persona\'s characteristics and behavior'),
   ttsProviderId: z.string().nullable().describe('ID of the TTS provider'),
   ttsSettings: ttsSettingsSchema.nullable().describe('TTS provider-specific settings'),
+  tags: z.array(z.string()).describe('Tags for categorizing and filtering this persona'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional persona-specific metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the persona was created'),
