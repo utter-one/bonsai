@@ -16,6 +16,9 @@ import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBod
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
+import { createFlowSchema, updateFlowBodySchema, deleteFlowBodySchema, flowResponseSchema, flowListResponseSchema } from './http/contracts/flow';
+import { createFlowActionSchema, updateFlowActionBodySchema, deleteFlowActionBodySchema, flowActionResponseSchema, flowActionListResponseSchema } from './http/contracts/flowAction';
+import { createFlowToolSchema, updateFlowToolBodySchema, deleteFlowToolBodySchema, flowToolResponseSchema, flowToolListResponseSchema } from './http/contracts/flowTool';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema } from './http/contracts/providerCatalog';
@@ -56,6 +59,9 @@ import { ClassifierController } from './http/controllers/ClassifierController';
 import { ContextTransformerController } from './http/controllers/ContextTransformerController';
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
+import { FlowController } from './http/controllers/FlowController';
+import { FlowActionController } from './http/controllers/FlowActionController';
+import { FlowToolController } from './http/controllers/FlowToolController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -208,6 +214,21 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteGlobalActionRequest', deleteGlobalActionBodySchema);
   registry.register('GlobalActionResponse', globalActionResponseSchema);
   registry.register('GlobalActionListResponse', globalActionListResponseSchema);
+  registry.register('CreateFlowRequest', createFlowSchema);
+  registry.register('UpdateFlowRequest', updateFlowBodySchema);
+  registry.register('DeleteFlowRequest', deleteFlowBodySchema);
+  registry.register('FlowResponse', flowResponseSchema);
+  registry.register('FlowListResponse', flowListResponseSchema);
+  registry.register('CreateFlowActionRequest', createFlowActionSchema);
+  registry.register('UpdateFlowActionRequest', updateFlowActionBodySchema);
+  registry.register('DeleteFlowActionRequest', deleteFlowActionBodySchema);
+  registry.register('FlowActionResponse', flowActionResponseSchema);
+  registry.register('FlowActionListResponse', flowActionListResponseSchema);
+  registry.register('CreateFlowToolRequest', createFlowToolSchema);
+  registry.register('UpdateFlowToolRequest', updateFlowToolBodySchema);
+  registry.register('DeleteFlowToolRequest', deleteFlowToolBodySchema);
+  registry.register('FlowToolResponse', flowToolResponseSchema);
+  registry.register('FlowToolListResponse', flowToolListResponseSchema);
   registry.register('CreateEnvironmentRequest', createEnvironmentSchema);
   registry.register('UpdateEnvironmentRequest', updateEnvironmentBodySchema);
   registry.register('DeleteEnvironmentRequest', deleteEnvironmentBodySchema);
@@ -321,6 +342,24 @@ export function getOpenAPISpec(): any {
   // Register GlobalAction routes from GlobalActionController
   const globalActionPaths = GlobalActionController.getOpenAPIPaths();
   for (const path of globalActionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Flow routes from FlowController
+  const flowPaths = FlowController.getOpenAPIPaths();
+  for (const path of flowPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register FlowAction routes from FlowActionController
+  const flowActionPaths = FlowActionController.getOpenAPIPaths();
+  for (const path of flowActionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register FlowTool routes from FlowToolController
+  const flowToolPaths = FlowToolController.getOpenAPIPaths();
+  for (const path of flowToolPaths) {
     registry.registerPath(path);
   }
 

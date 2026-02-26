@@ -83,6 +83,16 @@ export const projectScopedParamsSchema = z.object({
 
 export type ProjectScopedParams = z.infer<typeof projectScopedParamsSchema>;
 
+/**
+ * Schema for route params of flow-scoped endpoints
+ */
+export const flowScopedParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
+  flowId: z.string().min(1).describe('Flow ID'),
+});
+
+export type FlowScopedParams = z.infer<typeof flowScopedParamsSchema>;
+
 // ====================
 // LLM Settings Schemas
 // ====================

@@ -19,6 +19,9 @@ import { ClassifierController } from './http/controllers/ClassifierController';
 import { ContextTransformerController } from './http/controllers/ContextTransformerController';
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
+import { FlowController } from './http/controllers/FlowController';
+import { FlowActionController } from './http/controllers/FlowActionController';
+import { FlowToolController } from './http/controllers/FlowToolController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -138,6 +141,15 @@ export function createApp(): express.Application {
 
   const globalActionController = container.resolve(GlobalActionController);
   globalActionController.registerRoutes(app);
+
+  const flowController = container.resolve(FlowController);
+  flowController.registerRoutes(app);
+
+  const flowActionController = container.resolve(FlowActionController);
+  flowActionController.registerRoutes(app);
+
+  const flowToolController = container.resolve(FlowToolController);
+  flowToolController.registerRoutes(app);
 
   const issueController = container.resolve(IssueController);
   issueController.registerRoutes(app);

@@ -245,6 +245,65 @@ export const globalActions = pgTable('global_actions', {
   primaryKey({ columns: [table.projectId, table.id] }),
 ]);
 
+// Flow table
+export const flows = pgTable('flows', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+]);
+
+// FlowAction table (scoped to a flow, mirrors GlobalAction structure)
+export const flowActions = pgTable('flow_actions', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull(),
+  flowId: text('flow_id').notNull(),
+  name: text('name').notNull(),
+  condition: text('condition'),
+  triggerOnUserInput: boolean('trigger_on_user_input').notNull().default(true),
+  triggerOnClientCommand: boolean('trigger_on_client_command').notNull().default(false),
+  classificationTrigger: text('classification_trigger'),
+  overrideClassifierId: text('override_classifier_id'),
+  parameters: jsonb('parameters').notNull().default([]).$type<StageActionParameter[]>(),
+  effects: jsonb('effects').notNull().default([]).$type<Effect[]>(),
+  examples: jsonb('examples').$type<string[]>(),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+  foreignKey({ columns: [table.projectId, table.flowId], foreignColumns: [flows.projectId, flows.id] }).onDelete('cascade'),
+]);
+
+// FlowTool table (scoped to a flow, mirrors Tool structure)
+export const flowTools = pgTable('flow_tools', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull(),
+  flowId: text('flow_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  prompt: text('prompt').notNull(),
+  llmProviderId: text('llm_provider_id'),
+  llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
+  inputType: text('input_type').$type<ToolInputType>().notNull(),
+  outputType: text('output_type').$type<ToolOutputType>().notNull(),
+  parameters: jsonb('parameters').notNull().default([]).$type<ToolParameter[]>(),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+  foreignKey({ columns: [table.projectId, table.flowId], foreignColumns: [flows.projectId, flows.id] }).onDelete('cascade'),
+]);
+
 // Issue table
 export const issues = pgTable('issues', {
   id: serial('id').notNull(),
@@ -380,6 +439,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   classifiers: many(classifiers),
   contextTransformers: many(contextTransformers),
   tools: many(tools),
+  flows: many(flows),
   knowledgeCategories: many(knowledgeCategories),
   globalActions: many(globalActions),
   issues: many(issues),
@@ -430,6 +490,29 @@ export const globalActionsRelations = relations(globalActions, ({ one }) => ({
   project: one(projects, {
     fields: [globalActions.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const flowsRelations = relations(flows, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [flows.projectId],
+    references: [projects.id],
+  }),
+  actions: many(flowActions),
+  tools: many(flowTools),
+}));
+
+export const flowActionsRelations = relations(flowActions, ({ one }) => ({
+  flow: one(flows, {
+    fields: [flowActions.projectId, flowActions.flowId],
+    references: [flows.projectId, flows.id],
+  }),
+}));
+
+export const flowToolsRelations = relations(flowTools, ({ one }) => ({
+  flow: one(flows, {
+    fields: [flowTools.projectId, flowTools.flowId],
+    references: [flows.projectId, flows.id],
   }),
 }));
 
