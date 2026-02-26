@@ -12,7 +12,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for ElevenLabs TTS provider configuration
  */
-export const elevenLabsTtsProviderConfigSchema = z.object({
+export const elevenLabsTtsProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with ElevenLabs'),
 });
 

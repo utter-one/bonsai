@@ -12,7 +12,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for Azure TTS provider configuration
  */
-export const azureTtsProviderConfigSchema = z.object({
+export const azureTtsProviderConfigSchema = z.strictObject({
   region: z.string().describe('The Azure region to use for the speech service (e.g., "eastus", "westeurope")'),
   subscriptionKey: z.string().describe('The subscription key to use for the speech service'),
 });

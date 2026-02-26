@@ -10,7 +10,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for Google Gemini-specific configuration
  */
-export const geminiLlmProviderConfigSchema = z.object({
+export const geminiLlmProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('Google API key'),
 });
 
@@ -26,11 +26,11 @@ export const geminiLlmSettingsSchema = z.object({
   defaultTemperature: z.number().min(0).max(2).optional().describe('Default temperature for generation (0-2)'),
   defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1)'),
   defaultTopK: z.number().int().positive().optional().describe('Default top-k for generation'),
-  
+
   thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high']).optional().describe('Thinking level for Gemini 3 models. Controls reasoning depth: minimal=chat/high-throughput, low=simple tasks, medium=balanced, high=max reasoning depth.'),
   thinkingBudget: z.number().int().optional().describe('Thinking budget (tokens) for Gemini 2.5 models. Set to -1 for dynamic thinking (default), 0 to disable, or specific token count (128-32768). Use thinkingLevel for Gemini 3.'),
   includeThoughts: z.boolean().optional().describe('Include thought summaries in response. Provides insight into model\'s reasoning process for debugging. Available for all thinking models.'),
-  
+
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
   safetySettings: z.array(z.unknown()).optional().describe('Safety settings configuration'),
 }).openapi('GeminiLlmSettings');
@@ -290,14 +290,14 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
         throw new Error('Failed to parse JSON output from model response');
       }
     }
-    
+
     const contentArray: LlmContent[] = [
       {
         contentType: 'text',
         text,
       },
     ];
-    
+
     const llmResult: LlmGenerationResult = {
       id: `gemini-${Date.now()}`,
       content: contentArray,

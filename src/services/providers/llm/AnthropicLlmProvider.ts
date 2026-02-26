@@ -10,7 +10,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for Anthropic-specific configuration
  */
-export const anthropicLlmProviderConfigSchema = z.object({
+export const anthropicLlmProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('Anthropic API key'),
   baseUrl: z.string().optional().describe('Optional base URL for custom endpoints'),
 });
@@ -26,10 +26,10 @@ export const anthropicLlmSettingsSchema = z.object({
   defaultMaxTokens: z.number().int().positive().optional().describe('Default maximum tokens for generation (includes thinking tokens when extended thinking is enabled)'),
   defaultTemperature: z.number().min(0).max(1).optional().describe('Default temperature for generation (0-1). Not compatible with extended thinking.'),
   defaultTopP: z.number().min(0).max(1).optional().describe('Default top-p for generation (0-1). Limited to 0.95-1 when thinking is enabled.'),
-  
+
   thinkingMode: z.enum(['enabled', 'adaptive']).optional().describe('Enable extended thinking. Use "adaptive" for Claude Opus 4.6+, "enabled" for earlier models. Allows Claude to reason internally before responding.'),
   thinkingBudgetTokens: z.number().int().min(1024).optional().describe('Maximum tokens for internal reasoning (min: 1024). Only used with thinkingMode="enabled". Higher budgets enable deeper reasoning but increase latency.'),
-  
+
   timeout: z.number().int().positive().optional().describe('Request timeout in milliseconds'),
   anthropicVersion: z.string().optional().describe('Anthropic API version'),
 }).openapi('AnthropicLlmSettings');

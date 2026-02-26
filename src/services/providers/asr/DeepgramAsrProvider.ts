@@ -11,7 +11,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for Deepgram ASR provider configuration
  */
-export const deepgramAsrProviderConfigSchema = z.object({
+export const deepgramAsrProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with Deepgram'),
 });
 

@@ -33,6 +33,7 @@ import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
 import { ConversationServer } from './websocket/ConversationServer';
 import logger from './utils/logger';
+import { fileURLToPath } from 'url';
 
 // Register the OpenAPI spec provider before the IoC container is used.
 // This breaks the circular module dependency that would arise from VersionService
@@ -92,8 +93,9 @@ export function createApp(): express.Application {
   // WebSocket Contracts JSON Schema endpoint
   app.get('/websocket-contracts.json', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
-    const schemaPath = new URL('../schemas/websocket-contracts.json', import.meta.url);
-    res.sendFile(schemaPath.pathname);
+    const schemaUrl = new URL('../schemas/websocket-contracts.json', import.meta.url);
+    const schemaPath = fileURLToPath(schemaUrl);
+    res.sendFile(schemaPath);
   });
 
   // Unauthenticated system endpoints — registered before auth middleware intentionally
@@ -102,7 +104,7 @@ export function createApp(): express.Application {
 
   // Authentication middleware (optional - sets req.user if token is valid)
   app.use(optionalAuthMiddleware);
-  
+
   // Request context middleware (creates req.context from req.user)
   app.use(requestContextMiddleware);
 
@@ -115,7 +117,7 @@ export function createApp(): express.Application {
 
   const adminController = container.resolve(AdminController);
   adminController.registerRoutes(app);
-  
+
   const projectController = container.resolve(ProjectController);
   projectController.registerRoutes(app);
 

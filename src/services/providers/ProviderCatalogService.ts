@@ -635,6 +635,41 @@ export class ProviderCatalogService {
           { code: 'zh', displayName: 'Chinese' },
         ],
       },
+      {
+        apiType: 'assemblyai',
+        displayName: 'AssemblyAI',
+        description: 'AssemblyAI Universal Streaming API with real-time streaming transcription, advanced turn detection, and multi-language support',
+        models: [
+          {
+            id: 'universal-streaming-english',
+            displayName: 'Universal Streaming (English)',
+            description: 'High-performance streaming speech recognition optimized for English-language voice agents with low latency',
+            recommended: true,
+            languages: ['en'],
+            supportedAudioFormats: ['pcm_8000', 'pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100'],
+            supportsCustomVocabulary: true,
+            supportsStreaming: true,
+          },
+          {
+            id: 'universal-streaming-multi',
+            displayName: 'Universal Streaming (Multilingual)',
+            description: 'Multilingual streaming speech recognition supporting English, Spanish, French, German, Italian, and Portuguese',
+            recommended: false,
+            languages: ['en', 'es', 'fr', 'de', 'it', 'pt'],
+            supportedAudioFormats: ['pcm_8000', 'pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100'],
+            supportsCustomVocabulary: true,
+            supportsStreaming: true,
+          },
+        ],
+        languages: [
+          { code: 'en', displayName: 'English' },
+          { code: 'es', displayName: 'Spanish' },
+          { code: 'fr', displayName: 'French' },
+          { code: 'de', displayName: 'German' },
+          { code: 'it', displayName: 'Italian' },
+          { code: 'pt', displayName: 'Portuguese' },
+        ],
+      },
     ];
   }
 

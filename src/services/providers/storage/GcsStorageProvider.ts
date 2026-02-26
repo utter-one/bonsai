@@ -10,7 +10,7 @@ extendZodWithOpenApi(z);
 /**
  * Google Cloud Storage provider configuration schema
  */
-export const gcsStorageProviderConfigSchema = z.object({
+export const gcsStorageProviderConfigSchema = z.strictObject({
   projectId: z.string().describe('Google Cloud project ID'),
   keyFileJson: z.string().describe('Service account key file content as JSON string'),
 }).openapi('GcsStorageConfig');
