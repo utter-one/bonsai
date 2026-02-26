@@ -19,6 +19,7 @@ import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalAct
 import { createFlowSchema, updateFlowBodySchema, deleteFlowBodySchema, flowResponseSchema, flowListResponseSchema } from './http/contracts/flow';
 import { createFlowActionSchema, updateFlowActionBodySchema, deleteFlowActionBodySchema, flowActionResponseSchema, flowActionListResponseSchema } from './http/contracts/flowAction';
 import { createFlowToolSchema, updateFlowToolBodySchema, deleteFlowToolBodySchema, flowToolResponseSchema, flowToolListResponseSchema } from './http/contracts/flowTool';
+import { createStageToolSchema, updateStageToolBodySchema, deleteStageToolBodySchema, stageToolResponseSchema, stageToolListResponseSchema } from './http/contracts/stageTool';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema } from './http/contracts/providerCatalog';
@@ -62,6 +63,7 @@ import { GlobalActionController } from './http/controllers/GlobalActionControlle
 import { FlowController } from './http/controllers/FlowController';
 import { FlowActionController } from './http/controllers/FlowActionController';
 import { FlowToolController } from './http/controllers/FlowToolController';
+import { StageToolController } from './http/controllers/StageToolController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -229,6 +231,11 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteFlowToolRequest', deleteFlowToolBodySchema);
   registry.register('FlowToolResponse', flowToolResponseSchema);
   registry.register('FlowToolListResponse', flowToolListResponseSchema);
+  registry.register('CreateStageToolRequest', createStageToolSchema);
+  registry.register('UpdateStageToolRequest', updateStageToolBodySchema);
+  registry.register('DeleteStageToolRequest', deleteStageToolBodySchema);
+  registry.register('StageToolResponse', stageToolResponseSchema);
+  registry.register('StageToolListResponse', stageToolListResponseSchema);
   registry.register('CreateEnvironmentRequest', createEnvironmentSchema);
   registry.register('UpdateEnvironmentRequest', updateEnvironmentBodySchema);
   registry.register('DeleteEnvironmentRequest', deleteEnvironmentBodySchema);
@@ -360,6 +367,12 @@ export function getOpenAPISpec(): any {
   // Register FlowTool routes from FlowToolController
   const flowToolPaths = FlowToolController.getOpenAPIPaths();
   for (const path of flowToolPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register StageTool routes from StageToolController
+  const stageToolPaths = StageToolController.getOpenAPIPaths();
+  for (const path of stageToolPaths) {
     registry.registerPath(path);
   }
 

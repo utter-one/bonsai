@@ -17,6 +17,7 @@ export const ID_PREFIXES = {
   FLOW: 'flow',
   FLOW_ACTION: 'fact',
   FLOW_TOOL: 'ftol',
+  STAGE_TOOL: 'stol',
   PROVIDER: 'prov',
   ENVIRONMENT: 'env',
   API_KEY: 'akey',

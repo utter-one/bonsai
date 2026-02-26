@@ -18,6 +18,7 @@ import {
   conversationArtifacts,
   providers,
   projects,
+  stageTools,
 } from '../db/schema';
 
 
@@ -40,4 +41,5 @@ export type AuditLog = InferSelectModel<typeof auditLogs>;
 export type ConversationArtifact = InferSelectModel<typeof conversationArtifacts>;
 export type Provider = InferSelectModel<typeof providers>;
 export type Project = InferSelectModel<typeof projects>;
+export type StageTool = InferSelectModel<typeof stageTools>;
 

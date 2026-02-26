@@ -22,6 +22,7 @@ import { GlobalActionController } from './http/controllers/GlobalActionControlle
 import { FlowController } from './http/controllers/FlowController';
 import { FlowActionController } from './http/controllers/FlowActionController';
 import { FlowToolController } from './http/controllers/FlowToolController';
+import { StageToolController } from './http/controllers/StageToolController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -150,6 +151,9 @@ export function createApp(): express.Application {
 
   const flowToolController = container.resolve(FlowToolController);
   flowToolController.registerRoutes(app);
+
+  const stageToolController = container.resolve(StageToolController);
+  stageToolController.registerRoutes(app);
 
   const issueController = container.resolve(IssueController);
   issueController.registerRoutes(app);
