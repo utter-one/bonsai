@@ -9,6 +9,7 @@ import { elevenLabsAsrSettingsSchema } from '../../services/providers/asr/Eleven
 import { parameterValueSchema } from '../../types/parameters';
 import { deepgramAsrSettingsSchema } from '../../services/providers/asr/DeepgramAsrProvider';
 import { assemblyAiAsrSettingsSchema } from '../../services/providers/asr/AssemblyAiAsrProvider';
+import { speechmaticsAsrSettingsSchema } from '../../services/providers/asr/SpeechmaticsAsrProvider';
 
 extendZodWithOpenApi(z);
 
@@ -47,6 +48,7 @@ export const asrSettingsSchema = z.union([
   elevenLabsAsrSettingsSchema,
   deepgramAsrSettingsSchema,
   assemblyAiAsrSettingsSchema,
+  speechmaticsAsrSettingsSchema,
 ]).describe('ASR provider settings');
 
 export const asrConfigSchema = z.object({

@@ -335,6 +335,9 @@
                     },
                     {
                       "$ref": "#/definitions/AssemblyAiAsrSettings"
+                    },
+                    {
+                      "$ref": "#/definitions/SpeechmaticsAsrSettings"
                     }
                   ],
                   "description": "ASR-specific settings including model, language preferences, etc."
@@ -630,6 +633,66 @@
       },
       "description": "AssemblyAI speech-to-text settings"
     },
+    "SpeechmaticsAsrSettings": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "Language code for speech recognition (e.g., \"en\", \"en-US\", \"es\", \"fr\")"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "pcm_16000",
+            "pcm_8000",
+            "pcm_44100"
+          ],
+          "default": "pcm_16000",
+          "description": "Audio input format for speech recognition, defaults to pcm_16000"
+        },
+        "transcriptionMode": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "enhanced"
+          ],
+          "default": "standard",
+          "description": "Transcription mode: \"standard\" for faster processing or \"enhanced\" for higher accuracy, defaults to standard"
+        },
+        "enablePunctuation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic punctuation in transcripts, defaults to true"
+        },
+        "enableFormatting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic formatting (numbers, dates, currency, etc.), defaults to true"
+        },
+        "additionalVocab": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Custom vocabulary words or phrases to improve recognition accuracy"
+        },
+        "enableDiarization": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable speaker diarization to detect different speakers, defaults to false"
+        },
+        "maxDelay": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Maximum delay in seconds for transcription results (0-10), lower values reduce latency"
+        }
+      },
+      "additionalProperties": {
+        "nullable": true
+      },
+      "description": "Speechmatics speech-to-text settings"
+    },
     "project-settings": {
       "type": "object",
       "properties": {
@@ -666,6 +729,9 @@
                 },
                 {
                   "$ref": "#/definitions/AssemblyAiAsrSettings"
+                },
+                {
+                  "$ref": "#/definitions/SpeechmaticsAsrSettings"
                 }
               ],
               "description": "ASR-specific settings including model, language preferences, etc."

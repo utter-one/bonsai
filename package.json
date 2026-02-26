@@ -25,6 +25,8 @@
     "@azure/storage-blob": "^12.31.0",
     "@google-cloud/storage": "^7.19.0",
     "@google/genai": "^1.35.0",
+    "@speechmatics/auth": "^0.1.0",
+    "@speechmatics/real-time-client": "^8.3.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/swagger-ui-express": "^4.1.8",
