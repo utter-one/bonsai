@@ -6,21 +6,22 @@ import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema,
 import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProviderConfigSchema, ElevenLabsAsrSettings, elevenLabsAsrSettingsSchema } from './ElevenLabsAsrProvider';
 import { DeepgramAsrProvider, DeepgramAsrProviderConfig, deepgramAsrProviderConfigSchema, DeepgramAsrSettings, deepgramAsrSettingsSchema } from './DeepgramAsrProvider';
 import { AssemblyAiAsrProvider, AssemblyAiAsrProviderConfig, assemblyAiAsrProviderConfigSchema, AssemblyAiAsrSettings, assemblyAiAsrSettingsSchema } from './AssemblyAiAsrProvider';
+import { SpeechmaticsAsrProvider, SpeechmaticsAsrProviderConfig, speechmaticsAsrProviderConfigSchema, SpeechmaticsAsrSettings, speechmaticsAsrSettingsSchema } from './SpeechmaticsAsrProvider';
 
 /**
  * Supported ASR provider API types
  */
-export type AsrProviderApiType = 'azure' | 'elevenlabs' | 'deepgram' | 'assemblyai';
+export type AsrProviderApiType = 'azure' | 'elevenlabs' | 'deepgram' | 'assemblyai' | 'speechmatics';
 
 /** 
  * Union type for all ASR provider settings
  */
-export type AsrSettings = AzureAsrSettings | ElevenLabsAsrSettings | DeepgramAsrSettings | AssemblyAiAsrSettings;
+export type AsrSettings = AzureAsrSettings | ElevenLabsAsrSettings | DeepgramAsrSettings | AssemblyAiAsrSettings | SpeechmaticsAsrSettings;
 
 /**
  * Union type for all ASR provider configurations
  */
-export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderConfig | DeepgramAsrProviderConfig | AssemblyAiAsrProviderConfig;
+export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderConfig | DeepgramAsrProviderConfig | AssemblyAiAsrProviderConfig | SpeechmaticsAsrProviderConfig;
 
 /**
  * Factory service for creating ASR provider instances based on provider entity configuration
@@ -56,8 +57,11 @@ export class AsrProviderFactory {
       case 'assemblyai':
         return this.createAssemblyAiProvider(provider, settings as AssemblyAiAsrSettings);
 
+      case 'speechmatics':
+        return this.createSpeechmaticsProvider(provider, settings as SpeechmaticsAsrSettings);
+
       default:
-        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai`;
+        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai, speechmatics`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -120,6 +124,20 @@ export class AsrProviderFactory {
   }
 
   /**
+   * Creates a Speechmatics ASR provider instance from provider entity
+   * @param provider - Provider entity with Speechmatics-specific configuration
+   * @returns Configured Speechmatics ASR provider
+   * @throws {Error} When required Speechmatics configuration fields are missing
+   */
+  private createSpeechmaticsProvider(provider: Provider, settings: SpeechmaticsAsrSettings): SpeechmaticsAsrProvider {
+    const config = speechmaticsAsrProviderConfigSchema.parse(provider.config);
+    const safeSettings = speechmaticsAsrSettingsSchema.parse(settings);
+
+    logger.info(`Creating Speechmatics ASR provider for provider ${provider.id} (region: ${config.region})`);
+    return new SpeechmaticsAsrProvider(config, safeSettings);
+  }
+
+  /**
    * Validates if a provider can be used for ASR
    * @param provider - Provider entity to validate
    * @returns True if provider is valid for ASR, false otherwise
@@ -129,7 +147,7 @@ export class AsrProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: AsrProviderApiType[] = ['azure', 'elevenlabs', 'deepgram', 'assemblyai'];
+    const supportedApiTypes: AsrProviderApiType[] = ['azure', 'elevenlabs', 'deepgram', 'assemblyai', 'speechmatics'];
     return supportedApiTypes.includes(provider.apiType as AsrProviderApiType);
   }
 
@@ -138,6 +156,6 @@ export class AsrProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): AsrProviderApiType[] {
-    return ['azure', 'elevenlabs', 'deepgram', 'assemblyai'];
+    return ['azure', 'elevenlabs', 'deepgram', 'assemblyai', 'speechmatics'];
   }
 }
