@@ -77,6 +77,8 @@ Used for: speech-to-text transcription at the project level.
 | `azure` | Azure Speech Services |
 | `elevenlabs` | ElevenLabs speech recognition |
 | `deepgram` | Deepgram Nova ASR |
+| `assemblyai` | AssemblyAI Universal Streaming |
+| `speechmatics` | Speechmatics real-time speech-to-text |
 
 Configured in the project's `asrConfig`.
 

@@ -25,6 +25,7 @@ Content-Type: application/json
 | `prompt` | `string` (min 1) | Yes | Persona characteristics and behavior prompt |
 | `ttsProviderId` | `string` | No | TTS provider ID |
 | `ttsSettings` | [`TtsSettings`](#tts-settings) | Yes | TTS provider-specific settings |
+| `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
 **Response** `201 Created` — [Persona Response](#persona-response)
@@ -60,7 +61,7 @@ Content-Type: application/json
 
 **Required permission:** `persona:write`
 
-All create fields are optional plus `version` (required).
+All create fields are optional plus `version` (required), **except `ttsSettings` which must always be provided**.
 
 **Response** `200 OK` — [Persona Response](#persona-response)
 
@@ -120,6 +121,7 @@ Returns audit log entries for the specified persona. See [Audit Logs](./audit-lo
 | `prompt` | `string` | No | Behavior prompt |
 | `ttsProviderId` | `string` | Yes | TTS provider ID |
 | `ttsSettings` | `TtsSettings` | Yes | TTS settings |
+| `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |

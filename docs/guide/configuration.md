@@ -58,7 +58,7 @@ Migrations run automatically on container startup before the application starts.
 After starting the server for the first time, you need to create the initial super admin account. Use the setup endpoint:
 
 ```bash
-curl -X POST http://localhost:3000/api/setup \
+curl -X POST http://localhost:3000/api/setup/initial-admin \
   -H "Content-Type: application/json" \
   -d '{
     "id": "admin",

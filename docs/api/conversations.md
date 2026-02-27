@@ -92,7 +92,7 @@ Returns audit log entries for the specified conversation. See [Audit Logs](./aud
 | `clientId` | `string` | No | Client identifier |
 | `stageId` | `string` | No | Current stage identifier |
 | `stageVars` | `Record<string, Record<string, unknown>>` | Yes | Variables stored per stage |
-| `status` | `string` | No | Status: `initialized`, `active`, `completed`, or `failed` |
+| `status` | `string` | No | Status: `initialized`, `awaiting_user_input`, `receiving_user_voice`, `processing_user_input`, `generating_response`, `finished`, `aborted`, or `failed` |
 | `statusDetails` | `string` | Yes | Details about the current status |
 | `metadata` | `object` | Yes | Additional metadata |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |

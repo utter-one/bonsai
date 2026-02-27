@@ -28,6 +28,7 @@ Content-Type: application/json
 | `inputType` | `string` | Yes | Expected input format: `"text"`, `"image"`, or `"multi-modal"` |
 | `outputType` | `string` | Yes | Expected output format: `"text"`, `"image"`, or `"multi-modal"` |
 | `parameters` | [`ToolParameter[]`](#tool-parameter) | No | Parameters the tool expects |
+| `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
 **Response** `201 Created` — [Tool Response](#tool-response)
@@ -63,7 +64,7 @@ Content-Type: application/json
 
 **Required permission:** `tool:write`
 
-All create fields are optional plus `version` (required).
+All create fields are optional plus `version` (required), **except `llmSettings` which must always be provided**.
 
 **Response** `200 OK` — [Tool Response](#tool-response)
 
@@ -126,6 +127,7 @@ Returns audit log entries for the specified tool. See [Audit Logs](./audit-logs)
 | `inputType` | `string` | No | `"text"`, `"image"`, or `"multi-modal"` |
 | `outputType` | `string` | No | `"text"`, `"image"`, or `"multi-modal"` |
 | `parameters` | `ToolParameter[]` | No | Tool parameters |
+| `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |

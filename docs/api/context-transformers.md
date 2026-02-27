@@ -26,6 +26,7 @@ Content-Type: application/json
 | `contextFields` | `string[]` | No | List of context field names to transform |
 | `llmProviderId` | `string` | No | LLM provider ID |
 | `llmSettings` | `LlmSettings` | Yes | LLM provider-specific settings |
+| `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
 **Response** `201 Created` — [Context Transformer Response](#context-transformer-response)
@@ -61,7 +62,7 @@ Content-Type: application/json
 
 **Required permission:** `context_transformer:write`
 
-All create fields are optional plus `version` (required).
+All create fields are optional plus `version` (required), **except `llmSettings` which must always be provided**.
 
 **Response** `200 OK` — [Context Transformer Response](#context-transformer-response)
 
@@ -122,6 +123,7 @@ Returns audit log entries for the specified context transformer. See [Audit Logs
 | `contextFields` | `string[]` | Yes | Context field names to transform |
 | `llmProviderId` | `string` | Yes | LLM provider ID |
 | `llmSettings` | `LlmSettings` | No | LLM settings |
+| `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
