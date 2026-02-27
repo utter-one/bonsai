@@ -126,17 +126,21 @@ export class ApiKeyService extends BaseService {
 
   /**
    * Lists API keys with flexible filtering, sorting, and pagination
+   * @param projectId - Optional project ID to filter by. If not provided, returns API keys from all projects
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of API keys matching the criteria
    */
-  async listApiKeys(projectId: string, params?: ListParams): Promise<ApiKeyListResponse> {
-    logger.debug({ params }, 'Listing API keys');
+  async listApiKeys(projectId?: string, params?: ListParams): Promise<ApiKeyListResponse> {
+    logger.debug({ projectId, params }, 'Listing API keys');
 
     try {
       const offset = params?.offset || 0;
       const limit = params?.limit ?? null;
 
-      const conditions: SQL[] = [eq(apiKeys.projectId, projectId)];
+      const conditions: SQL[] = [];
+      if (projectId) {
+        conditions.push(eq(apiKeys.projectId, projectId));
+      }
       const columnMap = { id: apiKeys.id, projectId: apiKeys.projectId, name: apiKeys.name, isActive: apiKeys.isActive, createdAt: apiKeys.createdAt, updatedAt: apiKeys.updatedAt };
 
       if (params?.filters) {
@@ -149,9 +153,9 @@ export class ApiKeyService extends BaseService {
       }
 
       const orderBy = buildOrderBy(params?.orderBy, columnMap) ?? desc(apiKeys.createdAt);
-      const whereCondition = conditions.length > 0 ? conditions : undefined;
-      const apiKeyList = await db.query.apiKeys.findMany({ where: whereCondition ? (whereCondition.length === 1 ? whereCondition[0] : undefined) : undefined, orderBy, offset, limit: limit ?? undefined });
-      const totalQuery = await db.select({ count: apiKeys.id }).from(apiKeys).where(whereCondition ? (whereCondition.length === 1 ? whereCondition[0] : undefined) : undefined);
+      const whereCondition = conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : undefined) : undefined;
+      const apiKeyList = await db.query.apiKeys.findMany({ where: whereCondition, orderBy, offset, limit: limit ?? undefined });
+      const totalQuery = await db.select({ count: apiKeys.id }).from(apiKeys).where(whereCondition);
       const total = totalQuery.length;
 
       const responseItems = apiKeyList.map(item => ({ ...item, keyPreview: this.getKeyPreview(item.key), lastUsedAt: item.lastUsedAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }));
@@ -160,7 +164,7 @@ export class ApiKeyService extends BaseService {
 
       return apiKeyListResponseSchema.parse({ items: responseItems, total });
     } catch (error) {
-      logger.error({ error, params }, 'Failed to list API keys');
+      logger.error({ error, projectId, params }, 'Failed to list API keys');
       throw error;
     }
   }
