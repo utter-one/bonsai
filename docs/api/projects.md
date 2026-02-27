@@ -27,6 +27,7 @@ Content-Type: application/json
 | `storageConfig` | [`StorageConfig`](#storage-config) | No | Storage configuration for conversation artifacts |
 | `constants` | `Record<string, ParameterValue>` | No | Constants for templating and conversation logic |
 | `metadata` | `object` | No | Additional metadata |
+| `timezone` | `string` | No | IANA timezone identifier for conversations (e.g. `Europe/Warsaw`). Used as fallback when no per-user or per-conversation timezone is set. Defaults to UTC. |
 
 **Response** `201 Created` — [Project Response](#project-response)
 
@@ -84,8 +85,7 @@ All fields from the create body are optional. `version` is required for optimist
 | `generateVoice` | `boolean` | No | Updated voice generation |
 | `storageConfig` | [`StorageConfig`](#storage-config) | No | Updated storage config |
 | `constants` | `Record<string, ParameterValue>` | No | Updated constants |
-| `metadata` | `object` | No | Updated metadata |
-
+| `metadata` | `object` | No | Updated metadata || `timezone` | `string` | No | Updated IANA timezone identifier |
 **Response** `200 OK` — [Project Response](#project-response)
 
 **Errors:** `400` Invalid body | `404` Not found | `409` Version conflict
@@ -122,6 +122,7 @@ Content-Type: application/json
 | `storageConfig` | `StorageConfig` | Yes | Storage configuration |
 | `constants` | `Record<string, ParameterValue>` | Yes | Project constants |
 | `metadata` | `object` | Yes | Additional metadata |
+| `timezone` | `string` | Yes | IANA timezone identifier (null means UTC) |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |

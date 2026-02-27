@@ -4,6 +4,7 @@ import type { StartConversationRequest, StartConversationResponse } from '../con
 import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { StageService } from '../../services/StageService';
+import { ProjectService } from '../../services/ProjectService';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
@@ -21,7 +22,8 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
   constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, 
     @inject(ConversationService) private conversationService: ConversationService, 
     @inject(UserService) private userService: UserService,
-    @inject(StageService) private stageService: StageService) {}
+    @inject(StageService) private stageService: StageService,
+    @inject(ProjectService) private projectService: ProjectService) {}
 
   /**
    * Handles start conversation requests.
@@ -51,8 +53,13 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       if (stage.projectId !== context.connection.projectId) {
         throw new NotFoundError('Stage not found');
       }
-      
-      const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, clientId: context.connection.id, status: 'initialized' });
+
+      // Resolve timezone with 4-level precedence: message > userProfile > project > null (UTC fallback at render time)
+      const project = await this.projectService.getProjectById(stage.projectId);
+      const profileTimezone = user.profile.timezone as string | undefined;
+      const resolvedTimezone = message.timezone ?? profileTimezone ?? project.timezone ?? null;
+
+      const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, clientId: context.connection.id, status: 'initialized', metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null });
       const conversationId = conversation.id;
 
       await this.connectionManager.attachConversationToSession(message.sessionId, conversationId);

@@ -10,6 +10,7 @@ import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
 import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
+import type { TimeContext, CalendarDay } from "../../types/TimeContext";
 
 /**
  * Recursively converts a single FieldDescriptor into a pseudo-JSON value.
@@ -123,6 +124,13 @@ export type ConversationContext = {
    */
   context?: Record<string, any>;
 
+  /**
+   * Time context for the conversation, anchored to the conversation's resolved timezone.
+   * Use `{{time.anchor}}` in prompts to ground the LLM in the current date/time.
+   * Use `{{time.nextTuesday}}`, `{{time.calendar}}`, etc. for relative date references.
+   */
+  time: TimeContext;
+
   /** Stage configuration and available actions (optional, included for classification and processing contexts) */
   stage?: {
     /** ID of the stage */
@@ -158,6 +166,137 @@ export type ConversationContext = {
 @singleton()
 export class ConversationContextBuilder {
   constructor(@inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor) {}
+
+  /**
+   * Builds a rich time context object anchored to the given IANA timezone.
+   * Uses only the native `Intl.DateTimeFormat` API — no external dependencies.
+   * @param timezone - IANA timezone identifier, e.g. "Europe/Warsaw". Defaults to "UTC".
+   */
+  private buildTimeContext(timezone: string = 'UTC'): TimeContext {
+    const now = new Date();
+    const ts = now.getTime();
+
+    // Extract individual date/time components in the target timezone
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(now);
+
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+
+    const year = get('year');
+    const month = get('month').padStart(2, '0');
+    const day = get('day').padStart(2, '0');
+    // Intl may return "24" for midnight — normalise to "00"
+    const hour = (get('hour') === '24' ? '00' : get('hour')).padStart(2, '0');
+    const minute = get('minute').padStart(2, '0');
+    const second = get('second').padStart(2, '0');
+
+    const date = `${year}-${month}-${day}`;
+    const time = `${hour}:${minute}:${second}`;
+    const dateTime = `${date} ${time}`;
+
+    const monthName = new Intl.DateTimeFormat('en-US', { timeZone: timezone, month: 'long' }).format(now);
+    const monthNameShort = new Intl.DateTimeFormat('en-US', { timeZone: timezone, month: 'short' }).format(now);
+    const dayOfWeek = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'long' }).format(now);
+    const dayOfWeekShort = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'short' }).format(now);
+
+    // Compute UTC offset by comparing TZ-local clock to UTC clock via toLocaleString
+    const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    const diffMinutes = Math.round((tzDate.getTime() - utcDate.getTime()) / 60000);
+    const offsetSign = diffMinutes >= 0 ? '+' : '-';
+    const absMinutes = Math.abs(diffMinutes);
+    const offsetHours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+    const offsetMins = String(absMinutes % 60).padStart(2, '0');
+    const offset = `${offsetSign}${offsetHours}:${offsetMins}`;
+
+    const iso = `${date}T${time}.000${offset}`;
+
+    // Weekday index of today (0=Sunday … 6=Saturday)
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayDowIndex = weekdays.indexOf(dayOfWeek);
+
+    // Helper: add N days to date string (YYYY-MM-DD) using UTC arithmetic
+    const addDays = (dateStr: string, n: number): string => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const base = new Date(Date.UTC(y, m - 1, d));
+      base.setUTCDate(base.getUTCDate() + n);
+      return [
+        base.getUTCFullYear(),
+        String(base.getUTCMonth() + 1).padStart(2, '0'),
+        String(base.getUTCDate()).padStart(2, '0'),
+      ].join('-');
+    };
+
+    // Next occurrence of each weekday (returns today if today matches)
+    const nextWeekday = (targetIndex: number): string => {
+      let daysAhead = targetIndex - todayDowIndex;
+      if (daysAhead < 0) daysAhead += 7;
+      return addDays(date, daysAhead);
+    };
+
+    const nextSunday    = nextWeekday(0);
+    const nextMonday    = nextWeekday(1);
+    const nextTuesday   = nextWeekday(2);
+    const nextWednesday = nextWeekday(3);
+    const nextThursday  = nextWeekday(4);
+    const nextFriday    = nextWeekday(5);
+    const nextSaturday  = nextWeekday(6);
+
+    // Upcoming 14-day calendar window
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const weekdaysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const calendar: CalendarDay[] = [];
+    for (let i = 0; i < 14; i++) {
+      const calDate = addDays(date, i);
+      const [cy, cm, cd] = calDate.split('-').map(Number);
+      const dowIndex = new Date(Date.UTC(cy, cm - 1, cd)).getUTCDay();
+      calendar.push({
+        date: calDate,
+        dayName: weekdays[dowIndex],
+        dayNameShort: weekdaysShort[dowIndex],
+        month: monthNames[cm - 1],
+        dayOfMonth: cd,
+        isToday: i === 0,
+      });
+    }
+
+    // Compute Mon–Sun boundaries for this week and next week
+    const daysToThisMonday = todayDowIndex === 0 ? -6 : 1 - todayDowIndex;
+    const thisMonday = addDays(date, daysToThisMonday);
+    const thisSunday = addDays(thisMonday, 6);
+    const nextWeekMonday = addDays(thisMonday, 7);
+    const nextWeekSunday = addDays(thisMonday, 13);
+
+    const shortLabel = (dateStr: string): string => {
+      const [, m, d] = dateStr.split('-').map(Number);
+      return `${d} ${monthNames[m - 1].substring(0, 3)}`;
+    };
+
+    const anchor = [
+      `Today is ${dayOfWeek}, ${parseInt(day)} ${monthName} ${year} (${timezone}, UTC${offset}).`,
+      `This week (Mon–Sun): ${shortLabel(thisMonday)}–${shortLabel(thisSunday)}.`,
+      `Next week: ${shortLabel(nextWeekMonday)}–${shortLabel(nextWeekSunday)}.`,
+      `Next Mon: ${shortLabel(nextMonday)}, Tue: ${shortLabel(nextTuesday)}, Wed: ${shortLabel(nextWednesday)}, Thu: ${shortLabel(nextThursday)}, Fri: ${shortLabel(nextFriday)}, Sat: ${shortLabel(nextSaturday)}, Sun: ${shortLabel(nextSunday)}.`,
+    ].join(' ');
+
+    return {
+      iso, timestamp: ts, date, time, dateTime,
+      year, month, day, hour, minute, second,
+      monthName, monthNameShort, dayOfWeek, dayOfWeekShort,
+      timezone, offset,
+      nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday,
+      calendar,
+      anchor,
+    };
+  }
 
   /**
    * Transforms Stage entity into simplified stage context for use in prompts.
@@ -307,6 +446,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage!, user?.profile || {})),
     };
 
@@ -360,6 +500,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!, user?.profile || {})),
     };
 
@@ -403,6 +544,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext, knowledgeCategories),
     };
 
@@ -481,6 +623,7 @@ export class ConversationContextBuilder {
       },
       schema: fieldDescriptorsToPseudoJson(outputFieldDescriptors),
       context: transformerContext,
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       stage: await this.buildStageContext(stage, rawContext),
     };
 
@@ -539,6 +682,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {})),
     };
 
@@ -582,6 +726,7 @@ export class ConversationContextBuilder {
         webhooks: {},
         tools: {},
       },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       stage: {
           id: conversation.stageId,
           name: stage.name,
