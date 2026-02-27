@@ -5,6 +5,48 @@ import { logger } from '../../utils/logger';
 import { ConversationContext } from './ConversationContextBuilder';
 
 /**
+ * Flow control signals emitted by a script via goToStage(), endConversation(), etc.
+ * Only meaningful in run_script effect context; silently ignored in condition and expression evaluation.
+ */
+export type ScriptFlowControl = {
+  /** Stage ID to transition to after the script finishes */
+  goToStageId?: string;
+  /** Whether the script requested conversation end */
+  shouldEndConversation?: boolean;
+  /** Reason for ending the conversation */
+  endReason?: string;
+  /** Whether the script requested conversation abort */
+  shouldAbortConversation?: boolean;
+  /** Reason for aborting the conversation */
+  abortReason?: string;
+  /**
+   * Whether to generate a response after the script.
+   * `true` with `prescriptedResponse` delivers that text directly; `true` without it triggers LLM generation.
+   * `false` suppresses any response for this turn.
+   */
+  shouldGenerateResponse?: boolean;
+  /** Pre-scripted response text to deliver, bypassing LLM generation */
+  prescriptedResponse?: string;
+};
+
+/**
+ * Result returned by executeScript(), carrying the script's return value,
+ * flow control signals, and mutable-state change flags.
+ */
+export type ScriptExecutionResult = {
+  /** Return value of the top-level script expression */
+  value: any;
+  /** Flow control signals emitted during execution */
+  flowControl: ScriptFlowControl;
+  /** True if context.vars was modified */
+  hasModifiedVars: boolean;
+  /** True if context.userInput was modified */
+  hasModifiedUserInput: boolean;
+  /** True if context.userProfile was modified */
+  hasModifiedUserProfile: boolean;
+};
+
+/**
  * Service responsible for executing JavaScript code in isolated VM environments
  * Provides secure script execution with memory limits, timeouts, and sandboxed APIs
  * 
@@ -36,11 +78,22 @@ import { ConversationContext } from './ConversationContextBuilder';
  * - `userInput` - Current user input text (can be replaced or set to null)
  *
  * Utility functions:
- * - `btoa(str)` - Base64-encode a binary string
- * - `atob(b64)` - Decode a base64 string
  * - `uuid()` - Generate a random UUID v4
- * - `hash(algorithm, data)` - Compute a hex digest; algorithm must be 'sha256', 'sha512', or 'md5'
  * - `formatDate(iso, locale?, options?)` - Format an ISO date string via Intl.DateTimeFormat
+ *
+ * History utilities (pure JS, zero host round-trips):
+ * - `lastMessage(role?)` - Content of the last message, optionally filtered by 'user' or 'assistant'
+ * - `messageCount(role?)` - Total message count, optionally filtered by role
+ * - `historyText(opts?)` - Messages formatted as "User: ...\nAssistant: ..."; opts: { n?, role?, labels? }
+ * - `historyContains(substr, role?)` - Case-insensitive substring search across messages
+ * - `stageMessages(role?)` - Messages exchanged in the current stage only, optionally filtered by role
+ *
+ * Flow control (run_script only; ignored in conditions and inline expressions):
+ * - `goToStage(stageId)` - Transition to a different stage after the script
+ * - `endConversation(reason?)` - End the conversation gracefully
+ * - `abortConversation(reason?)` - Abort the conversation
+ * - `prescriptResponse(text)` - Deliver a fixed response, bypassing LLM generation
+ * - `suppressResponse()` - Suppress any response for this turn
  *
  * Logging:
  * - `console.log()`, `console.error()`, `console.warn()` - Captured to application logs
@@ -54,8 +107,16 @@ export class IsolatedScriptExecutor {
    * @param context - Execution context containing conversation and stage information
    * @throws Error if script execution fails or times out
    */
-  async executeScript(code: string, context: ConversationContext): Promise<any> {
+  async executeScript(code: string, context: ConversationContext): Promise<ScriptExecutionResult> {
     logger.info({ conversationId: context.conversationId, stageId: context.stage.id, codeLength: code.length }, `Running script in isolated VM`);
+
+    // Snapshot mutable state for change detection
+    const varsSnapshot = JSON.stringify(context.vars);
+    const userProfileSnapshot = JSON.stringify(context.userProfile);
+    const userInputBefore = context.userInput;
+
+    // Flow control signals collected via host callbacks
+    const flowControl: ScriptFlowControl = {};
 
     // Create isolated VM instance with memory limit (16MB)
     const isolate = new ivm.Isolate({ memoryLimit: 16 });
@@ -101,24 +162,59 @@ export class IsolatedScriptExecutor {
       await jail.set('time', new ivm.ExternalCopy(context.time).copyInto());
       await jail.set('userInputSource', new ivm.ExternalCopy(context.userInputSource || null).copyInto());
       await jail.set('stageVars', new ivm.ExternalCopy(context.stageVars || null).copyInto());
+      await jail.set('events', new ivm.ExternalCopy(context.events).copyInto());
 
       // Inject mutable objects that scripts can modify
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
       await jail.set('userProfile', new ivm.ExternalCopy(context.userProfile).copyInto());
       await jail.set('userInput', new ivm.ExternalCopy(context.userInput || null).copyInto());
 
-      // Inject utility functions as synchronous host callbacks
-      await jail.set('btoa', new ivm.Callback((str: string) => Buffer.from(str, 'binary').toString('base64')));
-      await jail.set('atob', new ivm.Callback((b64: string) => Buffer.from(b64, 'base64').toString('binary')));
+      // Utility functions
       await jail.set('uuid', new ivm.Callback(() => crypto.randomUUID()));
-      await jail.set('hash', new ivm.Callback((algorithm: string, data: string) => {
-        const allowed = ['sha256', 'sha512', 'md5'];
-        if (!allowed.includes(algorithm)) throw new Error(`hash(): unsupported algorithm '${algorithm}'. Use: ${allowed.join(', ')}`);
-        return crypto.createHash(algorithm).update(data).digest('hex');
-      }));
-      await jail.set('formatDate', new ivm.Callback((iso: string, locale?: string, options?: Record<string, string>) => {
-        return new Intl.DateTimeFormat(locale ?? undefined, options ?? undefined).format(new Date(iso));
-      }));
+      await jail.set('formatDate', new ivm.Callback((iso: string, locale?: string, options?: Record<string, string>) => new Intl.DateTimeFormat(locale ?? undefined, options ?? undefined).format(new Date(iso))));
+
+      // Flow control functions — signals are captured into flowControl and returned with ScriptExecutionResult
+      await jail.set('goToStage', new ivm.Callback((stageId: string) => { flowControl.goToStageId = stageId; }));
+      await jail.set('endConversation', new ivm.Callback((reason?: string) => { flowControl.shouldEndConversation = true; if (reason) flowControl.endReason = reason; }));
+      await jail.set('abortConversation', new ivm.Callback((reason?: string) => { flowControl.shouldAbortConversation = true; if (reason) flowControl.abortReason = reason; }));
+      await jail.set('prescriptResponse', new ivm.Callback((text: string) => { flowControl.shouldGenerateResponse = true; flowControl.prescriptedResponse = text; }));
+      await jail.set('suppressResponse', new ivm.Callback(() => { flowControl.shouldGenerateResponse = false; }));
+
+      // History utility functions (pure JS inside the isolate — no host round-trips)
+      await ivmContext.eval(`
+        function lastMessage(role) {
+          var msgs = role ? history.filter(function(m) { return m.role === role; }) : history;
+          return msgs.length ? msgs[msgs.length - 1].content : null;
+        }
+        function messageCount(role) {
+          return role ? history.filter(function(m) { return m.role === role; }).length : history.length;
+        }
+        function historyText(opts) {
+          var n = opts && opts.n != null ? opts.n : null;
+          var role = opts && opts.role ? opts.role : null;
+          var labels = (opts && opts.labels) ? opts.labels : {};
+          var msgs = role ? history.filter(function(m) { return m.role === role; }) : history;
+          if (n != null) msgs = msgs.slice(-n);
+          var userLabel = labels.user || 'User';
+          var assistantLabel = labels.assistant || 'Assistant';
+          return msgs.map(function(m) { return (m.role === 'user' ? userLabel : assistantLabel) + ': ' + m.content; }).join('\\n');
+        }
+        function historyContains(substr, role) {
+          var msgs = role ? history.filter(function(m) { return m.role === role; }) : history;
+          var lower = substr.toLowerCase();
+          return msgs.some(function(m) { return m.content.toLowerCase().indexOf(lower) !== -1; });
+        }
+        function stageMessages(role) {
+          var jumps = events.filter(function(e) { return e.eventType === 'jump_to_stage'; });
+          var offset = 0;
+          if (jumps.length > 0) {
+            var lastJumpTs = jumps[jumps.length - 1].timestamp;
+            offset = events.filter(function(e) { return e.eventType === 'message' && e.timestamp <= lastJumpTs; }).length;
+          }
+          var msgs = history.slice(offset);
+          return role ? msgs.filter(function(m) { return m.role === role; }) : msgs;
+        }
+      `);
 
       // Compile the script
       const script = await isolate.compileScript(code);
@@ -154,14 +250,18 @@ export class IsolatedScriptExecutor {
         }
       }
 
+      const hasModifiedVars = JSON.stringify(context.vars) !== varsSnapshot;
+      const hasModifiedUserProfile = JSON.stringify(context.userProfile) !== userProfileSnapshot;
+      const hasModifiedUserInput = context.userInput !== userInputBefore;
+
       logger.info({ conversationId: context.conversationId, stageId: context.stage.id }, `Script executed successfully in isolated VM`);
-      return result;
+      return { value: result, flowControl, hasModifiedVars, hasModifiedUserInput, hasModifiedUserProfile };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ conversationId: context.conversationId, stageId: context.stage.id, error: errorMessage }, `Failed to execute script in isolated VM`);
       // Swallow errors to prevent crashing the conversation runner
       // Scripts should not be able to crash the system
-      return undefined;
+      return { value: undefined, flowControl: {}, hasModifiedVars: false, hasModifiedUserInput: false, hasModifiedUserProfile: false };
     } finally {
       // Dispose the isolate to free resources
       // This invalidates all references obtained from it

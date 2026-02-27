@@ -5,7 +5,7 @@ import { inject, singleton } from "tsyringe";
 import { Conversation, GlobalAction, Stage } from "../../types/models";
 import { FieldDescriptor } from "../../types/parameters";
 import { StageAction } from "../../types/actions";
-import { MessageEventData } from "../../types/conversationEvents";
+import { ConversationEventData, MessageEventData } from "../../types/conversationEvents";
 import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
 import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
@@ -65,6 +65,23 @@ export type FaqItem = {
   answer: string;
 };
 
+/**
+ * A single conversation event entry exposed to the script sandbox.
+ * Contains all event types in chronological order, including messages.
+ */
+export type ScriptEvent = {
+  /** Unique event ID */
+  id: string;
+  /** Event type discriminator */
+  eventType: string;
+  /** ISO 8601 timestamp of when the event occurred */
+  timestamp: string;
+  /** Event-specific data payload */
+  eventData: ConversationEventData;
+  /** Optional metadata */
+  metadata?: Record<string, any>;
+};
+
 export type ConversationContext = {
   /** ID of the conversation */
   conversationId: string;
@@ -89,6 +106,12 @@ export type ConversationContext = {
     role: 'user' | 'assistant';
     content: string;
   }>;
+
+  /**
+   * All conversation events in chronological order, including messages, actions, stage transitions, etc.
+   * Available in scripts as `events`. Use `history` for a pre-filtered view of message events only.
+   */
+  events: ScriptEvent[];
 
   /** Explicitly called or detected actions */
   actions: Record<string, {
@@ -439,6 +462,7 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
       history: [],
+      events: [],
       actions: {
         [actionName]: { parameters },
       },
@@ -450,21 +474,24 @@ export class ConversationContextBuilder {
       stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage!, user?.profile || {})),
     };
 
-    // Get history from database
-    const messages = await db.query.conversationEvents.findMany({
-      where: and(
-        eq(conversationEvents.conversationId, conversation.id),
-        eq(conversationEvents.eventType, 'message')
-      ),
+    // Get all events from database; history is a filtered view on message events
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: eq(conversationEvents.conversationId, conversation.id),
       orderBy: asc(conversationEvents.timestamp),
     });
-    context.history = messages.map(msg => {
-      const eventData = msg.eventData as MessageEventData;
-      return {
-        role: eventData.role,
-        content: eventData.text,
-      };
-    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = allEvents
+      .filter(e => e.eventType === 'message')
+      .map(e => {
+        const eventData = e.eventData as MessageEventData;
+        return { role: eventData.role, content: eventData.text };
+      });
 
     return context;
   }
@@ -495,6 +522,7 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: stage?.persona?.prompt,
       history: [],
+      events: [],
       actions: {},
       results: {
         webhooks: {},
@@ -537,6 +565,7 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
+      events: [],
       actions: {}, // Convert classification results to actions later
       userInput,
       originalUserInput,
@@ -548,21 +577,24 @@ export class ConversationContextBuilder {
       stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext, knowledgeCategories),
     };
 
-    // Get history from database
-    const messages = await db.query.conversationEvents.findMany({
-      where: and(
-        eq(conversationEvents.conversationId, conversation.id),
-        eq(conversationEvents.eventType, 'message')
-      ),
+    // Get all events from database; history is a filtered view on message events
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: eq(conversationEvents.conversationId, conversation.id),
       orderBy: asc(conversationEvents.timestamp),
     });
-    context.history = messages.map(msg => {
-      const eventData = msg.eventData as MessageEventData;
-      return {
-        role: eventData.role,
-        content: eventData.text,
-      };
-    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = allEvents
+      .filter(e => e.eventType === 'message')
+      .map(e => {
+        const eventData = e.eventData as MessageEventData;
+        return { role: eventData.role, content: eventData.text };
+      });
 
     return context;
   }
@@ -614,6 +646,7 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
+      events: [],
       actions: {},
       userInput,
       originalUserInput,
@@ -627,21 +660,24 @@ export class ConversationContextBuilder {
       stage: await this.buildStageContext(stage, rawContext),
     };
 
-    // Get history from database
-    const messages = await db.query.conversationEvents.findMany({
-      where: and(
-        eq(conversationEvents.conversationId, conversation.id),
-        eq(conversationEvents.eventType, 'message')
-      ),
+    // Get all events from database; history is a filtered view on message events
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: eq(conversationEvents.conversationId, conversation.id),
       orderBy: asc(conversationEvents.timestamp),
     });
-    context.history = messages.map(msg => {
-      const eventData = msg.eventData as MessageEventData;
-      return {
-        role: eventData.role,
-        content: eventData.text,
-      };
-    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = allEvents
+      .filter(e => e.eventType === 'message')
+      .map(e => {
+        const eventData = e.eventData as MessageEventData;
+        return { role: eventData.role, content: eventData.text };
+      });
 
     return context;
   }
@@ -671,6 +707,7 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       persona: (stage as any).persona?.prompt,
       history: [],
+      events: [],
       actions: actions.reduce((acc, action) => {
         acc[action.name] = { parameters: action.parameters };
         return acc;
@@ -686,21 +723,24 @@ export class ConversationContextBuilder {
       stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {})),
     };
 
-    // Get history from database
-    const messages = await db.query.conversationEvents.findMany({
-      where: and(
-        eq(conversationEvents.conversationId, conversation.id),
-        eq(conversationEvents.eventType, 'message')
-      ),
+    // Get all events from database; history is a filtered view on message events
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: eq(conversationEvents.conversationId, conversation.id),
       orderBy: asc(conversationEvents.timestamp),
     });
-    context.history = messages.map(msg => {
-      const eventData = msg.eventData as MessageEventData;
-      return {
-        role: eventData.role,
-        content: eventData.text,
-      };
-    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = allEvents
+      .filter(e => e.eventType === 'message')
+      .map(e => {
+        const eventData = e.eventData as MessageEventData;
+        return { role: eventData.role, content: eventData.text };
+      });
 
     return context;
   }
@@ -721,6 +761,7 @@ export class ConversationContextBuilder {
       stageVars: conversation.stageVars,
       userProfile: userProfile || {}, // Not loaded in raw context
       history: [], // Not loaded in raw context
+      events: [], // Not loaded in raw context
       actions: {}, // Not loaded in raw context
       results: {
         webhooks: {},

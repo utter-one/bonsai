@@ -32,6 +32,7 @@ Scripts have access to these global variables:
 | `time` | Read-only | Rich time context: `iso`, `date`, `time`, `dayOfWeek`, `timezone`, `calendar`, `anchor`, etc. |
 | `userInputSource` | Read-only | Input channel: `'text'` \| `'voice'` \| `null` |
 | `stageVars` | Read-only | Variables for all stages, keyed by stage ID |
+| `events` | Read-only | All conversation events in chronological order (messages, actions, stage transitions, etc.) |
 | `console` | — | `console.log()`, `console.error()`, `console.warn()` |
 
 ## Modifying State
@@ -105,30 +106,12 @@ const prevStepData = stageVars?.['stage-id-here']?.someField;
 
 The sandbox provides a set of pure utility functions:
 
-### `btoa(str)` / `atob(b64)`
-
-Base64 encode and decode binary strings.
-
-```javascript
-const encoded = btoa('hello world'); // 'aGVsbG8gd29ybGQ='
-const decoded = atob(encoded);       // 'hello world'
-```
-
 ### `uuid()`
 
 Generate a random UUID v4.
 
 ```javascript
 vars.correlationId = uuid(); // e.g. '3b1f8c2d-4e5a-6b7c-8d9e-0f1a2b3c4d5e'
-```
-
-### `hash(algorithm, data)`
-
-Compute a hex digest of a string. Supported algorithms: `'sha256'`, `'sha512'`, `'md5'`.
-
-```javascript
-const fingerprint = hash('sha256', vars.userId + vars.sessionToken);
-vars.cacheKey = hash('md5', JSON.stringify(results.webhooks?.orderLookup));
 ```
 
 ### `formatDate(iso, locale?, options?)`
@@ -143,6 +126,174 @@ const label = formatDate(time.iso, 'pl-PL', { dateStyle: 'long' });
 // Day and month only
 vars.appointmentLabel = formatDate(vars.appointmentDate, 'en-GB', { day: 'numeric', month: 'long' });
 // e.g. '14 March'
+```
+
+## History Utilities
+
+Five helper functions are available for working with conversation history. They operate purely on the in-memory `history` and `events` arrays — no host calls, no overhead.
+
+### `lastMessage(role?)`
+
+Returns the content of the last message, optionally filtered to `'user'` or `'assistant'`.
+
+```javascript
+const last = lastMessage();           // last message regardless of role
+const lastUser = lastMessage('user'); // last thing the user said
+```
+
+### `messageCount(role?)`
+
+Returns the total number of messages, optionally filtered by role.
+
+```javascript
+if (messageCount('user') >= 5) vars.needsEscalation = true;
+```
+
+### `historyText(opts?)`
+
+Formats messages as `"User: ...\nAssistant: ..."`. All options are optional.
+
+| Option | Type | Description |
+|---|---|---|
+| `n` | `number` | Limit to last N messages |
+| `role` | `'user'\|'assistant'` | Only include one role |
+| `labels` | `{ user?, assistant? }` | Override the `User:` / `Assistant:` prefix strings |
+
+```javascript
+vars.recentContext = historyText({ n: 6 });         // last 3 turns
+vars.summary = historyText();                       // full conversation
+
+// Custom prefixes
+vars.transcript = historyText({ n: 10, labels: { user: 'Customer', assistant: 'Agent' } });
+// e.g. "Customer: I need help\nAgent: Sure, let me check..."
+```
+
+### `historyContains(substr, role?)`
+
+Case-insensitive substring search across message content.
+
+```javascript
+if (historyContains('cancel', 'user')) vars.showCancellationFlow = true;
+if (historyContains('error')) vars.errorMentioned = true;
+```
+
+### `stageMessages(role?)`
+
+Returns only the messages exchanged since the most recent stage transition (i.e. in the current stage), optionally filtered by role. Returns all history if no stage transition has occurred.
+
+```javascript
+const stageUserMsgs = stageMessages('user');
+vars.stageRetries = stageUserMsgs.length;
+```
+
+## Flow Control
+
+Flow control functions are available in `run_script` effects only. They are silently ignored in action conditions and inline `=` expressions.
+
+All signals are queued and applied after the script finishes — the script always runs to completion first.
+
+### `goToStage(stageId)`
+
+Transition to a different stage after the script.
+
+```javascript
+if (vars.retryCount >= 3) {
+  goToStage('escalation-stage-id');
+}
+```
+
+### `endConversation(reason?)`
+
+End the conversation gracefully. Triggers the `on_leave` lifecycle on the current stage.
+
+```javascript
+if (vars.taskComplete) {
+  endConversation('Task completed successfully');
+}
+```
+
+### `abortConversation(reason?)`
+
+Abort the conversation immediately.
+
+```javascript
+if (vars.fraudDetected) {
+  abortConversation('Fraud detection triggered');
+}
+```
+
+### `prescriptResponse(text)`
+
+Deliver a fixed response to the user, bypassing LLM generation entirely.
+
+```javascript
+if (vars.language === 'pl') {
+  prescriptResponse('Dziękujemy za kontakt. Do widzenia!');
+} else {
+  prescriptResponse('Thank you for contacting us. Goodbye!');
+}
+```
+
+### `suppressResponse()`
+
+Suppress any response generation for this turn. Useful when the script handles the outcome fully through `goToStage` or when a silent state update is needed.
+
+```javascript
+// Silently process and transition without generating a response
+vars.stepCompleted = true;
+goToStage('next-step-id');
+suppressResponse();
+```
+
+## Events
+
+The `events` array contains all conversation events in chronological order, including messages, actions, stage transitions, tool calls, and more. It is the complete audit trail of the conversation turn.
+
+### `ScriptEvent` shape
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `string` | Unique event ID |
+| `eventType` | `string` | Event type (see below) |
+| `timestamp` | `string` | ISO 8601 timestamp |
+| `eventData` | `object` | Event-specific payload |
+| `metadata` | `object?` | Optional metadata |
+
+### Event types
+
+| `eventType` | Key `eventData` fields |
+|---|---|
+| `message` | `role`, `text`, `originalText` |
+| `action` | `actionName`, `stageId`, `effects` |
+| `tool_call` | `toolId`, `toolName`, `parameters`, `success`, `result?`, `error?` |
+| `classification` | `classifierId`, `input`, `actions` |
+| `transformation` | `transformerId`, `input`, `appliedFields` |
+| `command` | `command`, `parameters?` |
+| `jump_to_stage` | `fromStageId`, `toStageId` |
+| `conversation_start` | `stageId`, `initialVariables?` |
+| `conversation_resume` | `previousStatus`, `stageId` |
+| `conversation_end` | `reason?`, `stageId` |
+| `conversation_aborted` | `reason`, `stageId` |
+| `conversation_failed` | `reason`, `stageId?` |
+
+### Examples
+
+```javascript
+// How many times has the current stage been entered?
+const jumpsHere = events.filter(
+  e => e.eventType === 'jump_to_stage' && e.eventData.toStageId === stageId
+);
+vars.stageEntryCount = jumpsHere.length;
+
+// Did a specific tool succeed?
+const lookup = events.find(
+  e => e.eventType === 'tool_call' && e.eventData.toolName === 'customerLookup'
+);
+vars.lookupSucceeded = lookup?.eventData.success ?? false;
+
+// What stage did we come from?
+const lastJump = events.filter(e => e.eventType === 'jump_to_stage').at(-1);
+vars.previousStageId = lastJump?.eventData.fromStageId ?? null;
 ```
 
 ## Console Output

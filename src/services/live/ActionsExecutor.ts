@@ -484,18 +484,28 @@ export class ActionsExecutor {
 
   /**
    * Executes run_script effect
-   * Delegates to StageScriptRunner for secure script execution in isolated VM
+   * Delegates to IsolatedScriptExecutor for secure script execution in isolated VM.
+   * Flow control signals (goToStage, endConversation, etc.) emitted by the script are mapped
+   * directly onto EffectOutcome fields.
    */
   private async executeRunScript(
     effect: RunScriptEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
     logger.info({ effect, context }, `Executing run_script effect`);
-    await this.scriptRunner.executeScript(effect.code, context);
+    const result = await this.scriptRunner.executeScript(effect.code, context);
 
     return {
-      shouldEndConversation: false,
-      shouldAbortConversation: false,
+      shouldEndConversation: result.flowControl.shouldEndConversation ?? false,
+      endReason: result.flowControl.endReason,
+      shouldAbortConversation: result.flowControl.shouldAbortConversation ?? false,
+      abortReason: result.flowControl.abortReason,
+      newStageId: result.flowControl.goToStageId,
+      shouldGenerateResponse: result.flowControl.shouldGenerateResponse,
+      prescriptedResponse: result.flowControl.prescriptedResponse,
+      hasModifiedVars: result.hasModifiedVars,
+      hasModifiedUserInput: result.hasModifiedUserInput,
+      hasModifiedUserProfile: result.hasModifiedUserProfile,
     };
   }
 
