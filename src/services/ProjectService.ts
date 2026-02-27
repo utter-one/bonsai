@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, SQL, desc } from 'drizzle-orm';
+import { eq, SQL, desc, and } from 'drizzle-orm';
 import { db } from '../db/index';
-import { projects, providers } from '../db/schema';
+import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, personas, conversations, issues } from '../db/schema';
 import type { CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse } from '../http/contracts/project';
 import type { ListParams } from '../http/contracts/common';
 import { projectResponseSchema, projectListResponseSchema } from '../http/contracts/project';
@@ -39,11 +39,11 @@ export class ProjectService extends BaseService {
 
     try {
       const id = generateId(ID_PREFIXES.PROJECT);
-      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, version: 1 }).returning();
+      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, version: 1 }).returning();
 
       const createdProject = project[0];
 
-      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, storageConfig: createdProject.storageConfig, constants: createdProject.constants, metadata: createdProject.metadata }, context?.adminId);
+      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, storageConfig: createdProject.storageConfig, constants: createdProject.constants, metadata: createdProject.metadata, timezone: createdProject.timezone }, context?.adminId);
 
       logger.info({ projectId: createdProject.id }, 'Project created successfully');
 
@@ -146,14 +146,14 @@ export class ProjectService extends BaseService {
         throw new OptimisticLockError('Project');
       }
 
-      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, version: existingProject.version + 1, updatedAt: new Date() };
+      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, version: existingProject.version + 1, updatedAt: new Date() };
       const updatedProject = await db.update(projects).set(updateData).where(eq(projects.id, id)).returning();
 
       if (!updatedProject[0]) {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata }, context?.adminId);
+      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata, timezone: existingProject.timezone }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata, timezone: updatedProject[0].timezone }, context?.adminId);
 
       logger.info({ projectId: id }, 'Project updated successfully');
 
@@ -165,14 +165,14 @@ export class ProjectService extends BaseService {
   }
 
   /**
-   * Deletes a project by their identifier
+   * Deletes a project and all related entities (cascading deletion)
    * @param id - The project identifier
    * @param context - Request context for auditing and authorization
    * @throws {NotFoundError} When project is not found
    */
   async deleteProject(id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.PROJECT_DELETE);
-    logger.info({ projectId: id, adminId: context?.adminId }, 'Deleting project');
+    logger.info({ projectId: id, adminId: context?.adminId }, 'Deleting project with cascading deletion');
 
     try {
       const existingProject = await db.query.projects.findFirst({ where: eq(projects.id, id) });
@@ -181,11 +181,106 @@ export class ProjectService extends BaseService {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      await db.delete(projects).where(eq(projects.id, id));
+      // Use transaction to ensure atomicity - all or nothing
+      await db.transaction(async (tx) => {
+        // Delete in FK-safe order (reverse of import order from MigrationService)
 
-      await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata }, context?.adminId);
+        // 1. Delete apiKeys
+        const apiKeyRecords = await tx.query.apiKeys.findMany({ where: eq(apiKeys.projectId, id) });
+        for (const apiKey of apiKeyRecords) {
+          await tx.delete(apiKeys).where(and(eq(apiKeys.projectId, id), eq(apiKeys.id, apiKey.id)));
+          await this.auditService.logDelete('api_key', apiKey.id, { id: apiKey.id, name: apiKey.name, projectId: apiKey.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: apiKeyRecords.length }, 'Deleted apiKeys');
 
-      logger.info({ projectId: id }, 'Project deleted successfully');
+        // 2. Delete stages (must be before personas/classifiers due to FK references)
+        const stageRecords = await tx.query.stages.findMany({ where: eq(stages.projectId, id) });
+        for (const stage of stageRecords) {
+          await tx.delete(stages).where(and(eq(stages.projectId, id), eq(stages.id, stage.id)));
+          await this.auditService.logDelete('stage', stage.id, { id: stage.id, name: stage.name, projectId: stage.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: stageRecords.length }, 'Deleted stages');
+
+        // 3. Delete knowledgeItems (children of knowledgeCategories)
+        const categoryRecords = await tx.query.knowledgeCategories.findMany({ where: eq(knowledgeCategories.projectId, id) });
+        for (const category of categoryRecords) {
+          const itemRecords = await tx.query.knowledgeItems.findMany({ where: and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.categoryId, category.id)) });
+          for (const item of itemRecords) {
+            await tx.delete(knowledgeItems).where(and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.id, item.id)));
+            await this.auditService.logDelete('knowledge_item', item.id, { id: item.id, categoryId: item.categoryId }, context?.adminId);
+          }
+        }
+        logger.debug({ projectId: id, categoryCount: categoryRecords.length }, 'Deleted knowledgeItems');
+
+        // 4. Delete knowledgeCategories
+        for (const category of categoryRecords) {
+          await tx.delete(knowledgeCategories).where(and(eq(knowledgeCategories.projectId, id), eq(knowledgeCategories.id, category.id)));
+          await this.auditService.logDelete('knowledge_category', category.id, { id: category.id, name: category.name, projectId: category.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: categoryRecords.length }, 'Deleted knowledgeCategories');
+
+        // 5. Delete globalActions
+        const globalActionRecords = await tx.query.globalActions.findMany({ where: eq(globalActions.projectId, id) });
+        for (const action of globalActionRecords) {
+          await tx.delete(globalActions).where(and(eq(globalActions.projectId, id), eq(globalActions.id, action.id)));
+          await this.auditService.logDelete('global_action', action.id, { id: action.id, name: action.name, projectId: action.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: globalActionRecords.length }, 'Deleted globalActions');
+
+        // 6. Delete tools
+        const toolRecords = await tx.query.tools.findMany({ where: eq(tools.projectId, id) });
+        for (const tool of toolRecords) {
+          await tx.delete(tools).where(and(eq(tools.projectId, id), eq(tools.id, tool.id)));
+          await this.auditService.logDelete('tool', tool.id, { id: tool.id, name: tool.name, projectId: tool.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: toolRecords.length }, 'Deleted tools');
+
+        // 7. Delete contextTransformers
+        const transformerRecords = await tx.query.contextTransformers.findMany({ where: eq(contextTransformers.projectId, id) });
+        for (const transformer of transformerRecords) {
+          await tx.delete(contextTransformers).where(and(eq(contextTransformers.projectId, id), eq(contextTransformers.id, transformer.id)));
+          await this.auditService.logDelete('context_transformer', transformer.id, { id: transformer.id, name: transformer.name, projectId: transformer.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: transformerRecords.length }, 'Deleted contextTransformers');
+
+        // 8. Delete classifiers
+        const classifierRecords = await tx.query.classifiers.findMany({ where: eq(classifiers.projectId, id) });
+        for (const classifier of classifierRecords) {
+          await tx.delete(classifiers).where(and(eq(classifiers.projectId, id), eq(classifiers.id, classifier.id)));
+          await this.auditService.logDelete('classifier', classifier.id, { id: classifier.id, name: classifier.name, projectId: classifier.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: classifierRecords.length }, 'Deleted classifiers');
+
+        // 9. Delete personas
+        const personaRecords = await tx.query.personas.findMany({ where: eq(personas.projectId, id) });
+        for (const persona of personaRecords) {
+          await tx.delete(personas).where(and(eq(personas.projectId, id), eq(personas.id, persona.id)));
+          await this.auditService.logDelete('persona', persona.id, { id: persona.id, name: persona.name, projectId: persona.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: personaRecords.length }, 'Deleted personas');
+
+        // 10. Delete conversations (auto-cascades to conversationEvents and conversationArtifacts via DB constraints)
+        const conversationRecords = await tx.query.conversations.findMany({ where: eq(conversations.projectId, id) });
+        for (const conversation of conversationRecords) {
+          await tx.delete(conversations).where(and(eq(conversations.projectId, id), eq(conversations.id, conversation.id)));
+          await this.auditService.logDelete('conversation', conversation.id, { id: conversation.id, projectId: conversation.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: conversationRecords.length }, 'Deleted conversations');
+
+        // 11. Delete issues
+        const issueRecords = await tx.query.issues.findMany({ where: eq(issues.projectId, id) });
+        for (const issue of issueRecords) {
+          await tx.delete(issues).where(and(eq(issues.projectId, id), eq(issues.id, issue.id)));
+          await this.auditService.logDelete('issue', String(issue.id), { id: issue.id, category: issue.category, bugDescription: issue.bugDescription, projectId: issue.projectId }, context?.adminId);
+        }
+        logger.debug({ projectId: id, count: issueRecords.length }, 'Deleted issues');
+
+        // 12. Finally delete the project itself
+        await tx.delete(projects).where(eq(projects.id, id));
+        await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata }, context?.adminId);
+      });
+
+      logger.info({ projectId: id }, 'Project and all related entities deleted successfully');
     } catch (error) {
       logger.error({ error, projectId: id }, 'Failed to delete project');
       throw error;

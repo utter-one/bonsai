@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, and, like, SQL, desc, sql } from 'drizzle-orm';
 import { db } from '../db/index';
 import { classifiers } from '../db/schema';
 import type { CreateClassifierRequest, UpdateClassifierRequest, ClassifierResponse, ClassifierListResponse, CloneClassifierRequest } from '../http/contracts/classifier';
@@ -30,17 +30,17 @@ export class ClassifierService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created classifier
    */
-  async createClassifier(input: CreateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
+  async createClassifier(projectId: string, input: CreateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
     const classifierId = input.id ?? generateId(ID_PREFIXES.CLASSIFIER);
-    logger.info({ classifierId, projectId: input.projectId, name: input.name, adminId: context?.adminId }, 'Creating classifier');
+    logger.info({ classifierId, projectId, name: input.name, adminId: context?.adminId }, 'Creating classifier');
 
     try {
-      const classifier = await db.insert(classifiers).values({ id: classifierId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, metadata: input.metadata ?? null, version: 1 }).returning();
+      const classifier = await db.insert(classifiers).values({ id: classifierId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdClassifier = classifier[0];
 
-      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, projectId: createdClassifier.projectId, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, llmSettings: createdClassifier.llmSettings, metadata: createdClassifier.metadata }, context?.adminId);
+      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, projectId: createdClassifier.projectId, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, llmSettings: createdClassifier.llmSettings, tags: createdClassifier.tags, metadata: createdClassifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: createdClassifier.id }, 'Classifier created successfully');
 
@@ -57,11 +57,11 @@ export class ClassifierService extends BaseService {
    * @returns The classifier if found
    * @throws {NotFoundError} When classifier is not found
    */
-  async getClassifierById(id: string): Promise<ClassifierResponse> {
+  async getClassifierById(projectId: string, id: string): Promise<ClassifierResponse> {
     logger.debug({ classifierId: id }, 'Fetching classifier by ID');
 
     try {
-      const classifier = await db.query.classifiers.findFirst({ where: eq(classifiers.id, id) });
+      const classifier = await db.query.classifiers.findFirst({ where: and(eq(classifiers.projectId, projectId), eq(classifiers.id, id)) });
 
       if (!classifier) {
         throw new NotFoundError(`Classifier with id ${id} not found`);
@@ -79,11 +79,11 @@ export class ClassifierService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of classifiers matching the criteria
    */
-  async listClassifiers(params?: ListParams): Promise<ClassifierListResponse> {
+  async listClassifiers(projectId: string, params?: ListParams): Promise<ClassifierListResponse> {
     logger.debug({ params }, 'Listing classifiers');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(classifiers.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -101,6 +101,11 @@ export class ClassifierService extends BaseService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
+          if (field === 'tags') {
+            const tagsArray = Array.isArray(filter) ? filter as string[] : [filter as string];
+            conditions.push(sql`${classifiers.tags} @> ${JSON.stringify(tagsArray)}::jsonb`);
+            continue;
+          }
           const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
@@ -152,13 +157,13 @@ export class ClassifierService extends BaseService {
    * @throws {NotFoundError} When classifier is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateClassifier(id: string, input: UpdateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
+  async updateClassifier(projectId: string, id: string, input: UpdateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ classifierId: id, expectedVersion, adminId: context?.adminId }, 'Updating classifier');
 
     try {
-      const existingClassifier = await db.query.classifiers.findFirst({ where: eq(classifiers.id, id) });
+      const existingClassifier = await db.query.classifiers.findFirst({ where: and(eq(classifiers.projectId, projectId), eq(classifiers.id, id)) });
 
       if (!existingClassifier) {
         throw new NotFoundError(`Classifier with id ${id} not found`);
@@ -174,9 +179,10 @@ export class ClassifierService extends BaseService {
       if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
       if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
       if (updateData.llmSettings !== undefined) updatePayload.llmSettings = updateData.llmSettings;
+      if (updateData.tags !== undefined) updatePayload.tags = updateData.tags;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedClassifier = await db.update(classifiers).set(updatePayload).where(and(eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
+      const updatedClassifier = await db.update(classifiers).set(updatePayload).where(and(eq(classifiers.projectId, projectId), eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
 
       if (updatedClassifier.length === 0) {
         throw new OptimisticLockError(`Failed to update classifier due to version conflict`);
@@ -184,7 +190,7 @@ export class ClassifierService extends BaseService {
 
       const classifier = updatedClassifier[0];
 
-      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, llmSettings: classifier.llmSettings, metadata: classifier.metadata }, context?.adminId);
+      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, llmSettings: classifier.llmSettings, tags: classifier.tags, metadata: classifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: classifier.id, newVersion: classifier.version }, 'Classifier updated successfully');
 
@@ -203,12 +209,12 @@ export class ClassifierService extends BaseService {
    * @throws {NotFoundError} When classifier is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deleteClassifier(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+  async deleteClassifier(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_DELETE);
     logger.info({ classifierId: id, expectedVersion, adminId: context?.adminId }, 'Deleting classifier');
 
     try {
-      const existingClassifier = await db.query.classifiers.findFirst({ where: eq(classifiers.id, id) });
+      const existingClassifier = await db.query.classifiers.findFirst({ where: and(eq(classifiers.projectId, projectId), eq(classifiers.id, id)) });
 
       if (!existingClassifier) {
         throw new NotFoundError(`Classifier with id ${id} not found`);
@@ -218,13 +224,13 @@ export class ClassifierService extends BaseService {
         throw new OptimisticLockError(`Classifier version mismatch. Expected ${expectedVersion}, got ${existingClassifier.version}`);
       }
 
-      const deleted = await db.delete(classifiers).where(and(eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
+      const deleted = await db.delete(classifiers).where(and(eq(classifiers.projectId, projectId), eq(classifiers.id, id), eq(classifiers.version, expectedVersion))).returning();
 
       if (deleted.length === 0) {
         throw new OptimisticLockError(`Failed to delete classifier due to version conflict`);
       }
 
-      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, metadata: existingClassifier.metadata }, context?.adminId);
+      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, context?.adminId);
 
       logger.info({ classifierId: id }, 'Classifier deleted successfully');
     } catch (error) {
@@ -241,18 +247,18 @@ export class ClassifierService extends BaseService {
    * @returns The newly created cloned classifier
    * @throws {NotFoundError} When the source classifier is not found
    */
-  async cloneClassifier(id: string, input: CloneClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
+  async cloneClassifier(projectId: string, id: string, input: CloneClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
     logger.info({ id, adminId: context?.adminId }, 'Cloning classifier');
 
     try {
-      const existingClassifier = await db.query.classifiers.findFirst({ where: eq(classifiers.id, id) });
+      const existingClassifier = await db.query.classifiers.findFirst({ where: and(eq(classifiers.projectId, projectId), eq(classifiers.id, id)) });
 
       if (!existingClassifier) {
         throw new NotFoundError(`Classifier with id ${id} not found`);
       }
 
-      return await this.createClassifier({ id: input.id, projectId: existingClassifier.projectId, name: input.name ?? `${existingClassifier.name} (Clone)`, description: existingClassifier.description ?? undefined, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings as any, metadata: existingClassifier.metadata ?? undefined }, context);
+      return await this.createClassifier(projectId, { id: input.id, name: input.name ?? `${existingClassifier.name} (Clone)`, description: existingClassifier.description ?? undefined, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings as any, tags: existingClassifier.tags as string[], metadata: existingClassifier.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone classifier');
       throw error;

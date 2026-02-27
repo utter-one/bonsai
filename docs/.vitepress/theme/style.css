@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=PT+Serif+Caption&display=swap');
+
+/* =====================
+   Brand Colors (primary green palette)
+   ===================== */
+:root {
+  --vp-c-brand-1: oklch(59.6% 0.145 163.225);   /* primary-600 */
+  --vp-c-brand-2: oklch(50.8% 0.118 165.612);   /* primary-700 */
+  --vp-c-brand-3: oklch(43.2% 0.095 166.913);   /* primary-800 */
+  --vp-c-brand-soft: oklch(97.9% 0.021 166.113 / 0.18);  /* primary-50 tinted */
+
+  /* Backgrounds (light mode) — mist gray */
+  --vp-c-bg: oklch(98.7% 0.002 197.1);          /* gray-50 */
+  --vp-c-bg-soft: oklch(96.3% 0.002 197.1);     /* gray-100 */
+  --vp-c-bg-mute: oklch(92.5% 0.005 214.3);     /* gray-200 */
+  --vp-c-bg-elv: oklch(100% 0 0);               /* white */
+
+  /* Text (light mode) */
+  --vp-c-text-1: oklch(21.8% 0.008 223.9);      /* gray-900 */
+  --vp-c-text-2: oklch(45% 0.017 213.2);        /* gray-600 */
+  --vp-c-text-3: oklch(56% 0.021 213.5);        /* gray-500 */
+
+  /* Dividers */
+  --vp-c-divider: oklch(87.2% 0.007 219.6);     /* gray-300 */
+  --vp-c-border: oklch(92.5% 0.005 214.3);      /* gray-200 */
+
+  /* Sidebar / Nav */
+  --vp-nav-bg-color: oklch(98.7% 0.002 197.1 / 0.92);
+  --vp-sidebar-bg-color: oklch(96.3% 0.002 197.1);
+
+  /* Code blocks */
+  --vp-code-bg: oklch(92.5% 0.005 214.3);
+  --vp-code-color: oklch(37.8% 0.077 168.94);   /* primary-900 */
+}
+
+.dark {
+  --vp-c-brand-1: oklch(76.5% 0.177 163.223);   /* primary-400 — brighter on dark bg */
+  --vp-c-brand-2: oklch(84.5% 0.143 164.978);   /* primary-300 */
+  --vp-c-brand-3: oklch(90.5% 0.093 164.15);    /* primary-200 */
+  --vp-c-brand-soft: oklch(26.2% 0.051 172.552 / 0.35); /* primary-950 tinted */
+
+  /* Backgrounds (dark mode) — mist gray dark */
+  --vp-c-bg: oklch(14.8% 0.004 228.8);          /* gray-950 */
+  --vp-c-bg-soft: oklch(21.8% 0.008 223.9);     /* gray-900 */
+  --vp-c-bg-mute: oklch(27.5% 0.011 216.9);     /* gray-800 */
+  --vp-c-bg-elv: oklch(21.8% 0.008 223.9);      /* gray-900 */
+
+  /* Text (dark mode) */
+  --vp-c-text-1: oklch(96.3% 0.002 197.1);      /* gray-100 */
+  --vp-c-text-2: oklch(72.3% 0.014 214.4);      /* gray-400 */
+  --vp-c-text-3: oklch(56% 0.021 213.5);        /* gray-500 */
+
+  /* Dividers */
+  --vp-c-divider: oklch(37.8% 0.015 216);       /* gray-700 */
+  --vp-c-border: oklch(27.5% 0.011 216.9);      /* gray-800 */
+
+  /* Sidebar / Nav */
+  --vp-nav-bg-color: oklch(14.8% 0.004 228.8 / 0.92);
+  --vp-sidebar-bg-color: oklch(21.8% 0.008 223.9);
+
+  /* Code blocks */
+  --vp-code-bg: oklch(27.5% 0.011 216.9);
+  --vp-code-color: oklch(84.5% 0.143 164.978);  /* primary-300 */
+}
+
+/* =====================
+   Typography
+   ===================== */
+:root {
+  --vp-font-family-base: 'Lexend', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+}
+
+.VPDoc h1,
+.VPDoc h2,
+.VPDoc h3,
+.VPDoc h4,
+.VPDoc h5,
+.VPDoc h6,
+.VPHero .name,
+.VPHero .text,
+.VPNavBar .title {
+  font-family: 'PT Serif Caption', serif;
+}
+
+/* =====================
+   Hero gradient
+   ===================== */
+.VPHero .name .clip {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* =====================
+   Button overrides
+   ===================== */
+.VPButton.brand {
+  background: linear-gradient(135deg, oklch(59.6% 0.145 163.225), oklch(50.8% 0.118 165.612));
+  border-color: transparent;
+}
+
+.VPButton.brand:hover {
+  background: linear-gradient(135deg, oklch(50.8% 0.118 165.612), oklch(43.2% 0.095 166.913));
+}
+
+/* =====================
+   Nav active link
+   ===================== */
+.VPNavBarMenuLink.active,
+.VPSidebarItem .link.active {
+  color: var(--vp-c-brand-1);
+}
+
+/* =====================
+   Custom scrollbar (optional, matches brand)
+   ===================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(76.5% 0.177 163.223 / 0.5);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(69.6% 0.17 162.48);
+}

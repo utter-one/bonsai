@@ -26,6 +26,7 @@ export const toolOutputTypeSchema = z.enum(['text', 'image', 'multi-modal']).des
  * Schema for tool route parameters
  */
 export const toolRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().min(1).describe('Tool ID'),
 });
 
@@ -38,7 +39,6 @@ export type ToolRouteParams = z.infer<typeof toolRouteParamsSchema>;
  */
 export const createToolSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the tool (auto-generated if not provided)'),
-  projectId: z.string().min(1).describe('ID of the project this tool belongs to'),
   name: z.string().min(1).describe('Display name of the tool'),
   description: z.string().nullable().optional().describe('Detailed description of the tool\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Handlebars template for tool invocation'),
@@ -47,6 +47,7 @@ export const createToolSchema = z.object({
   inputType: toolInputTypeSchema.describe('Expected input format for the tool'),
   outputType: toolOutputTypeSchema.describe('Expected output format from the tool'),
   parameters: z.array(toolParameterSchema).optional().default([]).describe('Parameters that this tool expects to receive'),
+  tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this tool'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional tool-specific metadata'),
 });
 
@@ -63,6 +64,7 @@ export const updateToolBodySchema = z.object({
   inputType: toolInputTypeSchema.optional().describe('Updated input format'),
   outputType: toolOutputTypeSchema.optional().describe('Updated output format'),
   parameters: z.array(toolParameterSchema).optional().describe('Updated parameters for the tool'),
+  tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -90,6 +92,7 @@ export const toolResponseSchema = z.object({
   inputType: toolInputTypeSchema.describe('Expected input format'),
   outputType: toolOutputTypeSchema.describe('Expected output format'),
   parameters: z.array(toolParameterSchema).describe('Parameters that this tool expects to receive'),
+  tags: z.array(z.string()).describe('Tags for categorizing and filtering this tool'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the tool was created'),

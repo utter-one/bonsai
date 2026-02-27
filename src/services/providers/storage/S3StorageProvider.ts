@@ -11,7 +11,7 @@ extendZodWithOpenApi(z);
 /**
  * S3 storage provider configuration schema
  */
-export const s3StorageProviderConfigSchema = z.object({
+export const s3StorageProviderConfigSchema = z.strictObject({
   accessKeyId: z.string().describe('AWS access key ID'),
   secretAccessKey: z.string().describe('AWS secret access key'),
   region: z.string().describe('AWS region (e.g., us-east-1)'),

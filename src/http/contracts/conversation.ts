@@ -12,6 +12,7 @@ export { listParamsSchema, type ListParams };
  * Schema for conversation route params
  */
 export const conversationRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Conversation ID'),
 });
 
@@ -19,6 +20,7 @@ export const conversationRouteParamsSchema = z.object({
  * Schema for conversation event route params
  */
 export const conversationEventRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Conversation ID'),
   eventId: z.string().describe('Event ID'),
 });
@@ -67,6 +69,7 @@ export const conversationListResponseSchema = z.object({
  */
 export const conversationEventResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the conversation event'),
+  projectId: z.string().describe('ID of the project this event belongs to'),
   conversationId: z.string().describe('Identifier of the conversation this event belongs to'),
   eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
   eventData: conversationEventDataSchema.describe('Event data payload'),

@@ -12,7 +12,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for Deepgram TTS provider configuration
  */
-export const deepgramTtsProviderConfigSchema = z.object({
+export const deepgramTtsProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with Deepgram'),
 });
 

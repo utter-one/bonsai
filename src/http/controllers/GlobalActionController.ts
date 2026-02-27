@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../permissions';
 import { GlobalActionService } from '../../services/GlobalActionService';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema, cloneGlobalActionSchema } from '../contracts/globalAction';
 import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, DeleteGlobalActionRequest, CloneGlobalActionRequest } from '../contracts/globalAction';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -24,7 +24,7 @@ export class GlobalActionController {
     return [
       {
         method: 'post',
-        path: '/api/global-actions',
+        path: '/api/projects/{projectId}/global-actions',
         tags: ['Global Actions'],
         summary: 'Create a new global action',
         description: 'Creates a new global action with specified name, prompt trigger, operations, and configuration',
@@ -52,7 +52,7 @@ export class GlobalActionController {
       },
       {
         method: 'get',
-        path: '/api/global-actions/{id}',
+        path: '/api/projects/{projectId}/global-actions/{id}',
         tags: ['Global Actions'],
         summary: 'Get global action by ID',
         description: 'Retrieves a single global action by its unique identifier',
@@ -73,7 +73,7 @@ export class GlobalActionController {
       },
       {
         method: 'get',
-        path: '/api/global-actions',
+        path: '/api/projects/{projectId}/global-actions',
         tags: ['Global Actions'],
         summary: 'List global actions',
         description: 'Retrieves a paginated list of global actions with optional filtering and sorting',
@@ -94,7 +94,7 @@ export class GlobalActionController {
       },
       {
         method: 'put',
-        path: '/api/global-actions/{id}',
+        path: '/api/projects/{projectId}/global-actions/{id}',
         tags: ['Global Actions'],
         summary: 'Update global action',
         description: 'Updates an existing global action with optimistic locking',
@@ -124,7 +124,7 @@ export class GlobalActionController {
       },
       {
         method: 'delete',
-        path: '/api/global-actions/{id}',
+        path: '/api/projects/{projectId}/global-actions/{id}',
         tags: ['Global Actions'],
         summary: 'Delete global action',
         description: 'Deletes a global action with optimistic locking',
@@ -147,7 +147,7 @@ export class GlobalActionController {
       },
       {
         method: 'get',
-        path: '/api/global-actions/{id}/audit-logs',
+        path: '/api/projects/{projectId}/global-actions/{id}/audit-logs',
         tags: ['Global Actions'],
         summary: 'Get global action audit logs',
         description: 'Retrieves audit logs for a specific global action',
@@ -163,7 +163,7 @@ export class GlobalActionController {
       },
       {
         method: 'post',
-        path: '/api/global-actions/{id}/clone',
+        path: '/api/projects/{projectId}/global-actions/{id}/clone',
         tags: ['Global Actions'],
         summary: 'Clone global action',
         description: 'Creates a copy of an existing global action with a new ID and optional name override',
@@ -197,13 +197,13 @@ export class GlobalActionController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/global-actions', asyncHandler(this.createGlobalAction.bind(this)));
-    router.get('/api/global-actions/:id', asyncHandler(this.getGlobalActionById.bind(this)));
-    router.get('/api/global-actions', asyncHandler(this.listGlobalActions.bind(this)));
-    router.put('/api/global-actions/:id', asyncHandler(this.updateGlobalAction.bind(this)));
-    router.delete('/api/global-actions/:id', asyncHandler(this.deleteGlobalAction.bind(this)));
-    router.get('/api/global-actions/:id/audit-logs', asyncHandler(this.getGlobalActionAuditLogs.bind(this)));
-    router.post('/api/global-actions/:id/clone', asyncHandler(this.cloneGlobalAction.bind(this)));
+    router.post('/api/projects/:projectId/global-actions', asyncHandler(this.createGlobalAction.bind(this)));
+    router.get('/api/projects/:projectId/global-actions/:id', asyncHandler(this.getGlobalActionById.bind(this)));
+    router.get('/api/projects/:projectId/global-actions', asyncHandler(this.listGlobalActions.bind(this)));
+    router.put('/api/projects/:projectId/global-actions/:id', asyncHandler(this.updateGlobalAction.bind(this)));
+    router.delete('/api/projects/:projectId/global-actions/:id', asyncHandler(this.deleteGlobalAction.bind(this)));
+    router.get('/api/projects/:projectId/global-actions/:id/audit-logs', asyncHandler(this.getGlobalActionAuditLogs.bind(this)));
+    router.post('/api/projects/:projectId/global-actions/:id/clone', asyncHandler(this.cloneGlobalAction.bind(this)));
   }
 
   /**
@@ -212,8 +212,9 @@ export class GlobalActionController {
    */
   private async createGlobalAction(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createGlobalActionSchema.parse(req.body);
-    const globalAction = await this.globalActionService.createGlobalAction(body, req.context);
+    const globalAction = await this.globalActionService.createGlobalAction(projectId, body, req.context);
     res.status(201).json(globalAction);
   }
 
@@ -224,7 +225,7 @@ export class GlobalActionController {
   private async getGlobalActionById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_READ]);
     const params = globalActionRouteParamsSchema.parse(req.params);
-    const globalAction = await this.globalActionService.getGlobalActionById(params.id);
+    const globalAction = await this.globalActionService.getGlobalActionById(params.projectId, params.id);
     res.status(200).json(globalAction);
   }
 
@@ -234,8 +235,9 @@ export class GlobalActionController {
    */
   private async listGlobalActions(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const globalActions = await this.globalActionService.listGlobalActions(query);
+    const globalActions = await this.globalActionService.listGlobalActions(projectId, query);
     res.status(200).json(globalActions);
   }
 
@@ -247,7 +249,7 @@ export class GlobalActionController {
     checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_WRITE]);
     const params = globalActionRouteParamsSchema.parse(req.params);
     const body = updateGlobalActionBodySchema.parse(req.body);
-    const globalAction = await this.globalActionService.updateGlobalAction(params.id, body, req.context);
+    const globalAction = await this.globalActionService.updateGlobalAction(params.projectId, params.id, body, req.context);
     res.status(200).json(globalAction);
   }
 
@@ -259,7 +261,7 @@ export class GlobalActionController {
     checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_DELETE]);
     const params = globalActionRouteParamsSchema.parse(req.params);
     const body = deleteGlobalActionBodySchema.parse(req.body);
-    await this.globalActionService.deleteGlobalAction(params.id, body.version, req.context);
+    await this.globalActionService.deleteGlobalAction(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -282,7 +284,7 @@ export class GlobalActionController {
     checkPermissions(req, [PERMISSIONS.GLOBAL_ACTION_WRITE]);
     const params = globalActionRouteParamsSchema.parse(req.params);
     const body = cloneGlobalActionSchema.parse(req.body);
-    const action = await this.globalActionService.cloneGlobalAction(params.id, body, req.context);
+    const action = await this.globalActionService.cloneGlobalAction(params.projectId, params.id, body, req.context);
     res.status(201).json(action);
   }
 }

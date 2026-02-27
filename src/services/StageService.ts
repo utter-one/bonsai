@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc, inArray } from 'drizzle-orm';
+import { eq, and, like, SQL, desc, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/index';
 import { stages, personas, classifiers, contextTransformers, globalActions, knowledgeCategories } from '../db/schema';
 import type { CreateStageRequest, UpdateStageRequest, StageResponse, StageListResponse, CloneStageRequest } from '../http/contracts/stage';
@@ -81,20 +81,20 @@ export class StageService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created stage
    */
-  async createStage(input: CreateStageRequest, context: RequestContext): Promise<StageResponse> {
+  async createStage(projectId: string, input: CreateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
     const stageId = input.id ?? generateId(ID_PREFIXES.STAGE);
-    logger.info({ id: stageId, projectId: input.projectId, name: input.name, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
+    logger.info({ id: stageId, projectId, name: input.name, personaId: input.personaId, adminId: context?.adminId }, 'Creating stage');
 
     try {
       // Validate referenced entities exist
       await this.validateReferencedEntities(input.personaId, input.defaultClassifierId, input.transformerIds, input.globalActions);
 
-      const stage = await db.insert(stages).values({ id: stageId, projectId: input.projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeTags: input.knowledgeTags ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variableDescriptors: input.variableDescriptors ?? [], actions: input.actions ?? {}, defaultClassifierId: input.defaultClassifierId ?? null, transformerIds: input.transformerIds ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const stage = await db.insert(stages).values({ id: stageId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, personaId: input.personaId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeTags: input.knowledgeTags ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variableDescriptors: input.variableDescriptors ?? [], actions: input.actions ?? {}, defaultClassifierId: input.defaultClassifierId ?? null, transformerIds: input.transformerIds ?? [], tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdStage = stage[0];
 
-      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, llmSettings: createdStage.llmSettings, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeTags: createdStage.knowledgeTags, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variableDescriptors: createdStage.variableDescriptors, actions: createdStage.actions, defaultClassifierId: createdStage.defaultClassifierId, transformerIds: createdStage.transformerIds, metadata: createdStage.metadata }, context?.adminId);
+      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, llmSettings: createdStage.llmSettings, personaId: createdStage.personaId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeTags: createdStage.knowledgeTags, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variableDescriptors: createdStage.variableDescriptors, actions: createdStage.actions, defaultClassifierId: createdStage.defaultClassifierId, transformerIds: createdStage.transformerIds, tags: createdStage.tags, metadata: createdStage.metadata }, context?.adminId);
       logger.info({ id: createdStage.id }, 'Stage created successfully');
 
       return stageResponseSchema.parse(createdStage);
@@ -110,11 +110,11 @@ export class StageService extends BaseService {
    * @returns The stage if found
    * @throws {NotFoundError} When stage is not found
    */
-  async getStageById(id: string): Promise<StageResponse> {
-    logger.debug({ id }, 'Fetching stage by ID');
+  async getStageById(projectId: string, id: string): Promise<StageResponse> {
+    logger.debug({ projectId, id }, 'Fetching stage by ID');
 
     try {
-      const stage = await db.query.stages.findFirst({ where: eq(stages.id, id) });
+      const stage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });
 
       if (!stage) {
         throw new NotFoundError(`Stage with id ${id} not found`);
@@ -132,11 +132,11 @@ export class StageService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of stages matching the criteria
    */
-  async listStages(params?: ListParams): Promise<StageListResponse> {
+  async listStages(projectId: string, params?: ListParams): Promise<StageListResponse> {
     logger.debug({ params }, 'Listing stages');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(stages.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -157,6 +157,11 @@ export class StageService extends BaseService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
+          if (field === 'tags') {
+            const tagsArray = Array.isArray(filter) ? filter as string[] : [filter as string];
+            conditions.push(sql`${stages.tags} @> ${JSON.stringify(tagsArray)}::jsonb`);
+            continue;
+          }
           const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
@@ -209,13 +214,13 @@ export class StageService extends BaseService {
    * @throws {NotFoundError} When stage is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async updateStage(id: string, input: UpdateStageRequest, context: RequestContext): Promise<StageResponse> {
+  async updateStage(projectId: string, id: string, input: UpdateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ id, expectedVersion, adminId: context?.adminId }, 'Updating stage');
 
     try {
-      const existingStage = await db.query.stages.findFirst({ where: eq(stages.id, id) });
+      const existingStage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });
 
       if (!existingStage) {
         throw new NotFoundError(`Stage with id ${id} not found`);
@@ -249,9 +254,10 @@ export class StageService extends BaseService {
       if (updateData.actions !== undefined) updatePayload.actions = updateData.actions;
       if (updateData.defaultClassifierId !== undefined) updatePayload.defaultClassifierId = updateData.defaultClassifierId;
       if (updateData.transformerIds !== undefined) updatePayload.transformerIds = updateData.transformerIds;
+      if (updateData.tags !== undefined) updatePayload.tags = updateData.tags;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
-      const updatedStage = await db.update(stages).set(updatePayload).where(and(eq(stages.id, id), eq(stages.version, expectedVersion))).returning();
+      const updatedStage = await db.update(stages).set(updatePayload).where(and(eq(stages.projectId, projectId), eq(stages.id, id), eq(stages.version, expectedVersion))).returning();
 
       if (updatedStage.length === 0) {
         throw new OptimisticLockError(`Failed to update stage due to version conflict`);
@@ -259,7 +265,7 @@ export class StageService extends BaseService {
 
       const stage = updatedStage[0];
 
-      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, llmSettings: stage.llmSettings, personaId: stage.personaId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeTags: stage.knowledgeTags, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variableDescriptors: stage.variableDescriptors, actions: stage.actions, defaultClassifierId: stage.defaultClassifierId, transformerIds: stage.transformerIds, metadata: stage.metadata }, context?.adminId);
+      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, llmSettings: stage.llmSettings, personaId: stage.personaId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeTags: stage.knowledgeTags, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variableDescriptors: stage.variableDescriptors, actions: stage.actions, defaultClassifierId: stage.defaultClassifierId, transformerIds: stage.transformerIds, tags: stage.tags, metadata: stage.metadata }, context?.adminId);
 
       logger.info({ id: stage.id, newVersion: stage.version }, 'Stage updated successfully');
 
@@ -278,12 +284,12 @@ export class StageService extends BaseService {
    * @throws {NotFoundError} When stage is not found
    * @throws {OptimisticLockError} When the version doesn't match (concurrent modification detected)
    */
-  async deleteStage(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
+  async deleteStage(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.STAGE_DELETE);
     logger.info({ id, expectedVersion, adminId: context?.adminId }, 'Deleting stage');
 
     try {
-      const existingStage = await db.query.stages.findFirst({ where: eq(stages.id, id) });
+      const existingStage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });
 
       if (!existingStage) {
         throw new NotFoundError(`Stage with id ${id} not found`);
@@ -293,13 +299,13 @@ export class StageService extends BaseService {
         throw new OptimisticLockError(`Stage version mismatch. Expected ${expectedVersion}, got ${existingStage.version}`);
       }
 
-      const deleted = await db.delete(stages).where(and(eq(stages.id, id), eq(stages.version, expectedVersion))).returning();
+      const deleted = await db.delete(stages).where(and(eq(stages.projectId, projectId), eq(stages.id, id), eq(stages.version, expectedVersion))).returning();
 
       if (deleted.length === 0) {
         throw new OptimisticLockError(`Failed to delete stage due to version conflict`);
       }
 
-      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, metadata: existingStage.metadata }, context?.adminId);
+      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, context?.adminId);
 
       logger.info({ id }, 'Stage deleted successfully');
     } catch (error) {
@@ -316,18 +322,18 @@ export class StageService extends BaseService {
    * @returns The newly created cloned stage
    * @throws {NotFoundError} When the source stage is not found
    */
-  async cloneStage(id: string, input: CloneStageRequest, context: RequestContext): Promise<StageResponse> {
+  async cloneStage(projectId: string, id: string, input: CloneStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
     logger.info({ id, adminId: context?.adminId }, 'Cloning stage');
 
     try {
-      const existingStage = await db.query.stages.findFirst({ where: eq(stages.id, id) });
+      const existingStage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });
 
       if (!existingStage) {
         throw new NotFoundError(`Stage with id ${id} not found`);
       }
 
-      return await this.createStage({ id: input.id, projectId: existingStage.projectId, name: input.name ?? `${existingStage.name} (Clone)`, description: existingStage.description ?? undefined, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings as any, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior as 'generate_response' | 'await_user_input', useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags as string[], useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions as string[], variableDescriptors: existingStage.variableDescriptors as any, actions: existingStage.actions as any, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds as string[], metadata: existingStage.metadata ?? undefined }, context);
+      return await this.createStage(projectId, { id: input.id, name: input.name ?? `${existingStage.name} (Clone)`, description: existingStage.description ?? undefined, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings as any, personaId: existingStage.personaId, enterBehavior: existingStage.enterBehavior as 'generate_response' | 'await_user_input', useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags as string[], useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions as string[], variableDescriptors: existingStage.variableDescriptors as any, actions: existingStage.actions as any, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds as string[], tags: existingStage.tags as string[], metadata: existingStage.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone stage');
       throw error;

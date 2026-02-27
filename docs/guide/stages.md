@@ -1,0 +1,109 @@
+# Stages
+
+A **Stage** represents a distinct phase in a conversation. Stages are the central orchestration entity — they tie together personas, classifiers, transformers, actions, knowledge, and providers into a coherent conversational experience.
+
+## Structure
+
+| Field | Description |
+|---|---|
+| `id` | Unique identifier (within project) |
+| `projectId` | Parent project |
+| `name` | Display name |
+| `description` | Optional description |
+| `prompt` | System prompt (Handlebars template) |
+| `personaId` | Referenced persona for AI personality and voice |
+| `llmProviderId` | LLM provider for response generation |
+| `llmSettings` | LLM-specific settings (model, temperature, etc.) |
+| `enterBehavior` | What happens when entering this stage |
+| `useKnowledge` | Whether to include knowledge base in classification |
+| `knowledgeTags` | Filter knowledge categories by tags |
+| `useGlobalActions` | Whether global actions are available |
+| `globalActions` | Specific global action IDs to include |
+| `defaultClassifierId` | Primary classifier for user input |
+| `transformerIds` | Context transformers to run on each input |
+| `variableDescriptors` | Schema of typed variables for this stage |
+| `actions` | Map of action definitions |
+| `metadata` | Arbitrary JSON |
+| `version` | Optimistic locking version |
+
+## Enter Behavior
+
+When a conversation enters a stage (at start or via `go_to_stage`), the `enterBehavior` controls what happens:
+
+- **`generate_response`** (default) — The AI immediately generates a response using the stage prompt. This is useful for greeting messages or informational stages.
+- **`await_user_input`** — The system waits for the user to speak or type first. This is useful when the user should initiate the interaction.
+
+## System Prompt
+
+The `prompt` field is a [Handlebars template](./templating) that defines the AI's system prompt for this stage. It has access to:
+
+- <code v-pre>{{vars.&lt;key&gt;}}</code> — Stage variables
+- <code v-pre>{{userProfile.&lt;key&gt;}}</code> — User profile data
+- <code v-pre>{{constants.&lt;key&gt;}}</code> — Project-level constants
+- <code v-pre>{{history}}</code> — Conversation history (auto-injected)
+
+Example prompt:
+
+```handlebars
+You are a customer service agent for {{constants.companyName}}.
+The customer's name is {{userProfile.name}}.
+
+{{#if (exists vars.issue)}}
+The customer is experiencing: {{vars.issue}}
+Help them resolve this issue step by step.
+{{else}}
+Ask the customer what they need help with today.
+{{/if}}
+```
+
+## Variable Descriptors
+
+Stages define a typed schema for their variables using `variableDescriptors`. These descriptors tell the system (and LLM) what data is expected:
+
+```json
+[
+  { "name": "customerName", "type": "string", "isArray": false },
+  { "name": "issueCategory", "type": "string", "isArray": false },
+  { "name": "orderIds", "type": "string", "isArray": true },
+  {
+    "name": "address",
+    "type": "object",
+    "isArray": false,
+    "objectSchema": [
+      { "name": "street", "type": "string", "isArray": false },
+      { "name": "city", "type": "string", "isArray": false },
+      { "name": "zip", "type": "string", "isArray": false }
+    ]
+  }
+]
+```
+
+Supported types: `string`, `number`, `boolean`, `object`. Any type can be an array via `isArray: true`. Objects can nest via `objectSchema`.
+
+Variables are persisted in the conversation's `stageVars` and are available in Handlebars templates, action conditions, and scripts.
+
+## References
+
+A stage references several other entities:
+
+- **Persona** (`personaId`) — Defines the AI's personality prompt and TTS voice settings. See [Personas](./personas).
+- **LLM Provider** (`llmProviderId` / `llmSettings`) — The model used for generating responses. See [Providers](./providers).
+- **Classifier** (`defaultClassifierId`) — Classifies user input into action triggers. See [Classifiers](./classifiers).
+- **Context Transformers** (`transformerIds`) — Extract structured data from each turn. See [Context Transformers](./context-transformers).
+- **Global Actions** (`globalActions`) — Reusable actions available in this stage. See [Global Actions](./global-actions).
+- **Knowledge** (`knowledgeTags`) — FAQ categories included in classification. See [Knowledge](./knowledge).
+
+## Stage Navigation
+
+Conversations move between stages via the `go_to_stage` effect. When navigating:
+
+1. The `__on_leave` lifecycle action runs on the current stage (if defined)
+2. The new stage is loaded with all its providers, classifiers, and transformers
+3. The `__on_enter` lifecycle action runs on the new stage (if defined)
+4. The new stage's `enterBehavior` determines what happens next
+
+See [Actions & Effects](./actions-and-effects) for details on lifecycle actions and the `go_to_stage` effect.
+
+## Cloning
+
+Stages can be cloned to create copies with optional custom `id` and `name`. The clone inherits all configuration from the source stage.

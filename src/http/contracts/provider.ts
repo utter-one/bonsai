@@ -16,6 +16,8 @@ import { azureTtsProviderConfigSchema } from '../../services/providers/tts/Azure
 import { azureAsrProviderConfigSchema } from '../../services/providers/asr/AzureAsrProvider';
 import { elevenLabsAsrProviderConfigSchema } from '../../services/providers/asr/ElevenLabsAsrProvider';
 import { deepgramAsrProviderConfigSchema } from '../../services/providers/asr/DeepgramAsrProvider';
+import { assemblyAiAsrProviderConfigSchema } from '../../services/providers/asr/AssemblyAiAsrProvider';
+import { speechmaticsAsrProviderConfigSchema } from '../../services/providers/asr/SpeechmaticsAsrProvider';
 import { s3StorageProviderConfigSchema } from '../../services/providers/storage/S3StorageProvider';
 import { azureBlobStorageProviderConfigSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
 import { gcsStorageProviderConfigSchema } from '../../services/providers/storage/GcsStorageProvider';
@@ -53,6 +55,8 @@ export const asrProviderConfigSchema = z.union([
   azureAsrProviderConfigSchema,
   elevenLabsAsrProviderConfigSchema,
   deepgramAsrProviderConfigSchema,
+  assemblyAiAsrProviderConfigSchema,
+  speechmaticsAsrProviderConfigSchema,
 ]).describe('ASR provider configuration');
 
 /**

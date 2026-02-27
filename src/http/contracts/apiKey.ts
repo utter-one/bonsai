@@ -13,7 +13,6 @@ extendZodWithOpenApi(z);
  * Schema for creating a new API key
  */
 export const createApiKeySchema = z.object({
-  projectId: z.string().min(1).describe('The ID of the project this API key belongs to'),
   name: z.string().min(1).max(255).describe('A descriptive name for the API key'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the API key'),
 });
@@ -36,6 +35,7 @@ export type UpdateApiKeyRequest = z.infer<typeof updateApiKeySchema>;
  * Schema for API key route parameters
  */
 export const apiKeyRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('The unique identifier of the API key'),
 });
 

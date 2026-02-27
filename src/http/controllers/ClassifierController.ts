@@ -5,7 +5,7 @@ import { PERMISSIONS } from '../../permissions';
 import { ClassifierService } from '../../services/ClassifierService';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema, classifierRouteParamsSchema, cloneClassifierSchema } from '../contracts/classifier';
 import type { CloneClassifierRequest } from '../contracts/classifier';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -23,7 +23,7 @@ export class ClassifierController {
     return [
       {
         method: 'post',
-        path: '/api/classifiers',
+        path: '/api/projects/{projectId}/classifiers',
         tags: ['Classifiers'],
         summary: 'Create a new classifier',
         description: 'Creates a new classifier with specified name, prompt, and configuration',
@@ -51,7 +51,7 @@ export class ClassifierController {
       },
       {
         method: 'get',
-        path: '/api/classifiers/{id}',
+        path: '/api/projects/{projectId}/classifiers/{id}',
         tags: ['Classifiers'],
         summary: 'Get classifier by ID',
         description: 'Retrieves a single classifier by its unique identifier',
@@ -72,7 +72,7 @@ export class ClassifierController {
       },
       {
         method: 'get',
-        path: '/api/classifiers',
+        path: '/api/projects/{projectId}/classifiers',
         tags: ['Classifiers'],
         summary: 'List classifiers',
         description: 'Retrieves a paginated list of classifiers with optional filtering and sorting',
@@ -93,7 +93,7 @@ export class ClassifierController {
       },
       {
         method: 'put',
-        path: '/api/classifiers/{id}',
+        path: '/api/projects/{projectId}/classifiers/{id}',
         tags: ['Classifiers'],
         summary: 'Update classifier',
         description: 'Updates an existing classifier with optimistic locking',
@@ -123,7 +123,7 @@ export class ClassifierController {
       },
       {
         method: 'delete',
-        path: '/api/classifiers/{id}',
+        path: '/api/projects/{projectId}/classifiers/{id}',
         tags: ['Classifiers'],
         summary: 'Delete classifier',
         description: 'Deletes a classifier with optimistic locking',
@@ -146,7 +146,7 @@ export class ClassifierController {
       },
       {
         method: 'get',
-        path: '/api/classifiers/{id}/audit-logs',
+        path: '/api/projects/{projectId}/classifiers/{id}/audit-logs',
         tags: ['Classifiers'],
         summary: 'Get classifier audit logs',
         description: 'Retrieves audit logs for a specific classifier',
@@ -162,7 +162,7 @@ export class ClassifierController {
       },
       {
         method: 'post',
-        path: '/api/classifiers/{id}/clone',
+        path: '/api/projects/{projectId}/classifiers/{id}/clone',
         tags: ['Classifiers'],
         summary: 'Clone classifier',
         description: 'Creates a copy of an existing classifier with a new ID and optional name override',
@@ -196,13 +196,13 @@ export class ClassifierController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/classifiers', asyncHandler(this.createClassifier.bind(this)));
-    router.get('/api/classifiers/:id', asyncHandler(this.getClassifierById.bind(this)));
-    router.get('/api/classifiers', asyncHandler(this.listClassifiers.bind(this)));
-    router.put('/api/classifiers/:id', asyncHandler(this.updateClassifier.bind(this)));
-    router.delete('/api/classifiers/:id', asyncHandler(this.deleteClassifier.bind(this)));
-    router.get('/api/classifiers/:id/audit-logs', asyncHandler(this.getClassifierAuditLogs.bind(this)));
-    router.post('/api/classifiers/:id/clone', asyncHandler(this.cloneClassifier.bind(this)));
+    router.post('/api/projects/:projectId/classifiers', asyncHandler(this.createClassifier.bind(this)));
+    router.get('/api/projects/:projectId/classifiers/:id', asyncHandler(this.getClassifierById.bind(this)));
+    router.get('/api/projects/:projectId/classifiers', asyncHandler(this.listClassifiers.bind(this)));
+    router.put('/api/projects/:projectId/classifiers/:id', asyncHandler(this.updateClassifier.bind(this)));
+    router.delete('/api/projects/:projectId/classifiers/:id', asyncHandler(this.deleteClassifier.bind(this)));
+    router.get('/api/projects/:projectId/classifiers/:id/audit-logs', asyncHandler(this.getClassifierAuditLogs.bind(this)));
+    router.post('/api/projects/:projectId/classifiers/:id/clone', asyncHandler(this.cloneClassifier.bind(this)));
   }
 
   /**
@@ -211,8 +211,9 @@ export class ClassifierController {
    */
   private async createClassifier(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createClassifierSchema.parse(req.body);
-    const classifier = await this.classifierService.createClassifier(body, req.context);
+    const classifier = await this.classifierService.createClassifier(projectId, body, req.context);
     res.status(201).json(classifier);
   }
 
@@ -223,7 +224,7 @@ export class ClassifierController {
   private async getClassifierById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_READ]);
     const params = classifierRouteParamsSchema.parse(req.params);
-    const classifier = await this.classifierService.getClassifierById(params.id);
+    const classifier = await this.classifierService.getClassifierById(params.projectId, params.id);
     res.status(200).json(classifier);
   }
 
@@ -233,8 +234,9 @@ export class ClassifierController {
    */
   private async listClassifiers(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const classifiers = await this.classifierService.listClassifiers(query);
+    const classifiers = await this.classifierService.listClassifiers(projectId, query);
     res.status(200).json(classifiers);
   }
 
@@ -246,7 +248,7 @@ export class ClassifierController {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_WRITE]);
     const params = classifierRouteParamsSchema.parse(req.params);
     const body = updateClassifierBodySchema.parse(req.body);
-    const classifier = await this.classifierService.updateClassifier(params.id, body, req.context);
+    const classifier = await this.classifierService.updateClassifier(params.projectId, params.id, body, req.context);
     res.status(200).json(classifier);
   }
 
@@ -258,7 +260,7 @@ export class ClassifierController {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_DELETE]);
     const params = classifierRouteParamsSchema.parse(req.params);
     const body = deleteClassifierBodySchema.parse(req.body);
-    await this.classifierService.deleteClassifier(params.id, body.version, req.context);
+    await this.classifierService.deleteClassifier(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -281,7 +283,7 @@ export class ClassifierController {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_WRITE]);
     const params = classifierRouteParamsSchema.parse(req.params);
     const body = cloneClassifierSchema.parse(req.body);
-    const classifier = await this.classifierService.cloneClassifier(params.id, body, req.context);
+    const classifier = await this.classifierService.cloneClassifier(params.projectId, params.id, body, req.context);
     res.status(201).json(classifier);
   }
 }

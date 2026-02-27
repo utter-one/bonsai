@@ -32,7 +32,7 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
       throw new InvalidOperationError('A conversation is already active in this session');
     }
 
-    const conversation = await this.conversationService.getConversationById(message.conversationId);
+    const conversation = await this.conversationService.getConversationById(context.connection.projectId, message.conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
     }

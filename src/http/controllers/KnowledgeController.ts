@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { PERMISSIONS } from '../../permissions';
 import { KnowledgeService } from '../../services/KnowledgeService';
 import { createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema, knowledgeCategoryRouteParamsSchema, knowledgeItemRouteParamsSchema, knowledgeCategoryItemsRouteParamsSchema } from '../contracts/knowledge';
-import { listParamsSchema } from '../contracts/common';
+import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -26,7 +26,7 @@ export class KnowledgeController {
       // ============================================================
       {
         method: 'post',
-        path: '/api/knowledge/categories',
+        path: '/api/projects/{projectId}/knowledge/categories',
         tags: ['Knowledge'],
         summary: 'Create a new knowledge category',
         description: 'Creates a new knowledge category with trigger phrase and associated tags',
@@ -54,7 +54,7 @@ export class KnowledgeController {
       },
       {
         method: 'get',
-        path: '/api/knowledge/categories/{id}',
+        path: '/api/projects/{projectId}/knowledge/categories/{id}',
         tags: ['Knowledge'],
         summary: 'Get knowledge category by ID',
         description: 'Retrieves a single knowledge category with all its items by unique identifier',
@@ -75,7 +75,7 @@ export class KnowledgeController {
       },
       {
         method: 'get',
-        path: '/api/knowledge/categories',
+        path: '/api/projects/{projectId}/knowledge/categories',
         tags: ['Knowledge'],
         summary: 'List knowledge categories',
         description: 'Retrieves a paginated list of knowledge categories with their items. Supports filtering, sorting, and text search',
@@ -96,7 +96,7 @@ export class KnowledgeController {
       },
       {
         method: 'put',
-        path: '/api/knowledge/categories/{id}',
+        path: '/api/projects/{projectId}/knowledge/categories/{id}',
         tags: ['Knowledge'],
         summary: 'Update knowledge category',
         description: 'Updates an existing knowledge category with optimistic locking',
@@ -126,7 +126,7 @@ export class KnowledgeController {
       },
       {
         method: 'delete',
-        path: '/api/knowledge/categories/{id}',
+        path: '/api/projects/{projectId}/knowledge/categories/{id}',
         tags: ['Knowledge'],
         summary: 'Delete knowledge category',
         description: 'Deletes a knowledge category with optimistic locking. This will also delete all items in the category',
@@ -152,7 +152,7 @@ export class KnowledgeController {
       // ============================================================
       {
         method: 'post',
-        path: '/api/knowledge/items',
+        path: '/api/projects/{projectId}/knowledge/items',
         tags: ['Knowledge'],
         summary: 'Create a new knowledge item',
         description: 'Creates a new knowledge item (Q&A pair) within a specific category',
@@ -180,7 +180,7 @@ export class KnowledgeController {
       },
       {
         method: 'get',
-        path: '/api/knowledge/items/{id}',
+        path: '/api/projects/{projectId}/knowledge/items/{id}',
         tags: ['Knowledge'],
         summary: 'Get knowledge item by ID',
         description: 'Retrieves a single knowledge item by its unique identifier',
@@ -201,7 +201,7 @@ export class KnowledgeController {
       },
       {
         method: 'get',
-        path: '/api/knowledge/items',
+        path: '/api/projects/{projectId}/knowledge/items',
         tags: ['Knowledge'],
         summary: 'List knowledge items',
         description: 'Retrieves a paginated list of knowledge items. Supports filtering by categoryId, text search, sorting, and pagination',
@@ -222,7 +222,7 @@ export class KnowledgeController {
       },
       {
         method: 'put',
-        path: '/api/knowledge/items/{id}',
+        path: '/api/projects/{projectId}/knowledge/items/{id}',
         tags: ['Knowledge'],
         summary: 'Update knowledge item',
         description: 'Updates an existing knowledge item with optimistic locking',
@@ -252,7 +252,7 @@ export class KnowledgeController {
       },
       {
         method: 'delete',
-        path: '/api/knowledge/items/{id}',
+        path: '/api/projects/{projectId}/knowledge/items/{id}',
         tags: ['Knowledge'],
         summary: 'Delete knowledge item',
         description: 'Deletes a knowledge item with optimistic locking',
@@ -275,7 +275,7 @@ export class KnowledgeController {
       },
       {
         method: 'get',
-        path: '/api/knowledge/categories/{categoryId}/items',
+        path: '/api/projects/{projectId}/knowledge/categories/{categoryId}/items',
         tags: ['Knowledge'],
         summary: 'Get items by category',
         description: 'Retrieves all knowledge items belonging to a specific category, ordered by their display order',
@@ -302,21 +302,21 @@ export class KnowledgeController {
    */
   registerRoutes(router: Router): void {
     // Category routes
-    router.post('/api/knowledge/categories', asyncHandler(this.createKnowledgeCategory.bind(this)));
-    router.get('/api/knowledge/categories/:id', asyncHandler(this.getKnowledgeCategoryById.bind(this)));
-    router.get('/api/knowledge/categories', asyncHandler(this.listKnowledgeCategories.bind(this)));
-    router.put('/api/knowledge/categories/:id', asyncHandler(this.updateKnowledgeCategory.bind(this)));
-    router.delete('/api/knowledge/categories/:id', asyncHandler(this.deleteKnowledgeCategory.bind(this)));
+    router.post('/api/projects/:projectId/knowledge/categories', asyncHandler(this.createKnowledgeCategory.bind(this)));
+    router.get('/api/projects/:projectId/knowledge/categories/:id', asyncHandler(this.getKnowledgeCategoryById.bind(this)));
+    router.get('/api/projects/:projectId/knowledge/categories', asyncHandler(this.listKnowledgeCategories.bind(this)));
+    router.put('/api/projects/:projectId/knowledge/categories/:id', asyncHandler(this.updateKnowledgeCategory.bind(this)));
+    router.delete('/api/projects/:projectId/knowledge/categories/:id', asyncHandler(this.deleteKnowledgeCategory.bind(this)));
 
     // Item routes
-    router.post('/api/knowledge/items', asyncHandler(this.createKnowledgeItem.bind(this)));
-    router.get('/api/knowledge/items/:id', asyncHandler(this.getKnowledgeItemById.bind(this)));
-    router.get('/api/knowledge/items', asyncHandler(this.listKnowledgeItems.bind(this)));
-    router.put('/api/knowledge/items/:id', asyncHandler(this.updateKnowledgeItem.bind(this)));
-    router.delete('/api/knowledge/items/:id', asyncHandler(this.deleteKnowledgeItem.bind(this)));
+    router.post('/api/projects/:projectId/knowledge/items', asyncHandler(this.createKnowledgeItem.bind(this)));
+    router.get('/api/projects/:projectId/knowledge/items/:id', asyncHandler(this.getKnowledgeItemById.bind(this)));
+    router.get('/api/projects/:projectId/knowledge/items', asyncHandler(this.listKnowledgeItems.bind(this)));
+    router.put('/api/projects/:projectId/knowledge/items/:id', asyncHandler(this.updateKnowledgeItem.bind(this)));
+    router.delete('/api/projects/:projectId/knowledge/items/:id', asyncHandler(this.deleteKnowledgeItem.bind(this)));
 
     // Category items route
-    router.get('/api/knowledge/categories/:categoryId/items', asyncHandler(this.getItemsByCategory.bind(this)));
+    router.get('/api/projects/:projectId/knowledge/categories/:categoryId/items', asyncHandler(this.getItemsByCategory.bind(this)));
   }
 
   // ============================================================
@@ -329,8 +329,9 @@ export class KnowledgeController {
    */
   private async createKnowledgeCategory(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createKnowledgeCategorySchema.parse(req.body);
-    const category = await this.knowledgeService.createKnowledgeCategory(body, req.context);
+    const category = await this.knowledgeService.createKnowledgeCategory(projectId, body, req.context);
     res.status(201).json(category);
   }
 
@@ -341,7 +342,7 @@ export class KnowledgeController {
   private async getKnowledgeCategoryById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_READ]);
     const params = knowledgeCategoryRouteParamsSchema.parse(req.params);
-    const category = await this.knowledgeService.getKnowledgeCategoryById(params.id);
+    const category = await this.knowledgeService.getKnowledgeCategoryById(params.projectId, params.id);
     res.status(200).json(category);
   }
 
@@ -351,8 +352,9 @@ export class KnowledgeController {
    */
   private async listKnowledgeCategories(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const categories = await this.knowledgeService.listKnowledgeCategories(query);
+    const categories = await this.knowledgeService.listKnowledgeCategories(projectId, query);
     res.status(200).json(categories);
   }
 
@@ -364,7 +366,7 @@ export class KnowledgeController {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
     const params = knowledgeCategoryRouteParamsSchema.parse(req.params);
     const body = updateKnowledgeCategoryBodySchema.parse(req.body);
-    const category = await this.knowledgeService.updateKnowledgeCategory(params.id, body, req.context);
+    const category = await this.knowledgeService.updateKnowledgeCategory(params.projectId, params.id, body, req.context);
     res.status(200).json(category);
   }
 
@@ -376,7 +378,7 @@ export class KnowledgeController {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_DELETE]);
     const params = knowledgeCategoryRouteParamsSchema.parse(req.params);
     const body = deleteKnowledgeCategoryBodySchema.parse(req.body);
-    await this.knowledgeService.deleteKnowledgeCategory(params.id, body.version, req.context);
+    await this.knowledgeService.deleteKnowledgeCategory(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -390,8 +392,9 @@ export class KnowledgeController {
    */
   private async createKnowledgeItem(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const body = createKnowledgeItemSchema.parse(req.body);
-    const item = await this.knowledgeService.createKnowledgeItem(body, req.context);
+    const item = await this.knowledgeService.createKnowledgeItem(projectId, body, req.context);
     res.status(201).json(item);
   }
 
@@ -402,7 +405,7 @@ export class KnowledgeController {
   private async getKnowledgeItemById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_READ]);
     const params = knowledgeItemRouteParamsSchema.parse(req.params);
-    const item = await this.knowledgeService.getKnowledgeItemById(params.id);
+    const item = await this.knowledgeService.getKnowledgeItemById(params.projectId, params.id);
     res.status(200).json(item);
   }
 
@@ -412,8 +415,9 @@ export class KnowledgeController {
    */
   private async listKnowledgeItems(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_READ]);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const items = await this.knowledgeService.listKnowledgeItems(query);
+    const items = await this.knowledgeService.listKnowledgeItems(projectId, query);
     res.status(200).json(items);
   }
 
@@ -425,7 +429,7 @@ export class KnowledgeController {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_WRITE]);
     const params = knowledgeItemRouteParamsSchema.parse(req.params);
     const body = updateKnowledgeItemBodySchema.parse(req.body);
-    const item = await this.knowledgeService.updateKnowledgeItem(params.id, body, req.context);
+    const item = await this.knowledgeService.updateKnowledgeItem(params.projectId, params.id, body, req.context);
     res.status(200).json(item);
   }
 
@@ -437,7 +441,7 @@ export class KnowledgeController {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_DELETE]);
     const params = knowledgeItemRouteParamsSchema.parse(req.params);
     const body = deleteKnowledgeItemBodySchema.parse(req.body);
-    await this.knowledgeService.deleteKnowledgeItem(params.id, body.version, req.context);
+    await this.knowledgeService.deleteKnowledgeItem(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
   }
 
@@ -448,7 +452,7 @@ export class KnowledgeController {
   private async getItemsByCategory(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.KNOWLEDGE_READ]);
     const params = knowledgeCategoryItemsRouteParamsSchema.parse(req.params);
-    const items = await this.knowledgeService.getItemsByCategory(params.categoryId);
+    const items = await this.knowledgeService.getItemsByCategory(params.projectId, params.categoryId);
     res.status(200).json(items);
   }
 }

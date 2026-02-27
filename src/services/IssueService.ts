@@ -28,12 +28,12 @@ export class IssueService extends BaseService {
    * @param context - Request context for auditing and authorization
    * @returns The created issue
    */
-  async createIssue(input: CreateIssueRequest, context: RequestContext): Promise<IssueResponse> {
+  async createIssue(projectId: string, input: CreateIssueRequest, context: RequestContext): Promise<IssueResponse> {
     this.requirePermission(context, PERMISSIONS.ISSUE_WRITE);
-    logger.info({ projectId: input.projectId, environment: input.environment, severity: input.severity, adminId: context?.adminId }, 'Creating issue');
+    logger.info({ projectId, environment: input.environment, severity: input.severity, adminId: context?.adminId }, 'Creating issue');
 
     try {
-      const issue = await db.insert(issues).values({ projectId: input.projectId, environment: input.environment, buildVersion: input.buildVersion, beat: input.beat, sessionId: input.sessionId, eventIndex: input.eventIndex, userId: input.userId, severity: input.severity, category: input.category, bugDescription: input.bugDescription, expectedBehaviour: input.expectedBehaviour, comments: input.comments ?? '', status: input.status }).returning();
+      const issue = await db.insert(issues).values({ projectId, environment: input.environment, buildVersion: input.buildVersion, beat: input.beat, sessionId: input.sessionId, eventIndex: input.eventIndex, userId: input.userId, severity: input.severity, category: input.category, bugDescription: input.bugDescription, expectedBehaviour: input.expectedBehaviour, comments: input.comments ?? '', status: input.status }).returning();
 
       const createdIssue = issue[0];
 
@@ -54,11 +54,11 @@ export class IssueService extends BaseService {
    * @returns The issue if found
    * @throws {NotFoundError} When issue is not found
    */
-  async getIssueById(id: number): Promise<IssueResponse> {
+  async getIssueById(projectId: string, id: number): Promise<IssueResponse> {
     logger.debug({ issueId: id }, 'Fetching issue by ID');
 
     try {
-      const issue = await db.query.issues.findFirst({ where: eq(issues.id, id) });
+      const issue = await db.query.issues.findFirst({ where: and(eq(issues.projectId, projectId), eq(issues.id, id)) });
 
       if (!issue) {
         throw new NotFoundError(`Issue with id ${id} not found`);
@@ -76,11 +76,11 @@ export class IssueService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of issues matching the criteria
    */
-  async listIssues(params?: ListParams): Promise<IssueListResponse> {
+  async listIssues(projectId: string, params?: ListParams): Promise<IssueListResponse> {
     logger.debug({ params }, 'Listing issues');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(issues.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -154,18 +154,18 @@ export class IssueService extends BaseService {
    * @returns The updated issue
    * @throws {NotFoundError} When issue is not found
    */
-  async updateIssue(id: number, input: UpdateIssueRequest, context: RequestContext): Promise<IssueResponse> {
+  async updateIssue(projectId: string, id: number, input: UpdateIssueRequest, context: RequestContext): Promise<IssueResponse> {
     this.requirePermission(context, PERMISSIONS.ISSUE_WRITE);
     logger.info({ issueId: id, adminId: context?.adminId }, 'Updating issue');
 
     try {
-      const existingIssue = await db.query.issues.findFirst({ where: eq(issues.id, id) });
+      const existingIssue = await db.query.issues.findFirst({ where: and(eq(issues.projectId, projectId), eq(issues.id, id)) });
 
       if (!existingIssue) {
         throw new NotFoundError(`Issue with id ${id} not found`);
       }
 
-      const updatedIssue = await db.update(issues).set({ ...input, updatedAt: new Date() }).where(eq(issues.id, id)).returning();
+      const updatedIssue = await db.update(issues).set({ ...input, updatedAt: new Date() }).where(and(eq(issues.projectId, projectId), eq(issues.id, id))).returning();
 
       if (updatedIssue.length === 0) {
         throw new NotFoundError(`Issue with id ${id} not found`);
@@ -189,18 +189,18 @@ export class IssueService extends BaseService {
    * @param id - The unique identifier of the issue to delete
    * @param context - Request context for auditing and authorization
    */
-  async deleteIssue(id: number, context: RequestContext): Promise<void> {
+  async deleteIssue(projectId: string, id: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.ISSUE_DELETE);
     logger.info({ issueId: id, adminId: context?.adminId }, 'Deleting issue');
 
     try {
-      const existingIssue = await db.query.issues.findFirst({ where: eq(issues.id, id) });
+      const existingIssue = await db.query.issues.findFirst({ where: and(eq(issues.projectId, projectId), eq(issues.id, id)) });
 
       if (!existingIssue) {
         throw new NotFoundError(`Issue with id ${id} not found`);
       }
 
-      const deleted = await db.delete(issues).where(eq(issues.id, id)).returning();
+      const deleted = await db.delete(issues).where(and(eq(issues.projectId, projectId), eq(issues.id, id))).returning();
 
       if (deleted.length === 0) {
         throw new NotFoundError(`Issue with id ${id} not found`);

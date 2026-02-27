@@ -74,6 +74,15 @@ export type ListFilter = z.infer<typeof listFilterSchema>;
 /** List query parameters for filtering, sorting, pagination, and search */
 export type ListParams = z.infer<typeof listParamsSchema>;
 
+/**
+ * Schema for route params of project-scoped endpoints
+ */
+export const projectScopedParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
+});
+
+export type ProjectScopedParams = z.infer<typeof projectScopedParamsSchema>;
+
 // ====================
 // LLM Settings Schemas
 // ====================

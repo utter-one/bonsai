@@ -10,7 +10,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for OpenAI-specific configuration
  */
-export const openAILlmProviderConfigSchema = z.object({
+export const openAILlmProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('OpenAI API key'),
   organizationId: z.string().optional().describe('Optional organization ID'),
   baseUrl: z.string().optional().describe('Optional base URL for OpenAI-compatible APIs'),

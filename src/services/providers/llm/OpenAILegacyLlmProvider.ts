@@ -11,7 +11,7 @@ extendZodWithOpenApi(z);
 /**
  * Schema for OpenAI-specific configuration for legacy Chat Completions API
  */
-export const openAILegacyLlmProviderConfigSchema = z.object({
+export const openAILegacyLlmProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('OpenAI API key'),
   organizationId: z.string().optional().describe('Optional organization ID'),
   baseUrl: z.string().optional().describe('Optional base URL for OpenAI-compatible APIs'),

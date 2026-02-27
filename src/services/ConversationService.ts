@@ -84,7 +84,7 @@ export class ConversationService extends BaseService {
   /**
    * Saves the current state of a conversation (internal use only)
    */
-  async saveConversationState(conversationId: string,
+  async saveConversationState(projectId: string, conversationId: string,
     status: ConversationState,
     statusDetails?: string | null,
     stageVars?: Record<string, Record<string, any>>
@@ -112,7 +112,7 @@ export class ConversationService extends BaseService {
 
       await db.update(conversations)
         .set(updateData)
-        .where(eq(conversations.id, conversationId));
+        .where(and(eq(conversations.projectId, projectId), eq(conversations.id, conversationId)));
 
       logger.debug({ conversationId }, 'Conversation state saved successfully');
     } catch (error) {
@@ -128,13 +128,14 @@ export class ConversationService extends BaseService {
    * @param eventData - The data associated with the event
    * @param metadata - Optional metadata for the event
    */
-  async saveConversationEvent(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<void> {
+  async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<void> {
     logger.debug({ conversationId, eventType }, 'Saving conversation event');
 
     try {
       const eventId = generateId(ID_PREFIXES.EVENT);
       const eventRecord = {
         id: eventId,
+        projectId,
         conversationId,
         eventType,
         eventData,
@@ -160,11 +161,11 @@ export class ConversationService extends BaseService {
    * @returns The conversation if found
    * @throws {NotFoundError} When conversation is not found
    */
-  async getConversationById(id: string): Promise<ConversationResponse> {
+  async getConversationById(projectId: string, id: string): Promise<ConversationResponse> {
     logger.debug({ conversationId: id }, 'Fetching conversation by ID');
 
     try {
-      const conversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+      const conversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
 
       if (!conversation) {
         throw new NotFoundError(`Conversation with id ${id} not found`);
@@ -182,11 +183,11 @@ export class ConversationService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of conversations matching the criteria
    */
-  async listConversations(params?: ListParams): Promise<ConversationListResponse> {
+  async listConversations(projectId: string, params?: ListParams): Promise<ConversationListResponse> {
     logger.debug({ params }, 'Listing conversations');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(conversations.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -253,11 +254,11 @@ export class ConversationService extends BaseService {
    * @param id - The unique identifier of the conversation
    * @param reason - Optional reason for finishing the conversation
    */
-  async finishConversation(id: string, reason: string = ''): Promise<void> {
+  async finishConversation(projectId: string, id: string, reason: string = ''): Promise<void> {
     logger.info({ conversationId: id }, 'Ending conversation');
 
     try {
-      const existingConversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+      const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
 
       if (!existingConversation) {
         throw new NotFoundError(`Conversation with id ${id} not found`);
@@ -273,7 +274,7 @@ export class ConversationService extends BaseService {
           status: 'finished',
           updatedAt: new Date()
         })
-        .where(eq(conversations.id, id));
+        .where(and(eq(conversations.projectId, projectId), eq(conversations.id, id)));
 
       logger.info({ conversationId: id }, 'Conversation ended successfully');
     } catch (error) {
@@ -287,11 +288,11 @@ export class ConversationService extends BaseService {
    * @param id - The unique identifier of the conversation
    * @param reason - Human-readable description of why the conversation failed
    */
-  async failConversation(id: string, reason: string): Promise<void> {
+  async failConversation(projectId: string, id: string, reason: string): Promise<void> {
     logger.info({ conversationId: id, reason }, `Marking conversation as failed: ${reason}`);
 
     try {
-      const existingConversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+      const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
 
       if (!existingConversation) {
         throw new NotFoundError(`Conversation with id ${id} not found`);
@@ -303,7 +304,7 @@ export class ConversationService extends BaseService {
           statusDetails: reason,
           updatedAt: new Date()
         })
-        .where(eq(conversations.id, id));
+        .where(and(eq(conversations.projectId, projectId), eq(conversations.id, id)));
 
       logger.info({ conversationId: id }, 'Conversation marked as failed successfully');
     } catch (error) {
@@ -317,18 +318,18 @@ export class ConversationService extends BaseService {
    * @param id - The unique identifier of the conversation to delete
    * @param context - Request context for auditing and authorization
    */
-  async deleteConversation(id: string, context: RequestContext): Promise<void> {
+  async deleteConversation(projectId: string, id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.CONVERSATION_DELETE);
     logger.info({ conversationId: id, adminId: context?.adminId }, 'Deleting conversation');
 
     try {
-      const existingConversation = await db.query.conversations.findFirst({ where: eq(conversations.id, id) });
+      const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
 
       if (!existingConversation) {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
 
-      const deleted = await db.delete(conversations).where(eq(conversations.id, id)).returning();
+      const deleted = await db.delete(conversations).where(and(eq(conversations.projectId, projectId), eq(conversations.id, id))).returning();
 
       if (deleted.length === 0) {
         throw new NotFoundError(`Conversation with id ${id} not found`);
@@ -350,18 +351,18 @@ export class ConversationService extends BaseService {
    * @returns Paginated array of conversation events
    * @throws {NotFoundError} When conversation is not found
    */
-  async getConversationEvents(conversationId: string, params?: ListParams): Promise<ConversationEventListResponse> {
+  async getConversationEvents(projectId: string, conversationId: string, params?: ListParams): Promise<ConversationEventListResponse> {
     logger.debug({ conversationId, params }, 'Fetching conversation events');
 
     try {
       // Verify conversation exists
-      const conversation = await db.query.conversations.findFirst({ where: eq(conversations.id, conversationId) });
+      const conversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, conversationId)) });
 
       if (!conversation) {
         throw new NotFoundError(`Conversation with id ${conversationId} not found`);
       }
 
-      const conditions: SQL[] = [eq(conversationEvents.conversationId, conversationId)];
+      const conditions: SQL[] = [eq(conversationEvents.projectId, projectId), eq(conversationEvents.conversationId, conversationId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
@@ -425,19 +426,19 @@ export class ConversationService extends BaseService {
    * @returns The conversation event if found
    * @throws {NotFoundError} When conversation or event is not found
    */
-  async getConversationEventById(conversationId: string, eventId: string): Promise<ConversationEventResponse> {
+  async getConversationEventById(projectId: string, conversationId: string, eventId: string): Promise<ConversationEventResponse> {
     logger.debug({ conversationId, eventId }, 'Fetching conversation event by ID');
 
     try {
       // Verify conversation exists
-      const conversation = await db.query.conversations.findFirst({ where: eq(conversations.id, conversationId) });
+      const conversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, conversationId)) });
 
       if (!conversation) {
         throw new NotFoundError(`Conversation with id ${conversationId} not found`);
       }
 
       const event = await db.query.conversationEvents.findFirst({
-        where: and(eq(conversationEvents.id, eventId), eq(conversationEvents.conversationId, conversationId)),
+        where: and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId), eq(conversationEvents.conversationId, conversationId)),
       });
 
       if (!event) {

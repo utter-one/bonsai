@@ -78,6 +78,34 @@
       "when": 1771599295015,
       "tag": "0010_sturdy_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1771944044660,
+      "tag": "0011_goofy_professor_monster",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772135627762,
+      "tag": "0012_supreme_mattie_franklin",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1772139545826,
+      "tag": "0013_milky_sir_ram",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1772182682255,
+      "tag": "0014_regular_morbius",
+      "breakpoints": true
     }
   ]
 }

@@ -10,7 +10,7 @@ extendZodWithOpenApi(z);
 /**
  * Azure Blob Storage provider configuration schema
  */
-export const azureBlobStorageProviderConfigSchema = z.object({
+export const azureBlobStorageProviderConfigSchema = z.strictObject({
   accountName: z.string().describe('Azure storage account name'),
   accountKey: z.string().describe('Azure storage account key'),
   endpoint: z.string().optional().describe('Custom endpoint for Azure Blob Storage'),
