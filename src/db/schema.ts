@@ -82,6 +82,7 @@ export const projects = pgTable('projects', {
   }>(),
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
+  timezone: text('timezone'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

@@ -9,6 +9,7 @@ export const startConversationRequestSchema = sessionInputMessageSchema.extend({
   userId: z.string().describe('User ID initiating the conversation'),
   personaId: z.string().optional().describe('Optional persona ID for the conversation'),
   stageId: z.string().describe('Stage ID to initiate the conversation at a specific stage'),
+  timezone: z.string().optional().describe('IANA timezone identifier for this conversation (e.g. America/New_York, Europe/Warsaw). Overrides user profile and project timezone settings. Defaults to UTC when not provided by any source.'),
 });
 
 export type StartConversationRequest = z.infer<typeof startConversationRequestSchema>;

@@ -73,6 +73,7 @@ export const createProjectSchema = z.object({
   storageConfig: storageConfigSchema.optional().describe('Optional storage configuration for conversation artifacts'),
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
+  timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
@@ -89,6 +90,7 @@ export const updateProjectSchema = z.object({
   storageConfig: storageConfigSchema.describe('Updated storage configuration settings'),
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
+  timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
   version: z.number().describe('The current version number for optimistic locking'),
 });
 
@@ -107,6 +109,7 @@ export const projectResponseSchema = z.object({
   storageConfig: storageConfigSchema.nullable().describe('Storage configuration for conversation artifacts'),
   constants: z.record(z.string(), parameterValueSchema).nullable().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).nullable().describe('Additional metadata for the project'),
+  timezone: z.string().nullable().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Null means UTC.'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),
   updatedAt: z.coerce.date().describe('The timestamp when the project was last updated'),
