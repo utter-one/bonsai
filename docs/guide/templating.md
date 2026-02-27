@@ -227,11 +227,11 @@ These fields always hold the date (YYYY-MM-DD) of the **next occurrence** of eac
 | `dayOfMonth` | `number` | Day of month, e.g. `2` |
 | `isToday` | `boolean` | `true` for the first entry (today) |
 
-Render it with `{{json time.calendar}}` to give a structured LLM model the full two-week window:
+Render it with <span v-pre>`{{{json time.calendar}}}`</span> to give a structured LLM model the full two-week window:
 
 ```handlebars
 Available dates for the next two weeks:
-{{json time.calendar}}
+{{{json time.calendar}}}
 ```
 
 ### Examples
