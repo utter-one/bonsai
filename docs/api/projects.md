@@ -85,7 +85,8 @@ All fields from the create body are optional. `version` is required for optimist
 | `generateVoice` | `boolean` | No | Updated voice generation |
 | `storageConfig` | [`StorageConfig`](#storage-config) | No | Updated storage config |
 | `constants` | `Record<string, ParameterValue>` | No | Updated constants |
-| `metadata` | `object` | No | Updated metadata || `timezone` | `string` | No | Updated IANA timezone identifier |
+| `metadata` | `object` | No | Updated metadata |
+| `timezone` | `string` | No | Updated IANA timezone identifier |
 **Response** `200 OK` — [Project Response](#project-response)
 
 **Errors:** `400` Invalid body | `404` Not found | `409` Version conflict

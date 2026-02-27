@@ -107,6 +107,7 @@ All fields default to `true` if omitted.
 | `userId` | `string` | Yes | User initiating the conversation |
 | `stageId` | `string` | Yes | Initial stage ID |
 | `personaId` | `string` | No | Persona override |
+| `timezone` | `string` | No | IANA timezone identifier (e.g. `America/New_York`). Highest precedence in: `start_conversation.timezone` → `userProfile.timezone` → `project.timezone` → UTC |
 
 **Response**
 

@@ -16,8 +16,8 @@ import { GlobalAction } from "../types/models";
 export async function isActionActive(action: StageAction | GlobalAction, rawContext: ConversationContext, scriptExecutor: IsolatedScriptExecutor): Promise<boolean> {
   if (action.condition) {
     const result = await scriptExecutor.executeScript(action.condition, rawContext);
-    logger.info({ conversationId: rawContext.conversationId, condition: action.condition, stageId: rawContext.stage.id, actionName: action.name, conditionResult: !!result }, `Evaluated condition for action '${action.name}'`);
-    return !!result;
+    logger.info({ conversationId: rawContext.conversationId, condition: action.condition, stageId: rawContext.stage.id, actionName: action.name, conditionResult: !!result.value }, `Evaluated condition for action '${action.name}'`);
+    return !!result.value;
   }
 
   return true;
