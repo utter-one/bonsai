@@ -6,7 +6,6 @@ import { AsrProviderBase } from './AsrProviderBase';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
-import { appendFileSync } from 'fs';
 import { TextChunk } from './IAsrProvider';
 
 extendZodWithOpenApi(z);
@@ -259,7 +258,6 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
    * @param message Server message from Speechmatics
    */
   private handleServerMessage(message: RealtimeServerMessage): void {
-    appendFileSync('speechmatics_messages.log', JSON.stringify(message) + '\n'); // Log raw messages for debugging
     try {
       switch (message.message) {
         case 'RecognitionStarted':
