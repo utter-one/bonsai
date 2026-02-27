@@ -563,6 +563,11 @@ export class ConversationRunner {
   }
 
   async resumeConversation() {
+    // Validate conversation can be resumed (should already be checked in prepareConversation, but double-check)
+    if (this.conversation.status === 'finished' || this.conversation.status === 'failed' || this.conversation.status === 'aborted') {
+      throw new Error(`Cannot resume conversation in state: ${this.conversation.status}`);
+    }
+
     const previousStatus = this.conversation.status;
     const eventData: ConversationResumeEventData = {
       previousStatus,
@@ -571,7 +576,8 @@ export class ConversationRunner {
     await this.saveAndSendEvent('conversation_resume', eventData);
     logger.info({ conversationId: this.conversation.id, previousStatus, stageId: this.stageData.id }, 'Conversation resumed');
 
-    throw new Error("Method not implemented.");
+    // Resume to awaiting user input state to allow the user to continue
+    await this.changeState('awaiting_user_input');
   }
 
   async receiveUserTextInput(userInput: string): Promise<string> {
