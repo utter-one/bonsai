@@ -1,5 +1,6 @@
 import { injectable } from 'tsyringe';
 import ivm from 'isolated-vm';
+import crypto from 'crypto';
 import { logger } from '../../utils/logger';
 import { ConversationContext } from './ConversationContextBuilder';
 
@@ -15,16 +16,34 @@ import { ConversationContext } from './ConversationContextBuilder';
  * - Proper cleanup to prevent memory leaks
  * 
  * Available APIs in scripts:
+ *
+ * Read-only context:
  * - `conversationId` - ID of the current conversation
+ * - `projectId` - ID of the current project
  * - `stageId` - ID of the current stage in the conversation
+ * - `stage` - Full stage object: id, name, availableActions, metadata, enterBehavior, useKnowledge
  * - `history` - Array of conversation messages with role and content
- * - `actions` - Available actions in the current context
+ * - `actions` - Matched action results and their parameters
  * - `originalUserInput` - The original unmodified user input
- * - `results` - Results from previous operations
- * - `vars` - Mutable object containing all stage variables (can be modified)
- * - `userProfile` - Mutable object containing user profile data (can be modified)
- * - `userInput` - The current user input (can be modified)
- * - `console.log()`, `console.error()`, `console.warn()` - Logging functions
+ * - `results` - Results from tools and webhooks
+ * - `time` - Rich time context: iso, date, time, dayOfWeek, timezone, calendar, anchor, etc.
+ * - `userInputSource` - Input channel: 'text' | 'voice' | null
+ * - `stageVars` - Variables for all stages keyed by stage id
+ *
+ * Mutable context (changes persist after script execution):
+ * - `vars` - Current stage variables; supports full replacement including key deletion
+ * - `userProfile` - End user profile data; supports full replacement including key deletion
+ * - `userInput` - Current user input text (can be replaced or set to null)
+ *
+ * Utility functions:
+ * - `btoa(str)` - Base64-encode a binary string
+ * - `atob(b64)` - Decode a base64 string
+ * - `uuid()` - Generate a random UUID v4
+ * - `hash(algorithm, data)` - Compute a hex digest; algorithm must be 'sha256', 'sha512', or 'md5'
+ * - `formatDate(iso, locale?, options?)` - Format an ISO date string via Intl.DateTimeFormat
+ *
+ * Logging:
+ * - `console.log()`, `console.error()`, `console.warn()` - Captured to application logs
  */
 @injectable()
 export class IsolatedScriptExecutor {
@@ -72,16 +91,34 @@ export class IsolatedScriptExecutor {
       // Inject read-only context fields using ExternalCopy
       // copyInto() automatically internalizes the value into the isolate
       await jail.set('conversationId', new ivm.ExternalCopy(context.conversationId).copyInto());
+      await jail.set('projectId', new ivm.ExternalCopy(context.projectId).copyInto());
       await jail.set('stageId', new ivm.ExternalCopy(context.stage.id).copyInto());
+      await jail.set('stage', new ivm.ExternalCopy(context.stage).copyInto());
       await jail.set('history', new ivm.ExternalCopy(context.history).copyInto());
       await jail.set('actions', new ivm.ExternalCopy(context.actions).copyInto());
       await jail.set('originalUserInput', new ivm.ExternalCopy(context.originalUserInput || null).copyInto());
       await jail.set('results', new ivm.ExternalCopy(context.results).copyInto());
+      await jail.set('time', new ivm.ExternalCopy(context.time).copyInto());
+      await jail.set('userInputSource', new ivm.ExternalCopy(context.userInputSource || null).copyInto());
+      await jail.set('stageVars', new ivm.ExternalCopy(context.stageVars || null).copyInto());
 
       // Inject mutable objects that scripts can modify
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
       await jail.set('userProfile', new ivm.ExternalCopy(context.userProfile).copyInto());
       await jail.set('userInput', new ivm.ExternalCopy(context.userInput || null).copyInto());
+
+      // Inject utility functions as synchronous host callbacks
+      await jail.set('btoa', new ivm.Callback((str: string) => Buffer.from(str, 'binary').toString('base64')));
+      await jail.set('atob', new ivm.Callback((b64: string) => Buffer.from(b64, 'base64').toString('binary')));
+      await jail.set('uuid', new ivm.Callback(() => crypto.randomUUID()));
+      await jail.set('hash', new ivm.Callback((algorithm: string, data: string) => {
+        const allowed = ['sha256', 'sha512', 'md5'];
+        if (!allowed.includes(algorithm)) throw new Error(`hash(): unsupported algorithm '${algorithm}'. Use: ${allowed.join(', ')}`);
+        return crypto.createHash(algorithm).update(data).digest('hex');
+      }));
+      await jail.set('formatDate', new ivm.Callback((iso: string, locale?: string, options?: Record<string, string>) => {
+        return new Intl.DateTimeFormat(locale ?? undefined, options ?? undefined).format(new Date(iso));
+      }));
 
       // Compile the script
       const script = await isolate.compileScript(code);
@@ -89,26 +126,17 @@ export class IsolatedScriptExecutor {
       // Run the script with a 5-second timeout
       const result = await script.run(ivmContext, { timeout: 5000 });
 
-      // Extract modified values back from the isolate
-      // Get vars as a Reference, then copy it back
+      // Extract modified values back from the isolate using full replacement
+      // so that key deletions (delete vars.foo) are reflected correctly
       const varsRef = await jail.get('vars', { reference: true });
       if (varsRef && varsRef.typeof === 'object') {
-        const updatedVars = await varsRef.copy();
-        // Update context with modified variables
-        for (const [key, value] of Object.entries(updatedVars)) {
-          context.vars[key] = value;
-        }
+        context.vars = await varsRef.copy();
         varsRef.release();
       }
 
-      // Get userProfile as a Reference, then copy it back
       const userProfileRef = await jail.get('userProfile', { reference: true });
       if (userProfileRef && userProfileRef.typeof === 'object') {
-        const updatedUserProfile = await userProfileRef.copy();
-        // Update context with modified user profile
-        for (const [key, value] of Object.entries(updatedUserProfile)) {
-          context.userProfile[key] = value;
-        }
+        context.userProfile = await userProfileRef.copy();
         userProfileRef.release();
       }
 

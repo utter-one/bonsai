@@ -22,16 +22,23 @@ Scripts have access to these global variables:
 | `userProfile` | Read/Write | End user's profile data |
 | `userInput` | Read/Write | Current user input text (string) |
 | `conversationId` | Read-only | Current conversation ID |
+| `projectId` | Read-only | Current project ID |
 | `stageId` | Read-only | Current stage ID |
+| `stage` | Read-only | Full stage object: `id`, `name`, `availableActions`, `metadata`, `enterBehavior`, `useKnowledge` |
 | `history` | Read-only | Conversation message history |
-| `actions` | Read-only | Matched action results |
+| `actions` | Read-only | Matched action results and their parameters |
 | `originalUserInput` | Read-only | Original unmodified user input |
-| `results` | Read-only | Results from tools, webhooks, etc. |
+| `results` | Read-only | Results from tools and webhooks |
+| `time` | Read-only | Rich time context: `iso`, `date`, `time`, `dayOfWeek`, `timezone`, `calendar`, `anchor`, etc. |
+| `userInputSource` | Read-only | Input channel: `'text'` \| `'voice'` \| `null` |
+| `stageVars` | Read-only | Variables for all stages, keyed by stage ID |
 | `console` | — | `console.log()`, `console.error()`, `console.warn()` |
 
 ## Modifying State
 
-Scripts can modify three mutable globals. Changes persist after script execution:
+Scripts can modify three mutable globals. Changes persist after script execution.
+
+> **Key deletion** — Assigning new properties and deleting existing ones (`delete vars.foo`) both work correctly. The entire object is replaced after each script run.
 
 ### Stage Variables
 
@@ -45,10 +52,6 @@ vars.order = {
   status: "pending",
   items: ["Widget A", "Widget B"]
 };
-
-// Modify arrays
-vars.history = vars.history || [];
-vars.history.push("Step completed at " + new Date().toISOString());
 ```
 
 ### User Profile
@@ -79,6 +82,67 @@ const matchedActions = actions;
 
 // Access webhook/tool results
 const orderData = results.webhooks?.orderLookup;
+
+// Current stage metadata
+const isBookingStage = stage.name === 'Booking';
+const availableActionNames = stage.availableActions.map(a => a.name);
+
+// Distinguish voice vs text input
+if (userInputSource === 'voice') {
+  userInput = userInput.toLowerCase();
+}
+
+// Time-based logic
+const hour = parseInt(time.hour, 10);
+const isBusinessHours = time.dayOfWeek !== 'Saturday' && time.dayOfWeek !== 'Sunday' && hour >= 9 && hour < 17;
+vars.isBusinessHours = isBusinessHours;
+
+// Cross-stage variable access
+const prevStepData = stageVars?.['stage-id-here']?.someField;
+```
+
+## Utility Functions
+
+The sandbox provides a set of pure utility functions:
+
+### `btoa(str)` / `atob(b64)`
+
+Base64 encode and decode binary strings.
+
+```javascript
+const encoded = btoa('hello world'); // 'aGVsbG8gd29ybGQ='
+const decoded = atob(encoded);       // 'hello world'
+```
+
+### `uuid()`
+
+Generate a random UUID v4.
+
+```javascript
+vars.correlationId = uuid(); // e.g. '3b1f8c2d-4e5a-6b7c-8d9e-0f1a2b3c4d5e'
+```
+
+### `hash(algorithm, data)`
+
+Compute a hex digest of a string. Supported algorithms: `'sha256'`, `'sha512'`, `'md5'`.
+
+```javascript
+const fingerprint = hash('sha256', vars.userId + vars.sessionToken);
+vars.cacheKey = hash('md5', JSON.stringify(results.webhooks?.orderLookup));
+```
+
+### `formatDate(iso, locale?, options?)`
+
+Format an ISO date string using [`Intl.DateTimeFormat`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat). `locale` defaults to the runtime locale; `options` accepts any `Intl.DateTimeFormat` options object.
+
+```javascript
+// Short date in Polish
+const label = formatDate(time.iso, 'pl-PL', { dateStyle: 'long' });
+// e.g. '27 lutego 2026'
+
+// Day and month only
+vars.appointmentLabel = formatDate(vars.appointmentDate, 'en-GB', { day: 'numeric', month: 'long' });
+// e.g. '14 March'
 ```
 
 ## Console Output
