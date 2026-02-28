@@ -776,9 +776,9 @@
           "type": "string",
           "description": "User ID initiating the conversation"
         },
-        "personaId": {
+        "agentId": {
           "type": "string",
-          "description": "Optional persona ID for the conversation"
+          "description": "Optional agent ID for the conversation"
         },
         "stageId": {
           "type": "string",

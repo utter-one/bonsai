@@ -29,7 +29,7 @@ export class ProjectController {
         path: '/api/projects',
         tags: ['Projects'],
         summary: 'Create a new project',
-        description: 'Creates a new project that groups stages, personas, classifiers, context transformers, tools, knowledge, actions, and issues',
+        description: 'Creates a new project that groups stages, agents, classifiers, context transformers, tools, knowledge, actions, and issues',
         request: {
           body: {
             content: {

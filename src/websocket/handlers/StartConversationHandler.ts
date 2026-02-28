@@ -29,7 +29,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
    * Handles start conversation requests.
    */
   async handle(context: WebSocketHandlerContext, message: StartConversationRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, personaId: message.personaId, requestId: message.requestId }, 'Start conversation request received');
+    logger.info({ sessionId: message.sessionId, agentId: message.agentId, requestId: message.requestId }, 'Start conversation request received');
     
     if (!context.connection) {
       throw new NotFoundError('Session not found');

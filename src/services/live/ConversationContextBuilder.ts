@@ -98,8 +98,8 @@ export type ConversationContext = {
   /** User profile data */
   userProfile: Record<string, any>;
 
-  /** Persona prompt that defines AI personality and behavior */
-  persona?: string;
+  /** Agent prompt that defines AI personality and behavior */
+  agent?: string;
 
   /** Conversation history as an array of messages */
   history: Array<{
@@ -447,10 +447,10 @@ export class ConversationContextBuilder {
       where: eq(users.id, conversation.userId),
     });
 
-    // Load stage with persona
+    // Load stage with agent
     const stage = await db.query.stages.findFirst({
       where: eq(stages.id, conversation.stageId),
-      with: { persona: true },
+      with: { agent: true },
     });
 
     const context = {
@@ -460,7 +460,7 @@ export class ConversationContextBuilder {
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
-      persona: stage?.persona?.prompt,
+      agent: stage?.agent?.prompt,
       history: [],
       events: [],
       actions: {
@@ -498,15 +498,15 @@ export class ConversationContextBuilder {
 
   /**
    * Builds the initial conversation context when a conversation starts, without any user input.
-   * This context will not include any actions or history, but will include stage variables, user profile, and persona.
+   * This context will not include any actions or history, but will include stage variables, user profile, and agent.
    * 
    * @param conversation - Conversation entity
    */
   async buildContextForConversationStart(conversation: Conversation): Promise<ConversationContext> {
-    // Load stage with persona
+    // Load stage with agent
     const stage = await db.query.stages.findFirst({
       where: eq(stages.id, conversation.stageId),
-      with: { persona: true },
+      with: { agent: true },
     });
 
     const user = await db.query.users.findFirst({
@@ -520,7 +520,7 @@ export class ConversationContextBuilder {
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
-      persona: stage?.persona?.prompt,
+      agent: stage?.agent?.prompt,
       history: [],
       events: [],
       actions: {},
@@ -539,7 +539,7 @@ export class ConversationContextBuilder {
    * Builds context specifically for a classifier with filtered actions.
    * Only includes actions that are either not assigned to any classifier or assigned to the specific classifier.
    * @param conversation - Conversation entity
-   * @param stage - Stage entity with persona relation
+   * @param stage - Stage entity with agent relation
    * @param globalActions - Array of global actions for the stage
    * @param classifierId - ID of the classifier to build context for
    * @param userInput - The user input text
@@ -563,7 +563,7 @@ export class ConversationContextBuilder {
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
-      persona: (stage as any).persona?.prompt,
+      agent: (stage as any).agent?.prompt,
       history: [],
       events: [],
       actions: {}, // Convert classification results to actions later
@@ -604,7 +604,7 @@ export class ConversationContextBuilder {
    * Unlike the classifier context, no action filtering is applied — transformers receive the complete stage view.
    * Also populates a special `schema` variable describing the shape of stage variables and the transformer's expected output fields.
    * @param conversation - Conversation entity
-   * @param stage - Stage entity with persona relation
+   * @param stage - Stage entity with agent relation
    * @param globalActions - Array of global actions for the stage
    * @param transformerId - ID of the transformer being executed (reserved for future per-transformer filtering)
    * @param contextFields - The list of field names this transformer is expected to output (from transformer.contextFields)
@@ -644,7 +644,7 @@ export class ConversationContextBuilder {
       vars: stageVars,
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
-      persona: (stage as any).persona?.prompt,
+      agent: (stage as any).agent?.prompt,
       history: [],
       events: [],
       actions: {},
@@ -686,7 +686,7 @@ export class ConversationContextBuilder {
    * Builds a full conversation context for main completion processing, including all actions and history.
    * This is used when processing user input for generating assistant responses, where all available information should be included in the context.
    * @param conversation - Conversation entity
-   * @param stage - Stage entity with persona relation
+   * @param stage - Stage entity with agent relation
    * @param userInput - The user input text
    * @param originalUserInput - The original user input before any transformations
    * @param actions - Array of action classification results
@@ -705,7 +705,7 @@ export class ConversationContextBuilder {
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
-      persona: (stage as any).persona?.prompt,
+      agent: (stage as any).agent?.prompt,
       history: [],
       events: [],
       actions: actions.reduce((acc, action) => {

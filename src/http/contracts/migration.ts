@@ -16,8 +16,8 @@ const bundleEntitySchema = z.record(z.string(), z.any());
  * dependencies of the selected ones.
  *
  * Transitive dependency resolution performed by the service:
- *   stages        → personas, classifiers, contextTransformers, globalActions, providers
- *   personas      → providers (tts)
+ *   stages        → agents, classifiers, contextTransformers, globalActions, providers
+ *   agents        → providers (tts)
  *   classifiers   → providers (llm)
  *   contextTransformers → providers (llm)
  *   tools         → providers (llm)
@@ -27,9 +27,9 @@ const bundleEntitySchema = z.record(z.string(), z.any());
  *   projects      → providers (asr, storage)
  */
 export const migrationSelectionSchema = z.object({
-  projectIds: z.array(z.string()).optional().describe('Specific project IDs to include. Pulls all child entities (stages, personas, classifiers, etc.) for these projects.'),
-  stageIds: z.array(z.string()).optional().describe('Specific stage IDs to include. Transitively pulls in the stage\'s persona, classifiers, context transformers, global actions, and all referenced providers.'),
-  personaIds: z.array(z.string()).optional().describe('Specific persona IDs to include. Pulls in referenced TTS provider.'),
+  projectIds: z.array(z.string()).optional().describe('Specific project IDs to include. Pulls all child entities (stages, agents, classifiers, etc.) for these projects.'),
+  stageIds: z.array(z.string()).optional().describe('Specific stage IDs to include. Transitively pulls in the stage\'s agent, classifiers, context transformers, global actions, and all referenced providers.'),
+  agentIds: z.array(z.string()).optional().describe('Specific agent IDs to include. Pulls in referenced TTS provider.'),
   classifierIds: z.array(z.string()).optional().describe('Specific classifier IDs to include. Pulls in referenced LLM provider.'),
   contextTransformerIds: z.array(z.string()).optional().describe('Specific context transformer IDs to include. Pulls in referenced LLM provider.'),
   toolIds: z.array(z.string()).optional().describe('Specific tool IDs to include. Pulls in referenced LLM provider.'),
@@ -45,7 +45,7 @@ export type MigrationSelection = z.infer<typeof migrationSelectionSchema>;
  * Self-contained export bundle produced by GET /api/migration/export.
  * Entity arrays are ordered by foreign-key dependency so they can be
  * imported sequentially without FK violations:
- *   providers → projects → personas → classifiers → contextTransformers
+ *   providers → projects → agents → classifiers → contextTransformers
  *   → tools → globalActions → knowledgeCategories → knowledgeItems
  *   → stages → apiKeys
  *
@@ -61,14 +61,14 @@ export const exportBundleSchema = z.object({
   selection: migrationSelectionSchema.describe('The selection criteria that produced this bundle'),
   providers: z.array(bundleEntitySchema).describe('Provider stub records — config (API credentials) is stripped on export; credentials must be reconfigured on the target after import'),
   projects: z.array(bundleEntitySchema).describe('Project records'),
-  personas: z.array(bundleEntitySchema).describe('Persona records — depend on projects'),
+  agents: z.array(bundleEntitySchema).describe('Agent records — depend on projects'),
   classifiers: z.array(bundleEntitySchema).describe('Classifier records — depend on projects'),
   contextTransformers: z.array(bundleEntitySchema).describe('Context transformer records — depend on projects'),
   tools: z.array(bundleEntitySchema).describe('Tool records — depend on projects'),
   globalActions: z.array(bundleEntitySchema).describe('Global action records — depend on projects'),
   knowledgeCategories: z.array(bundleEntitySchema).describe('Knowledge category records — depend on projects'),
   knowledgeItems: z.array(bundleEntitySchema).describe('Knowledge item records — depend on knowledgeCategories'),
-  stages: z.array(bundleEntitySchema).describe('Stage records — depend on projects, personas, and classifiers'),
+  stages: z.array(bundleEntitySchema).describe('Stage records — depend on projects, agents, and classifiers'),
   apiKeys: z.array(bundleEntitySchema).describe('API key records — depend on projects'),
 }).openapi('ExportBundle');
 
@@ -78,7 +78,7 @@ export type ExportBundle = z.infer<typeof exportBundleSchema>;
 export const exportQuerySchema = z.object({
   projectIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific project IDs to export (comma-separated or repeated). Omit for all projects.'),
   stageIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific stage IDs to export.'),
-  personaIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific persona IDs to export.'),
+  agentIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific agent IDs to export.'),
   classifierIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific classifier IDs to export.'),
   contextTransformerIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific context transformer IDs to export.'),
   toolIds: z.union([z.string(), z.array(z.string())]).optional().transform(v => v === undefined ? undefined : Array.isArray(v) ? v : [v]).describe('Specific tool IDs to export.'),
@@ -164,7 +164,7 @@ export const migrationPreviewSchema = z.object({
   totalCount: z.number().int().describe('Total number of entities across all types'),
   providers: z.array(entityStubSchema).describe('Provider stubs that would be included'),
   projects: z.array(entityStubSchema).describe('Project stubs that would be included'),
-  personas: z.array(entityStubSchema).describe('Persona stubs that would be included'),
+  agents: z.array(entityStubSchema).describe('Agent stubs that would be included'),
   classifiers: z.array(entityStubSchema).describe('Classifier stubs that would be included'),
   contextTransformers: z.array(entityStubSchema).describe('Context transformer stubs that would be included'),
   tools: z.array(entityStubSchema).describe('Tool stubs that would be included'),

@@ -45,7 +45,7 @@ export class MigrationController {
         description:
           'Produces a self-contained JSON bundle of all migratable config entities. ' +
           'Intended to be called by a remote instance during a server-side pull. ' +
-          'Pass one or more ID arrays (projectIds, stageIds, personaIds, …) to select specific entities — ' +
+          'Pass one or more ID arrays (projectIds, stageIds, agentIds, …) to select specific entities — ' +
           'all transitive FK dependencies are resolved automatically so the bundle is always self-consistent. ' +
           'An empty query (no params) exports everything. ' +
           'Provider config (API credentials) is stripped from exported records.',

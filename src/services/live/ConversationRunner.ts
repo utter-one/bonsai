@@ -8,7 +8,7 @@ import { conversations, users } from "../../db/schema";
 import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
-import { PersonaService } from "../PersonaService";
+import { AgentService } from "../AgentService";
 import { Connection, ConnectionManager } from "../../websocket/ConnectionManager";
 import { AiTranscribedChunkMessage, EndAiGenerationOutputMessage, SendAiVoiceChunkMessage, StartAiGenerationOutputMessage } from "../../websocket/contracts/aiResponse";
 import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
@@ -77,7 +77,7 @@ export class ConversationRunner {
     @inject(TtsProviderFactory) private ttsProviderFactory: TtsProviderFactory,
     @inject(ConversationService) private conversationService: ConversationService,
     @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
-    @inject(PersonaService) private personaService: PersonaService,
+    @inject(AgentService) private agentService: AgentService,
     @inject(UserInputProcessor) private userInputProcessor: UserInputProcessor,
     @inject(ActionsExecutor) private actionsExecutor: ActionsExecutor,
     @inject(ResponseGenerator) private responseGenerator: ResponseGenerator,
@@ -111,8 +111,8 @@ export class ConversationRunner {
   }
 
   private async buildStageData(conversation: Conversation): Promise<StageRuntimeData> {
-    // Load current stage data with persona relation
-    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, conversation.stageId), with: { persona: true } });
+    // Load current stage data with agent relation
+    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, conversation.stageId), with: { agent: true } });
     if (!stage) {
       throw new NotFoundError(`Stage with ID ${conversation.stageId} not found`);
     }
@@ -212,13 +212,13 @@ export class ConversationRunner {
     }
 
     // Initialize TTS provider if configured and client wants voice output
-    const persona = await this.personaService.getPersonaById(stageData.project.id, stageData.stage.personaId);
-    if (!persona) {
-      throw new NotFoundError(`Persona with ID ${stageData.stage.personaId} not found`);
+    const agent = await this.agentService.getAgentById(stageData.project.id, stageData.stage.agentId);
+    if (!agent) {
+      throw new NotFoundError(`Agent with ID ${stageData.stage.agentId} not found`);
     }
-    const ttsSettings = persona.ttsSettings;
-    if (project.generateVoice && persona.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
-      const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, persona.ttsProviderId) });
+    const ttsSettings = agent.ttsSettings;
+    if (project.generateVoice && agent.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
+      const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.ttsProviderId) });
       if (voiceProviderEntity && ttsSettings) {
         stageData.ttsProvider = this.ttsProviderFactory.createProvider(voiceProviderEntity, ttsSettings);
       }

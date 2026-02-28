@@ -88,8 +88,8 @@ export const projects = pgTable('projects', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Persona table
-export const personas = pgTable('personas', {
+// Agent table
+export const agents = pgTable('agents', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
@@ -178,7 +178,7 @@ export const stages = pgTable('stages', {
   prompt: text('prompt').notNull(),
   llmProviderId: text('llm_provider_id'),
   llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
-  personaId: text('persona_id').notNull(),
+  agentId: text('agent_id').notNull(),
   enterBehavior: text('enter_behavior').notNull().$type<StageEnterBehavior>().default('generate_response'),
   useKnowledge: boolean('use_knowledge').notNull().default(false),
   knowledgeTags: jsonb('knowledge_tags').notNull().default([]).$type<string[]>(),
@@ -195,7 +195,7 @@ export const stages = pgTable('stages', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
-  foreignKey({ columns: [table.projectId, table.personaId], foreignColumns: [personas.projectId, personas.id] }),
+  foreignKey({ columns: [table.projectId, table.agentId], foreignColumns: [agents.projectId, agents.id] }),
   foreignKey({ columns: [table.projectId, table.defaultClassifierId], foreignColumns: [classifiers.projectId, classifiers.id] }),
 ]);
 
@@ -382,7 +382,7 @@ export const conversationEventsRelations = relations(conversationEvents, ({ one 
 
 export const projectsRelations = relations(projects, ({ many }) => ({
   conversations: many(conversations),
-  personas: many(personas),
+  agents: many(agents),
   stages: many(stages),
   classifiers: many(classifiers),
   contextTransformers: many(contextTransformers),
@@ -393,9 +393,9 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   apiKeys: many(apiKeys),
 }));
 
-export const personasRelations = relations(personas, ({ one, many }) => ({
+export const agentsRelations = relations(agents, ({ one, many }) => ({
   project: one(projects, {
-    fields: [personas.projectId],
+    fields: [agents.projectId],
     references: [projects.id],
   }),
   stages: many(stages),
@@ -406,9 +406,9 @@ export const stagesRelations = relations(stages, ({ one }) => ({
     fields: [stages.projectId],
     references: [projects.id],
   }),
-  persona: one(personas, {
-    fields: [stages.personaId],
-    references: [personas.id],
+  agent: one(agents, {
+    fields: [stages.agentId],
+    references: [agents.id],
   }),
 }));
 

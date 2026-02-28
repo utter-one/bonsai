@@ -5,7 +5,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/admin';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
 import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema } from './http/contracts/project';
-import { createPersonaSchema, updatePersonaBodySchema, deletePersonaBodySchema, personaResponseSchema, personaListResponseSchema } from './http/contracts/persona';
+import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema } from './http/contracts/agent';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
 import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './http/contracts/setup';
 import { createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './http/contracts/knowledge';
@@ -46,7 +46,7 @@ import { speechmaticsAsrSettingsSchema } from './services/providers/asr/Speechma
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
-import { PersonaController } from './http/controllers/PersonaController';
+import { AgentController } from './http/controllers/AgentController';
 import { AuthController } from './http/controllers/AuthController';
 import { SetupController } from './http/controllers/SetupController';
 import { KnowledgeController } from './http/controllers/KnowledgeController';
@@ -155,11 +155,11 @@ export function getOpenAPISpec(): any {
   registry.register('UpdateProjectRequest', updateProjectSchema);
   registry.register('ProjectResponse', projectResponseSchema);
   registry.register('ProjectListResponse', projectListResponseSchema);
-  registry.register('CreatePersonaRequest', createPersonaSchema);
-  registry.register('UpdatePersonaRequest', updatePersonaBodySchema);
-  registry.register('DeletePersonaRequest', deletePersonaBodySchema);
-  registry.register('PersonaResponse', personaResponseSchema);
-  registry.register('PersonaListResponse', personaListResponseSchema);
+  registry.register('CreateAgentRequest', createAgentSchema);
+  registry.register('UpdateAgentRequest', updateAgentBodySchema);
+  registry.register('DeleteAgentRequest', deleteAgentBodySchema);
+  registry.register('AgentResponse', agentResponseSchema);
+  registry.register('AgentListResponse', agentListResponseSchema);
   registry.register('LoginRequest', loginSchema);
   registry.register('RefreshTokenRequest', refreshTokenSchema);
   registry.register('LoginResponse', loginResponseSchema);
@@ -296,9 +296,9 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
-  // Register Persona routes from PersonaController
-  const personaPaths = PersonaController.getOpenAPIPaths();
-  for (const path of personaPaths) {
+  // Register Agent routes from AgentController
+  const agentPaths = AgentController.getOpenAPIPaths();
+  for (const path of agentPaths) {
     registry.registerPath(path);
   }
 

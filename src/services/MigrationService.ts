@@ -4,7 +4,7 @@ import { db } from '../db/index';
 import {
   providers,
   projects,
-  personas,
+  agents,
   classifiers,
   contextTransformers,
   tools,
@@ -40,7 +40,7 @@ function isSelectAll(sel: MigrationSelection): boolean {
  * Service for migrating config data between Bonsai Backed instances.
  *
  * Export entity order (FK-safe):
- *   providers → projects → personas → classifiers → contextTransformers
+ *   providers → projects → agents → classifiers → contextTransformers
  *   → tools → globalActions → knowledgeCategories → knowledgeItems
  *   → stages → apiKeys
  *
@@ -82,7 +82,7 @@ export class MigrationService extends BaseService {
     const selection: MigrationSelection = {
       projectIds: query.projectIds,
       stageIds: query.stageIds,
-      personaIds: query.personaIds,
+      agentIds: query.agentIds,
       classifierIds: query.classifierIds,
       contextTransformerIds: query.contextTransformerIds,
       toolIds: query.toolIds,
@@ -133,7 +133,7 @@ export class MigrationService extends BaseService {
       await db.transaction(async (tx) => {
         upserted.push({ entity: 'providers', count: await this.upsertProviders(tx, bundle.providers, context.adminId) });
         upserted.push({ entity: 'projects', count: await this.upsertProjects(tx, bundle.projects) });
-        upserted.push({ entity: 'personas', count: await this.upsertPersonas(tx, bundle.personas) });
+        upserted.push({ entity: 'agents', count: await this.upsertAgents(tx, bundle.agents) });
         upserted.push({ entity: 'classifiers', count: await this.upsertClassifiers(tx, bundle.classifiers) });
         upserted.push({ entity: 'contextTransformers', count: await this.upsertContextTransformers(tx, bundle.contextTransformers) });
         upserted.push({ entity: 'tools', count: await this.upsertTools(tx, bundle.tools) });
@@ -148,7 +148,7 @@ export class MigrationService extends BaseService {
       await Promise.all([
         ...bundle.providers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'provider', entityId: row.id, userId: context.adminId, newEntity: row })),
         ...bundle.projects.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'project', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.personas.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'persona', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.agents.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'agent', entityId: row.id, userId: context.adminId, newEntity: row })),
         ...bundle.classifiers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'classifier', entityId: row.id, userId: context.adminId, newEntity: row })),
         ...bundle.contextTransformers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'contextTransformer', entityId: row.id, userId: context.adminId, newEntity: row })),
         ...bundle.tools.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'tool', entityId: row.id, userId: context.adminId, newEntity: row })),
@@ -162,7 +162,7 @@ export class MigrationService extends BaseService {
       upserted.push(
         { entity: 'providers', count: bundle.providers.length },
         { entity: 'projects', count: bundle.projects.length },
-        { entity: 'personas', count: bundle.personas.length },
+        { entity: 'agents', count: bundle.agents.length },
         { entity: 'classifiers', count: bundle.classifiers.length },
         { entity: 'contextTransformers', count: bundle.contextTransformers.length },
         { entity: 'tools', count: bundle.tools.length },
@@ -285,7 +285,7 @@ export class MigrationService extends BaseService {
     const selection: MigrationSelection = {
       projectIds: query.projectIds,
       stageIds: query.stageIds,
-      personaIds: query.personaIds,
+      agentIds: query.agentIds,
       classifierIds: query.classifierIds,
       contextTransformerIds: query.contextTransformerIds,
       toolIds: query.toolIds,
@@ -303,7 +303,7 @@ export class MigrationService extends BaseService {
     const result: MigrationPreview = {
       providers: bundle.providers.map(toStub),
       projects: bundle.projects.map(toStub),
-      personas: bundle.personas.map(toProjectStub),
+      agents: bundle.agents.map(toProjectStub),
       classifiers: bundle.classifiers.map(toProjectStub),
       contextTransformers: bundle.contextTransformers.map(toProjectStub),
       tools: bundle.tools.map(toProjectStub),
@@ -315,7 +315,7 @@ export class MigrationService extends BaseService {
       totalCount: 0,
     };
     result.totalCount = [
-      result.providers, result.projects, result.personas, result.classifiers,
+      result.providers, result.projects, result.agents, result.classifiers,
       result.contextTransformers, result.tools, result.globalActions,
       result.knowledgeCategories, result.knowledgeItems, result.stages, result.apiKeys,
     ].reduce((sum, arr) => sum + arr.length, 0);
@@ -336,7 +336,7 @@ export class MigrationService extends BaseService {
    * Resolution order (each step may expand what earlier steps fetch):
    *  1. Fetch entities explicitly requested by the caller (or everything if empty).
    *  2. For project-level selections, fetch all direct children.
-   *  3. Pull up parent entities required by children (personas from stages, etc.).
+   *  3. Pull up parent entities required by children (agents from stages, etc.).
    *  4. Collect all referenced provider IDs and fetch them last.
    */
   private async resolveBundle(selection: MigrationSelection, restSchemaHash: string, originalSelection: MigrationSelection): Promise<ExportBundle> {
@@ -353,8 +353,8 @@ export class MigrationService extends BaseService {
 
     // ── 2. Fetch explicitly selected leaf entities ────────────────────────────
 
-    const [explicitPersonaRows, explicitClassifierRows, explicitCtRows, explicitToolRows, explicitGaRows, explicitKcRows, explicitStageRows, explicitApiKeyRows] = await Promise.all([
-      this.fetchOrAll(selectAll || !!selection.personaIds?.length, personas, selection.personaIds, personas.id),
+    const [explicitAgentRows, explicitClassifierRows, explicitCtRows, explicitToolRows, explicitGaRows, explicitKcRows, explicitStageRows, explicitApiKeyRows] = await Promise.all([
+      this.fetchOrAll(selectAll || !!selection.agentIds?.length, agents, selection.agentIds, agents.id),
       this.fetchOrAll(selectAll || !!selection.classifierIds?.length, classifiers, selection.classifierIds, classifiers.id),
       this.fetchOrAll(selectAll || !!selection.contextTransformerIds?.length, contextTransformers, selection.contextTransformerIds, contextTransformers.id),
       this.fetchOrAll(selectAll || !!selection.toolIds?.length, tools, selection.toolIds, tools.id),
@@ -370,7 +370,7 @@ export class MigrationService extends BaseService {
 
     const childrenOfProjects = expandedProjectIds.size > 0 && !selectAll
       ? await Promise.all([
-          db.select().from(personas).where(inArray(personas.projectId, [...expandedProjectIds])),
+          db.select().from(agents).where(inArray(agents.projectId, [...expandedProjectIds])),
           db.select().from(classifiers).where(inArray(classifiers.projectId, [...expandedProjectIds])),
           db.select().from(contextTransformers).where(inArray(contextTransformers.projectId, [...expandedProjectIds])),
           db.select().from(tools).where(inArray(tools.projectId, [...expandedProjectIds])),
@@ -382,7 +382,7 @@ export class MigrationService extends BaseService {
       : [[], [], [], [], [], [], [], []];
 
     // Merge explicit + project-child rows (deduplicated by ID)
-    const personaRows = this.dedup([...explicitPersonaRows, ...childrenOfProjects[0] as any[]], 'id');
+    const agentRows = this.dedup([...explicitAgentRows, ...childrenOfProjects[0] as any[]], 'id');
     const classifierRows = this.dedup([...explicitClassifierRows, ...childrenOfProjects[1] as any[]], 'id');
     const ctRows = this.dedup([...explicitCtRows, ...childrenOfProjects[2] as any[]], 'id');
     const toolRows = this.dedup([...explicitToolRows, ...childrenOfProjects[3] as any[]], 'id');
@@ -404,7 +404,7 @@ export class MigrationService extends BaseService {
     // ── 5. Collect parent projects missing from explicit project selection ─────
 
     const allEntityProjectIds = new Set<string>([
-      ...personaRows.map(r => r.projectId),
+      ...agentRows.map(r => r.projectId),
       ...classifierRows.map(r => r.projectId),
       ...ctRows.map(r => r.projectId),
       ...toolRows.map(r => r.projectId),
@@ -420,14 +420,14 @@ export class MigrationService extends BaseService {
       : [];
     const allProjectRows = this.dedup([...projectRows, ...additionalProjectRows], 'id');
 
-    // ── 6. Collect parent personas for stages that reference personas not yet in bundle ─
+    // ── 6. Collect parent agents for stages that reference agents not yet in bundle ─
 
-    const stagePersonaIds = stageRows.map(s => s.personaId).filter(Boolean) as string[];
-    const missingPersonaIds = stagePersonaIds.filter(id => !personaRows.find(p => p.id === id));
-    const additionalPersonaRows = missingPersonaIds.length > 0
-      ? await db.select().from(personas).where(inArray(personas.id, missingPersonaIds))
+    const stageAgentIds = stageRows.map(s => s.agentId).filter(Boolean) as string[];
+    const missingAgentIds = stageAgentIds.filter(id => !agentRows.find(p => p.id === id));
+    const additionalAgentRows = missingAgentIds.length > 0
+      ? await db.select().from(agents).where(inArray(agents.id, missingAgentIds))
       : [];
-    const allPersonaRows = this.dedup([...personaRows, ...additionalPersonaRows], 'id');
+    const allAgentRows = this.dedup([...agentRows, ...additionalAgentRows], 'id');
 
     // ── 7. Collect parent classifiers for stages that reference classifiers not yet in bundle ─
 
@@ -449,7 +449,7 @@ export class MigrationService extends BaseService {
 
     const referencedProviderIds = new Set<string>(selection.providerIds ?? []);
 
-    for (const p of allPersonaRows) {
+    for (const p of allAgentRows) {
       if (p.ttsProviderId) referencedProviderIds.add(p.ttsProviderId);
     }
     for (const row of [...allClassifierRows, ...allCtRows, ...toolRows, ...stageRows]) {
@@ -474,7 +474,7 @@ export class MigrationService extends BaseService {
       selection: originalSelection,
       providers: providerRows,
       projects: allProjectRows,
-      personas: allPersonaRows,
+      agents: allAgentRows,
       classifiers: allClassifierRows,
       contextTransformers: allCtRows,
       tools: toolRows,
@@ -660,10 +660,10 @@ export class MigrationService extends BaseService {
     return rows.length;
   }
 
-  private async upsertPersonas(tx: DbTx, rows: any[]): Promise<number> {
+  private async upsertAgents(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
-    await tx.insert(personas).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
-      target: [personas.projectId, personas.id],
+    await tx.insert(agents).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: [agents.projectId, agents.id],
       set: {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
@@ -672,7 +672,7 @@ export class MigrationService extends BaseService {
         ttsProviderId: sql`excluded.tts_provider_id`,
         ttsSettings: sql`excluded.tts_settings`,
         metadata: sql`excluded.metadata`,
-        version: sql`${personas.version} + 1`,
+        version: sql`${agents.version} + 1`,
         updatedAt: sql`now()`,
       },
     });
@@ -807,7 +807,7 @@ export class MigrationService extends BaseService {
         prompt: sql`excluded.prompt`,
         llmProviderId: sql`excluded.llm_provider_id`,
         llmSettings: sql`excluded.llm_settings`,
-        personaId: sql`excluded.persona_id`,
+        agentId: sql`excluded.agent_id`,
         enterBehavior: sql`excluded.enter_behavior`,
         useKnowledge: sql`excluded.use_knowledge`,
         knowledgeTags: sql`excluded.knowledge_tags`,
