@@ -324,6 +324,7 @@ export const auditLogs = pgTable('audit_logs', {
   action: text('action').notNull(),
   entityId: text('entity_id').notNull(),
   entityType: text('entity_type').notNull(),
+  projectId: text('project_id'),
   oldEntity: jsonb('old_entity').$type<Record<string, any>>(),
   newEntity: jsonb('new_entity').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),

@@ -13,6 +13,7 @@ export interface AuditLogInput {
   action: string;
   entityId: string;
   entityType: string;
+  projectId?: string;
   oldEntity?: Record<string, any>;
   newEntity?: Record<string, any>;
 }
@@ -39,6 +40,7 @@ export class AuditService {
           action: input.action,
           entityId: input.entityId,
           entityType: input.entityType,
+          projectId: input.projectId,
           oldEntity: input.oldEntity,
           newEntity: input.newEntity,
           version: 1,
@@ -85,6 +87,7 @@ export class AuditService {
       entityType,
       entityId,
       newEntity,
+      projectId: newEntity?.projectId, // Assuming newEntity contains projectId for created entities
     });
   }
 
@@ -111,6 +114,7 @@ export class AuditService {
       entityId,
       oldEntity,
       newEntity,
+      projectId: newEntity?.projectId || oldEntity?.projectId, // Use projectId from newEntity or fallback to oldEntity
     });
   }
 
@@ -134,6 +138,7 @@ export class AuditService {
       entityType,
       entityId,
       oldEntity,
+      projectId: oldEntity?.projectId, // Assuming oldEntity contains projectId for deleted entities
     });
   }
 
@@ -215,6 +220,7 @@ export class AuditService {
         action: auditLogs.action,
         entityId: auditLogs.entityId,
         entityType: auditLogs.entityType,
+        projectId: auditLogs.projectId,
         version: auditLogs.version,
         createdAt: auditLogs.createdAt,
       };
