@@ -1,6 +1,6 @@
 # Projects
 
-Projects are the top-level organizational unit. All conversation resources (stages, personas, classifiers, etc.) belong to a project.
+Projects are the top-level organizational unit. All conversation resources (stages, agents, classifiers, etc.) belong to a project.
 
 **Tag:** `Projects`
 

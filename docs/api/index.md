@@ -39,7 +39,7 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 ### Core Resources
 - [Projects](./projects) — Project management
 - [Stages](./stages) — Conversation stage configuration
-- [Personas](./personas) — AI persona definitions
+- [Agents](./agents) — AI agent definitions
 - [Classifiers](./classifiers) — Intent classifiers
 - [Context Transformers](./context-transformers) — Context transformation pipelines
 - [Tools](./tools) — LLM tool definitions

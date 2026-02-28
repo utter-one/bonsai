@@ -1,6 +1,6 @@
-# Personas
+# Agents
 
-A **Persona** defines the AI's personality and voice for a conversation stage. Personas are scoped to a project and can be shared across multiple stages.
+An **Agent** defines the AI's personality and voice for a conversation stage. Agents are scoped to a project and can be shared across multiple stages.
 
 ## Structure
 
@@ -18,7 +18,7 @@ A **Persona** defines the AI's personality and voice for a conversation stage. P
 
 ## Personality Prompt
 
-The persona's `prompt` defines behavioral characteristics that are combined with the stage's system prompt. This allows reusing the same personality across different stages while varying the task-specific instructions.
+The agent's `prompt` defines behavioral characteristics that are combined with the stage's system prompt. This allows reusing the same personality across different stages while varying the task-specific instructions.
 
 Example:
 
@@ -92,10 +92,10 @@ The `ttsSettings` object varies by TTS provider:
 
 ## Usage in Stages
 
-Every stage must reference exactly one persona via `personaId`. The persona's prompt is combined with the stage prompt when generating responses, and the persona's TTS settings determine the voice used for audio output.
+Every stage must reference exactly one agent via `agentId`. The agent's prompt is combined with the stage prompt when generating responses, and the agent's TTS settings determine the voice used for audio output.
 
-Multiple stages can share the same persona, which is useful when you want consistent voice and personality across different conversation phases.
+Multiple stages can share the same agent, which is useful when you want consistent voice and personality across different conversation phases.
 
 ## Cloning
 
-Personas can be cloned to create variations (e.g., same voice with a different personality prompt, or same personality with a different voice).
+Agents can be cloned to create variations (e.g., same voice with a different personality prompt, or same personality with a different voice).
