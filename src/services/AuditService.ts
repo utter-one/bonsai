@@ -220,6 +220,7 @@ export class AuditService {
         action: auditLogs.action,
         entityId: auditLogs.entityId,
         entityType: auditLogs.entityType,
+        projectId: auditLogs.projectId,
         version: auditLogs.version,
         createdAt: auditLogs.createdAt,
       };
