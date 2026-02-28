@@ -1,19 +1,19 @@
-# Personas
+# Agents
 
-Personas define the AI character's voice and behavior in conversations. Each persona has a behavior prompt and TTS (text-to-speech) settings.
+Agents define the AI character's voice and behavior in conversations. Each agent has a behavior prompt and TTS (text-to-speech) settings.
 
-**Tag:** `Personas` | **Scoped to:** Project
+**Tag:** `Agents` | **Scoped to:** Project
 
-For more information, see the [Personas](../guide/personas) guide.
+For more information, see the [Agents](../guide/agents) guide.
 
-## Create Persona
+## Create Agent
 
 ```http
-POST /api/projects/:projectId/personas
+POST /api/projects/:projectId/agents
 Content-Type: application/json
 ```
 
-**Required permission:** `persona:write`
+**Required permission:** `agent:write`
 
 **Request Body**
 
@@ -21,60 +21,60 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | `id` | `string` (min 1) | No | Unique identifier (auto-generated if omitted) |
 | `name` | `string` (min 1) | Yes | Display name |
-| `description` | `string` | No | Description of persona purpose |
-| `prompt` | `string` (min 1) | Yes | Persona characteristics and behavior prompt |
+| `description` | `string` | No | Description of agent purpose |
+| `prompt` | `string` (min 1) | Yes | Agent characteristics and behavior prompt |
 | `ttsProviderId` | `string` | No | TTS provider ID |
 | `ttsSettings` | [`TtsSettings`](#tts-settings) | Yes | TTS provider-specific settings |
 | `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
-**Response** `201 Created` — [Persona Response](#persona-response)
+**Response** `201 Created` — [Agent Response](#agent-response)
 
-**Errors:** `400` Invalid body | `409` Persona already exists
+**Errors:** `400` Invalid body | `409` Agent already exists
 
-## Get Persona
-
-```http
-GET /api/projects/:projectId/personas/:id
-```
-
-**Required permission:** `persona:read`
-
-**Response** `200 OK` — [Persona Response](#persona-response)
-
-## List Personas
+## Get Agent
 
 ```http
-GET /api/projects/:projectId/personas
+GET /api/projects/:projectId/agents/:id
 ```
 
-**Required permission:** `persona:read`
+**Required permission:** `agent:read`
+
+**Response** `200 OK` — [Agent Response](#agent-response)
+
+## List Agents
+
+```http
+GET /api/projects/:projectId/agents
+```
+
+**Required permission:** `agent:read`
 
 Supports [pagination & filtering](./pagination).
 
-## Update Persona
+## Update Agent
 
 ```http
-PUT /api/projects/:projectId/personas/:id
+PUT /api/projects/:projectId/agents/:id
 Content-Type: application/json
 ```
 
-**Required permission:** `persona:write`
+**Required permission:** `agent:write`
 
 All create fields are optional plus `version` (required), **except `ttsSettings` which must always be provided**.
 
-**Response** `200 OK` — [Persona Response](#persona-response)
+**Response** `200 OK` — [Agent Response](#agent-response)
 
 **Errors:** `400` | `404` | `409`
 
-## Delete Persona
+## Delete Agent
 
 ```http
-DELETE /api/projects/:projectId/personas/:id
+DELETE /api/projects/:projectId/agents/:id
 Content-Type: application/json
 ```
 
-**Required permission:** `persona:delete`
+**Required permission:** `agent:delete`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -82,35 +82,35 @@ Content-Type: application/json
 
 **Response** `204 No Content`
 
-## Clone Persona
+## Clone Agent
 
 ```http
-POST /api/projects/:projectId/personas/:id/clone
+POST /api/projects/:projectId/agents/:id/clone
 Content-Type: application/json
 ```
 
-**Required permission:** `persona:write`
+**Required permission:** `agent:write`
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | New ID (auto-generated if omitted) |
 | `name` | `string` | No | New name (defaults to "{original name} (Clone)") |
 
-**Response** `201 Created` — [Persona Response](#persona-response)
+**Response** `201 Created` — [Agent Response](#agent-response)
 
 ## Get Audit Logs
 
 ```http
-GET /api/projects/:projectId/personas/:id/audit-logs
+GET /api/projects/:projectId/agents/:id/audit-logs
 ```
 
 **Required permission:** `audit:read`
 
-Returns audit log entries for the specified persona. See [Audit Logs](./audit-logs) for response format.
+Returns audit log entries for the specified agent. See [Audit Logs](./audit-logs) for response format.
 
 ---
 
-## Persona Response
+## Agent Response
 
 | Field | Type | Nullable | Description |
 |-------|------|----------|-------------|

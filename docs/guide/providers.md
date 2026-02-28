@@ -56,7 +56,7 @@ Each entity referencing an LLM provider can customize settings like model select
 
 ### TTS Providers
 
-Used for: voice synthesis in personas.
+Used for: voice synthesis in agents.
 
 | API Type | Description |
 |---|---|
@@ -66,7 +66,7 @@ Used for: voice synthesis in personas.
 | `deepgram` | Deepgram Aura TTS |
 | `cartesia` | Cartesia Sonic TTS |
 
-See [Personas](./personas) for TTS settings configuration per voice.
+See [Agents](./agents) for TTS settings configuration per voice.
 
 ### ASR Providers
 
@@ -110,7 +110,7 @@ This is useful for building admin UIs that dynamically render provider configura
 | Entity | Provider Types Used |
 |---|---|
 | Project | ASR (speech-to-text), Storage (artifacts) |
-| Persona | TTS (voice synthesis) |
+| Agent | TTS (voice synthesis) |
 | Stage | LLM (response generation) |
 | Classifier | LLM (intent classification) |
 | Context Transformer | LLM (data extraction) |

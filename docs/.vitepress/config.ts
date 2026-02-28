@@ -25,7 +25,7 @@ export default defineConfig({
           items: [
             { text: 'Projects', link: '/guide/projects' },
             { text: 'Stages', link: '/guide/stages' },
-            { text: 'Personas', link: '/guide/personas' },
+            { text: 'Agents', link: '/guide/agents' },
             { text: 'Classifiers', link: '/guide/classifiers' },
             { text: 'Context Transformers', link: '/guide/context-transformers' },
             { text: 'Tools', link: '/guide/tools' },
@@ -73,7 +73,7 @@ export default defineConfig({
           items: [
             { text: 'Projects', link: '/api/projects' },
             { text: 'Stages', link: '/api/stages' },
-            { text: 'Personas', link: '/api/personas' },
+            { text: 'Agents', link: '/api/agents' },
             { text: 'Classifiers', link: '/api/classifiers' },
             { text: 'Context Transformers', link: '/api/context-transformers' },
             { text: 'Tools', link: '/api/tools' },

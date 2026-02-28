@@ -11,7 +11,7 @@ In addition, most entity types expose audit logs at their own path:
 ```
 GET /api/admins/:id/audit-logs
 GET /api/projects/:projectId/stages/:id/audit-logs
-GET /api/projects/:projectId/personas/:id/audit-logs
+GET /api/projects/:projectId/agents/:id/audit-logs
 GET /api/projects/:projectId/classifiers/:id/audit-logs
 GET /api/projects/:projectId/context-transformers/:id/audit-logs
 GET /api/projects/:projectId/tools/:id/audit-logs
@@ -37,7 +37,7 @@ Supports [pagination & filtering](./pagination).
 
 | Filter | Description |
 |--------|-------------|
-| `entityType` | Filter by entity type (e.g., `admin`, `persona`, `stage`) |
+| `entityType` | Filter by entity type (e.g., `admin`, `agent`, `stage`) |
 | `action` | Filter by action: `CREATE`, `UPDATE`, `DELETE` |
 | `userId` | Filter by admin who performed the action |
 | `entityId` | Filter by the affected entity's ID |
@@ -52,8 +52,8 @@ Supports [pagination & filtering](./pagination).
       "id": "audit-123",
       "userId": "admin@example.com",
       "action": "UPDATE",
-      "entityId": "persona-1",
-      "entityType": "persona",
+      "entityId": "agent-1",
+      "entityType": "agent",
       "oldEntity": { "name": "Old Name" },
       "newEntity": { "name": "New Name" },
       "version": 1,
@@ -74,7 +74,7 @@ Supports [pagination & filtering](./pagination).
 | `userId` | `string` | Yes | Admin who performed the action |
 | `action` | `string` | No | `CREATE`, `UPDATE`, or `DELETE` |
 | `entityId` | `string` | No | ID of the affected entity |
-| `entityType` | `string` | No | Type of entity (e.g., `admin`, `persona`, `stage`) |
+| `entityType` | `string` | No | Type of entity (e.g., `admin`, `agent`, `stage`) |
 | `oldEntity` | `object` | Yes | Entity state before the change (`null` for CREATE) |
 | `newEntity` | `object` | Yes | Entity state after the change (`null` for DELETE) |
 | `version` | `integer` | No | Audit log version |

@@ -20,7 +20,7 @@ GET /api/migration/preview
 |-----------|------|-------------|
 | `projectIds` | `string \| string[]` | Specific project IDs |
 | `stageIds` | `string \| string[]` | Specific stage IDs |
-| `personaIds` | `string \| string[]` | Specific persona IDs |
+| `agentIds` | `string \| string[]` | Specific agent IDs |
 | `classifierIds` | `string \| string[]` | Specific classifier IDs |
 | `contextTransformerIds` | `string \| string[]` | Specific context transformer IDs |
 | `toolIds` | `string \| string[]` | Specific tool IDs |
@@ -36,7 +36,7 @@ GET /api/migration/preview
   "totalCount": 42,
   "providers": [{ "id": "provider-1", "name": "OpenAI Main" }],
   "projects": [{ "id": "project-1", "name": "My Project" }],
-  "personas": [{ "id": "persona-1", "name": "Assistant", "projectId": "project-1" }],
+  "agents": [{ "id": "agent-1", "name": "Assistant", "projectId": "project-1" }],
   "classifiers": [...],
   "contextTransformers": [...],
   "tools": [...],
@@ -77,7 +77,7 @@ Accepts the same query parameters as the preview endpoint.
   "selection": {},
   "providers": [...],
   "projects": [...],
-  "personas": [...],
+  "agents": [...],
   "classifiers": [...],
   "contextTransformers": [...],
   "tools": [...],
@@ -97,7 +97,7 @@ Accepts the same query parameters as the preview endpoint.
 | `selection` | `object` | Selection criteria used |
 | `providers` | `array` | Provider records (config/credentials stripped) |
 | `projects` | `array` | Full project records |
-| `personas` | `array` | Full persona records |
+| `agents` | `array` | Full agent records |
 | `classifiers` | `array` | Full classifier records |
 | `contextTransformers` | `array` | Full context transformer records |
 | `tools` | `array` | Full tool records |

@@ -15,10 +15,10 @@ hero:
 
 features:
   - title: Conversation Design
-    details: Build multi-stage conversational flows with personas, classifiers, context transformers, knowledge bases, and fully customisable actions.
+    details: Build multi-stage conversational flows with agents, classifiers, context transformers, knowledge bases, and fully customisable actions.
     link: /guide/concepts
   - title: REST API
-    details: Full-featured HTTP API for managing projects, personas, stages, classifiers, tools, knowledge, providers, users, and more.
+    details: Full-featured HTTP API for managing projects, agents, stages, classifiers, tools, knowledge, providers, users, and more.
     link: /api/
   - title: Real-Time WebSocket
     details: Bidirectional streaming protocol for live AI sessions with incremental audio and text, stage transitions, and client commands.

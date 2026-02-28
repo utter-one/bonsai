@@ -20,10 +20,10 @@ export const PERMISSIONS = {
   PROJECT_WRITE: 'project:write',
   PROJECT_DELETE: 'project:delete',
 
-  // Persona permissions
-  PERSONA_READ: 'persona:read',
-  PERSONA_WRITE: 'persona:write',
-  PERSONA_DELETE: 'persona:delete',
+  // Agent permissions
+  AGENT_READ: 'agent:read',
+  AGENT_WRITE: 'agent:write',
+  AGENT_DELETE: 'agent:delete',
 
   // Conversation permissions
   CONVERSATION_READ: 'conversation:read',
@@ -101,14 +101,14 @@ export const ROLES = {
   },
   content_manager: {
     name: 'Content Manager',
-    description: 'Manage content entities (personas, conversations, users, knowledge)',
+    description: 'Manage content entities (agents, conversations, users, knowledge)',
     permissions: [
       PERMISSIONS.USER_READ,
       PERMISSIONS.USER_WRITE,
       PERMISSIONS.PROJECT_READ,
       PERMISSIONS.PROJECT_WRITE,
-      PERMISSIONS.PERSONA_READ,
-      PERMISSIONS.PERSONA_WRITE,
+      PERMISSIONS.AGENT_READ,
+      PERMISSIONS.AGENT_WRITE,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.CONVERSATION_WRITE,
       PERMISSIONS.STAGE_READ,
@@ -150,7 +150,7 @@ export const ROLES = {
     permissions: [
       PERMISSIONS.USER_READ,
       PERMISSIONS.PROJECT_READ,
-      PERMISSIONS.PERSONA_READ,
+      PERMISSIONS.AGENT_READ,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.STAGE_READ,
       PERMISSIONS.CLASSIFIER_READ,
@@ -171,7 +171,7 @@ export const ROLES = {
     permissions: [
       PERMISSIONS.USER_READ,
       PERMISSIONS.PROJECT_READ,
-      PERMISSIONS.PERSONA_READ,
+      PERMISSIONS.AGENT_READ,
       PERMISSIONS.CONVERSATION_READ,
       PERMISSIONS.STAGE_READ,
       PERMISSIONS.CLASSIFIER_READ,

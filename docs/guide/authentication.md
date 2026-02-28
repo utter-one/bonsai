@@ -52,7 +52,7 @@ Admins are assigned one or more roles. Each role carries a set of permissions in
 | Role | Description |
 |---|---|
 | `super_admin` | Full system access — all permissions |
-| `content_manager` | Manage content entities: projects, personas, stages, classifiers, transformers, tools, knowledge, providers, API keys |
+| `content_manager` | Manage content entities: projects, agents, stages, classifiers, transformers, tools, knowledge, providers, API keys |
 | `support` | View projects and conversations, manage users and issues |
 | `developer` | Read-only access to most entities plus system configuration |
 | `viewer` | Read-only access to most entities |
@@ -66,7 +66,7 @@ Permissions follow the `entity:action` pattern:
 | Admin | `admin:read` | `admin:write` | `admin:delete` |
 | User | `user:read` | `user:write` | `user:delete` |
 | Project | `project:read` | `project:write` | `project:delete` |
-| Persona | `persona:read` | `persona:write` | `persona:delete` |
+| Agent | `agent:read` | `agent:write` | `agent:delete` |
 | Stage | `stage:read` | `stage:write` | `stage:delete` |
 | Classifier | `classifier:read` | `classifier:write` | `classifier:delete` |
 | Context Transformer | `context_transformer:read` | `context_transformer:write` | `context_transformer:delete` |

@@ -1,6 +1,6 @@
 # Prompt Templating
 
-Bonsai Backed uses **Handlebars** as its templating engine for all prompts — stage system prompts, persona prompts, tool prompts, and various effect templates. This allows dynamic content injection based on conversation state.
+Bonsai Backed uses **Handlebars** as its templating engine for all prompts — stage system prompts, agent prompts, tool prompts, and various effect templates. This allows dynamic content injection based on conversation state.
 
 ## Available Variables
 

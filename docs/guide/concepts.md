@@ -19,7 +19,7 @@ Everything in Bonsai Backed revolves around **Projects**. A project is a self-co
 ```
 Project
 ├── Stages (conversation phases)
-│   ├── → Persona (AI personality + voice)
+│   ├── → Agent (AI personality + voice)
 │   ├── → LLM Provider (for response generation)
 │   ├── → Default Classifier (intent detection)
 │   ├── → Context Transformers[] (data extraction)
@@ -28,7 +28,7 @@ Project
 │   ├── Variable Descriptors (stage data schema)
 │   └── Actions (triggered behaviors with effects)
 │
-├── Personas (AI personality definitions)
+├── Agents (AI personality definitions)
 │   ├── Prompt (system behavior)
 │   └── TTS Settings (voice configuration)
 │
@@ -98,7 +98,7 @@ Each step streams results incrementally to the client via WebSocket, providing l
 Stages represent distinct phases in a conversation. A customer service bot might have stages like "greeting", "identify_issue", "troubleshooting", and "resolution". Each stage has its own:
 
 - System prompt (Handlebars template)
-- Persona (AI personality and voice)
+- Agent (AI personality and voice)
 - Available actions and their effects
 - Variable schema for structured data
 - Classifier for intent detection
@@ -126,7 +126,7 @@ All mutable entities use a `version` field for optimistic concurrency control. U
 
 Bonsai Backed exposes two APIs:
 
-1. **REST API** — For administration: create and manage projects, stages, personas, providers, and all other entities. Protected by JWT authentication with role-based permissions.
+1. **REST API** — For administration: create and manage projects, stages, agents, providers, and all other entities. Protected by JWT authentication with role-based permissions.
 
 2. **WebSocket API** — For end-user conversations: real-time bidirectional communication for voice and text sessions. Protected by project-scoped API keys.
 

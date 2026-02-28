@@ -1,6 +1,6 @@
 # Stages
 
-Stages define the conversational flow within a project. Each stage has its own prompt, LLM settings, actions, and associated persona.
+Stages define the conversational flow within a project. Each stage has its own prompt, LLM settings, actions, and associated agent.
 
 **Tag:** `Stages` | **Scoped to:** Project
 
@@ -25,7 +25,7 @@ Content-Type: application/json
 | `prompt` | `string` (min 1) | Yes | System prompt defining stage behavior |
 | `llmProviderId` | `string` | No | LLM provider ID |
 | `llmSettings` | [`LlmSettings`](#llm-settings) | Yes | LLM provider-specific settings |
-| `personaId` | `string` (min 1) | Yes | Associated persona ID |
+| `agentId` | `string` (min 1) | Yes | Associated agent ID |
 | `enterBehavior` | `string` | No | `"generate_response"` (default) or `"await_user_input"` |
 | `useKnowledge` | `boolean` | No (default: `false`) | Enable knowledge base for this stage |
 | `knowledgeTags` | `string[]` | No | Knowledge tags to include |
@@ -135,7 +135,7 @@ Returns audit log entries for the specified stage. See [Audit Logs](./audit-logs
 | `prompt` | `string` | No | System prompt |
 | `llmProviderId` | `string` | Yes | LLM provider ID |
 | `llmSettings` | `LlmSettings` | No | LLM settings |
-| `personaId` | `string` | No | Associated persona ID |
+| `agentId` | `string` | No | Associated agent ID |
 | `enterBehavior` | `string` | No | `"generate_response"` or `"await_user_input"` |
 | `useKnowledge` | `boolean` | No | Knowledge base enabled |
 | `knowledgeTags` | `string[]` | No | Knowledge tags |

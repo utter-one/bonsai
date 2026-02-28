@@ -1,6 +1,6 @@
 # Stages
 
-A **Stage** represents a distinct phase in a conversation. Stages are the central orchestration entity — they tie together personas, classifiers, transformers, actions, knowledge, and providers into a coherent conversational experience.
+A **Stage** represents a distinct phase in a conversation. Stages are the central orchestration entity — they tie together agents, classifiers, transformers, actions, knowledge, and providers into a coherent conversational experience.
 
 ## Structure
 
@@ -11,7 +11,7 @@ A **Stage** represents a distinct phase in a conversation. Stages are the centra
 | `name` | Display name |
 | `description` | Optional description |
 | `prompt` | System prompt (Handlebars template) |
-| `personaId` | Referenced persona for AI personality and voice |
+| `agentId` | Referenced agent for AI personality and voice |
 | `llmProviderId` | LLM provider for response generation |
 | `llmSettings` | LLM-specific settings (model, temperature, etc.) |
 | `enterBehavior` | What happens when entering this stage |
@@ -86,7 +86,7 @@ Variables are persisted in the conversation's `stageVars` and are available in H
 
 A stage references several other entities:
 
-- **Persona** (`personaId`) — Defines the AI's personality prompt and TTS voice settings. See [Personas](./personas).
+- **Agent** (`agentId`) — Defines the AI's personality prompt and TTS voice settings. See [Agents](./agents).
 - **LLM Provider** (`llmProviderId` / `llmSettings`) — The model used for generating responses. See [Providers](./providers).
 - **Classifier** (`defaultClassifierId`) — Classifies user input into action triggers. See [Classifiers](./classifiers).
 - **Context Transformers** (`transformerIds`) — Extract structured data from each turn. See [Context Transformers](./context-transformers).
