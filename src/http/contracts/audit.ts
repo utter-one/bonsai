@@ -17,6 +17,7 @@ export const auditLogResponseSchema = z.object({
   action: z.string().describe('Action performed (CREATE, UPDATE, DELETE)'),
   entityId: z.string().describe('ID of the entity that was modified'),
   entityType: z.string().describe('Type of the entity (e.g., "admin", "agent", "classifier")'),
+  projectId: z.string().nullable().describe('ID of the project associated with the entity'),
   oldEntity: z.record(z.string(), z.unknown()).nullable().describe('Entity state before the change'),
   newEntity: z.record(z.string(), z.unknown()).nullable().describe('Entity state after the change'),
   version: z.number().int().describe('Version number for the audit log'),
