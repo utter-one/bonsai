@@ -77,6 +77,8 @@ export class ConversationRunner {
   private ws: WebSocket;
   /** True when a filler sentence has already opened the response turn (outputTurnId assigned, start_ai_generation_output sent, TTS started) */
   private responseOutputTurnStarted: boolean = false;
+  /** Filler sentence generated for the current turn, passed as assistant prefix to the LLM so it continues naturally */
+  private lastFillerSentence: string | null = null;
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -1130,6 +1132,7 @@ export class ConversationRunner {
 
     // Start filler sentence immediately — opens the response turn early by sending
     // start_ai_generation_output and feeding the sentence into TTS before classification begins.
+    this.lastFillerSentence = null;
     const fillerSentence = await this.generateFillerSentence(userInput);
     if (fillerSentence) {
       this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
@@ -1161,6 +1164,7 @@ export class ConversationRunner {
         this.ws.send(JSON.stringify(chunkMessage));
       }
       this.responseOutputTurnStarted = true;
+      this.lastFillerSentence = fillerSentence;
     }
 
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
@@ -1298,8 +1302,9 @@ export class ConversationRunner {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
         this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
-        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
+        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
       }
+      this.lastFillerSentence = null;
     } else if (executionOutcome.shouldEndConversation) {
       // Close the filler turn if it was opened but no response follows
       if (this.responseOutputTurnStarted) {

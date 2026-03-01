@@ -16,13 +16,18 @@ export class ResponseGenerator {
    * @param stage - The current stage of the conversation
    * @param renderedPrompt - The rendered system prompt
    * @param completionLlmProvider - The LLM provider to use for generating the response
+   * @param assistantPrefix - Optional filler sentence already spoken; passed as an assistant prefill so the LLM continues naturally from it
    */
-  async generateResponse(context: ConversationContext, stage: Stage, renderedPrompt: string, completionLlmProvider: ILlmProvider) {
+  async generateResponse(context: ConversationContext, stage: Stage, renderedPrompt: string, completionLlmProvider: ILlmProvider, assistantPrefix?: string) {
     const history = context.history.map(msg => { return { role: msg.role, content: msg.content } as LlmMessage; });
-    await completionLlmProvider.generateStream([
-      { role: 'system', content: renderedPrompt }, 
-      ...history, 
-      { role: 'user', content: context.userInput ?? '---' }
-    ], {});
+    const messages: LlmMessage[] = [
+      { role: 'system', content: renderedPrompt },
+      ...history,
+      { role: 'user', content: context.userInput ?? '---' },
+    ];
+    if (assistantPrefix) {
+      messages.push({ role: 'assistant', content: assistantPrefix });
+    }
+    await completionLlmProvider.generateStream(messages, {});
   }
 }
