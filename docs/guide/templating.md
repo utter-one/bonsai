@@ -10,7 +10,7 @@ Templates have access to these data contexts:
 |---|---|
 | `vars` | Current stage variables |
 | `userProfile` | End user's profile data |
-| `constants` | Project-level constants |
+| `consts` | Project-level constants |
 | `userInput` | Current user input text |
 | `history` | Conversation message history (auto-injected) |
 | `context.results` | Results from tool calls, webhooks, and actions |
@@ -21,7 +21,7 @@ Templates have access to these data contexts:
 ### Variable Interpolation
 
 ```handlebars
-Hello {{userProfile.name}}, welcome to {{constants.companyName}}.
+Hello {{userProfile.name}}, welcome to {{consts.companyName}}.
 ```
 
 ### Nested Properties
@@ -105,7 +105,7 @@ Templates are compiled and cached for performance (up to 1,000 templates). Cachi
 ### Stage System Prompt
 
 ```handlebars
-You are a {{constants.agentRole}} for {{constants.companyName}}.
+You are a {{consts.agentRole}} for {{consts.companyName}}.
 
 {{#exists vars.customerName}}
 You are speaking with {{vars.customerName}}.

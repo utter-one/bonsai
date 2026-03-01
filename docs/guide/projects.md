@@ -50,7 +50,7 @@ The optional `storageConfig` allows persisting conversation artifacts (audio rec
 
 ## Constants
 
-Project-level constants are available in all Handlebars prompts via <code v-pre>{{constants.key}}</code>. This is useful for values shared across stages, like company name, product info, or configuration values:
+Project-level constants are available in all Handlebars prompts and scripts via <code v-pre>{{consts.key}}</code>. This is useful for values shared across stages, like company name, product info, or configuration values:
 
 ```json
 {

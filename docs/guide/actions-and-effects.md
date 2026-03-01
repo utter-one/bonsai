@@ -186,7 +186,7 @@ Makes an HTTP request to an external service:
   "type": "call_webhook",
   "method": "POST",
   "url": "https://api.example.com/orders/{{vars.orderId}}",
-  "headers": { "Authorization": "Bearer {{constants.apiToken}}" },
+  "headers": { "Authorization": "Bearer {{consts.apiToken}}" },
   "body": { "action": "check_status" },
   "resultKey": "orderStatus"
 }

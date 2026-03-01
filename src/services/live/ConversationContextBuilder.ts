@@ -98,6 +98,9 @@ export type ConversationContext = {
   /** User profile data */
   userProfile: Record<string, any>;
 
+  /** Project-level constants available in all prompts via {{consts.key}} */
+  consts: Record<string, any>;
+
   /** Agent prompt that defines AI personality and behavior */
   agent?: string;
 
@@ -453,6 +456,12 @@ export class ConversationContextBuilder {
       with: { agent: true },
     });
 
+    // Load project constants
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, conversation.projectId),
+      columns: { constants: true },
+    });
+
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
@@ -460,6 +469,7 @@ export class ConversationContextBuilder {
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
+      consts: project?.constants || {},
       agent: stage?.agent?.prompt,
       history: [],
       events: [],
@@ -471,7 +481,7 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
-      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage!, user?.profile || {})),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage!, user?.profile || {}, project?.constants || {})),
     };
 
     // Get all events from database; history is a filtered view on message events
@@ -513,6 +523,11 @@ export class ConversationContextBuilder {
       where: eq(users.id, conversation.userId),
     });
 
+    // Load project constants
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, conversation.projectId),
+      columns: { constants: true },
+    });
 
     const context: ConversationContext = {
       conversationId: conversation.id,
@@ -520,6 +535,7 @@ export class ConversationContextBuilder {
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
+      consts: project?.constants || {},
       agent: stage?.agent?.prompt,
       history: [],
       events: [],
@@ -529,7 +545,7 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
-      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!, user?.profile || {})),
+      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!, user?.profile || {}, project?.constants || {})),
     };
 
     return context;
@@ -552,8 +568,14 @@ export class ConversationContextBuilder {
       where: eq(users.id, conversation.userId),
     });
 
+    // Load project constants
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, conversation.projectId),
+      columns: { constants: true },
+    });
+
     // Build raw context for condition evaluation
-    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {});
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {});
     rawContext.userInput = userInput;
     rawContext.originalUserInput = originalUserInput;
 
@@ -563,6 +585,7 @@ export class ConversationContextBuilder {
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
+      consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
       history: [],
       events: [],
@@ -617,7 +640,13 @@ export class ConversationContextBuilder {
       where: eq(users.id, conversation.userId),
     });
 
-    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {});
+    // Load project constants
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, conversation.projectId),
+      columns: { constants: true },
+    });
+
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {});
     rawContext.userInput = userInput;
     rawContext.originalUserInput = originalUserInput;
 
@@ -644,6 +673,7 @@ export class ConversationContextBuilder {
       vars: stageVars,
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
+      consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
       history: [],
       events: [],
@@ -699,12 +729,19 @@ export class ConversationContextBuilder {
       where: eq(users.id, conversation.userId),
     });
 
+    // Load project constants
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, conversation.projectId),
+      columns: { constants: true },
+    });
+
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
+      consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
       history: [],
       events: [],
@@ -720,7 +757,7 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
-      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {})),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {})),
     };
 
     // Get all events from database; history is a filtered view on message events
@@ -753,13 +790,14 @@ export class ConversationContextBuilder {
    * @param stage - Stage entity
    * @returns ConversationContext with only raw data and no filtering for actions or stage context.
    */
-  public buildRawContext(conversation: Conversation, stage: Stage, userProfile: Record<string, any>): ConversationContext {
+  public buildRawContext(conversation: Conversation, stage: Stage, userProfile: Record<string, any>, consts: Record<string, any> = {}): ConversationContext {
     return {
       conversationId: conversation.id,
       projectId: conversation.projectId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: userProfile || {}, // Not loaded in raw context
+      consts,
       history: [], // Not loaded in raw context
       events: [], // Not loaded in raw context
       actions: {}, // Not loaded in raw context

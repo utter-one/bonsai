@@ -31,6 +31,7 @@ Scripts have access to these global variables:
 | `results` | Read-only | Results from tools and webhooks |
 | `time` | Read-only | Rich time context: `iso`, `date`, `time`, `dayOfWeek`, `timezone`, `calendar`, `anchor`, etc. |
 | `userInputSource` | Read-only | Input channel: `'text'` \| `'voice'` \| `null` |
+| `consts` | Read-only | Project-level constants (from project settings) |
 | `stageVars` | Read-only | Variables for all stages, keyed by stage ID |
 | `events` | Read-only | All conversation events in chronological order (messages, actions, stage transitions, etc.) |
 | `console` | — | `console.log()`, `console.error()`, `console.warn()` |
@@ -100,6 +101,9 @@ vars.isBusinessHours = isBusinessHours;
 
 // Cross-stage variable access
 const prevStepData = stageVars?.['stage-id-here']?.someField;
+
+// Project-level constants
+const companyName = consts.companyName;
 ```
 
 ## Utility Functions
