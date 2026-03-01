@@ -58,6 +58,8 @@ export type StageRuntimeData = {
   shouldEndConversation: boolean;
   /** Loaded agent, includes fillerSettings and TTS configuration */
   agent: AgentResponse;
+  /** LLM provider used to generate filler sentences, preloaded from agent.fillerSettings */
+  fillerLlmProvider?: ILlmProvider;
   inputTurnId?: string;
   outputTurnId?: string;
   /** FAQ items gathered from knowledge base, persisted between turns until new knowledge actions are detected */
@@ -73,8 +75,6 @@ export class ConversationRunner {
   private session: Connection;
   private conversation: Conversation;
   private ws: WebSocket;
-  /** Sequential index for round-robin filler sentence selection, advances each turn */
-  private fillerSequentialIndex: number = 0;
   /** True when a filler sentence has already opened the response turn (outputTurnId assigned, start_ai_generation_output sent, TTS started) */
   private responseOutputTurnStarted: boolean = false;
 
@@ -225,6 +225,17 @@ export class ConversationRunner {
       throw new NotFoundError(`Agent with ID ${stageData.stage.agentId} not found`);
     }
     stageData.agent = agent;
+
+    // Preload LLM provider for filler sentence generation if configured
+    if (agent.fillerSettings?.llmProviderId) {
+      const fillerLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.fillerSettings.llmProviderId) });
+      if (fillerLlmProviderEntity) {
+        stageData.fillerLlmProvider = this.llmProviderFactory.createProvider(fillerLlmProviderEntity, agent.fillerSettings.llmSettings);
+      } else {
+        logger.warn({ agentId: agent.id, llmProviderId: agent.fillerSettings.llmProviderId }, 'Filler LLM provider not found, filler responses will be skipped');
+      }
+    }
+
     const ttsSettings = agent.ttsSettings;
     if (project.generateVoice && agent.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
       const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.ttsProviderId) });
@@ -1119,8 +1130,8 @@ export class ConversationRunner {
 
     // Start filler sentence immediately — opens the response turn early by sending
     // start_ai_generation_output and feeding the sentence into TTS before classification begins.
-    const fillerSentence = this.pickFillerSentence();
-    if (fillerSentence && this.stageData.ttsProvider) {
+    const fillerSentence = await this.generateFillerSentence(userInput);
+    if (fillerSentence) {
       this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
       const fillerStartMessage = {
         type: 'start_ai_generation_output',
@@ -1128,11 +1139,13 @@ export class ConversationRunner {
         outputTurnId: this.stageData.outputTurnId,
         sessionId: this.session.id,
         requestId: null,
-        expectVoice: true,
+        expectVoice: !!this.stageData.ttsProvider,
       } as StartAiGenerationOutputMessage;
       this.ws.send(JSON.stringify(fillerStartMessage));
-      await this.stageData.ttsProvider.start();
-      await this.stageData.ttsProvider.sendText(fillerSentence);
+      if (this.stageData.ttsProvider) {
+        await this.stageData.ttsProvider.start();
+        await this.stageData.ttsProvider.sendText(fillerSentence);
+      }
       if (this.session.sessionSettings.receiveTranscriptionUpdates) {
         const chunkMessage = {
           type: 'ai_transcribed_chunk',
@@ -1331,22 +1344,25 @@ export class ConversationRunner {
   }
 
   /**
-   * Picks a filler sentence from the agent's fillerSettings based on the configured strategy.
-   * Advances fillerSequentialIndex for sequential selection.
-   * @returns A filler sentence string, or null if filler is disabled or not configured.
+   * Calls the filler LLM provider to generate a short neutral sentence for the current turn.
+   * @returns A generated filler sentence, or null if filler is not configured or generation fails.
    */
-  private pickFillerSentence(): string | null {
-    const settings = this.stageData.agent?.fillerSettings;
-    if (!settings || settings.strategy === 'disabled' || !settings.sentences || settings.sentences.length === 0) {
+  private async generateFillerSentence(userInput: string): Promise<string | null> {
+    const fillerLlmProvider = this.stageData.fillerLlmProvider;
+    const fillerSettings = this.stageData.agent?.fillerSettings;
+    if (!fillerLlmProvider || !fillerSettings) {
       return null;
     }
-    if (settings.strategy === 'sequential') {
-      const sentence = settings.sentences[this.fillerSequentialIndex % settings.sentences.length];
-      this.fillerSequentialIndex++;
-      return sentence;
+    try {
+      const result = await fillerLlmProvider.generate([
+        { role: 'system', content: fillerSettings.prompt },
+        { role: 'user', content: userInput }]);
+      const text = extractTextFromContent(result.content).trim();
+      return text.length > 0 ? text : null;
+    } catch (error) {
+      logger.warn({ conversationId: this.conversation.id, message: error?.message }, 'Failed to generate filler sentence, skipping');
+      return null;
     }
-    // random (default)
-    return settings.sentences[Math.floor(Math.random() * settings.sentences.length)];
   }
 
   /**

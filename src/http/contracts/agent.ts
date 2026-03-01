@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema, ttsSettingsSchema } from './common';
+import { listParamsSchema, ttsSettingsSchema, llmSettingsSchema } from './common';
 import { audioFormatValues } from '../../types/audio';
 import type { ListParams } from './common';
 
@@ -13,12 +13,18 @@ export { listParamsSchema, type ListParams };
  * When configured, a randomly or sequentially picked sentence is fed into the TTS pipeline
  * at the very start of the response turn, while classification is still running in parallel.
  */
+/**
+ * Schema for agent filler response settings.
+ * When configured, an LLM generates a short neutral sentence that is fed into the TTS pipeline
+ * at the very start of the response turn, while classification runs in parallel.
+ */
 export const fillerSettingsSchema = z.object({
-  strategy: z.enum(['disabled', 'random', 'sequential']).describe('How to pick a filler sentence: disabled turns the feature off, random picks one at random each turn, sequential cycles through the list in order'),
-  sentences: z.array(z.string().min(1)).describe('List of short filler sentences to choose from (e.g. "Hmm...", "Let me think.")'),
+  llmProviderId: z.string().describe('ID of the LLM provider used to generate the filler sentence'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for filler generation'),
+  prompt: z.string().min(1).describe('Prompt instructing the LLM to produce a short neutral filler sentence (e.g. "Generate a single short neutral sentence to fill silence while processing, like \"Hmm, let me think about that.\"")'),
 }).openapi('FillerSettings');
 
-/** Settings controlling filler sentence playback at the start of each response turn */
+/** Settings controlling LLM-generated filler sentence playback at the start of each response turn */
 export type FillerSettings = z.infer<typeof fillerSettingsSchema>;
 
 // Route param schema
