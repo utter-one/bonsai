@@ -30,6 +30,7 @@ import { TemplatingEngine } from "./TemplatingEngine";
 import { extractTextFromContent, getContentSize } from "../../utils/llm";
 import { KnowledgeService } from "../KnowledgeService";
 import type { FaqItem } from "./ConversationContextBuilder";
+import type { AgentResponse } from "../../http/contracts/agent";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -55,6 +56,8 @@ export type StageRuntimeData = {
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   shouldEndConversation: boolean;
+  /** Loaded agent, includes fillerSettings and TTS configuration */
+  agent: AgentResponse;
   inputTurnId?: string;
   outputTurnId?: string;
   /** FAQ items gathered from knowledge base, persisted between turns until new knowledge actions are detected */
@@ -70,6 +73,10 @@ export class ConversationRunner {
   private session: Connection;
   private conversation: Conversation;
   private ws: WebSocket;
+  /** Sequential index for round-robin filler sentence selection, advances each turn */
+  private fillerSequentialIndex: number = 0;
+  /** True when a filler sentence has already opened the response turn (outputTurnId assigned, start_ai_generation_output sent, TTS started) */
+  private responseOutputTurnStarted: boolean = false;
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -132,6 +139,7 @@ export class ConversationRunner {
       asrProvider: undefined,
       ttsProvider: undefined,
       shouldEndConversation: false,
+      agent: null as any, // populated below after agentService.getAgentById
       faq: [],
     };
 
@@ -216,6 +224,7 @@ export class ConversationRunner {
     if (!agent) {
       throw new NotFoundError(`Agent with ID ${stageData.stage.agentId} not found`);
     }
+    stageData.agent = agent;
     const ttsSettings = agent.ttsSettings;
     if (project.generateVoice && agent.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
       const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.ttsProviderId) });
@@ -1107,6 +1116,40 @@ export class ConversationRunner {
    */
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
     await this.changeState('processing_user_input');
+
+    // Start filler sentence immediately — opens the response turn early by sending
+    // start_ai_generation_output and feeding the sentence into TTS before classification begins.
+    const fillerSentence = this.pickFillerSentence();
+    if (fillerSentence && this.stageData.ttsProvider) {
+      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
+      const fillerStartMessage = {
+        type: 'start_ai_generation_output',
+        conversationId: this.conversation.id,
+        outputTurnId: this.stageData.outputTurnId,
+        sessionId: this.session.id,
+        requestId: null,
+        expectVoice: true,
+      } as StartAiGenerationOutputMessage;
+      this.ws.send(JSON.stringify(fillerStartMessage));
+      await this.stageData.ttsProvider.start();
+      await this.stageData.ttsProvider.sendText(fillerSentence);
+      if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+        const chunkMessage = {
+          type: 'ai_transcribed_chunk',
+          conversationId: this.conversation.id,
+          outputTurnId: this.stageData.outputTurnId,
+          chunkId: generateId(ID_PREFIXES.CHUNK),
+          chunkText: fillerSentence,
+          ordinal: 0,
+          isFinal: true,
+          sessionId: this.session.id,
+          requestId: null,
+        } as AiTranscribedChunkMessage;
+        this.ws.send(JSON.stringify(chunkMessage));
+      }
+      this.responseOutputTurnStarted = true;
+    }
+
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
 
     // Detect and handle knowledge actions - these are synthetic actions from the knowledge base
@@ -1216,22 +1259,28 @@ export class ConversationRunner {
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
     if (shouldGenerateResponse) {
-      // Send AI response start notification to client through WebSocket
-      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
-      const message = {
-        type: 'start_ai_generation_output',
-        conversationId: this.conversation.id,
-        outputTurnId: this.stageData.outputTurnId,
-        sessionId: this.session.id,
-        requestId: null,
-        expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null
-      } as StartAiGenerationOutputMessage;
-      this.ws.send(JSON.stringify(message));
+      if (this.responseOutputTurnStarted) {
+        // Filler already opened the turn: outputTurnId, start_ai_generation_output and TTS start
+        // were handled in processUserInput — skip all of that here.
+        this.responseOutputTurnStarted = false;
+      } else {
+        // Normal path: open the turn now.
+        this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
+        const message = {
+          type: 'start_ai_generation_output',
+          conversationId: this.conversation.id,
+          outputTurnId: this.stageData.outputTurnId,
+          sessionId: this.session.id,
+          requestId: null,
+          expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null
+        } as StartAiGenerationOutputMessage;
+        this.ws.send(JSON.stringify(message));
 
-      await this.changeState('generating_response');
-      if (this.stageData.ttsProvider) {
-        await this.stageData.ttsProvider.start();
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.start();
+        }
       }
+      await this.changeState('generating_response');
       if (executionOutcome.prescriptedResponse !== undefined) {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
@@ -1239,6 +1288,13 @@ export class ConversationRunner {
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
       }
     } else if (executionOutcome.shouldEndConversation) {
+      // Close the filler turn if it was opened but no response follows
+      if (this.responseOutputTurnStarted) {
+        this.responseOutputTurnStarted = false;
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.end();
+        }
+      }
       // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
@@ -1247,6 +1303,13 @@ export class ConversationRunner {
       await this.saveAndSendEvent('conversation_end', eventData);
       await this.changeState('finished');
     } else if (executionOutcome.shouldAbortConversation) {
+      // Close the filler turn if it was opened but no response follows
+      if (this.responseOutputTurnStarted) {
+        this.responseOutputTurnStarted = false;
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.end();
+        }
+      }
       // Abort conversation without generating response
       const eventData: ConversationAbortedEventData = {
         stageId: this.stageData.id,
@@ -1255,9 +1318,35 @@ export class ConversationRunner {
       await this.saveAndSendEvent('conversation_aborted', eventData);
       await this.changeState('finished');
     } else {
+      // Close the filler turn if it was opened but no response follows
+      if (this.responseOutputTurnStarted) {
+        this.responseOutputTurnStarted = false;
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.end();
+        }
+      }
       // If no response generation, go back to awaiting user input
       await this.changeState('awaiting_user_input');
     }
+  }
+
+  /**
+   * Picks a filler sentence from the agent's fillerSettings based on the configured strategy.
+   * Advances fillerSequentialIndex for sequential selection.
+   * @returns A filler sentence string, or null if filler is disabled or not configured.
+   */
+  private pickFillerSentence(): string | null {
+    const settings = this.stageData.agent?.fillerSettings;
+    if (!settings || settings.strategy === 'disabled' || !settings.sentences || settings.sentences.length === 0) {
+      return null;
+    }
+    if (settings.strategy === 'sequential') {
+      const sentence = settings.sentences[this.fillerSequentialIndex % settings.sentences.length];
+      this.fillerSequentialIndex++;
+      return sentence;
+    }
+    // random (default)
+    return settings.sentences[Math.floor(Math.random() * settings.sentences.length)];
   }
 
   /**

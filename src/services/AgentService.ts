@@ -35,7 +35,7 @@ export class AgentService extends BaseService {
     logger.info({ agentId, projectId, name: input.name, adminId: context?.adminId }, 'Creating agent');
 
     try {
-      const agent = await db.insert(agents).values({ id: agentId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, tags: input.tags ?? [], metadata: input.metadata, version: 1 }).returning();
+      const agent = await db.insert(agents).values({ id: agentId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, tags: input.tags ?? [], metadata: input.metadata, fillerSettings: input.fillerSettings, version: 1 }).returning();
 
       const createdAgent = agent[0];
 
@@ -171,7 +171,7 @@ export class AgentService extends BaseService {
         throw new OptimisticLockError(`Agent version mismatch. Expected ${expectedVersion}, got ${existingAgent.version}`);
       }
 
-      const updatedAgent = await db.update(agents).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, tags: updateData.tags, metadata: updateData.metadata, version: existingAgent.version + 1, updatedAt: new Date() }).where(and(eq(agents.projectId, projectId), eq(agents.id, id), eq(agents.version, expectedVersion))).returning();
+      const updatedAgent = await db.update(agents).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, tags: updateData.tags, metadata: updateData.metadata, fillerSettings: updateData.fillerSettings, version: existingAgent.version + 1, updatedAt: new Date() }).where(and(eq(agents.projectId, projectId), eq(agents.id, id), eq(agents.version, expectedVersion))).returning();
 
       if (updatedAgent.length === 0) {
         throw new OptimisticLockError(`Failed to update agent due to version conflict`);
@@ -247,7 +247,7 @@ export class AgentService extends BaseService {
         throw new NotFoundError(`Agent with id ${id} not found`);
       }
 
-      return await this.createAgent(projectId, { id: input.id, name: input.name ?? `${existingAgent.name} (Clone)`, description: existingAgent.description ?? undefined, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId ?? undefined, ttsSettings: existingAgent.ttsSettings as any, tags: existingAgent.tags as string[], metadata: existingAgent.metadata ?? undefined }, context);
+      return await this.createAgent(projectId, { id: input.id, name: input.name ?? `${existingAgent.name} (Clone)`, description: existingAgent.description ?? undefined, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId ?? undefined, ttsSettings: existingAgent.ttsSettings as any, tags: existingAgent.tags as string[], metadata: existingAgent.metadata ?? undefined, fillerSettings: existingAgent.fillerSettings as any ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone agent');
       throw error;

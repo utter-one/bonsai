@@ -8,6 +8,19 @@ extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
 
+/**
+ * Schema for agent filler response settings.
+ * When configured, a randomly or sequentially picked sentence is fed into the TTS pipeline
+ * at the very start of the response turn, while classification is still running in parallel.
+ */
+export const fillerSettingsSchema = z.object({
+  strategy: z.enum(['disabled', 'random', 'sequential']).describe('How to pick a filler sentence: disabled turns the feature off, random picks one at random each turn, sequential cycles through the list in order'),
+  sentences: z.array(z.string().min(1)).describe('List of short filler sentences to choose from (e.g. "Hmm...", "Let me think.")'),
+}).openapi('FillerSettings');
+
+/** Settings controlling filler sentence playback at the start of each response turn */
+export type FillerSettings = z.infer<typeof fillerSettingsSchema>;
+
 // Route param schema
 export const agentRouteParamsSchema = z.object({
   projectId: z.string().min(1).describe('Project ID'),
@@ -28,6 +41,7 @@ export const createAgentSchema = z.object({
   ttsSettings: ttsSettingsSchema.describe('TTS provider-specific settings'),
   tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this agent'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional agent-specific metadata'),
+  fillerSettings: fillerSettingsSchema.optional().describe('Filler response settings: a short sentence spoken through TTS at the very start of each turn while classification runs in parallel'),
 });
 
 /**
@@ -43,6 +57,7 @@ export const updateAgentBodySchema = z.object({
   ttsSettings: ttsSettingsSchema.describe('Updated TTS provider-specific settings'),
   tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
+  fillerSettings: fillerSettingsSchema.optional().describe('Updated filler response settings'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
 
@@ -68,6 +83,7 @@ export const agentResponseSchema = z.object({
   ttsSettings: ttsSettingsSchema.nullable().describe('TTS provider-specific settings'),
   tags: z.array(z.string()).describe('Tags for categorizing and filtering this agent'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional agent-specific metadata'),
+  fillerSettings: fillerSettingsSchema.nullable().describe('Filler response settings'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the agent was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the agent was last updated'),
