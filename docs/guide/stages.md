@@ -39,13 +39,13 @@ The `prompt` field is a [Handlebars template](./templating) that defines the AI'
 
 - <code v-pre>{{vars.&lt;key&gt;}}</code> — Stage variables
 - <code v-pre>{{userProfile.&lt;key&gt;}}</code> — User profile data
-- <code v-pre>{{constants.&lt;key&gt;}}</code> — Project-level constants
+- <code v-pre>{{consts.&lt;key&gt;}}</code> — Project-level constants
 - <code v-pre>{{history}}</code> — Conversation history (auto-injected)
 
 Example prompt:
 
 ```handlebars
-You are a customer service agent for {{constants.companyName}}.
+You are a customer service agent for {{consts.companyName}}.
 The customer's name is {{userProfile.name}}.
 
 {{#if (exists vars.issue)}}
