@@ -5,7 +5,7 @@ export const ID_PREFIXES = {
   ADMIN: 'adm',
   USER: 'user',
   PROJECT: 'proj',
-  PERSONA: 'pers',
+  AGENT: 'agnt',
   CLASSIFIER: 'clas',
   CONTEXT_TRANSFORMER: 'tran',
   TOOL: 'tool',

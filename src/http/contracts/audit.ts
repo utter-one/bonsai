@@ -16,7 +16,8 @@ export const auditLogResponseSchema = z.object({
   userId: z.string().nullable().describe('ID of the admin user who performed the action'),
   action: z.string().describe('Action performed (CREATE, UPDATE, DELETE)'),
   entityId: z.string().describe('ID of the entity that was modified'),
-  entityType: z.string().describe('Type of the entity (e.g., "admin", "persona", "classifier")'),
+  entityType: z.string().describe('Type of the entity (e.g., "admin", "agent", "classifier")'),
+  projectId: z.string().nullable().describe('ID of the project associated with the entity'),
   oldEntity: z.record(z.string(), z.unknown()).nullable().describe('Entity state before the change'),
   newEntity: z.record(z.string(), z.unknown()).nullable().describe('Entity state after the change'),
   version: z.number().int().describe('Version number for the audit log'),
@@ -33,7 +34,7 @@ export const auditLogResponseSchema = z.object({
  * - textSearch: Search query for action field
  * - orderBy: Field(s) to sort by, use '-' prefix for descending (e.g., '-createdAt')
  * - filters: Dynamic filters such as:
- *   - entityType: Filter by entity type (e.g., 'admin', 'persona')
+ *   - entityType: Filter by entity type (e.g., 'admin', 'agent')
  *   - action: Filter by action type (e.g., 'CREATE', 'UPDATE', 'DELETE')
  *   - userId: Filter by admin user ID
  *   - entityId: Filter by entity ID

@@ -148,6 +148,8 @@ Configuration varies by provider type and API type:
 | `azure` | `subscriptionKey`, `region`, `language` |
 | `elevenlabs` | `apiKey` |
 | `deepgram` | `apiKey` |
+| `assemblyai` | `apiKey`, `region` |
+| `speechmatics` | `apiKey`, `region` |
 
 ### Storage Providers
 

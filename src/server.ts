@@ -7,7 +7,7 @@ import swaggerUi from 'swagger-ui-express';
 import qs from 'qs';
 import { AdminController } from './http/controllers/AdminController';
 import { UserController } from './http/controllers/UserController';
-import { PersonaController } from './http/controllers/PersonaController';
+import { AgentController } from './http/controllers/AgentController';
 import { ProjectController } from './http/controllers/ProjectController';
 import { AuthController } from './http/controllers/AuthController';
 import { SetupController } from './http/controllers/SetupController';
@@ -145,8 +145,8 @@ export function createApp(): express.Application {
   const knowledgeController = container.resolve(KnowledgeController);
   knowledgeController.registerRoutes(app);
 
-  const personaController = container.resolve(PersonaController);
-  personaController.registerRoutes(app);
+  const agentController = container.resolve(AgentController);
+  agentController.registerRoutes(app);
 
   const providerController = container.resolve(ProviderController);
   providerController.registerRoutes(app);

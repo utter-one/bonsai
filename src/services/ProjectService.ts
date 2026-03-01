@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, SQL, desc, and } from 'drizzle-orm';
 import { db } from '../db/index';
-import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, personas, conversations, issues } from '../db/schema';
+import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, agents, conversations, issues } from '../db/schema';
 import type { CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse } from '../http/contracts/project';
 import type { ListParams } from '../http/contracts/common';
 import { projectResponseSchema, projectListResponseSchema } from '../http/contracts/project';
@@ -193,7 +193,7 @@ export class ProjectService extends BaseService {
         }
         logger.debug({ projectId: id, count: apiKeyRecords.length }, 'Deleted apiKeys');
 
-        // 2. Delete stages (must be before personas/classifiers due to FK references)
+        // 2. Delete stages (must be before agents/classifiers due to FK references)
         const stageRecords = await tx.query.stages.findMany({ where: eq(stages.projectId, id) });
         for (const stage of stageRecords) {
           await tx.delete(stages).where(and(eq(stages.projectId, id), eq(stages.id, stage.id)));
@@ -251,13 +251,13 @@ export class ProjectService extends BaseService {
         }
         logger.debug({ projectId: id, count: classifierRecords.length }, 'Deleted classifiers');
 
-        // 9. Delete personas
-        const personaRecords = await tx.query.personas.findMany({ where: eq(personas.projectId, id) });
-        for (const persona of personaRecords) {
-          await tx.delete(personas).where(and(eq(personas.projectId, id), eq(personas.id, persona.id)));
-          await this.auditService.logDelete('persona', persona.id, { id: persona.id, name: persona.name, projectId: persona.projectId }, context?.adminId);
+        // 9. Delete agents
+        const agentRecords = await tx.query.agents.findMany({ where: eq(agents.projectId, id) });
+        for (const agent of agentRecords) {
+          await tx.delete(agents).where(and(eq(agents.projectId, id), eq(agents.id, agent.id)));
+          await this.auditService.logDelete('agent', agent.id, { id: agent.id, name: agent.name, projectId: agent.projectId }, context?.adminId);
         }
-        logger.debug({ projectId: id, count: personaRecords.length }, 'Deleted personas');
+        logger.debug({ projectId: id, count: agentRecords.length }, 'Deleted agents');
 
         // 10. Delete conversations (auto-cascades to conversationEvents and conversationArtifacts via DB constraints)
         const conversationRecords = await tx.query.conversations.findMany({ where: eq(conversations.projectId, id) });

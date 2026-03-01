@@ -53,7 +53,7 @@ After connecting, the client must authenticate with an API key:
 | `sendTextInput` | `true` | Client will send text messages |
 | `receiveVoiceOutput` | `true` | Client wants TTS audio chunks |
 | `receiveTranscriptionUpdates` | `true` | Client wants intermediate transcription chunks |
-| `receiveEvents` | `false` | Client wants raw conversation event broadcasts |
+| `receiveEvents` | `true` | Client wants raw conversation event broadcasts |
 
 ## Message Format
 
@@ -99,7 +99,7 @@ All messages follow this structure:
 |---|---|---|
 | `userId` | Yes | User initiating the conversation |
 | `stageId` | Yes | Stage to start at |
-| `personaId` | No | Override the default persona |
+| `agentId` | No | Override the default agent |
 | `timezone` | No | IANA timezone identifier (e.g. `America/New_York`). Takes highest precedence in the timezone resolution chain: `start_conversation.timezone` → `userProfile.timezone` → `project.timezone` → UTC. Persisted for the lifetime of the conversation so resume works correctly. |
 
 **Server → Client:**
@@ -180,8 +180,9 @@ Voice input uses a three-step streaming protocol:
 {
   "type": "send_user_voice_chunk",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "inputTurnId": "turn-uuid",
-  "audio": "<base64-encoded-audio>",
+  "audioData": "<base64-encoded-audio>",
   "ordinal": 1
 }
 ```
@@ -191,6 +192,7 @@ Voice input uses a three-step streaming protocol:
 {
   "type": "end_user_voice_input",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "inputTurnId": "turn-uuid"
 }
 ```
@@ -203,7 +205,9 @@ When `receiveTranscriptionUpdates` is enabled, the server sends interim and fina
 {
   "type": "user_transcribed_chunk",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "inputTurnId": "turn-uuid",
+  "chunkId": "chunk-uuid",
   "chunkText": "Hello, I need",
   "ordinal": 1,
   "isFinal": false
@@ -220,6 +224,7 @@ AI responses are streamed as a sequence of messages:
 {
   "type": "start_ai_generation_output",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "outputTurnId": "turn-uuid",
   "expectVoice": true
 }
@@ -231,7 +236,9 @@ AI responses are streamed as a sequence of messages:
 {
   "type": "ai_transcribed_chunk",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "outputTurnId": "turn-uuid",
+  "chunkId": "chunk-uuid",
   "chunkText": "I'd be happy to help",
   "ordinal": 1,
   "isFinal": false
@@ -244,8 +251,9 @@ AI responses are streamed as a sequence of messages:
 {
   "type": "send_ai_voice_chunk",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "outputTurnId": "turn-uuid",
-  "audio": "<base64-encoded-audio>",
+  "audioData": "<base64-encoded-audio>",
   "audioFormat": "mp3",
   "sampleRate": 44100,
   "ordinal": 1,
@@ -259,6 +267,7 @@ AI responses are streamed as a sequence of messages:
 {
   "type": "end_ai_generation_output",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "outputTurnId": "turn-uuid",
   "fullText": "I'd be happy to help you with your order. Can you give me your order number?"
 }
@@ -272,8 +281,9 @@ For multimodal responses:
 {
   "type": "send_ai_image_output",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "outputTurnId": "turn-uuid",
-  "image": "<base64-encoded-image>",
+  "imageData": "<base64-encoded-image>",
   "mimeType": "image/png",
   "sequenceNumber": 1
 }
@@ -303,8 +313,9 @@ Clients can send commands to control the conversation:
   "type": "set_var",
   "sessionId": "session-uuid",
   "conversationId": "conv-uuid",
-  "name": "selectedProduct",
-  "value": "Widget Pro"
+  "stageId": "current-stage",
+  "variableName": "selectedProduct",
+  "variableValue": "Widget Pro"
 }
 ```
 
@@ -316,7 +327,8 @@ Clients can send commands to control the conversation:
   "type": "get_var",
   "sessionId": "session-uuid",
   "conversationId": "conv-uuid",
-  "name": "selectedProduct"
+  "stageId": "current-stage",
+  "variableName": "selectedProduct"
 }
 ```
 
@@ -327,7 +339,8 @@ Clients can send commands to control the conversation:
   "requestId": "req-10",
   "type": "get_all_vars",
   "sessionId": "session-uuid",
-  "conversationId": "conv-uuid"
+  "conversationId": "conv-uuid",
+  "stageId": "current-stage"
 }
 ```
 
@@ -339,7 +352,7 @@ Clients can send commands to control the conversation:
   "type": "run_action",
   "sessionId": "session-uuid",
   "conversationId": "conv-uuid",
-  "actionId": "check-order-status",
+  "actionName": "check-order-status",
   "parameters": { "orderId": "ORD-123" }
 }
 ```
@@ -365,6 +378,7 @@ When `receiveEvents` is enabled in session settings, the server broadcasts conve
 {
   "type": "conversation_event",
   "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
   "eventType": "classification",
   "eventData": {
     "classifierId": "default-classifier",

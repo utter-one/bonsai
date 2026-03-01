@@ -25,6 +25,7 @@ Content-Type: application/json
 | `prompt` | `string` (min 1) | Yes | Prompt defining classification logic |
 | `llmProviderId` | `string` | No | LLM provider ID |
 | `llmSettings` | `LlmSettings` | Yes | LLM provider-specific settings |
+| `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
 **Response** `201 Created` — [Classifier Response](#classifier-response)
@@ -60,7 +61,7 @@ Content-Type: application/json
 
 **Required permission:** `classifier:write`
 
-All create fields are optional plus `version` (required).
+All create fields are optional plus `version` (required), **except `llmSettings` which must always be provided**.
 
 **Response** `200 OK` — [Classifier Response](#classifier-response)
 
@@ -120,6 +121,7 @@ Returns audit log entries for the specified classifier. See [Audit Logs](./audit
 | `prompt` | `string` | No | Classification prompt |
 | `llmProviderId` | `string` | Yes | LLM provider ID |
 | `llmSettings` | `LlmSettings` | No | LLM settings |
+| `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |

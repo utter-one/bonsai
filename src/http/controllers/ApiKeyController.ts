@@ -15,7 +15,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class ApiKeyController {
-  constructor(@inject(ApiKeyService) private readonly apiKeyService: ApiKeyService) {}
+  constructor(@inject(ApiKeyService) private readonly apiKeyService: ApiKeyService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -94,6 +94,26 @@ export class ApiKeyController {
         },
       },
       {
+        method: 'get',
+        path: '/api/api-keys',
+        tags: ['API Keys'],
+        summary: 'List all API keys',
+        description: 'Retrieves a list of all API keys across all projects with optional filtering, sorting, and pagination.',
+        request: {
+          query: listParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'All API keys retrieved successfully',
+            content: {
+              'application/json': {
+                schema: apiKeyListResponseSchema,
+              },
+            },
+          },
+        },
+      },
+      {
         method: 'put',
         path: '/api/projects/{projectId}/api-keys/{id}',
         tags: ['API Keys'],
@@ -154,6 +174,7 @@ export class ApiKeyController {
     router.post('/api/projects/:projectId/api-keys', asyncHandler(this.createApiKey.bind(this)));
     router.get('/api/projects/:projectId/api-keys/:id', asyncHandler(this.getApiKey.bind(this)));
     router.get('/api/projects/:projectId/api-keys', asyncHandler(this.listApiKeys.bind(this)));
+    router.get('/api/api-keys', asyncHandler(this.listAllApiKeys.bind(this)));
     router.put('/api/projects/:projectId/api-keys/:id', asyncHandler(this.updateApiKey.bind(this)));
     router.delete('/api/projects/:projectId/api-keys/:id', asyncHandler(this.deleteApiKey.bind(this)));
   }
@@ -187,6 +208,16 @@ export class ApiKeyController {
     const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
     const result = await this.apiKeyService.listApiKeys(projectId, query);
+    res.status(200).json(result);
+  }
+
+  /**
+   * List all API keys across all projects with filtering and pagination
+   */
+  private async listAllApiKeys(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.API_KEY_READ]);
+    const query = listParamsSchema.parse(req.query);
+    const result = await this.apiKeyService.listApiKeys(undefined, query);
     res.status(200).json(result);
   }
 

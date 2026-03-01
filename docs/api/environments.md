@@ -116,7 +116,7 @@ GET /api/environments/:id/migration/scope
   "totalCount": 42,
   "providers": [{ "id": "...", "name": "..." }],
   "projects": [{ "id": "...", "name": "..." }],
-  "personas": [{ "id": "...", "name": "...", "projectId": "..." }],
+  "agents": [{ "id": "...", "name": "...", "projectId": "..." }],
   "classifiers": [...],
   "contextTransformers": [...],
   "tools": [...],
@@ -178,8 +178,8 @@ GET /api/environments/:id/migration/jobs/:jobId
 | Field | Type | Description |
 |-------|------|-------------|
 | `projectIds` | `string[]` | Project IDs (pulls all children) |
-| `stageIds` | `string[]` | Stage IDs (pulls persona, classifiers, transformers, actions, providers) |
-| `personaIds` | `string[]` | Persona IDs (pulls TTS provider) |
+| `stageIds` | `string[]` | Stage IDs (pulls agent, classifiers, transformers, actions, providers) |
+| `agentIds` | `string[]` | Agent IDs (pulls TTS provider) |
 | `classifierIds` | `string[]` | Classifier IDs (pulls LLM provider) |
 | `contextTransformerIds` | `string[]` | Context transformer IDs (pulls LLM provider) |
 | `toolIds` | `string[]` | Tool IDs (pulls LLM provider) |

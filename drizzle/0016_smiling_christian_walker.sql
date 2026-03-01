@@ -1,0 +1,1 @@
+ALTER TABLE "audit_logs" ADD COLUMN "project_id" text;

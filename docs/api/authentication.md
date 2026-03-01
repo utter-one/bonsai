@@ -121,7 +121,7 @@ The system uses role-based access control (RBAC). Permissions follow the `entity
 | Role | Description |
 |------|-------------|
 | `super_admin` | Full system access with all permissions |
-| `content_manager` | Manage content entities (personas, stages, knowledge, etc.) |
+| `content_manager` | Manage content entities (agents, stages, knowledge, etc.) |
 | `support` | View and assist with user-related issues |
 | `developer` | Technical access for development and debugging |
 | `viewer` | Read-only access to most entities |
@@ -137,7 +137,7 @@ Has every permission in the system.
 | `admin` | `read`, `write`, `delete` |
 | `user` | `read`, `write`, `delete` |
 | `project` | `read`, `write`, `delete` |
-| `persona` | `read`, `write`, `delete` |
+| `agent` | `read`, `write`, `delete` |
 | `conversation` | `read`, `write`, `delete` |
 | `stage` | `read`, `write`, `delete` |
 | `classifier` | `read`, `write`, `delete` |
@@ -155,13 +155,13 @@ Has every permission in the system.
 
 #### `content_manager`
 
-Manages content entities. Has read/write across most entities but cannot delete projects, personas, users, conversations, or stages, and has no admin or system access.
+Manages content entities. Has read/write across most entities but cannot delete projects, agents, users, conversations, or stages, and has no admin or system access.
 
 | Entity | Permissions |
 |--------|-------------|
 | `user` | `read`, `write` |
 | `project` | `read`, `write` |
-| `persona` | `read`, `write` |
+| `agent` | `read`, `write` |
 | `conversation` | `read`, `write` |
 | `stage` | `read`, `write` |
 | `classifier` | `read`, `write` |
@@ -193,7 +193,7 @@ Read-only access across all technical entities plus system configuration. No wri
 |--------|-------------|
 | `user` | `read` |
 | `project` | `read` |
-| `persona` | `read` |
+| `agent` | `read` |
 | `conversation` | `read` |
 | `stage` | `read` |
 | `classifier` | `read` |
@@ -215,7 +215,7 @@ Strictly read-only access. Same entity coverage as `developer` but without `syst
 |--------|-------------|
 | `user` | `read` |
 | `project` | `read` |
-| `persona` | `read` |
+| `agent` | `read` |
 | `conversation` | `read` |
 | `stage` | `read` |
 | `classifier` | `read` |

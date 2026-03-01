@@ -16,14 +16,14 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
-  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, @inject(ConversationService) private conversationService: ConversationService) {}
+  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, @inject(ConversationService) private conversationService: ConversationService) { }
 
   /**
    * Handles resume conversation requests.
    */
   async handle(context: WebSocketHandlerContext, message: ResumeConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Resume conversation request received');
-    
+
     if (!context.connection) {
       throw new NotFoundError('Session not found');
     }
@@ -42,7 +42,7 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
       throw new NotFoundError('Conversation not found');
     }
 
-    this.connectionManager.attachConversationToSession(message.sessionId, message.conversationId);
+    await this.connectionManager.attachConversationToSession(message.sessionId, message.conversationId);
 
     // Return success response
     const response: ResumeConversationResponse = { type: 'resume_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };

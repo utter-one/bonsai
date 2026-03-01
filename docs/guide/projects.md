@@ -65,7 +65,7 @@ Project-level constants are available in all Handlebars prompts via <code v-pre>
 A project contains the following child entities, all scoped by `projectId`:
 
 - [Stages](./stages) — Conversation phases
-- [Personas](./personas) — AI personality definitions
+- [Agents](./agents) — AI personality definitions
 - [Classifiers](./classifiers) — Intent classification
 - [Context Transformers](./context-transformers) — Data extraction
 - [Tools](./tools) — Callable LLM-powered tools

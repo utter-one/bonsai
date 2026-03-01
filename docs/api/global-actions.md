@@ -29,6 +29,7 @@ Content-Type: application/json
 | `parameters` | `StageActionParameter[]` | No | Parameters to extract from user input |
 | `effects` | `Effect[]` | No | Effects to execute when triggered |
 | `examples` | `string[]` | No | Example trigger phrases |
+| `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
 **Response** `201 Created` — [Global Action Response](#global-action-response)
@@ -128,6 +129,7 @@ Returns audit log entries for the specified global action. See [Audit Logs](./au
 | `parameters` | `StageActionParameter[]` | No | Parameters array |
 | `effects` | `Effect[]` | No | Effects array |
 | `examples` | `string[]` | Yes | Example phrases |
+| `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |

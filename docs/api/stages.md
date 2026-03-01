@@ -1,6 +1,6 @@
 # Stages
 
-Stages define the conversational flow within a project. Each stage has its own prompt, LLM settings, actions, and associated persona.
+Stages define the conversational flow within a project. Each stage has its own prompt, LLM settings, actions, and associated agent.
 
 **Tag:** `Stages` | **Scoped to:** Project
 
@@ -25,7 +25,7 @@ Content-Type: application/json
 | `prompt` | `string` (min 1) | Yes | System prompt defining stage behavior |
 | `llmProviderId` | `string` | No | LLM provider ID |
 | `llmSettings` | [`LlmSettings`](#llm-settings) | Yes | LLM provider-specific settings |
-| `personaId` | `string` (min 1) | Yes | Associated persona ID |
+| `agentId` | `string` (min 1) | Yes | Associated agent ID |
 | `enterBehavior` | `string` | No | `"generate_response"` (default) or `"await_user_input"` |
 | `useKnowledge` | `boolean` | No (default: `false`) | Enable knowledge base for this stage |
 | `knowledgeTags` | `string[]` | No | Knowledge tags to include |
@@ -35,6 +35,7 @@ Content-Type: application/json
 | `actions` | `Record<string, StageAction>` | No | Action definitions map (see [Actions](#actions)) |
 | `defaultClassifierId` | `string` | No | Default classifier ID |
 | `transformerIds` | `string[]` | No | Context transformer IDs |
+| `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
 **Response** `201 Created` — [Stage Response](#stage-response)
@@ -74,7 +75,7 @@ Content-Type: application/json
 
 **Required permission:** `stage:write`
 
-All create fields are optional plus `version` (required for optimistic locking).
+All create fields are optional plus `version` (required for optimistic locking), **except `llmSettings` which must always be provided**.
 
 **Response** `200 OK` — [Stage Response](#stage-response)
 
@@ -134,7 +135,7 @@ Returns audit log entries for the specified stage. See [Audit Logs](./audit-logs
 | `prompt` | `string` | No | System prompt |
 | `llmProviderId` | `string` | Yes | LLM provider ID |
 | `llmSettings` | `LlmSettings` | No | LLM settings |
-| `personaId` | `string` | No | Associated persona ID |
+| `agentId` | `string` | No | Associated agent ID |
 | `enterBehavior` | `string` | No | `"generate_response"` or `"await_user_input"` |
 | `useKnowledge` | `boolean` | No | Knowledge base enabled |
 | `knowledgeTags` | `string[]` | No | Knowledge tags |
@@ -143,7 +144,8 @@ Returns audit log entries for the specified stage. See [Audit Logs](./audit-logs
 | `variableDescriptors` | `FieldDescriptor[]` | No | Variable definitions |
 | `actions` | `Record<string, StageAction>` | No | Action definitions |
 | `defaultClassifierId` | `string` | Yes | Default classifier ID |
-| `transformerIds` | `string[]` | No | Transformer IDs |
+| `transformerIds` | `string[]` | No | Context transformer IDs used in this stage |
+| `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
@@ -165,12 +167,18 @@ Actions are defined as a `Record<string, StageAction>` where keys are action nam
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `name` | `string` | Display name of the action |
 | `condition` | `string?` | Condition expression for activation |
+| `triggerOnUserInput` | `boolean` | Whether triggered by user input |
+| `triggerOnClientCommand` | `boolean` | Whether triggered by client commands |
+| `triggerOnTransformation` | `boolean` | Whether triggered by variable transformations (default: `false`) |
 | `classificationTrigger` | `string?` | Classification label that triggers this action |
 | `overrideClassifierId` | `string?` | Classifier ID override |
 | `parameters` | `StageActionParameter[]` | Parameters to extract from user input |
 | `effects` | `Effect[]` | Effects to execute when triggered |
 | `examples` | `string[]` | Example trigger phrases |
+| `watchedVariables` | `Record<string, string>?` | Map of variable paths to watch (`new`, `changed`, `removed`) |
+| `metadata` | `object?` | Additional metadata |
 
 ### StageActionParameter
 
@@ -199,6 +207,6 @@ LLM settings is a discriminated union based on provider type:
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `string` | Variable name |
-| `type` | `string` | Variable type |
-| `description` | `string` | Human-readable description |
-| `required` | `boolean` | Whether the variable is required |
+| `type` | `string` | Variable type (`string`, `number`, `boolean`, `object`) |
+| `isArray` | `boolean` | Whether this field holds an array of values |
+| `objectSchema` | `FieldDescriptor[]?` | Nested field definitions (only for `object` type) |

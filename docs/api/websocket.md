@@ -97,7 +97,7 @@ All fields default to `true` if omitted.
   "sessionId": "session-abc",
   "userId": "user-123",
   "stageId": "intro-stage",
-  "personaId": "assistant"
+  "agentId": "assistant"
 }
 ```
 
@@ -106,7 +106,8 @@ All fields default to `true` if omitted.
 | `sessionId` | `string` | Yes | Session ID from auth |
 | `userId` | `string` | Yes | User initiating the conversation |
 | `stageId` | `string` | Yes | Initial stage ID |
-| `personaId` | `string` | No | Persona override |
+| `agentId` | `string` | No | Agent override |
+| `timezone` | `string` | No | IANA timezone identifier (e.g. `America/New_York`). Highest precedence in: `start_conversation.timezone` → `userProfile.timezone` → `project.timezone` → UTC |
 
 **Response**
 

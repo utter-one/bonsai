@@ -71,7 +71,8 @@ export async function transformEffectValue(
 
   if (value[0] === '=') {
     // Inline script expression
-    return scriptRunner.executeScript(value.slice(1).trim(), context);
+    const result = await scriptRunner.executeScript(value.slice(1).trim(), context);
+    return result.value;
   }
 
   // Default: Handlebars template rendering

@@ -6,7 +6,7 @@ Bonsai Backed is a powerful, extensible backend service for building conversatio
 
 Bonsai Backed provides:
 
-- **REST API** — Manage projects, personas, stages, classifiers, knowledge bases, and more
+- **REST API** — Manage projects, agents, stages, classifiers, knowledge bases, and more
 - **WebSocket API** — Real-time bidirectional communication for live conversational AI sessions with streaming audio and text support
 - **Authentication** — JWT-based authentication with role-based permissions and API keys
 - **Multi-Provider Support** — Integrate with OpenAI, Anthropic, Google Gemini, Azure, ElevenLabs, Deepgram, Cartesia, and more
@@ -15,7 +15,7 @@ Bonsai Backed provides:
 
 ## How It Works
 
-At a high level, Bonsai Backed lets you design **Projects** — self-contained conversational AI experiences. Each project is composed of **Stages** (conversation phases), **Personas** (AI personalities with voice settings), **Classifiers** (intent detectors), **Knowledge** (FAQ data), and **Actions** (behaviors triggered by user input).
+At a high level, Bonsai Backed lets you design **Projects** — self-contained conversational AI experiences. Each project is composed of **Stages** (conversation phases), **Agents** (AI personalities with voice settings), **Classifiers** (intent detectors), **Knowledge** (FAQ data), and **Actions** (behaviors triggered by user input).
 
 When an end user connects via WebSocket and starts a conversation, the system:
 
@@ -39,7 +39,7 @@ This guide covers:
 | [Core Concepts](./concepts) | Architecture overview and entity relationships |
 | [Projects](./projects) | Top-level container for conversational experiences |
 | [Stages](./stages) | Conversation phases and flow control |
-| [Personas](./personas) | AI personality and voice configuration |
+| [Agents](./agents) | AI personality and voice configuration |
 | [Actions & Effects](./actions-and-effects) | Behaviors triggered by user input |
 | [Classifiers](./classifiers) | LLM-powered intent classification |
 | [Context Transformers](./context-transformers) | Structured data extraction from conversations |
