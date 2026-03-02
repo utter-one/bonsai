@@ -153,7 +153,7 @@ export class ProjectService extends BaseService {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata, timezone: existingProject.timezone }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata, timezone: updatedProject[0].timezone }, context?.adminId);
+      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata, timezone: existingProject.timezone }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata, timezone: updatedProject[0].timezone }, context?.adminId, id);
 
       logger.info({ projectId: id }, 'Project updated successfully');
 
@@ -207,7 +207,7 @@ export class ProjectService extends BaseService {
           const itemRecords = await tx.query.knowledgeItems.findMany({ where: and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.categoryId, category.id)) });
           for (const item of itemRecords) {
             await tx.delete(knowledgeItems).where(and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.id, item.id)));
-            await this.auditService.logDelete('knowledge_item', item.id, { id: item.id, categoryId: item.categoryId }, context?.adminId);
+            await this.auditService.logDelete('knowledge_item', item.id, { id: item.id, categoryId: item.categoryId }, context?.adminId, id);
           }
         }
         logger.debug({ projectId: id, categoryCount: categoryRecords.length }, 'Deleted knowledgeItems');
