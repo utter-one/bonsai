@@ -2,7 +2,7 @@
  * Entity type prefixes for ID generation
  */
 export const ID_PREFIXES = {
-  ADMIN: 'adm',
+  OPERATOR: 'oper',
   USER: 'user',
   PROJECT: 'proj',
   AGENT: 'agnt',

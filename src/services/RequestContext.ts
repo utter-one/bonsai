@@ -3,9 +3,9 @@
  * Contains authentication information and request metadata
  */
 export type RequestContext = {
-  /** The authenticated admin user ID */
-  adminId: string;
-  /** Roles assigned to the authenticated admin */
+  /** The authenticated operator user ID */
+  operatorId: string;
+  /** Roles assigned to the authenticated operator */
   roles: string[];
   /** IP address of the client making the request */
   ip: string;

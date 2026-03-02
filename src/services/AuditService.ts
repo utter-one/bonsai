@@ -69,7 +69,7 @@ export class AuditService {
 
   /**
    * Log entity creation
-   * @param entityType - The type of entity being created (e.g., 'admin')
+   * @param entityType - The type of entity being created (e.g., 'operator')
    * @param entityId - The unique identifier of the created entity
    * @param newEntity - The newly created entity data
    * @param userId - Optional ID of the user who created the entity
@@ -95,7 +95,7 @@ export class AuditService {
 
   /**
    * Log entity update
-   * @param entityType - The type of entity being updated (e.g., 'admin')
+   * @param entityType - The type of entity being updated (e.g., 'operator')
    * @param entityId - The unique identifier of the updated entity
    * @param oldEntity - The entity data before the update
    * @param newEntity - The entity data after the update
@@ -124,7 +124,7 @@ export class AuditService {
 
   /**
    * Log entity deletion
-   * @param entityType - The type of entity being deleted (e.g., 'admin')
+   * @param entityType - The type of entity being deleted (e.g., 'operator')
    * @param entityId - The unique identifier of the deleted entity
    * @param oldEntity - The entity data before deletion
    * @param userId - Optional ID of the user who deleted the entity
@@ -150,7 +150,7 @@ export class AuditService {
 
   /**
    * Query audit logs for a specific entity
-   * @param entityType - The type of entity to retrieve logs for (e.g., 'admin')
+   * @param entityType - The type of entity to retrieve logs for (e.g., 'operator')
    * @param entityId - The unique identifier of the entity
    * @returns Array of audit logs for the specified entity, ordered by creation date descending
    */

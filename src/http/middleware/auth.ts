@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger';
 
 /** JWT payload structure */
 export type JWTPayload = {
-  adminId: string;
+  operatorId: string;
   roles: string[];
   type: 'access' | 'refresh';
 };
@@ -37,7 +37,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     }
 
     req.user = {
-      adminId: payload.adminId,
+      operatorId: payload.operatorId,
       roles: payload.roles,
     };
 
@@ -69,7 +69,7 @@ export function optionalAuthMiddleware(req: Request, res: Response, next: NextFu
         
         if (payload.type === 'access') {
           req.user = {
-            adminId: payload.adminId,
+            operatorId: payload.operatorId,
             roles: payload.roles,
           };
         }

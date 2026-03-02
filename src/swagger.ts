@@ -2,12 +2,12 @@ import 'reflect-metadata';
 import { OpenAPIRegistry, OpenApiGeneratorV3 } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/admin';
+import { createOperatorSchema, updateOperatorBodySchema, deleteOperatorBodySchema, operatorResponseSchema, operatorListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/operator';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
 import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema } from './http/contracts/project';
 import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema, fillerSettingsSchema } from './http/contracts/agent';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
-import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './http/contracts/setup';
+import { initialOperatorSetupSchema, setupStatusResponseSchema, initialOperatorSetupResponseSchema } from './http/contracts/setup';
 import { createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './http/contracts/knowledge';
 import { createIssueSchema, updateIssueBodySchema, issueResponseSchema, issueListResponseSchema } from './http/contracts/issue';
 import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema } from './http/contracts/conversation';
@@ -43,7 +43,7 @@ import { elevenLabsAsrSettingsSchema } from './services/providers/asr/ElevenLabs
 import { deepgramAsrSettingsSchema } from './services/providers/asr/DeepgramAsrProvider';
 import { assemblyAiAsrSettingsSchema } from './services/providers/asr/AssemblyAiAsrProvider';
 import { speechmaticsAsrSettingsSchema } from './services/providers/asr/SpeechmaticsAsrProvider';
-import { AdminController } from './http/controllers/AdminController';
+import { OperatorController } from './http/controllers/OperatorController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
 import { AgentController } from './http/controllers/AgentController';
@@ -141,11 +141,11 @@ export function getOpenAPISpec(): any {
   registry.register('StageAction', stageActionSchema);
 
   // Register main API schemas
-  registry.register('CreateAdminRequest', createAdminSchema);
-  registry.register('UpdateAdminRequest', updateAdminBodySchema);
-  registry.register('DeleteAdminRequest', deleteAdminBodySchema);
-  registry.register('AdminResponse', adminResponseSchema);
-  registry.register('AdminListResponse', adminListResponseSchema);
+  registry.register('CreateOperatorRequest', createOperatorSchema);
+  registry.register('UpdateOperatorRequest', updateOperatorBodySchema);
+  registry.register('DeleteOperatorRequest', deleteOperatorBodySchema);
+  registry.register('OperatorResponse', operatorResponseSchema);
+  registry.register('OperatorListResponse', operatorListResponseSchema);
   registry.register('UpdateProfileRequest', updateProfileSchema);
   registry.register('ProfileResponse', profileResponseSchema);
   registry.register('CreateUserRequest', createUserSchema);
@@ -165,9 +165,9 @@ export function getOpenAPISpec(): any {
   registry.register('RefreshTokenRequest', refreshTokenSchema);
   registry.register('LoginResponse', loginResponseSchema);
   registry.register('RefreshTokenResponse', refreshTokenResponseSchema);
-  registry.register('InitialAdminSetupRequest', initialAdminSetupSchema);
+  registry.register('InitialOperatorSetupRequest', initialOperatorSetupSchema);
   registry.register('SetupStatusResponse', setupStatusResponseSchema);
-  registry.register('InitialAdminSetupResponse', initialAdminSetupResponseSchema);
+  registry.register('InitialOperatorSetupResponse', initialOperatorSetupResponseSchema);
   registry.register('CreateKnowledgeCategoryRequest', createKnowledgeCategorySchema);
   registry.register('UpdateKnowledgeCategoryRequest', updateKnowledgeCategoryBodySchema);
   registry.register('DeleteKnowledgeCategoryRequest', deleteKnowledgeCategoryBodySchema);
@@ -243,9 +243,9 @@ export function getOpenAPISpec(): any {
   registry.register('ApiKeyResponse', apiKeyResponseSchema);
   registry.register('ApiKeyListResponse', apiKeyListResponseSchema);
 
-  // Register Admin routes from AdminController
-  const adminPaths = AdminController.getOpenAPIPaths();
-  for (const path of adminPaths) {
+  // Register Operator routes from OperatorController
+  const operatorPaths = OperatorController.getOpenAPIPaths();
+  for (const path of operatorPaths) {
     registry.registerPath(path);
   }
 
@@ -381,8 +381,8 @@ export function getOpenAPISpec(): any {
   const document = generator.generateDocument({
     openapi: '3.0.0',
     info: {
-      title: 'Bonsai Admin API',
-      description: 'API documentation for Bonsai Admin API with JWT authentication',
+      title: 'Bonsai Operator API',
+      description: 'API documentation for Bonsai Operator API with JWT authentication',
       version: '0.1.0',
     },
     servers: [

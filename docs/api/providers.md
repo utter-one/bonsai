@@ -25,7 +25,7 @@ Content-Type: application/json
 | `providerType` | `string` | Yes | `asr`, `tts`, `llm`, `embeddings`, or `storage` |
 | `apiType` | `string` | Yes | Specific provider implementation (see below) |
 | `config` | `object` | Yes | Provider-specific configuration (see [Provider Config](#provider-config)) |
-| `createdBy` | `string` | No | Admin user ID who created |
+| `createdBy` | `string` | No | Operator user ID who created |
 | `tags` | `string[]` | No | Searchable tags |
 
 **Response** `201 Created` — [Provider Response](#provider-response)
@@ -112,7 +112,7 @@ Returns audit log entries for the specified provider. See [Audit Logs](./audit-l
 | `providerType` | `string` | No | `asr`, `tts`, `llm`, `embeddings`, or `storage` |
 | `apiType` | `string` | No | Provider implementation type |
 | `config` | `object` | No | Provider configuration |
-| `createdBy` | `string` | Yes | Creator's admin ID |
+| `createdBy` | `string` | Yes | Creator's operator ID |
 | `tags` | `string[]` | Yes | Tags |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |

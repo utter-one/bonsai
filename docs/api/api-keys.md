@@ -1,6 +1,6 @@
 # API Keys
 
-API keys provide authentication for WebSocket real-time conversations. Each key is scoped to a project and is used exclusively by client applications (web apps, mobile apps, kiosks) to authenticate WebSocket sessions — they are not a substitute for JWT-based admin authentication.
+API keys provide authentication for WebSocket real-time conversations. Each key is scoped to a project and is used exclusively by client applications (web apps, mobile apps, kiosks) to authenticate WebSocket sessions — they are not a substitute for JWT-based operator authentication.
 
 **Tag:** `API Keys` | **Scoped to:** Project
 

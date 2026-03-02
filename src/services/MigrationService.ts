@@ -45,7 +45,7 @@ function isSelectAll(sel: MigrationSelection): boolean {
  *   → stages → apiKeys
  *
  * Excluded from migration (runtime / credential data):
- *   admins, users, conversations, conversationEvents, conversationArtifacts,
+ *   operators, users, conversations, conversationEvents, conversationArtifacts,
  *   auditLogs, issues, environments
  */
 @singleton()
@@ -92,11 +92,11 @@ export class MigrationService extends BaseService {
       apiKeyIds: query.apiKeyIds,
     };
 
-    logger.info({ selection, adminId: context.adminId }, 'Exporting migration bundle');
+    logger.info({ selection, operatorId: context.operatorId }, 'Exporting migration bundle');
 
     const bundle = await this.resolveBundle(selection, restSchemaHash, selection);
 
-    logger.info({ projectCount: bundle.projects.length, stageCount: bundle.stages.length, providerCount: bundle.providers.length, adminId: context.adminId }, 'Migration bundle exported successfully');
+    logger.info({ projectCount: bundle.projects.length, stageCount: bundle.stages.length, providerCount: bundle.providers.length, operatorId: context.operatorId }, 'Migration bundle exported successfully');
 
     return bundle;
   }
@@ -104,7 +104,7 @@ export class MigrationService extends BaseService {
   /**
    * Imports an export bundle into this instance using a single DB transaction.
    * All entities are upserted (INSERT … ON CONFLICT DO UPDATE) in FK-safe order.
-   * The providers.createdBy FK is nulled out since admin IDs differ between environments.
+   * The providers.createdBy FK is nulled out since operator IDs differ between environments.
    * @param input - Bundle, force flag, and dryRun flag.
    * @param context - Request context for permission checking and audit logging.
    */
@@ -125,13 +125,13 @@ export class MigrationService extends BaseService {
       logger.warn({ sourceHash: bundle.restSchemaHash, localHash }, 'Importing bundle with mismatched schema hash (force=true)');
     }
 
-    logger.info({ dryRun, force, schemaHashMatch, adminId: context.adminId }, 'Starting bundle import');
+    logger.info({ dryRun, force, schemaHashMatch, operatorId: context.operatorId }, 'Starting bundle import');
 
     const upserted: MigrationResult['upserted'] = [];
 
     if (!dryRun) {
       await db.transaction(async (tx) => {
-        upserted.push({ entity: 'providers', count: await this.upsertProviders(tx, bundle.providers, context.adminId) });
+        upserted.push({ entity: 'providers', count: await this.upsertProviders(tx, bundle.providers, context.operatorId) });
         upserted.push({ entity: 'projects', count: await this.upsertProjects(tx, bundle.projects) });
         upserted.push({ entity: 'agents', count: await this.upsertAgents(tx, bundle.agents) });
         upserted.push({ entity: 'classifiers', count: await this.upsertClassifiers(tx, bundle.classifiers) });
@@ -146,17 +146,17 @@ export class MigrationService extends BaseService {
 
       // Log a 'migrate' audit entry per entity instance after the transaction commits
       await Promise.all([
-        ...bundle.providers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'provider', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.projects.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'project', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.agents.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'agent', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.classifiers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'classifier', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.contextTransformers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'contextTransformer', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.tools.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'tool', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.globalActions.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'globalAction', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.knowledgeCategories.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeCategory', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.knowledgeItems.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeItem', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.stages.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'stage', entityId: row.id, userId: context.adminId, newEntity: row })),
-        ...bundle.apiKeys.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'apiKey', entityId: row.id, userId: context.adminId, newEntity: row })),
+        ...bundle.providers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'provider', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.projects.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'project', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.agents.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'agent', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.classifiers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'classifier', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.contextTransformers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'contextTransformer', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.tools.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'tool', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.globalActions.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'globalAction', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.knowledgeCategories.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeCategory', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.knowledgeItems.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeItem', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.stages.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'stage', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.apiKeys.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'apiKey', entityId: row.id, userId: context.operatorId, newEntity: row })),
       ]);
     } else {
       upserted.push(
@@ -225,7 +225,7 @@ export class MigrationService extends BaseService {
 
     const preview = await previewRes.json() as MigrationPreview;
 
-    logger.info({ environmentId, totalCount: preview.totalCount, adminId: context.adminId }, 'Remote migration preview fetched');
+    logger.info({ environmentId, totalCount: preview.totalCount, operatorId: context.operatorId }, 'Remote migration preview fetched');
 
     return preview;
   }
@@ -320,7 +320,7 @@ export class MigrationService extends BaseService {
       result.knowledgeCategories, result.knowledgeItems, result.stages, result.apiKeys,
     ].reduce((sum, arr) => sum + arr.length, 0);
 
-    logger.info({ totalCount: result.totalCount, selection, adminId: context.adminId }, 'Migration preview computed');
+    logger.info({ totalCount: result.totalCount, selection, operatorId: context.operatorId }, 'Migration preview computed');
     return result;
   }
 
@@ -602,7 +602,7 @@ export class MigrationService extends BaseService {
   // Private: per-entity upsert helpers
   // All helpers batch-insert rows and update every column on id conflict.
   // On conflict, version is incremented (not replaced) to preserve local history.
-  // providers.createdBy is set to the importing admin ID since it differs between environments.
+  // providers.createdBy is set to the importing operator ID since it differs between environments.
   // ---------------------------------------------------------------------------
 
   /**
@@ -620,10 +620,10 @@ export class MigrationService extends BaseService {
     return result;
   }
 
-  private async upsertProviders(tx: DbTx, rows: any[], adminId: string): Promise<number> {
+  private async upsertProviders(tx: DbTx, rows: any[], operatorId: string): Promise<number> {
     if (!rows.length) return 0;
-    // Replace source createdBy with the importing admin's ID since admin IDs differ between environments
-    await tx.insert(providers).values(rows.map(r => ({ ...this.parseTimestamps(r), createdBy: adminId }))).onConflictDoUpdate({
+    // Replace source createdBy with the importing operator's ID since operator IDs differ between environments
+    await tx.insert(providers).values(rows.map(r => ({ ...this.parseTimestamps(r), createdBy: operatorId }))).onConflictDoUpdate({
       target: providers.id,
       set: {
         name: sql`excluded.name`,
@@ -631,7 +631,7 @@ export class MigrationService extends BaseService {
         providerType: sql`excluded.provider_type`,
         apiType: sql`excluded.api_type`,
         config: sql`excluded.config`,
-        createdBy: adminId,
+        createdBy: operatorId,
         tags: sql`excluded.tags`,
         version: sql`${providers.version} + 1`,
         updatedAt: sql`now()`,

@@ -1,36 +1,36 @@
 import { injectable, inject } from 'tsyringe';
 import { db } from '../db/index';
-import { admins } from '../db/schema';
-import type { InitialAdminSetupRequest, InitialAdminSetupResponse, SetupStatusResponse } from '../http/contracts/setup';
+import { operators } from '../db/schema';
+import type { InitialOperatorSetupRequest, InitialOperatorSetupResponse, SetupStatusResponse } from '../http/contracts/setup';
 import { AuthService } from './AuthService';
 import { InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
 
 /**
  * Service for system setup and initialization
- * Handles first-time configuration when no admin accounts exist
+ * Handles first-time configuration when no operator accounts exist
  */
 @injectable()
 export class SetupService {
   constructor(@inject(AuthService) private readonly authService: AuthService) {}
 
   /**
-   * Check if the system has been set up (i.e., at least one admin exists)
+   * Check if the system has been set up (i.e., at least one operator exists)
    * @returns Setup status with boolean flag and descriptive message
    */
   async getSetupStatus(): Promise<SetupStatusResponse> {
     logger.debug('Checking system setup status');
 
     try {
-      const adminCount = await db.query.admins.findMany({ limit: 1 });
+      const operatorCount = await db.query.operators.findMany({ limit: 1 });
 
-      const isSetup = adminCount.length > 0;
+      const isSetup = operatorCount.length > 0;
 
-      logger.debug({ isSetup, adminCount: adminCount.length }, 'System setup status checked');
+      logger.debug({ isSetup, operatorCount: operatorCount.length }, 'System setup status checked');
 
       return {
         isSetup,
-        message: isSetup ? 'System is already configured with admin accounts' : 'System setup required - no admin accounts found',
+        message: isSetup ? 'System is already configured with operator accounts' : 'System setup required - no operator accounts found',
       };
     } catch (error) {
       logger.error({ error }, 'Failed to check system setup status');
@@ -39,43 +39,43 @@ export class SetupService {
   }
 
   /**
-   * Create the initial admin account with super_admin role
-   * This endpoint can only be used when no admin accounts exist
-   * @param input - Initial admin creation data (id, name, password, optional metadata)
-   * @returns Admin details and authentication tokens for immediate login
+   * Create the initial operator account with super_operator role
+   * This endpoint can only be used when no operator accounts exist
+   * @param input - Initial operator creation data (id, name, password, optional metadata)
+   * @returns Operator details and authentication tokens for immediate login
    */
-  async createInitialAdmin(input: InitialAdminSetupRequest): Promise<InitialAdminSetupResponse> {
-    logger.info({ adminId: input.id, name: input.name }, 'Creating initial admin account');
+  async createInitialOperator(input: InitialOperatorSetupRequest): Promise<InitialOperatorSetupResponse> {
+    logger.info({ operatorId: input.id, name: input.name }, 'Creating initial operator account');
 
     try {
-      // Check if any admin accounts exist
-      const existingAdmins = await db.query.admins.findMany({ limit: 1 });
+      // Check if any operator accounts exist
+      const existingOperators = await db.query.operators.findMany({ limit: 1 });
 
-      if (existingAdmins.length > 0) {
-        logger.warn({ adminId: input.id, existingAdminCount: existingAdmins.length }, 'Attempted initial admin creation when system is already set up');
-        throw new InvalidOperationError('System is already configured. Use regular admin creation endpoint instead.');
+      if (existingOperators.length > 0) {
+        logger.warn({ operatorId: input.id, existingOperatorCount: existingOperators.length }, 'Attempted initial operator creation when system is already set up');
+        throw new InvalidOperationError('System is already configured. Use regular operator creation endpoint instead.');
       }
 
       // Hash password before storing
       const hashedPassword = await this.authService.hashPassword(input.password);
 
-      // Create admin with super_admin role (all permissions)
-      const admin = await db.insert(admins).values({ id: input.id, name: input.name, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
+      // Create operator with super_operator role (all permissions)
+      const operator = await db.insert(operators).values({ id: input.id, name: input.name, roles: ['super_operator'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
 
-      const createdAdmin = admin[0];
+      const createdOperator = operator[0];
 
       // Generate authentication tokens for immediate login
       const loginResponse = await this.authService.login(input.id, input.password);
 
-      logger.info({ adminId: createdAdmin.id, roles: createdAdmin.roles }, 'Initial admin account created successfully');
+      logger.info({ operatorId: createdOperator.id, roles: createdOperator.roles }, 'Initial operator account created successfully');
 
       return {
-        admin: {
-          id: createdAdmin.id,
-          name: createdAdmin.name,
-          roles: createdAdmin.roles,
-          metadata: createdAdmin.metadata ?? {},
-          createdAt: createdAdmin.createdAt,
+        operator: {
+          id: createdOperator.id,
+          name: createdOperator.name,
+          roles: createdOperator.roles,
+          metadata: createdOperator.metadata ?? {},
+          createdAt: createdOperator.createdAt,
         },
         accessToken: loginResponse.accessToken,
         refreshToken: loginResponse.refreshToken,
@@ -85,7 +85,7 @@ export class SetupService {
       if (error instanceof InvalidOperationError) {
         throw error;
       }
-      logger.error({ error, adminId: input.id }, 'Failed to create initial admin');
+      logger.error({ error, operatorId: input.id }, 'Failed to create initial operator');
       throw error;
     }
   }

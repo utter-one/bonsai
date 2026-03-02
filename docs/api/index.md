@@ -33,7 +33,7 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 ### System & Auth
 - [Setup](./setup) — Initial system setup
 - [Authentication](./authentication) — Login, token refresh
-- [Admins](./admins) — Admin user management and profile
+- [Operators](./operators) — Operator user management and profile
 - [Version](./version) — API schema version info
 
 ### Core Resources

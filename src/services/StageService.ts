@@ -84,7 +84,7 @@ export class StageService extends BaseService {
   async createStage(projectId: string, input: CreateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
     const stageId = input.id ?? generateId(ID_PREFIXES.STAGE);
-    logger.info({ id: stageId, projectId, name: input.name, agentId: input.agentId, adminId: context?.adminId }, 'Creating stage');
+    logger.info({ id: stageId, projectId, name: input.name, agentId: input.agentId, operatorId: context?.operatorId }, 'Creating stage');
 
     try {
       // Validate referenced entities exist
@@ -94,7 +94,7 @@ export class StageService extends BaseService {
 
       const createdStage = stage[0];
 
-      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, llmSettings: createdStage.llmSettings, agentId: createdStage.agentId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeTags: createdStage.knowledgeTags, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variableDescriptors: createdStage.variableDescriptors, actions: createdStage.actions, defaultClassifierId: createdStage.defaultClassifierId, transformerIds: createdStage.transformerIds, tags: createdStage.tags, metadata: createdStage.metadata }, context?.adminId);
+      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, llmSettings: createdStage.llmSettings, agentId: createdStage.agentId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeTags: createdStage.knowledgeTags, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variableDescriptors: createdStage.variableDescriptors, actions: createdStage.actions, defaultClassifierId: createdStage.defaultClassifierId, transformerIds: createdStage.transformerIds, tags: createdStage.tags, metadata: createdStage.metadata }, context?.operatorId);
       logger.info({ id: createdStage.id }, 'Stage created successfully');
 
       return stageResponseSchema.parse(createdStage);
@@ -217,7 +217,7 @@ export class StageService extends BaseService {
   async updateStage(projectId: string, id: string, input: UpdateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
     const { version: expectedVersion, ...updateData } = input;
-    logger.info({ id, expectedVersion, adminId: context?.adminId }, 'Updating stage');
+    logger.info({ id, expectedVersion, operatorId: context?.operatorId }, 'Updating stage');
 
     try {
       const existingStage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });
@@ -265,7 +265,7 @@ export class StageService extends BaseService {
 
       const stage = updatedStage[0];
 
-      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, agentId: existingStage.agentId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, llmSettings: stage.llmSettings, agentId: stage.agentId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeTags: stage.knowledgeTags, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variableDescriptors: stage.variableDescriptors, actions: stage.actions, defaultClassifierId: stage.defaultClassifierId, transformerIds: stage.transformerIds, tags: stage.tags, metadata: stage.metadata }, context?.adminId, projectId);
+      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, agentId: existingStage.agentId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, llmSettings: stage.llmSettings, agentId: stage.agentId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeTags: stage.knowledgeTags, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variableDescriptors: stage.variableDescriptors, actions: stage.actions, defaultClassifierId: stage.defaultClassifierId, transformerIds: stage.transformerIds, tags: stage.tags, metadata: stage.metadata }, context?.operatorId, projectId);
 
       logger.info({ id: stage.id, newVersion: stage.version }, 'Stage updated successfully');
 
@@ -286,7 +286,7 @@ export class StageService extends BaseService {
    */
   async deleteStage(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.STAGE_DELETE);
-    logger.info({ id, expectedVersion, adminId: context?.adminId }, 'Deleting stage');
+    logger.info({ id, expectedVersion, operatorId: context?.operatorId }, 'Deleting stage');
 
     try {
       const existingStage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });
@@ -305,7 +305,7 @@ export class StageService extends BaseService {
         throw new OptimisticLockError(`Failed to delete stage due to version conflict`);
       }
 
-      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, agentId: existingStage.agentId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, context?.adminId, projectId);
+      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, agentId: existingStage.agentId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, context?.operatorId, projectId);
 
       logger.info({ id }, 'Stage deleted successfully');
     } catch (error) {
@@ -324,7 +324,7 @@ export class StageService extends BaseService {
    */
   async cloneStage(projectId: string, id: string, input: CloneStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
-    logger.info({ id, adminId: context?.adminId }, 'Cloning stage');
+    logger.info({ id, operatorId: context?.operatorId }, 'Cloning stage');
 
     try {
       const existingStage = await db.query.stages.findFirst({ where: and(eq(stages.projectId, projectId), eq(stages.id, id)) });

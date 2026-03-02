@@ -33,14 +33,14 @@ export class ToolService extends BaseService {
   async createTool(projectId: string, input: CreateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
     const toolId = input.id ?? generateId(ID_PREFIXES.TOOL);
-    logger.info({ toolId, projectId, name: input.name, adminId: context?.adminId }, 'Creating tool');
+    logger.info({ toolId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating tool');
 
     try {
       const tool = await db.insert(tools).values({ id: toolId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, inputType: input.inputType, outputType: input.outputType, parameters: input.parameters ?? [], tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdTool = tool[0];
 
-      await this.auditService.logCreate('tool', createdTool.id, { id: createdTool.id, projectId: createdTool.projectId, name: createdTool.name, description: createdTool.description, prompt: createdTool.prompt, llmProviderId: createdTool.llmProviderId, llmSettings: createdTool.llmSettings, inputType: createdTool.inputType, outputType: createdTool.outputType, parameters: createdTool.parameters, tags: createdTool.tags, metadata: createdTool.metadata }, context?.adminId);
+      await this.auditService.logCreate('tool', createdTool.id, { id: createdTool.id, projectId: createdTool.projectId, name: createdTool.name, description: createdTool.description, prompt: createdTool.prompt, llmProviderId: createdTool.llmProviderId, llmSettings: createdTool.llmSettings, inputType: createdTool.inputType, outputType: createdTool.outputType, parameters: createdTool.parameters, tags: createdTool.tags, metadata: createdTool.metadata }, context?.operatorId);
 
       logger.info({ toolId: createdTool.id }, 'Tool created successfully');
 
@@ -162,7 +162,7 @@ export class ToolService extends BaseService {
   async updateTool(projectId: string, id: string, input: UpdateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
     const { version: expectedVersion, ...updateData } = input;
-    logger.info({ toolId: id, expectedVersion, adminId: context?.adminId }, 'Updating tool');
+    logger.info({ toolId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating tool');
 
     try {
       const existingTool = await db.query.tools.findFirst({ where: and(eq(tools.projectId, projectId), eq(tools.id, id)) });
@@ -195,7 +195,7 @@ export class ToolService extends BaseService {
 
       const tool = updatedTool[0];
 
-      await this.auditService.logUpdate('tool', tool.id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, { id: tool.id, name: tool.name, description: tool.description, prompt: tool.prompt, llmProviderId: tool.llmProviderId, llmSettings: tool.llmSettings, inputType: tool.inputType, outputType: tool.outputType, parameters: tool.parameters, tags: tool.tags, metadata: tool.metadata }, context?.adminId, projectId);
+      await this.auditService.logUpdate('tool', tool.id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, { id: tool.id, name: tool.name, description: tool.description, prompt: tool.prompt, llmProviderId: tool.llmProviderId, llmSettings: tool.llmSettings, inputType: tool.inputType, outputType: tool.outputType, parameters: tool.parameters, tags: tool.tags, metadata: tool.metadata }, context?.operatorId, projectId);
 
       logger.info({ toolId: tool.id, newVersion: tool.version }, 'Tool updated successfully');
 
@@ -216,7 +216,7 @@ export class ToolService extends BaseService {
    */
   async deleteTool(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.TOOL_DELETE);
-    logger.info({ toolId: id, expectedVersion, adminId: context?.adminId }, 'Deleting tool');
+    logger.info({ toolId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting tool');
 
     try {
       const existingTool = await db.query.tools.findFirst({ where: and(eq(tools.projectId, projectId), eq(tools.id, id)) });
@@ -235,7 +235,7 @@ export class ToolService extends BaseService {
         throw new OptimisticLockError(`Failed to delete tool due to version conflict`);
       }
 
-      await this.auditService.logDelete('tool', id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, context?.adminId, projectId);
+      await this.auditService.logDelete('tool', id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, context?.operatorId, projectId);
 
       logger.info({ toolId: id }, 'Tool deleted successfully');
     } catch (error) {
@@ -254,7 +254,7 @@ export class ToolService extends BaseService {
    */
   async cloneTool(projectId: string, id: string, input: CloneToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
-    logger.info({ id, adminId: context?.adminId }, 'Cloning tool');
+    logger.info({ id, operatorId: context?.operatorId }, 'Cloning tool');
 
     try {
       const existingTool = await db.query.tools.findFirst({ where: and(eq(tools.projectId, projectId), eq(tools.id, id)) });

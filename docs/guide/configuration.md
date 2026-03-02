@@ -55,19 +55,19 @@ Migrations run automatically on container startup before the application starts.
 
 ## Initial Setup
 
-After starting the server for the first time, you need to create the initial super admin account. Use the setup endpoint:
+After starting the server for the first time, you need to create the initial super operator account. Use the setup endpoint:
 
 ```bash
-curl -X POST http://localhost:3000/api/setup/initial-admin \
+curl -X POST http://localhost:3000/api/setup/initial-operator \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "admin",
-    "name": "Super Admin",
+    "id": "operator",
+    "name": "Super Operator",
     "password": "your-secure-password"
   }'
 ```
 
-This endpoint is only available when no admin accounts exist. It creates a super admin with full system access.
+This endpoint is only available when no operator accounts exist. It creates a super operator with full system access.
 
 ## Swagger UI
 

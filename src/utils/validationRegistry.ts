@@ -9,7 +9,7 @@ class ValidationRegistry {
 
   /**
    * Register a schema with a type name key
-   * Convention: CreateAdminRequest -> 'CreateAdminRequest'
+   * Convention: CreateOperatorRequest -> 'CreateOperatorRequest'
    */
   register(typeName: string, schema: z.ZodType): void {
     this.schemas.set(typeName, schema);

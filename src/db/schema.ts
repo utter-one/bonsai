@@ -52,8 +52,8 @@ export const conversationEvents = pgTable('conversation_events', {
   foreignKey({ columns: [table.projectId, table.conversationId], foreignColumns: [conversations.projectId, conversations.id] }).onDelete('cascade'),
 ]);
 
-// Admin table
-export const admins = pgTable('admins', {
+// Operator table
+export const operators = pgTable('operators', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   roles: jsonb('roles').notNull().$type<string[]>(),
@@ -296,7 +296,7 @@ export const providers = pgTable('providers', {
   providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings, storage
   apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex, s3, azure-blob, gcs, local
   config: jsonb('config').notNull().$type<ProviderConfig>(),
-  createdBy: text('created_by').references(() => admins.id),
+  createdBy: text('created_by').references(() => operators.id),
   tags: jsonb('tags').$type<string[]>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -476,22 +476,22 @@ export const conversationArtifactsRelations = relations(conversationArtifacts, (
   }),
 }));
 
-export const adminsRelations = relations(admins, ({ many }) => ({
+export const operatorsRelations = relations(operators, ({ many }) => ({
   auditLogs: many(auditLogs),
   providers: many(providers),
 }));
 
 export const providersRelations = relations(providers, ({ one }) => ({
-  creator: one(admins, {
+  creator: one(operators, {
     fields: [providers.createdBy],
-    references: [admins.id],
+    references: [operators.id],
   }),
 }));
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
-  admin: one(admins, {
+  operator: one(operators, {
     fields: [auditLogs.userId],
-    references: [admins.id],
+    references: [operators.id],
   }),
 }));
 

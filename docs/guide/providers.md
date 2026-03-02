@@ -12,7 +12,7 @@
 | `providerType` | Service type: `llm`, `tts`, `asr`, `embeddings`, or `storage` |
 | `apiType` | Implementation identifier (e.g., `openai`, `azure`, `anthropic`) |
 | `config` | Provider-specific connection configuration |
-| `createdBy` | Admin who created the provider |
+| `createdBy` | Operator who created the provider |
 | `tags` | Searchable labels for organization |
 | `version` | Optimistic locking version |
 
@@ -103,7 +103,7 @@ The system includes a built-in **Provider Catalog** that lists all available pro
 GET /api/provider-catalog
 ```
 
-This is useful for building admin UIs that dynamically render provider configuration forms.
+This is useful for building operator UIs that dynamically render provider configuration forms.
 
 ## Where Providers Are Referenced
 
@@ -122,4 +122,4 @@ If a stage, classifier, transformer, or tool does not specify its own `llmProvid
 
 ## Security
 
-Provider configurations contain sensitive data (API keys, connection strings). Only admins with `provider:read` or `provider:write` permissions can view or modify providers. The config is stored securely and not exposed in API responses beyond what's necessary.
+Provider configurations contain sensitive data (API keys, connection strings). Only operators with `provider:read` or `provider:write` permissions can view or modify providers. The config is stored securely and not exposed in API responses beyond what's necessary.

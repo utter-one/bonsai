@@ -33,7 +33,7 @@ export abstract class BaseService {
 
     const hasRequired = hasAllPermissions(context.roles, permissions);
     if (!hasRequired) {
-      logger.warn({ adminId: context.adminId, roles: context.roles, requiredPermissions: permissions }, 'Permission denied');
+      logger.warn({ operatorId: context.operatorId, roles: context.roles, requiredPermissions: permissions }, 'Permission denied');
       throw new ForbiddenError(`Missing required permissions: ${permissions.join(', ')}`);
     }
   }
@@ -45,6 +45,6 @@ export abstract class BaseService {
    * @param details - Additional details to log
    */
   protected logOperation(context: RequestContext | undefined, operation: string, details: Record<string, any> = {}): void {
-    logger.info({ adminId: context?.adminId, ip: context?.ip, requestId: context?.requestId, operation, ...details }, `Operation: ${operation}`);
+    logger.info({ operatorId: context?.operatorId, ip: context?.ip, requestId: context?.requestId, operation, ...details }, `Operation: ${operation}`);
   }
 }
