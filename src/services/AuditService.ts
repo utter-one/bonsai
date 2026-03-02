@@ -73,13 +73,15 @@ export class AuditService {
    * @param entityId - The unique identifier of the created entity
    * @param newEntity - The newly created entity data
    * @param userId - Optional ID of the user who created the entity
+   * @param projectId - Optional project ID the entity belongs to (preferred over projectId extracted from entity snapshot)
    * @returns The created audit log entry
    */
   async logCreate(
     entityType: string,
     entityId: string,
     newEntity: Record<string, any>,
-    userId?: string
+    userId?: string,
+    projectId?: string
   ): Promise<AuditLog> {
     return this.logChange({
       userId,
@@ -87,7 +89,7 @@ export class AuditService {
       entityType,
       entityId,
       newEntity,
-      projectId: newEntity?.projectId, // Assuming newEntity contains projectId for created entities
+      projectId: projectId ?? newEntity?.projectId,
     });
   }
 
@@ -98,6 +100,7 @@ export class AuditService {
    * @param oldEntity - The entity data before the update
    * @param newEntity - The entity data after the update
    * @param userId - Optional ID of the user who updated the entity
+   * @param projectId - Optional project ID the entity belongs to (preferred over projectId extracted from entity snapshots)
    * @returns The created audit log entry
    */
   async logUpdate(
@@ -105,7 +108,8 @@ export class AuditService {
     entityId: string,
     oldEntity: Record<string, any>,
     newEntity: Record<string, any>,
-    userId?: string
+    userId?: string,
+    projectId?: string
   ): Promise<AuditLog> {
     return this.logChange({
       userId,
@@ -114,7 +118,7 @@ export class AuditService {
       entityId,
       oldEntity,
       newEntity,
-      projectId: newEntity?.projectId || oldEntity?.projectId, // Use projectId from newEntity or fallback to oldEntity
+      projectId: projectId ?? newEntity?.projectId ?? oldEntity?.projectId,
     });
   }
 
@@ -124,13 +128,15 @@ export class AuditService {
    * @param entityId - The unique identifier of the deleted entity
    * @param oldEntity - The entity data before deletion
    * @param userId - Optional ID of the user who deleted the entity
+   * @param projectId - Optional project ID the entity belongs to (preferred over projectId extracted from entity snapshot)
    * @returns The created audit log entry
    */
   async logDelete(
     entityType: string,
     entityId: string,
     oldEntity: Record<string, any>,
-    userId?: string
+    userId?: string,
+    projectId?: string
   ): Promise<AuditLog> {
     return this.logChange({
       userId,
@@ -138,7 +144,7 @@ export class AuditService {
       entityType,
       entityId,
       oldEntity,
-      projectId: oldEntity?.projectId, // Assuming oldEntity contains projectId for deleted entities
+      projectId: projectId ?? oldEntity?.projectId,
     });
   }
 
