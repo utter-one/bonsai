@@ -30,6 +30,6 @@ features:
     details: Execute sandboxed JavaScript actions, call external webhooks, and invoke LLM-powered tools from within any conversation stage.
     link: /guide/scripting
   - title: Authentication & Permissions
-    details: JWT-based admin authentication with role-based access control (RBAC) and project-scoped API keys for WebSocket clients.
+    details: JWT-based operator authentication with role-based access control (RBAC) and project-scoped API keys for WebSocket clients.
     link: /guide/authentication
 ---

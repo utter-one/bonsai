@@ -9,7 +9,7 @@ All audit log endpoints require the `audit:read` permission.
 In addition, most entity types expose audit logs at their own path:
 
 ```
-GET /api/admins/:id/audit-logs
+GET /api/operators/:id/audit-logs
 GET /api/projects/:projectId/stages/:id/audit-logs
 GET /api/projects/:projectId/agents/:id/audit-logs
 GET /api/projects/:projectId/classifiers/:id/audit-logs
@@ -37,9 +37,9 @@ Supports [pagination & filtering](./pagination).
 
 | Filter | Description |
 |--------|-------------|
-| `entityType` | Filter by entity type (e.g., `admin`, `agent`, `stage`) |
+| `entityType` | Filter by entity type (e.g., `operator`, `agent`, `stage`) |
 | `action` | Filter by action: `CREATE`, `UPDATE`, `DELETE` |
-| `userId` | Filter by admin who performed the action |
+| `userId` | Filter by operator who performed the action |
 | `entityId` | Filter by the affected entity's ID |
 | `createdAt` | Filter by timestamp (supports operators: `gte`, `lte`, `between`) |
 
@@ -50,7 +50,7 @@ Supports [pagination & filtering](./pagination).
   "items": [
     {
       "id": "audit-123",
-      "userId": "admin@example.com",
+      "userId": "operator@example.com",
       "action": "UPDATE",
       "entityId": "agent-1",
       "entityType": "agent",
@@ -71,10 +71,10 @@ Supports [pagination & filtering](./pagination).
 | Field | Type | Nullable | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | Unique audit log identifier |
-| `userId` | `string` | Yes | Admin who performed the action |
+| `userId` | `string` | Yes | Operator who performed the action |
 | `action` | `string` | No | `CREATE`, `UPDATE`, or `DELETE` |
 | `entityId` | `string` | No | ID of the affected entity |
-| `entityType` | `string` | No | Type of entity (e.g., `admin`, `agent`, `stage`) |
+| `entityType` | `string` | No | Type of entity (e.g., `operator`, `agent`, `stage`) |
 | `oldEntity` | `object` | Yes | Entity state before the change (`null` for CREATE) |
 | `newEntity` | `object` | Yes | Entity state after the change (`null` for DELETE) |
 | `version` | `integer` | No | Audit log version |

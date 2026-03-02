@@ -1,17 +1,17 @@
 # Authentication & Permissions
 
-Bonsai Backed uses two authentication mechanisms: **JWT tokens** for admin REST API access, and **API keys** for WebSocket conversation sessions.
+Bonsai Backed uses two authentication mechanisms: **JWT tokens** for operator REST API access, and **API keys** for WebSocket conversation sessions.
 
-## Admin Authentication (JWT)
+## Operator Authentication (JWT)
 
 ### Login
 
-Admins authenticate by posting credentials to the login endpoint:
+Operators authenticate by posting credentials to the login endpoint:
 
 ```bash
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{ "id": "admin", "password": "your-password" }'
+  -d '{ "id": "operator", "password": "your-password" }'
 ```
 
 The response includes an **access token** and a **refresh token**:
@@ -20,7 +20,7 @@ The response includes an **access token** and a **refresh token**:
 {
   "accessToken": "eyJhbG...",
   "refreshToken": "eyJhbG...",
-  "adminId": "admin",
+  "operatorId": "operator",
   "roles": ["super_admin"]
 }
 ```
@@ -45,7 +45,7 @@ curl -X POST http://localhost:3000/api/auth/refresh \
 
 ## Role-Based Access Control (RBAC)
 
-Admins are assigned one or more roles. Each role carries a set of permissions in `entity:action` format.
+Operators are assigned one or more roles. Each role carries a set of permissions in `entity:action` format.
 
 ### Roles
 
@@ -63,7 +63,7 @@ Permissions follow the `entity:action` pattern:
 
 | Entity | Read | Write | Delete |
 |---|---|---|---|
-| Admin | `admin:read` | `admin:write` | `admin:delete` |
+| Operator | `operator:read` | `operator:write` | `operator:delete` |
 | User | `user:read` | `user:write` | `user:delete` |
 | Project | `project:read` | `project:write` | `project:delete` |
 | Agent | `agent:read` | `agent:write` | `agent:delete` |
@@ -135,13 +135,13 @@ Deactivated keys are immediately rejected on WebSocket authentication attempts.
 
 ## Initial Setup
 
-When the system has no admin accounts, the setup endpoint is available:
+When the system has no operator accounts, the setup endpoint is available:
 
 ```bash
-POST /api/setup
+POST /api/setup/initial-operator
 ```
 
-This creates the first super admin account. The endpoint is disabled after the first admin is created.
+This creates the first super operator account. The endpoint is disabled after the first operator is created.
 
 ## Audit Logs
 

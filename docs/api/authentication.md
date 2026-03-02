@@ -1,12 +1,12 @@
 # Authentication
 
-Bonsai Backed uses **JWT-based authentication** for admin access and **API key authentication** for programmatic access.
+Bonsai Backed uses **JWT-based authentication** for operator access and **API key authentication** for programmatic access.
 
 For more information, see the [Authentication & Permissions](../guide/authentication) guide.
 
 ## Login
 
-Authenticate with admin credentials to receive a JWT token pair.
+Authenticate with operator credentials to receive a JWT token pair.
 
 ```http
 POST /api/auth/login
@@ -17,12 +17,12 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | `string` (min 1) | Yes | Admin user ID or email |
-| `password` | `string` (min 1) | Yes | Admin user password |
+| `id` | `string` (min 1) | Yes | Operator user ID or email |
+| `password` | `string` (min 1) | Yes | Operator user password |
 
 ```json
 {
-  "id": "admin@example.com",
+  "id": "operator@example.com",
   "password": "your-password"
 }
 ```
@@ -34,8 +34,8 @@ Content-Type: application/json
   "accessToken": "eyJ...",
   "refreshToken": "eyJ...",
   "expiresIn": 900,
-  "adminId": "admin@example.com",
-  "displayName": "Admin User",
+  "operatorId": "operator@example.com",
+  "displayName": "Operator User",
   "roles": ["super_admin"]
 }
 ```
@@ -45,8 +45,8 @@ Content-Type: application/json
 | `accessToken` | `string` | JWT access token (short-lived) |
 | `refreshToken` | `string` | JWT refresh token (long-lived) |
 | `expiresIn` | `integer` | Access token expiry in seconds |
-| `adminId` | `string` | Admin user ID |
-| `displayName` | `string` | Admin display name |
+| `operatorId` | `string` | Operator user ID |
+| `displayName` | `string` | Operator display name |
 | `roles` | `string[]` | Array of role identifiers |
 
 **Error Responses**
@@ -114,7 +114,7 @@ See [API Keys](./api-keys) for managing API keys and [WebSocket](./websocket) fo
 
 ## Roles & Permissions
 
-The system uses role-based access control (RBAC). Permissions follow the `entity:action` format (e.g., `project:read`, `stage:write`, `admin:delete`).
+The system uses role-based access control (RBAC). Permissions follow the `entity:action` format (e.g., `project:read`, `stage:write`, `operator:delete`).
 
 ### Available Roles
 
@@ -134,7 +134,7 @@ Has every permission in the system.
 
 | Entity | Permissions |
 |--------|-------------|
-| `admin` | `read`, `write`, `delete` |
+| `operator` | `read`, `write`, `delete` |
 | `user` | `read`, `write`, `delete` |
 | `project` | `read`, `write`, `delete` |
 | `agent` | `read`, `write`, `delete` |
@@ -155,7 +155,7 @@ Has every permission in the system.
 
 #### `content_manager`
 
-Manages content entities. Has read/write across most entities but cannot delete projects, agents, users, conversations, or stages, and has no admin or system access.
+Manages content entities. Has read/write across most entities but cannot delete projects, agents, users, conversations, or stages, and has no operator or system access.
 
 | Entity | Permissions |
 |--------|-------------|

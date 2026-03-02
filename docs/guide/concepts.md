@@ -120,7 +120,7 @@ Knowledge categories contain FAQ-style question-answer pairs. When a stage has `
 
 ### Optimistic Locking
 
-All mutable entities use a `version` field for optimistic concurrency control. Update and delete operations must include the current version number, ensuring no silent overwrites when multiple admins edit simultaneously.
+All mutable entities use a `version` field for optimistic concurrency control. Update and delete operations must include the current version number, ensuring no silent overwrites when multiple operators edit simultaneously.
 
 ## Two APIs
 
@@ -130,4 +130,4 @@ Bonsai Backed exposes two APIs:
 
 2. **WebSocket API** — For end-user conversations: real-time bidirectional communication for voice and text sessions. Protected by project-scoped API keys.
 
-These two APIs serve different audiences. The REST API is used by administrators and content managers, while the WebSocket API is used by client applications (web apps, mobile apps, kiosks, etc.) that host the conversational experience.
+These two APIs serve different audiences. The REST API is used by operators and content managers, while the WebSocket API is used by client applications (web apps, mobile apps, kiosks, etc.) that host the conversational experience.

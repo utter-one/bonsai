@@ -49,7 +49,7 @@ This guide covers:
 | [Providers](./providers) | LLM, TTS, ASR, and Storage provider integrations |
 | [Conversations](./conversations) | Conversation lifecycle, states, and events |
 | [WebSocket Protocol](./websocket) | Real-time communication protocol reference |
-| [Authentication](./authentication) | Admin auth, API keys, and RBAC |
+| [Authentication](./authentication) | Operator auth, API keys, and RBAC |
 | [Templating](./templating) | Handlebars templates in prompts |
 | [Scripting](./scripting) | Sandboxed JavaScript execution in effects |
 
