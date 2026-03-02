@@ -507,6 +507,70 @@ export class ConversationContextBuilder {
   }
 
   /**
+   * Builds a lightweight context for filler sentence prompt template rendering.
+   * Includes user input, vars, user profile, constants, conversation history, and time.
+   * Does not include actions or FAQ since classification has not run yet at filler generation time.
+   *
+   * @param conversation - Conversation entity
+   * @param stage - Current stage entity
+   * @param userInput - The raw user input that triggered the filler
+   * @returns ConversationContext suitable for rendering filler sentence prompt templates
+   */
+  async buildContextForFillerSentence(conversation: Conversation, stage: Stage, userInput: string): Promise<ConversationContext> {
+    // Load user data
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, conversation.userId),
+    });
+
+    // Load project constants
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, conversation.projectId),
+      columns: { constants: true },
+    });
+
+    const context: ConversationContext = {
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
+      userProfile: user?.profile || {},
+      consts: project?.constants || {},
+      agent: (stage as any).agent?.prompt,
+      history: [],
+      events: [],
+      actions: {},
+      userInput,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {})),
+    };
+
+    // Load conversation history so templates can reference prior messages
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: eq(conversationEvents.conversationId, conversation.id),
+      orderBy: asc(conversationEvents.timestamp),
+    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = allEvents
+      .filter(e => e.eventType === 'message')
+      .map(e => {
+        const eventData = e.eventData as MessageEventData;
+        return { role: eventData.role, content: eventData.text };
+      });
+
+    return context;
+  }
+
+  /**
    * Builds the initial conversation context when a conversation starts, without any user input.
    * This context will not include any actions or history, but will include stage variables, user profile, and agent.
    * 

@@ -1350,6 +1350,7 @@ export class ConversationRunner {
 
   /**
    * Calls the filler LLM provider to generate a short neutral sentence for the current turn.
+   * The filler prompt is processed through the templating engine before being sent to the LLM.
    * @returns A generated filler sentence, or null if filler is not configured or generation fails.
    */
   private async generateFillerSentence(userInput: string): Promise<string | null> {
@@ -1359,8 +1360,10 @@ export class ConversationRunner {
       return null;
     }
     try {
+      const context = await this.contextBuilder.buildContextForFillerSentence(this.conversation, this.stageData.stage, userInput);
+      const renderedPrompt = await this.templatingEngine.render(fillerSettings.prompt, context);
       const result = await fillerLlmProvider.generate([
-        { role: 'system', content: fillerSettings.prompt },
+        { role: 'system', content: renderedPrompt },
         { role: 'user', content: userInput }]);
       const text = extractTextFromContent(result.content).trim();
       return text.length > 0 ? text : null;
