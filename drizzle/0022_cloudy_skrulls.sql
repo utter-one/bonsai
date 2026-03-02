@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "user_profile_variable_descriptors" jsonb DEFAULT '[]'::jsonb NOT NULL;

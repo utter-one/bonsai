@@ -6,7 +6,7 @@ import { gcsStorageSettingsSchema } from '../../services/providers/storage/GcsSt
 import { localStorageSettingsSchema } from '../../services/providers/storage/LocalStorageProvider';
 import { azureAsrSettingsSchema } from '../../services/providers/asr/AzureAsrProvider';
 import { elevenLabsAsrSettingsSchema } from '../../services/providers/asr/ElevenLabsAsrProvider';
-import { parameterValueSchema } from '../../types/parameters';
+import { parameterValueSchema, fieldDescriptorSchema } from '../../types/parameters';
 import { deepgramAsrSettingsSchema } from '../../services/providers/asr/DeepgramAsrProvider';
 import { assemblyAiAsrSettingsSchema } from '../../services/providers/asr/AssemblyAiAsrProvider';
 import { speechmaticsAsrSettingsSchema } from '../../services/providers/asr/SpeechmaticsAsrProvider';
@@ -74,6 +74,7 @@ export const createProjectSchema = z.object({
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
   timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
+  userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().default([]).describe('Descriptors defining the data schema for user profile variables in this project'),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
@@ -91,6 +92,7 @@ export const updateProjectSchema = z.object({
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
   timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
+  userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().describe('Updated descriptors defining the data schema for user profile variables in this project'),
   version: z.number().describe('The current version number for optimistic locking'),
 });
 
@@ -110,6 +112,7 @@ export const projectResponseSchema = z.object({
   constants: z.record(z.string(), parameterValueSchema).nullable().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).nullable().describe('Additional metadata for the project'),
   timezone: z.string().nullable().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Null means UTC.'),
+  userProfileVariableDescriptors: z.array(fieldDescriptorSchema).describe('Descriptors defining the data schema for user profile variables in this project'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),
   updatedAt: z.coerce.date().describe('The timestamp when the project was last updated'),
