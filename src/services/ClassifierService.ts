@@ -230,7 +230,7 @@ export class ClassifierService extends BaseService {
         throw new OptimisticLockError(`Failed to delete classifier due to version conflict`);
       }
 
-      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, context?.adminId);
+      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, context?.adminId, projectId);
 
       logger.info({ classifierId: id }, 'Classifier deleted successfully');
     } catch (error) {

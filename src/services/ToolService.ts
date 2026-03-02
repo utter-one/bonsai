@@ -235,7 +235,7 @@ export class ToolService extends BaseService {
         throw new OptimisticLockError(`Failed to delete tool due to version conflict`);
       }
 
-      await this.auditService.logDelete('tool', id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, context?.adminId);
+      await this.auditService.logDelete('tool', id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, context?.adminId, projectId);
 
       logger.info({ toolId: id }, 'Tool deleted successfully');
     } catch (error) {

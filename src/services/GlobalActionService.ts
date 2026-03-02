@@ -233,7 +233,7 @@ export class GlobalActionService extends BaseService {
         throw new OptimisticLockError(`Failed to delete global action due to version conflict`);
       }
 
-      await this.auditService.logDelete('global_action', id, { id: existingGlobalAction.id, name: existingGlobalAction.name, condition: existingGlobalAction.condition, triggerOnUserInput: existingGlobalAction.triggerOnUserInput, triggerOnClientCommand: existingGlobalAction.triggerOnClientCommand, classificationTrigger: existingGlobalAction.classificationTrigger, overrideClassifierId: existingGlobalAction.overrideClassifierId, parameters: existingGlobalAction.parameters, effects: existingGlobalAction.effects, examples: existingGlobalAction.examples, tags: existingGlobalAction.tags, metadata: existingGlobalAction.metadata }, context?.adminId);
+      await this.auditService.logDelete('global_action', id, { id: existingGlobalAction.id, name: existingGlobalAction.name, condition: existingGlobalAction.condition, triggerOnUserInput: existingGlobalAction.triggerOnUserInput, triggerOnClientCommand: existingGlobalAction.triggerOnClientCommand, classificationTrigger: existingGlobalAction.classificationTrigger, overrideClassifierId: existingGlobalAction.overrideClassifierId, parameters: existingGlobalAction.parameters, effects: existingGlobalAction.effects, examples: existingGlobalAction.examples, tags: existingGlobalAction.tags, metadata: existingGlobalAction.metadata }, context?.adminId, projectId);
 
       logger.info({ globalActionId: id }, 'Global action deleted successfully');
     } catch (error) {

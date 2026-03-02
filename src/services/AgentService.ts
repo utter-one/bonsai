@@ -219,7 +219,7 @@ export class AgentService extends BaseService {
         throw new OptimisticLockError(`Failed to delete agent due to version conflict`);
       }
 
-      await this.auditService.logDelete('agent', id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata }, context?.adminId);
+      await this.auditService.logDelete('agent', id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata }, context?.adminId, projectId);
 
       logger.info({ agentId: id }, 'Agent deleted successfully');
     } catch (error) {

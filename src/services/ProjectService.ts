@@ -207,7 +207,7 @@ export class ProjectService extends BaseService {
           const itemRecords = await tx.query.knowledgeItems.findMany({ where: and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.categoryId, category.id)) });
           for (const item of itemRecords) {
             await tx.delete(knowledgeItems).where(and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.id, item.id)));
-            await this.auditService.logDelete('knowledge_item', item.id, { id: item.id, categoryId: item.categoryId }, context?.adminId);
+            await this.auditService.logDelete('knowledge_item', item.id, { id: item.id, categoryId: item.categoryId }, context?.adminId, id);
           }
         }
         logger.debug({ projectId: id, categoryCount: categoryRecords.length }, 'Deleted knowledgeItems');

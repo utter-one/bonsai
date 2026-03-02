@@ -206,7 +206,7 @@ export class IssueService extends BaseService {
         throw new NotFoundError(`Issue with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('issue', String(id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, context?.adminId);
+      await this.auditService.logDelete('issue', String(id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, context?.adminId, projectId);
 
       logger.info({ issueId: id }, 'Issue deleted successfully');
     } catch (error) {

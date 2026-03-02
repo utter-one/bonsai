@@ -202,7 +202,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Failed to delete knowledge category due to version conflict`);
       }
 
-      await this.auditService.logDelete('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, context?.adminId);
+      await this.auditService.logDelete('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, context?.adminId, projectId);
 
       logger.info({ categoryId: id }, 'Knowledge category deleted successfully');
     } catch (error) {
@@ -231,7 +231,7 @@ export class KnowledgeService extends BaseService {
 
       const createdItem = item[0];
 
-      await this.auditService.logCreate('knowledge_item', createdItem.id, { id: createdItem.id, categoryId: createdItem.categoryId, question: createdItem.question, answer: createdItem.answer, order: createdItem.order }, context?.adminId);
+      await this.auditService.logCreate('knowledge_item', createdItem.id, { id: createdItem.id, categoryId: createdItem.categoryId, question: createdItem.question, answer: createdItem.answer, order: createdItem.order }, context?.adminId, projectId);
 
       logger.info({ itemId: createdItem.id }, 'Knowledge item created successfully');
 
@@ -391,7 +391,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Failed to delete knowledge item due to version conflict`);
       }
 
-      await this.auditService.logDelete('knowledge_item', id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, context?.adminId);
+      await this.auditService.logDelete('knowledge_item', id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, context?.adminId, projectId);
 
       logger.info({ itemId: id }, 'Knowledge item deleted successfully');
     } catch (error) {

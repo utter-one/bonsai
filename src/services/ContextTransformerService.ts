@@ -231,7 +231,7 @@ export class ContextTransformerService extends BaseService {
         throw new OptimisticLockError(`Failed to delete context transformer due to version conflict`);
       }
 
-      await this.auditService.logDelete('context_transformer', id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProviderId: existingTransformer.llmProviderId, llmSettings: existingTransformer.llmSettings, tags: existingTransformer.tags, metadata: existingTransformer.metadata }, context?.adminId);
+      await this.auditService.logDelete('context_transformer', id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProviderId: existingTransformer.llmProviderId, llmSettings: existingTransformer.llmSettings, tags: existingTransformer.tags, metadata: existingTransformer.metadata }, context?.adminId, projectId);
 
       logger.info({ transformerId: id }, 'Context transformer deleted successfully');
     } catch (error) {
