@@ -27,6 +27,7 @@ Content-Type: application/json
 | `ttsSettings` | [`TtsSettings`](#tts-settings) | Yes | TTS provider-specific settings |
 | `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
+| `fillerSettings` | [`FillerSettings`](#filler-settings) | No | LLM-generated filler sentence spoken at turn start while classification runs |
 
 **Response** `201 Created` — [Agent Response](#agent-response)
 
@@ -61,7 +62,7 @@ Content-Type: application/json
 
 **Required permission:** `agent:write`
 
-All create fields are optional plus `version` (required), **except `ttsSettings` which must always be provided**.
+All create fields are optional plus `version` (required), **except `ttsSettings` which must always be provided**. Set `fillerSettings` to `null` to remove existing filler settings.
 
 **Response** `200 OK` — [Agent Response](#agent-response)
 
@@ -123,9 +124,35 @@ Returns audit log entries for the specified agent. See [Audit Logs](./audit-logs
 | `ttsSettings` | `TtsSettings` | Yes | TTS settings |
 | `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
+| `fillerSettings` | [`FillerSettings`](#filler-settings) | Yes | Filler response settings, or `null` if not configured |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+
+## Filler Settings
+
+When configured, an LLM generates a short neutral sentence at the very start of each response turn, which is immediately fed into TTS while classification runs in parallel. This reduces perceived latency by letting the user hear a response fragment (e.g. *"Hmm, let me think about that."*) before the main AI reply is ready.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `llmProviderId` | `string` | Yes | ID of the LLM provider used to generate the filler sentence |
+| `llmSettings` | `object` | Yes | LLM provider-specific settings (model, temperature, etc.) |
+| `prompt` | `string` | Yes | System prompt instructing the LLM to produce a single short neutral filler sentence |
+
+The `prompt` field supports the same [template variables](../guide/templating) as stage prompts, with the following available at filler-generation time:
+
+| Variable | Description |
+|----------|-------------|
+| `{{ userInput }}` | The raw text of the current user turn |
+| `{{ vars }}` | Stage-scoped conversation variables |
+| `{{ stageVars }}` | All stage variables keyed by stage ID |
+| `{{ userProfile }}` | User profile object |
+| `{{ consts }}` | Project-level constants |
+| `{{ history }}` | Conversation message history |
+| `{{ time }}` | Current time context |
+| `{{ stage }}` | Current stage context |
+
+> **Note:** `actions`, `results`, and FAQ context are **not** available in the filler prompt because classification has not run yet at filler generation time.
 
 ## TTS Settings
 
