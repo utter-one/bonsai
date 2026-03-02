@@ -258,9 +258,9 @@ export const globalActions = pgTable('global_actions', {
 export const issues = pgTable('issues', {
   id: serial('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
-  environment: text('environment').notNull(),
-  buildVersion: text('build_version').notNull(),
-  beat: text('beat'),
+  environment: text('environment'),
+  buildVersion: text('build_version'),
+  stage: text('stage'),
   sessionId: text('session_id'),
   eventIndex: integer('event_index'),
   userId: text('user_id'),

@@ -1,6 +1,6 @@
 {
-  "id": "b58680eb-e99f-461c-b02c-bd6074f0252b",
-  "prevId": "25164170-21c1-4021-8bc0-1ceb4862e283",
+  "id": "a09d3ebf-8d2b-4066-999a-ceaaa69ed0c3",
+  "prevId": "80a92b9a-a447-4987-9af0-a761f4d51e41",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -123,12 +123,6 @@
         },
         "metadata": {
           "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "filler_settings": {
-          "name": "filler_settings",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -1172,16 +1166,16 @@
           "name": "environment",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "build_version": {
           "name": "build_version",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "beat": {
-          "name": "beat",
+        "stage": {
+          "name": "stage",
           "type": "text",
           "primaryKey": false,
           "notNull": false
