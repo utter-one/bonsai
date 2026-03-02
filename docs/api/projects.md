@@ -28,6 +28,7 @@ Content-Type: application/json
 | `constants` | `Record<string, ParameterValue>` | No | Constants for templating and conversation logic |
 | `metadata` | `object` | No | Additional metadata |
 | `timezone` | `string` | No | IANA timezone identifier for conversations (e.g. `Europe/Warsaw`). Used as fallback when no per-user or per-conversation timezone is set. Defaults to UTC. |
+| `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No (default: `[]`) | Descriptors defining the data schema for user profile variables in this project |
 
 **Response** `201 Created` — [Project Response](#project-response)
 
@@ -87,6 +88,7 @@ All fields from the create body are optional. `version` is required for optimist
 | `constants` | `Record<string, ParameterValue>` | No | Updated constants |
 | `metadata` | `object` | No | Updated metadata |
 | `timezone` | `string` | No | Updated IANA timezone identifier |
+| `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Updated descriptors for user profile variable schema |
 **Response** `200 OK` — [Project Response](#project-response)
 
 **Errors:** `400` Invalid body | `404` Not found | `409` Version conflict
@@ -124,6 +126,7 @@ Content-Type: application/json
 | `constants` | `Record<string, ParameterValue>` | Yes | Project constants |
 | `metadata` | `object` | Yes | Additional metadata |
 | `timezone` | `string` | Yes | IANA timezone identifier (null means UTC) |
+| `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Descriptors defining the data schema for user profile variables |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
@@ -143,3 +146,14 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | `storageProviderId` | `string` | No | Storage provider ID |
 | `settings` | `object` | No | Storage-specific settings (varies by provider: S3, Azure Blob, GCS, Local) |
+
+## Field Descriptor
+
+Describes a single field in a typed schema. Used in `userProfileVariableDescriptors` to define the expected shape of a user's profile data, enabling validation and tooling.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | Yes | Field name |
+| `type` | `string` | Yes | One of: `string`, `number`, `boolean`, `object`, `string[]`, `number[]`, `boolean[]`, `object[]`, `image`, `image[]`, `audio`, `audio[]` |
+| `isArray` | `boolean` | Yes | Whether the field holds an array of values |
+| `objectSchema` | `FieldDescriptor[]` | No | Nested field descriptors when `type` is `object` or `object[]` |

@@ -17,6 +17,7 @@ Each project includes:
 | `storageConfig` | Storage provider for conversation artifacts |
 | `constants` | Key-value store for templating across all stages |
 | `metadata` | Arbitrary JSON for custom data |
+| `userProfileVariableDescriptors` | Typed schema describing the fields expected on a user's profile |
 | `version` | Optimistic locking version number |
 
 ## ASR Configuration
@@ -59,6 +60,27 @@ Project-level constants are available in all Handlebars prompts and scripts via 
   "maxRetries": 3
 }
 ```
+
+## User Profile Variable Descriptors
+
+The `userProfileVariableDescriptors` field defines the typed schema for profile data attached to users in this project. It mirrors the `variableDescriptors` concept used on stages, but applies to the user profile object.
+
+Each descriptor specifies a field's name, type, and whether it is an array. Nested object schemas are supported recursively.
+
+```json
+{
+  "userProfileVariableDescriptors": [
+    { "name": "preferredLanguage", "type": "string", "isArray": false },
+    { "name": "loyaltyTier", "type": "string", "isArray": false },
+    { "name": "purchaseHistory", "type": "object", "isArray": true, "objectSchema": [
+      { "name": "productId", "type": "string", "isArray": false },
+      { "name": "amount", "type": "number", "isArray": false }
+    ]}
+  ]
+}
+```
+
+This schema is used to validate and document the fields that stage effects of type `modify_user_profile` operate on. Keeping it accurate ensures consistent profile shape across all stages and agents in the project.
 
 ## Child Entities
 
