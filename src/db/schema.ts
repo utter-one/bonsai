@@ -8,6 +8,7 @@ import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory'
 import { TtsProviderConfig, TtsSettings } from '../services/providers/tts/TtsProviderFactory';
 import { StorageProviderConfig } from '../http/contracts/provider';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
+import { FillerSettings } from '../http/contracts/agent';
 
 
 export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig;
@@ -99,6 +100,7 @@ export const agents = pgTable('agents', {
   ttsSettings: jsonb('tts_settings').$type<TtsSettings>(),
   tags: jsonb('tags').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
+  fillerSettings: jsonb('filler_settings').$type<FillerSettings>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

@@ -5,7 +5,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createAdminSchema, updateAdminBodySchema, deleteAdminBodySchema, adminResponseSchema, adminListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/admin';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
 import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema } from './http/contracts/project';
-import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema } from './http/contracts/agent';
+import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema, fillerSettingsSchema } from './http/contracts/agent';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
 import { initialAdminSetupSchema, setupStatusResponseSchema, initialAdminSetupResponseSchema } from './http/contracts/setup';
 import { createKnowledgeCategorySchema, updateKnowledgeCategoryBodySchema, deleteKnowledgeCategoryBodySchema, knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, createKnowledgeItemSchema, updateKnowledgeItemBodySchema, deleteKnowledgeItemBodySchema, knowledgeItemResponseSchema, knowledgeItemListResponseSchema } from './http/contracts/knowledge';
@@ -102,6 +102,7 @@ export function getOpenAPISpec(): any {
 
   // Voice and ASR configuration schemas
   registry.register('AsrConfig', asrConfigSchema);
+  registry.register('FillerSettings', fillerSettingsSchema);
 
   // ASR provider settings schemas
   registry.register('AzureAsrSettings', azureAsrSettingsSchema);

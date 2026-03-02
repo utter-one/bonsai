@@ -30,6 +30,7 @@ import { TemplatingEngine } from "./TemplatingEngine";
 import { extractTextFromContent, getContentSize } from "../../utils/llm";
 import { KnowledgeService } from "../KnowledgeService";
 import type { FaqItem } from "./ConversationContextBuilder";
+import type { AgentResponse } from "../../http/contracts/agent";
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -55,6 +56,10 @@ export type StageRuntimeData = {
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   shouldEndConversation: boolean;
+  /** Loaded agent, includes fillerSettings and TTS configuration */
+  agent: AgentResponse;
+  /** LLM provider used to generate filler sentences, preloaded from agent.fillerSettings */
+  fillerLlmProvider?: ILlmProvider;
   inputTurnId?: string;
   outputTurnId?: string;
   /** FAQ items gathered from knowledge base, persisted between turns until new knowledge actions are detected */
@@ -70,6 +75,10 @@ export class ConversationRunner {
   private session: Connection;
   private conversation: Conversation;
   private ws: WebSocket;
+  /** True when a filler sentence has already opened the response turn (outputTurnId assigned, start_ai_generation_output sent, TTS started) */
+  private responseOutputTurnStarted: boolean = false;
+  /** Filler sentence generated for the current turn, passed as assistant prefix to the LLM so it continues naturally */
+  private lastFillerSentence: string | null = null;
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -132,6 +141,7 @@ export class ConversationRunner {
       asrProvider: undefined,
       ttsProvider: undefined,
       shouldEndConversation: false,
+      agent: null as any, // populated below after agentService.getAgentById
       faq: [],
     };
 
@@ -216,6 +226,18 @@ export class ConversationRunner {
     if (!agent) {
       throw new NotFoundError(`Agent with ID ${stageData.stage.agentId} not found`);
     }
+    stageData.agent = agent;
+
+    // Preload LLM provider for filler sentence generation if configured
+    if (agent.fillerSettings?.llmProviderId) {
+      const fillerLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.fillerSettings.llmProviderId) });
+      if (fillerLlmProviderEntity) {
+        stageData.fillerLlmProvider = this.llmProviderFactory.createProvider(fillerLlmProviderEntity, agent.fillerSettings.llmSettings);
+      } else {
+        logger.warn({ agentId: agent.id, llmProviderId: agent.fillerSettings.llmProviderId }, 'Filler LLM provider not found, filler responses will be skipped');
+      }
+    }
+
     const ttsSettings = agent.ttsSettings;
     if (project.generateVoice && agent.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
       const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.ttsProviderId) });
@@ -1107,6 +1129,44 @@ export class ConversationRunner {
    */
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
     await this.changeState('processing_user_input');
+
+    // Start filler sentence immediately — opens the response turn early by sending
+    // start_ai_generation_output and feeding the sentence into TTS before classification begins.
+    this.lastFillerSentence = null;
+    const fillerSentence = await this.generateFillerSentence(userInput);
+    if (fillerSentence) {
+      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
+      const fillerStartMessage = {
+        type: 'start_ai_generation_output',
+        conversationId: this.conversation.id,
+        outputTurnId: this.stageData.outputTurnId,
+        sessionId: this.session.id,
+        requestId: null,
+        expectVoice: !!this.stageData.ttsProvider,
+      } as StartAiGenerationOutputMessage;
+      this.ws.send(JSON.stringify(fillerStartMessage));
+      if (this.stageData.ttsProvider) {
+        await this.stageData.ttsProvider.start();
+        await this.stageData.ttsProvider.sendText(fillerSentence);
+      }
+      if (this.session.sessionSettings.receiveTranscriptionUpdates) {
+        const chunkMessage = {
+          type: 'ai_transcribed_chunk',
+          conversationId: this.conversation.id,
+          outputTurnId: this.stageData.outputTurnId,
+          chunkId: generateId(ID_PREFIXES.CHUNK),
+          chunkText: fillerSentence,
+          ordinal: 0,
+          isFinal: true,
+          sessionId: this.session.id,
+          requestId: null,
+        } as AiTranscribedChunkMessage;
+        this.ws.send(JSON.stringify(chunkMessage));
+      }
+      this.responseOutputTurnStarted = true;
+      this.lastFillerSentence = fillerSentence;
+    }
+
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
 
     // Detect and handle knowledge actions - these are synthetic actions from the knowledge base
@@ -1216,29 +1276,43 @@ export class ConversationRunner {
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
     if (shouldGenerateResponse) {
-      // Send AI response start notification to client through WebSocket
-      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
-      const message = {
-        type: 'start_ai_generation_output',
-        conversationId: this.conversation.id,
-        outputTurnId: this.stageData.outputTurnId,
-        sessionId: this.session.id,
-        requestId: null,
-        expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null
-      } as StartAiGenerationOutputMessage;
-      this.ws.send(JSON.stringify(message));
+      if (this.responseOutputTurnStarted) {
+        // Filler already opened the turn: outputTurnId, start_ai_generation_output and TTS start
+        // were handled in processUserInput — skip all of that here.
+        this.responseOutputTurnStarted = false;
+      } else {
+        // Normal path: open the turn now.
+        this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
+        const message = {
+          type: 'start_ai_generation_output',
+          conversationId: this.conversation.id,
+          outputTurnId: this.stageData.outputTurnId,
+          sessionId: this.session.id,
+          requestId: null,
+          expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null
+        } as StartAiGenerationOutputMessage;
+        this.ws.send(JSON.stringify(message));
 
-      await this.changeState('generating_response');
-      if (this.stageData.ttsProvider) {
-        await this.stageData.ttsProvider.start();
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.start();
+        }
       }
+      await this.changeState('generating_response');
       if (executionOutcome.prescriptedResponse !== undefined) {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
         this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
-        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider);
+        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
       }
+      this.lastFillerSentence = null;
     } else if (executionOutcome.shouldEndConversation) {
+      // Close the filler turn if it was opened but no response follows
+      if (this.responseOutputTurnStarted) {
+        this.responseOutputTurnStarted = false;
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.end();
+        }
+      }
       // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
@@ -1247,6 +1321,13 @@ export class ConversationRunner {
       await this.saveAndSendEvent('conversation_end', eventData);
       await this.changeState('finished');
     } else if (executionOutcome.shouldAbortConversation) {
+      // Close the filler turn if it was opened but no response follows
+      if (this.responseOutputTurnStarted) {
+        this.responseOutputTurnStarted = false;
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.end();
+        }
+      }
       // Abort conversation without generating response
       const eventData: ConversationAbortedEventData = {
         stageId: this.stageData.id,
@@ -1255,8 +1336,40 @@ export class ConversationRunner {
       await this.saveAndSendEvent('conversation_aborted', eventData);
       await this.changeState('finished');
     } else {
+      // Close the filler turn if it was opened but no response follows
+      if (this.responseOutputTurnStarted) {
+        this.responseOutputTurnStarted = false;
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.end();
+        }
+      }
       // If no response generation, go back to awaiting user input
       await this.changeState('awaiting_user_input');
+    }
+  }
+
+  /**
+   * Calls the filler LLM provider to generate a short neutral sentence for the current turn.
+   * The filler prompt is processed through the templating engine before being sent to the LLM.
+   * @returns A generated filler sentence, or null if filler is not configured or generation fails.
+   */
+  private async generateFillerSentence(userInput: string): Promise<string | null> {
+    const fillerLlmProvider = this.stageData.fillerLlmProvider;
+    const fillerSettings = this.stageData.agent?.fillerSettings;
+    if (!fillerLlmProvider || !fillerSettings) {
+      return null;
+    }
+    try {
+      const context = await this.contextBuilder.buildContextForFillerSentence(this.conversation, this.stageData.stage, userInput);
+      const renderedPrompt = await this.templatingEngine.render(fillerSettings.prompt, context);
+      const result = await fillerLlmProvider.generate([
+        { role: 'system', content: renderedPrompt },
+        { role: 'user', content: userInput }]);
+      const text = extractTextFromContent(result.content).trim();
+      return text.length > 0 ? text : null;
+    } catch (error) {
+      logger.warn({ conversationId: this.conversation.id, message: error?.message }, 'Failed to generate filler sentence, skipping');
+      return null;
     }
   }
 

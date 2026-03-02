@@ -1,12 +1,31 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema, ttsSettingsSchema } from './common';
+import { listParamsSchema, ttsSettingsSchema, llmSettingsSchema } from './common';
 import { audioFormatValues } from '../../types/audio';
 import type { ListParams } from './common';
 
 extendZodWithOpenApi(z);
 
 export { listParamsSchema, type ListParams };
+
+/**
+ * Schema for agent filler response settings.
+ * When configured, a randomly or sequentially picked sentence is fed into the TTS pipeline
+ * at the very start of the response turn, while classification is still running in parallel.
+ */
+/**
+ * Schema for agent filler response settings.
+ * When configured, an LLM generates a short neutral sentence that is fed into the TTS pipeline
+ * at the very start of the response turn, while classification runs in parallel.
+ */
+export const fillerSettingsSchema = z.object({
+  llmProviderId: z.string().describe('ID of the LLM provider used to generate the filler sentence'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for filler generation'),
+  prompt: z.string().min(1).describe('Prompt instructing the LLM to produce a short neutral filler sentence (e.g. "Generate a single short neutral sentence to fill silence while processing, like \"Hmm, let me think about that.\"")'),
+}).openapi('FillerSettings');
+
+/** Settings controlling LLM-generated filler sentence playback at the start of each response turn */
+export type FillerSettings = z.infer<typeof fillerSettingsSchema>;
 
 // Route param schema
 export const agentRouteParamsSchema = z.object({
@@ -28,6 +47,7 @@ export const createAgentSchema = z.object({
   ttsSettings: ttsSettingsSchema.describe('TTS provider-specific settings'),
   tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this agent'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional agent-specific metadata'),
+  fillerSettings: fillerSettingsSchema.optional().describe('Filler response settings: a short sentence spoken through TTS at the very start of each turn while classification runs in parallel'),
 });
 
 /**
@@ -43,6 +63,7 @@ export const updateAgentBodySchema = z.object({
   ttsSettings: ttsSettingsSchema.describe('Updated TTS provider-specific settings'),
   tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
+  fillerSettings: fillerSettingsSchema.optional().describe('Updated filler response settings'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
 
@@ -68,6 +89,7 @@ export const agentResponseSchema = z.object({
   ttsSettings: ttsSettingsSchema.nullable().describe('TTS provider-specific settings'),
   tags: z.array(z.string()).describe('Tags for categorizing and filtering this agent'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional agent-specific metadata'),
+  fillerSettings: fillerSettingsSchema.nullable().describe('Filler response settings'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the agent was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the agent was last updated'),

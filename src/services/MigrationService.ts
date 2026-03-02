@@ -671,6 +671,7 @@ export class MigrationService extends BaseService {
         prompt: sql`excluded.prompt`,
         ttsProviderId: sql`excluded.tts_provider_id`,
         ttsSettings: sql`excluded.tts_settings`,
+        fillerSettings: sql`excluded.filler_settings`,
         metadata: sql`excluded.metadata`,
         version: sql`${agents.version} + 1`,
         updatedAt: sql`now()`,

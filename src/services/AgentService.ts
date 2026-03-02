@@ -35,11 +35,11 @@ export class AgentService extends BaseService {
     logger.info({ agentId, projectId, name: input.name, adminId: context?.adminId }, 'Creating agent');
 
     try {
-      const agent = await db.insert(agents).values({ id: agentId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, tags: input.tags ?? [], metadata: input.metadata, version: 1 }).returning();
+      const agent = await db.insert(agents).values({ id: agentId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, tags: input.tags ?? [], metadata: input.metadata, fillerSettings: input.fillerSettings, version: 1 }).returning();
 
       const createdAgent = agent[0];
 
-      await this.auditService.logCreate('agent', createdAgent.id, { id: createdAgent.id, projectId: createdAgent.projectId, name: createdAgent.name, description: createdAgent.description, prompt: createdAgent.prompt, ttsProviderId: createdAgent.ttsProviderId, ttsSettings: createdAgent.ttsSettings, tags: createdAgent.tags, metadata: createdAgent.metadata }, context?.adminId);
+      await this.auditService.logCreate('agent', createdAgent.id, { id: createdAgent.id, projectId: createdAgent.projectId, name: createdAgent.name, description: createdAgent.description, prompt: createdAgent.prompt, ttsProviderId: createdAgent.ttsProviderId, ttsSettings: createdAgent.ttsSettings, tags: createdAgent.tags, metadata: createdAgent.metadata, fillerSettings: createdAgent.fillerSettings }, context?.adminId);
 
       logger.info({ agentId: createdAgent.id }, 'Agent created successfully');
 
@@ -171,7 +171,7 @@ export class AgentService extends BaseService {
         throw new OptimisticLockError(`Agent version mismatch. Expected ${expectedVersion}, got ${existingAgent.version}`);
       }
 
-      const updatedAgent = await db.update(agents).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, tags: updateData.tags, metadata: updateData.metadata, version: existingAgent.version + 1, updatedAt: new Date() }).where(and(eq(agents.projectId, projectId), eq(agents.id, id), eq(agents.version, expectedVersion))).returning();
+      const updatedAgent = await db.update(agents).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, tags: updateData.tags, metadata: updateData.metadata, fillerSettings: updateData.fillerSettings, version: existingAgent.version + 1, updatedAt: new Date() }).where(and(eq(agents.projectId, projectId), eq(agents.id, id), eq(agents.version, expectedVersion))).returning();
 
       if (updatedAgent.length === 0) {
         throw new OptimisticLockError(`Failed to update agent due to version conflict`);
@@ -179,7 +179,7 @@ export class AgentService extends BaseService {
 
       const agent = updatedAgent[0];
 
-      await this.auditService.logUpdate('agent', agent.id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata }, { id: agent.id, name: agent.name, description: agent.description, prompt: agent.prompt, ttsProviderId: agent.ttsProviderId, ttsSettings: agent.ttsSettings, tags: agent.tags, metadata: agent.metadata }, context?.adminId, projectId);
+      await this.auditService.logUpdate('agent', agent.id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, { id: agent.id, name: agent.name, description: agent.description, prompt: agent.prompt, ttsProviderId: agent.ttsProviderId, ttsSettings: agent.ttsSettings, tags: agent.tags, metadata: agent.metadata, fillerSettings: agent.fillerSettings }, context?.adminId, projectId);
 
       logger.info({ agentId: agent.id, newVersion: agent.version }, 'Agent updated successfully');
 
@@ -219,7 +219,7 @@ export class AgentService extends BaseService {
         throw new OptimisticLockError(`Failed to delete agent due to version conflict`);
       }
 
-      await this.auditService.logDelete('agent', id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata }, context?.adminId, projectId);
+      await this.auditService.logDelete('agent', id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, context?.adminId, projectId);
 
       logger.info({ agentId: id }, 'Agent deleted successfully');
     } catch (error) {
@@ -247,7 +247,7 @@ export class AgentService extends BaseService {
         throw new NotFoundError(`Agent with id ${id} not found`);
       }
 
-      return await this.createAgent(projectId, { id: input.id, name: input.name ?? `${existingAgent.name} (Clone)`, description: existingAgent.description ?? undefined, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId ?? undefined, ttsSettings: existingAgent.ttsSettings as any, tags: existingAgent.tags as string[], metadata: existingAgent.metadata ?? undefined }, context);
+      return await this.createAgent(projectId, { id: input.id, name: input.name ?? `${existingAgent.name} (Clone)`, description: existingAgent.description ?? undefined, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId ?? undefined, ttsSettings: existingAgent.ttsSettings as any, tags: existingAgent.tags as string[], metadata: existingAgent.metadata ?? undefined, fillerSettings: existingAgent.fillerSettings as any ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone agent');
       throw error;
