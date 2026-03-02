@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { admins } from '../db/schema';
+import { operators } from '../db/schema';
 import type { JWTPayload } from '../http/middleware/auth';
 import { UnauthorizedError, InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
@@ -24,7 +24,7 @@ export type LoginResponse = {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
-  adminId: string;
+  operatorId: string;
   name: string;
   roles: string[];
 };
@@ -76,53 +76,53 @@ export class AuthService {
   }
 
   /**
-   * Authenticate an admin user with email and password
-   * @param id - Admin user ID (email)
+   * Authenticate an operator user with email and password
+   * @param id - Operator user ID (email)
    * @param password - Plain text password
    * @returns Login response with tokens and user info
    * @throws {UnauthorizedError} When credentials are invalid
    */
   async login(id: string, password: string): Promise<LoginResponse> {
-    logger.info({ adminId: id }, 'Login attempt');
+    logger.info({ operatorId: id }, 'Login attempt');
 
     try {
-      const admin = await db.query.admins.findFirst({ where: eq(admins.id, id) });
+      const operator = await db.query.operators.findFirst({ where: eq(operators.id, id) });
 
-      if (!admin) {
-        logger.warn({ adminId: id }, 'Login failed: admin not found');
+      if (!operator) {
+        logger.warn({ operatorId: id }, 'Login failed: operator not found');
         throw new UnauthorizedError('Invalid credentials');
       }
 
-      const isValidPassword = await this.verifyPassword(password, admin.password);
+      const isValidPassword = await this.verifyPassword(password, operator.password);
 
       if (!isValidPassword) {
-        logger.warn({ adminId: id }, 'Login failed: invalid password');
+        logger.warn({ operatorId: id }, 'Login failed: invalid password');
         throw new UnauthorizedError('Invalid credentials');
       }
 
       const payload: Omit<JWTPayload, 'type'> = {
-        adminId: admin.id,
-        roles: admin.roles,
+        operatorId: operator.id,
+        roles: operator.roles,
       };
 
       const accessToken = this.generateToken({ ...payload, type: 'access' }, ACCESS_TOKEN_EXPIRY);
       const refreshToken = this.generateToken({ ...payload, type: 'refresh' }, REFRESH_TOKEN_EXPIRY);
 
-      logger.info({ adminId: admin.id, roles: admin.roles }, 'Login successful');
+      logger.info({ operatorId: operator.id, roles: operator.roles }, 'Login successful');
 
       return {
         accessToken,
         refreshToken,
         expiresIn: 900, // 15 minutes in seconds
-        adminId: admin.id,
-        name: admin.name,
-        roles: admin.roles,
+        operatorId: operator.id,
+        name: operator.name,
+        roles: operator.roles,
       };
     } catch (error) {
       if (error instanceof UnauthorizedError) {
         throw error;
       }
-      logger.error({ error, adminId: id }, 'Login failed');
+      logger.error({ error, operatorId: id }, 'Login failed');
       throw new UnauthorizedError('Authentication failed');
     }
   }
@@ -148,16 +148,16 @@ export class AuthService {
         throw new UnauthorizedError('Invalid refresh token');
       }
 
-      const admin = await db.query.admins.findFirst({ where: eq(admins.id, payload.adminId) });
+      const operator = await db.query.operators.findFirst({ where: eq(operators.id, payload.operatorId) });
 
-      if (!admin) {
-        logger.warn({ adminId: payload.adminId }, 'Refresh failed: admin not found');
+      if (!operator) {
+        logger.warn({ operatorId: payload.operatorId }, 'Refresh failed: operator not found');
         throw new UnauthorizedError('Invalid refresh token');
       }
 
-      const newAccessToken = this.generateToken({ adminId: admin.id, roles: admin.roles, type: 'access' }, ACCESS_TOKEN_EXPIRY);
+      const newAccessToken = this.generateToken({ operatorId: operator.id, roles: operator.roles, type: 'access' }, ACCESS_TOKEN_EXPIRY);
 
-      logger.info({ adminId: admin.id }, 'Token refreshed successfully');
+      logger.info({ operatorId: operator.id }, 'Token refreshed successfully');
 
       return {
         accessToken: newAccessToken,

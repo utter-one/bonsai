@@ -5,7 +5,7 @@ import { createServer } from 'http';
 import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
 import qs from 'qs';
-import { AdminController } from './http/controllers/AdminController';
+import { OperatorController } from './http/controllers/OperatorController';
 import { UserController } from './http/controllers/UserController';
 import { AgentController } from './http/controllers/AgentController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -115,8 +115,8 @@ export function createApp(): express.Application {
   const setupController = container.resolve(SetupController);
   setupController.registerRoutes(app);
 
-  const adminController = container.resolve(AdminController);
-  adminController.registerRoutes(app);
+  const operatorController = container.resolve(OperatorController);
+  operatorController.registerRoutes(app);
 
   const projectController = container.resolve(ProjectController);
   projectController.registerRoutes(app);

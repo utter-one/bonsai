@@ -5,10 +5,10 @@
 
 /** All available permissions in the system */
 export const PERMISSIONS = {
-  // Admin permissions
-  ADMIN_READ: 'admin:read',
-  ADMIN_WRITE: 'admin:write',
-  ADMIN_DELETE: 'admin:delete',
+  // Operator permissions
+  OPERATOR_READ: 'operator:read',
+  OPERATOR_WRITE: 'operator:write',
+  OPERATOR_DELETE: 'operator:delete',
 
   // User permissions
   USER_READ: 'user:read',

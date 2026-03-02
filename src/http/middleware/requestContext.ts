@@ -8,7 +8,7 @@ declare global {
     interface Request {
       context?: RequestContext;
       user?: {
-        adminId: string;
+        operatorId: string;
         roles: string[];
       };
     }
@@ -23,7 +23,7 @@ export function requestContextMiddleware(req: Request, res: Response, next: Next
   // If authentication was successful, create context
   if (req.user) {
     req.context = {
-      adminId: req.user.adminId,
+      operatorId: req.user.operatorId,
       roles: req.user.roles,
       ip: (req.ip || req.socket.remoteAddress || 'unknown'),
       userAgent: req.get('user-agent') || 'unknown',

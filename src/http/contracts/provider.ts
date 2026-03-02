@@ -110,7 +110,7 @@ export const createProviderSchema = z.object({
   providerType: providerTypeSchema.describe('Provider category: asr, tts, llm, or embeddings'),
   apiType: providerNameSchema.describe('Specific provider implementation (e.g., openai, anthropic, azure, elevenlabs)'),
   config: providerConfigSchema.describe('Provider-specific configuration object (varies by providerType and apiType)'),
-  createdBy: z.string().optional().describe('Admin user ID who created the provider'),
+  createdBy: z.string().optional().describe('Operator user ID who created the provider'),
   tags: z.array(z.string()).optional().describe('Searchable tags for organization (e.g., ["production", "low-latency"])'),
 });
 
@@ -148,7 +148,7 @@ export const providerResponseSchema = z.object({
   providerType: providerTypeSchema.describe('Provider category (asr, tts, llm, embeddings)'),
   apiType: providerNameSchema.describe('Specific provider implementation'),
   config: providerConfigSchema.describe('Provider-specific configuration object'),
-  createdBy: z.string().nullable().describe('Admin user ID who created the provider'),
+  createdBy: z.string().nullable().describe('Operator user ID who created the provider'),
   tags: z.array(z.string()).nullable().describe('Tags for organization and search'),
   version: z.number().int().describe('Current version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the provider was created'),

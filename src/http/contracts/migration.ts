@@ -51,7 +51,7 @@ export type MigrationSelection = z.infer<typeof migrationSelectionSchema>;
  *
  * Provider records are exported WITHOUT their config field (API credentials are stripped).
  * The target instance must reconfigure provider credentials after import.
- * Excluded from migration: admins, users, conversations, conversationEvents,
+ * Excluded from migration: operators, users, conversations, conversationEvents,
  * conversationArtifacts, auditLogs, issues, environments.
  */
 export const exportBundleSchema = z.object({

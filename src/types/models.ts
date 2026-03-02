@@ -3,7 +3,7 @@ import {
   users,
   conversations,
   conversationEvents,
-  admins,
+  operators,
   agents,
   classifiers,
   contextTransformers,
@@ -25,7 +25,7 @@ import {
 export type User = InferSelectModel<typeof users>;
 export type Conversation = InferSelectModel<typeof conversations>;
 export type ConversationEvent = InferSelectModel<typeof conversationEvents>;
-export type Admin = InferSelectModel<typeof admins>;
+export type Operator = InferSelectModel<typeof operators>;
 export type Agent = InferSelectModel<typeof agents>;
 export type Classifier = InferSelectModel<typeof classifiers>;
 export type ContextTransformer = InferSelectModel<typeof contextTransformers>;

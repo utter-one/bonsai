@@ -30,14 +30,14 @@ export class IssueService extends BaseService {
    */
   async createIssue(input: CreateIssueRequest, context: RequestContext): Promise<IssueResponse> {
     this.requirePermission(context, PERMISSIONS.ISSUE_WRITE);
-    logger.info({ projectId: input.projectId, environment: input.environment, severity: input.severity, adminId: context?.adminId }, 'Creating issue');
+    logger.info({ projectId: input.projectId, environment: input.environment, severity: input.severity, operatorId: context?.operatorId }, 'Creating issue');
 
     try {
       const issue = await db.insert(issues).values({ projectId: input.projectId, environment: input.environment, buildVersion: input.buildVersion, stage: input.stage, sessionId: input.sessionId, eventIndex: input.eventIndex, userId: input.userId, severity: input.severity, category: input.category, bugDescription: input.bugDescription, expectedBehaviour: input.expectedBehaviour, comments: input.comments ?? '', status: input.status }).returning();
 
       const createdIssue = issue[0];
 
-      await this.auditService.logCreate('issue', String(createdIssue.id), { id: createdIssue.id, projectId: createdIssue.projectId, environment: createdIssue.environment, buildVersion: createdIssue.buildVersion, severity: createdIssue.severity, category: createdIssue.category, status: createdIssue.status }, context?.adminId);
+      await this.auditService.logCreate('issue', String(createdIssue.id), { id: createdIssue.id, projectId: createdIssue.projectId, environment: createdIssue.environment, buildVersion: createdIssue.buildVersion, severity: createdIssue.severity, category: createdIssue.category, status: createdIssue.status }, context?.operatorId);
 
       logger.info({ issueId: createdIssue.id }, 'Issue created successfully');
 
@@ -156,7 +156,7 @@ export class IssueService extends BaseService {
    */
   async updateIssue(id: number, input: UpdateIssueRequest, context: RequestContext): Promise<IssueResponse> {
     this.requirePermission(context, PERMISSIONS.ISSUE_WRITE);
-    logger.info({ issueId: id, adminId: context?.adminId }, 'Updating issue');
+    logger.info({ issueId: id, operatorId: context?.operatorId }, 'Updating issue');
 
     try {
       const existingIssue = await db.query.issues.findFirst({ where: eq(issues.id, id) });
@@ -173,7 +173,7 @@ export class IssueService extends BaseService {
 
       const issue = updatedIssue[0];
 
-      await this.auditService.logUpdate('issue', String(issue.id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, { id: issue.id, environment: issue.environment, severity: issue.severity, status: issue.status }, context?.adminId, existingIssue.projectId);
+      await this.auditService.logUpdate('issue', String(issue.id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, { id: issue.id, environment: issue.environment, severity: issue.severity, status: issue.status }, context?.operatorId, existingIssue.projectId);
 
       logger.info({ issueId: issue.id }, 'Issue updated successfully');
 
@@ -191,7 +191,7 @@ export class IssueService extends BaseService {
    */
   async deleteIssue(id: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.ISSUE_DELETE);
-    logger.info({ issueId: id, adminId: context?.adminId }, 'Deleting issue');
+    logger.info({ issueId: id, operatorId: context?.operatorId }, 'Deleting issue');
 
     try {
       const existingIssue = await db.query.issues.findFirst({ where: eq(issues.id, id) });
@@ -206,7 +206,7 @@ export class IssueService extends BaseService {
         throw new NotFoundError(`Issue with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('issue', String(id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, context?.adminId, existingIssue.projectId);
+      await this.auditService.logDelete('issue', String(id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, context?.operatorId, existingIssue.projectId);
 
       logger.info({ issueId: id }, 'Issue deleted successfully');
     } catch (error) {

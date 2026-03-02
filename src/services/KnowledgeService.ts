@@ -37,14 +37,14 @@ export class KnowledgeService extends BaseService {
   async createKnowledgeCategory(projectId: string, input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const categoryId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_CATEGORY);
-    logger.info({ categoryId, projectId, name: input.name, adminId: context?.adminId }, 'Creating knowledge category');
+    logger.info({ categoryId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating knowledge category');
 
     try {
       const category = await db.insert(knowledgeCategories).values({ id: categoryId, projectId, name: input.name, promptTrigger: input.promptTrigger, tags: input.tags ?? [], order: input.order ?? 0, version: 1 }).returning();
 
       const createdCategory = category[0];
 
-      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, projectId: createdCategory.projectId, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeTags: createdCategory.tags, order: createdCategory.order }, context?.adminId);
+      await this.auditService.logCreate('knowledge_category', createdCategory.id, { id: createdCategory.id, projectId: createdCategory.projectId, name: createdCategory.name, promptTrigger: createdCategory.promptTrigger, knowledgeTags: createdCategory.tags, order: createdCategory.order }, context?.operatorId);
 
       logger.info({ categoryId: createdCategory.id }, 'Knowledge category created successfully');
 
@@ -141,7 +141,7 @@ export class KnowledgeService extends BaseService {
   async updateKnowledgeCategory(projectId: string, id: string, input: UpdateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const { version: expectedVersion, ...updateData } = input;
-    logger.info({ categoryId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge category');
+    logger.info({ categoryId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating knowledge category');
 
     try {
       const existingCategory = await db.query.knowledgeCategories.findFirst({ where: and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id)), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
@@ -162,7 +162,7 @@ export class KnowledgeService extends BaseService {
 
       const category = await db.query.knowledgeCategories.findFirst({ where: eq(knowledgeCategories.id, id), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
-      await this.auditService.logUpdate('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, { id: category!.id, name: category!.name, promptTrigger: category!.promptTrigger, knowledgeTags: category!.tags, order: category!.order }, context?.adminId, projectId);
+      await this.auditService.logUpdate('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, { id: category!.id, name: category!.name, promptTrigger: category!.promptTrigger, knowledgeTags: category!.tags, order: category!.order }, context?.operatorId, projectId);
 
       logger.info({ categoryId: category!.id, newVersion: category!.version }, 'Knowledge category updated successfully');
 
@@ -183,7 +183,7 @@ export class KnowledgeService extends BaseService {
    */
   async deleteKnowledgeCategory(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
-    logger.info({ categoryId: id, expectedVersion, adminId: context?.adminId }, 'Deleting knowledge category');
+    logger.info({ categoryId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting knowledge category');
 
     try {
       const existingCategory = await db.query.knowledgeCategories.findFirst({ where: and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id)) });
@@ -202,7 +202,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Failed to delete knowledge category due to version conflict`);
       }
 
-      await this.auditService.logDelete('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, context?.adminId, projectId);
+      await this.auditService.logDelete('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, context?.operatorId, projectId);
 
       logger.info({ categoryId: id }, 'Knowledge category deleted successfully');
     } catch (error) {
@@ -224,14 +224,14 @@ export class KnowledgeService extends BaseService {
   async createKnowledgeItem(projectId: string, input: CreateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const itemId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_ITEM);
-    logger.info({ itemId, categoryId: input.categoryId, adminId: context?.adminId }, 'Creating knowledge item');
+    logger.info({ itemId, categoryId: input.categoryId, operatorId: context?.operatorId }, 'Creating knowledge item');
 
     try {
       const item = await db.insert(knowledgeItems).values({ id: itemId, projectId, categoryId: input.categoryId, question: input.question, answer: input.answer, order: input.order ?? 0, version: 1 }).returning();
 
       const createdItem = item[0];
 
-      await this.auditService.logCreate('knowledge_item', createdItem.id, { id: createdItem.id, categoryId: createdItem.categoryId, question: createdItem.question, answer: createdItem.answer, order: createdItem.order }, context?.adminId, projectId);
+      await this.auditService.logCreate('knowledge_item', createdItem.id, { id: createdItem.id, categoryId: createdItem.categoryId, question: createdItem.question, answer: createdItem.answer, order: createdItem.order }, context?.operatorId, projectId);
 
       logger.info({ itemId: createdItem.id }, 'Knowledge item created successfully');
 
@@ -330,7 +330,7 @@ export class KnowledgeService extends BaseService {
   async updateKnowledgeItem(projectId: string, id: string, input: UpdateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
     const { version: expectedVersion, ...updateData } = input;
-    logger.info({ itemId: id, expectedVersion, adminId: context?.adminId }, 'Updating knowledge item');
+    logger.info({ itemId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating knowledge item');
 
     try {
       const existingItem = await db.query.knowledgeItems.findFirst({ where: and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id)) });
@@ -351,7 +351,7 @@ export class KnowledgeService extends BaseService {
 
       const item = updatedItem[0];
 
-      await this.auditService.logUpdate('knowledge_item', item.id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, { id: item.id, categoryId: item.categoryId, question: item.question, answer: item.answer, order: item.order }, context?.adminId, projectId);
+      await this.auditService.logUpdate('knowledge_item', item.id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, { id: item.id, categoryId: item.categoryId, question: item.question, answer: item.answer, order: item.order }, context?.operatorId, projectId);
 
       logger.info({ itemId: item.id, newVersion: item.version }, 'Knowledge item updated successfully');
 
@@ -372,7 +372,7 @@ export class KnowledgeService extends BaseService {
    */
   async deleteKnowledgeItem(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
-    logger.info({ itemId: id, expectedVersion, adminId: context?.adminId }, 'Deleting knowledge item');
+    logger.info({ itemId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting knowledge item');
 
     try {
       const existingItem = await db.query.knowledgeItems.findFirst({ where: and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id)) });
@@ -391,7 +391,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Failed to delete knowledge item due to version conflict`);
       }
 
-      await this.auditService.logDelete('knowledge_item', id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, context?.adminId, projectId);
+      await this.auditService.logDelete('knowledge_item', id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, context?.operatorId, projectId);
 
       logger.info({ itemId: id }, 'Knowledge item deleted successfully');
     } catch (error) {

@@ -34,14 +34,14 @@ export class EnvironmentService extends BaseService {
   async createEnvironment(input: CreateEnvironmentRequest, context: RequestContext): Promise<EnvironmentResponse> {
     this.requirePermission(context, PERMISSIONS.ENVIRONMENT_WRITE);
     const environmentId = input.id ?? generateId(ID_PREFIXES.ENVIRONMENT);
-    logger.info({ environmentId, description: input.description, adminId: context?.adminId }, 'Creating environment');
+    logger.info({ environmentId, description: input.description, operatorId: context?.operatorId }, 'Creating environment');
 
     try {
       const environment = await db.insert(environments).values({ id: environmentId, description: input.description, url: input.url, login: input.login, password: input.password, version: 1 }).returning();
 
       const createdEnvironment = environment[0];
 
-      await this.auditService.logCreate('environment', createdEnvironment.id, { id: createdEnvironment.id, description: createdEnvironment.description, url: createdEnvironment.url, login: createdEnvironment.login }, context?.adminId);
+      await this.auditService.logCreate('environment', createdEnvironment.id, { id: createdEnvironment.id, description: createdEnvironment.description, url: createdEnvironment.url, login: createdEnvironment.login }, context?.operatorId);
 
       logger.info({ environmentId: createdEnvironment.id }, 'Environment created successfully');
 
@@ -156,7 +156,7 @@ export class EnvironmentService extends BaseService {
   async updateEnvironment(id: string, input: UpdateEnvironmentRequest, context: RequestContext): Promise<EnvironmentResponse> {
     this.requirePermission(context, PERMISSIONS.ENVIRONMENT_WRITE);
     const { version: expectedVersion, ...updateData } = input;
-    logger.info({ environmentId: id, expectedVersion, adminId: context?.adminId }, 'Updating environment');
+    logger.info({ environmentId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating environment');
 
     try {
       const existingEnvironment = await db.query.environments.findFirst({ where: eq(environments.id, id) });
@@ -183,7 +183,7 @@ export class EnvironmentService extends BaseService {
 
       const environment = updatedEnvironment[0];
 
-      await this.auditService.logUpdate('environment', environment.id, { id: existingEnvironment.id, description: existingEnvironment.description, url: existingEnvironment.url, login: existingEnvironment.login }, { id: environment.id, description: environment.description, url: environment.url, login: environment.login }, context?.adminId);
+      await this.auditService.logUpdate('environment', environment.id, { id: existingEnvironment.id, description: existingEnvironment.description, url: existingEnvironment.url, login: existingEnvironment.login }, { id: environment.id, description: environment.description, url: environment.url, login: environment.login }, context?.operatorId);
 
       logger.info({ environmentId: environment.id, newVersion: environment.version }, 'Environment updated successfully');
 
@@ -204,7 +204,7 @@ export class EnvironmentService extends BaseService {
    */
   async deleteEnvironment(id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.ENVIRONMENT_DELETE);
-    logger.info({ environmentId: id, expectedVersion, adminId: context?.adminId }, 'Deleting environment');
+    logger.info({ environmentId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting environment');
 
     try {
       const existingEnvironment = await db.query.environments.findFirst({ where: eq(environments.id, id) });
@@ -223,7 +223,7 @@ export class EnvironmentService extends BaseService {
         throw new OptimisticLockError(`Failed to delete environment due to version conflict`);
       }
 
-      await this.auditService.logDelete('environment', id, { id: existingEnvironment.id, description: existingEnvironment.description, url: existingEnvironment.url, login: existingEnvironment.login }, context?.adminId);
+      await this.auditService.logDelete('environment', id, { id: existingEnvironment.id, description: existingEnvironment.description, url: existingEnvironment.url, login: existingEnvironment.login }, context?.operatorId);
 
       logger.info({ environmentId: id }, 'Environment deleted successfully');
     } catch (error) {

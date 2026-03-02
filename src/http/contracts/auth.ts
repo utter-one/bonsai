@@ -8,8 +8,8 @@ extendZodWithOpenApi(z);
  * Required fields: id (email/username), password
  */
 export const loginSchema = z.object({
-  id: z.string().min(1).describe('Admin user ID or email'),
-  password: z.string().min(1).describe('Admin user password'),
+  id: z.string().min(1).describe('Operator user ID or email'),
+  password: z.string().min(1).describe('Operator user password'),
 });
 
 /**
@@ -28,8 +28,8 @@ export const loginResponseSchema = z.object({
   accessToken: z.string().describe('JWT access token (expires in 15 minutes)'),
   refreshToken: z.string().describe('JWT refresh token (expires in 7 days)'),
   expiresIn: z.number().int().positive().describe('Access token expiry time in seconds'),
-  adminId: z.string().describe('Admin user ID'),
-  displayName: z.string().describe('Admin display name'),
+  operatorId: z.string().describe('Operator user ID'),
+  displayName: z.string().describe('Operator display name'),
   roles: z.array(z.string()).describe('Array of role identifiers'),
 });
 

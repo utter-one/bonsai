@@ -32,14 +32,14 @@ export class AgentService extends BaseService {
   async createAgent(projectId: string, input: CreateAgentRequest, context: RequestContext): Promise<AgentResponse> {
     this.requirePermission(context, PERMISSIONS.AGENT_WRITE);
     const agentId = input.id ?? generateId(ID_PREFIXES.AGENT);
-    logger.info({ agentId, projectId, name: input.name, adminId: context?.adminId }, 'Creating agent');
+    logger.info({ agentId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating agent');
 
     try {
       const agent = await db.insert(agents).values({ id: agentId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, ttsProviderId: input.ttsProviderId, ttsSettings: input.ttsSettings, tags: input.tags ?? [], metadata: input.metadata, fillerSettings: input.fillerSettings, version: 1 }).returning();
 
       const createdAgent = agent[0];
 
-      await this.auditService.logCreate('agent', createdAgent.id, { id: createdAgent.id, projectId: createdAgent.projectId, name: createdAgent.name, description: createdAgent.description, prompt: createdAgent.prompt, ttsProviderId: createdAgent.ttsProviderId, ttsSettings: createdAgent.ttsSettings, tags: createdAgent.tags, metadata: createdAgent.metadata, fillerSettings: createdAgent.fillerSettings }, context?.adminId);
+      await this.auditService.logCreate('agent', createdAgent.id, { id: createdAgent.id, projectId: createdAgent.projectId, name: createdAgent.name, description: createdAgent.description, prompt: createdAgent.prompt, ttsProviderId: createdAgent.ttsProviderId, ttsSettings: createdAgent.ttsSettings, tags: createdAgent.tags, metadata: createdAgent.metadata, fillerSettings: createdAgent.fillerSettings }, context?.operatorId);
 
       logger.info({ agentId: createdAgent.id }, 'Agent created successfully');
 
@@ -158,7 +158,7 @@ export class AgentService extends BaseService {
   async updateAgent(projectId: string, id: string, input: UpdateAgentRequest, context: RequestContext): Promise<AgentResponse> {
     this.requirePermission(context, PERMISSIONS.AGENT_WRITE);
     const { version: expectedVersion, ...updateData } = input;
-    logger.info({ agentId: id, expectedVersion, adminId: context?.adminId }, 'Updating agent');
+    logger.info({ agentId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating agent');
 
     try {
       const existingAgent = await db.query.agents.findFirst({ where: and(eq(agents.projectId, projectId), eq(agents.id, id)) });
@@ -179,7 +179,7 @@ export class AgentService extends BaseService {
 
       const agent = updatedAgent[0];
 
-      await this.auditService.logUpdate('agent', agent.id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, { id: agent.id, name: agent.name, description: agent.description, prompt: agent.prompt, ttsProviderId: agent.ttsProviderId, ttsSettings: agent.ttsSettings, tags: agent.tags, metadata: agent.metadata, fillerSettings: agent.fillerSettings }, context?.adminId, projectId);
+      await this.auditService.logUpdate('agent', agent.id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, { id: agent.id, name: agent.name, description: agent.description, prompt: agent.prompt, ttsProviderId: agent.ttsProviderId, ttsSettings: agent.ttsSettings, tags: agent.tags, metadata: agent.metadata, fillerSettings: agent.fillerSettings }, context?.operatorId, projectId);
 
       logger.info({ agentId: agent.id, newVersion: agent.version }, 'Agent updated successfully');
 
@@ -200,7 +200,7 @@ export class AgentService extends BaseService {
    */
   async deleteAgent(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.AGENT_DELETE);
-    logger.info({ agentId: id, expectedVersion, adminId: context?.adminId }, 'Deleting agent');
+    logger.info({ agentId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting agent');
 
     try {
       const existingAgent = await db.query.agents.findFirst({ where: and(eq(agents.projectId, projectId), eq(agents.id, id)) });
@@ -219,7 +219,7 @@ export class AgentService extends BaseService {
         throw new OptimisticLockError(`Failed to delete agent due to version conflict`);
       }
 
-      await this.auditService.logDelete('agent', id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, context?.adminId, projectId);
+      await this.auditService.logDelete('agent', id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, context?.operatorId, projectId);
 
       logger.info({ agentId: id }, 'Agent deleted successfully');
     } catch (error) {
@@ -238,7 +238,7 @@ export class AgentService extends BaseService {
    */
   async cloneAgent(projectId: string, id: string, input: CloneAgentRequest, context: RequestContext): Promise<AgentResponse> {
     this.requirePermission(context, PERMISSIONS.AGENT_WRITE);
-    logger.info({ id, adminId: context?.adminId }, 'Cloning agent');
+    logger.info({ id, operatorId: context?.operatorId }, 'Cloning agent');
 
     try {
       const existingAgent = await db.query.agents.findFirst({ where: and(eq(agents.projectId, projectId), eq(agents.id, id)) });

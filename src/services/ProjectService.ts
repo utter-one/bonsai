@@ -30,7 +30,7 @@ export class ProjectService extends BaseService {
    */
   async createProject(input: CreateProjectRequest, context: RequestContext): Promise<ProjectResponse> {
     this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
-    logger.info({ name: input.name, adminId: context?.adminId }, 'Creating project');
+    logger.info({ name: input.name, operatorId: context?.operatorId }, 'Creating project');
 
     // Validate storage provider if configured
     if (input.storageConfig?.storageProviderId) {
@@ -43,7 +43,7 @@ export class ProjectService extends BaseService {
 
       const createdProject = project[0];
 
-      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, storageConfig: createdProject.storageConfig, constants: createdProject.constants, metadata: createdProject.metadata, timezone: createdProject.timezone }, context?.adminId);
+      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, storageConfig: createdProject.storageConfig, constants: createdProject.constants, metadata: createdProject.metadata, timezone: createdProject.timezone }, context?.operatorId);
 
       logger.info({ projectId: createdProject.id }, 'Project created successfully');
 
@@ -127,7 +127,7 @@ export class ProjectService extends BaseService {
    */
   async updateProject(id: string, input: UpdateProjectRequest, context: RequestContext): Promise<ProjectResponse> {
     this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
-    logger.info({ projectId: id, adminId: context?.adminId }, 'Updating project');
+    logger.info({ projectId: id, operatorId: context?.operatorId }, 'Updating project');
 
     // Validate storage provider if being updated
     if (input.storageConfig?.storageProviderId) {
@@ -153,7 +153,7 @@ export class ProjectService extends BaseService {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata, timezone: existingProject.timezone }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata, timezone: updatedProject[0].timezone }, context?.adminId, id);
+      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata, timezone: existingProject.timezone }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata, timezone: updatedProject[0].timezone }, context?.operatorId, id);
 
       logger.info({ projectId: id }, 'Project updated successfully');
 
@@ -172,7 +172,7 @@ export class ProjectService extends BaseService {
    */
   async deleteProject(id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.PROJECT_DELETE);
-    logger.info({ projectId: id, adminId: context?.adminId }, 'Deleting project with cascading deletion');
+    logger.info({ projectId: id, operatorId: context?.operatorId }, 'Deleting project with cascading deletion');
 
     try {
       const existingProject = await db.query.projects.findFirst({ where: eq(projects.id, id) });
@@ -189,7 +189,7 @@ export class ProjectService extends BaseService {
         const apiKeyRecords = await tx.query.apiKeys.findMany({ where: eq(apiKeys.projectId, id) });
         for (const apiKey of apiKeyRecords) {
           await tx.delete(apiKeys).where(and(eq(apiKeys.projectId, id), eq(apiKeys.id, apiKey.id)));
-          await this.auditService.logDelete('api_key', apiKey.id, { id: apiKey.id, name: apiKey.name, projectId: apiKey.projectId }, context?.adminId);
+          await this.auditService.logDelete('api_key', apiKey.id, { id: apiKey.id, name: apiKey.name, projectId: apiKey.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: apiKeyRecords.length }, 'Deleted apiKeys');
 
@@ -197,7 +197,7 @@ export class ProjectService extends BaseService {
         const stageRecords = await tx.query.stages.findMany({ where: eq(stages.projectId, id) });
         for (const stage of stageRecords) {
           await tx.delete(stages).where(and(eq(stages.projectId, id), eq(stages.id, stage.id)));
-          await this.auditService.logDelete('stage', stage.id, { id: stage.id, name: stage.name, projectId: stage.projectId }, context?.adminId);
+          await this.auditService.logDelete('stage', stage.id, { id: stage.id, name: stage.name, projectId: stage.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: stageRecords.length }, 'Deleted stages');
 
@@ -207,7 +207,7 @@ export class ProjectService extends BaseService {
           const itemRecords = await tx.query.knowledgeItems.findMany({ where: and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.categoryId, category.id)) });
           for (const item of itemRecords) {
             await tx.delete(knowledgeItems).where(and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.id, item.id)));
-            await this.auditService.logDelete('knowledge_item', item.id, { id: item.id, categoryId: item.categoryId }, context?.adminId, id);
+            await this.auditService.logDelete('knowledge_item', item.id, { id: item.id, categoryId: item.categoryId }, context?.operatorId, id);
           }
         }
         logger.debug({ projectId: id, categoryCount: categoryRecords.length }, 'Deleted knowledgeItems');
@@ -215,7 +215,7 @@ export class ProjectService extends BaseService {
         // 4. Delete knowledgeCategories
         for (const category of categoryRecords) {
           await tx.delete(knowledgeCategories).where(and(eq(knowledgeCategories.projectId, id), eq(knowledgeCategories.id, category.id)));
-          await this.auditService.logDelete('knowledge_category', category.id, { id: category.id, name: category.name, projectId: category.projectId }, context?.adminId);
+          await this.auditService.logDelete('knowledge_category', category.id, { id: category.id, name: category.name, projectId: category.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: categoryRecords.length }, 'Deleted knowledgeCategories');
 
@@ -223,7 +223,7 @@ export class ProjectService extends BaseService {
         const globalActionRecords = await tx.query.globalActions.findMany({ where: eq(globalActions.projectId, id) });
         for (const action of globalActionRecords) {
           await tx.delete(globalActions).where(and(eq(globalActions.projectId, id), eq(globalActions.id, action.id)));
-          await this.auditService.logDelete('global_action', action.id, { id: action.id, name: action.name, projectId: action.projectId }, context?.adminId);
+          await this.auditService.logDelete('global_action', action.id, { id: action.id, name: action.name, projectId: action.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: globalActionRecords.length }, 'Deleted globalActions');
 
@@ -231,7 +231,7 @@ export class ProjectService extends BaseService {
         const toolRecords = await tx.query.tools.findMany({ where: eq(tools.projectId, id) });
         for (const tool of toolRecords) {
           await tx.delete(tools).where(and(eq(tools.projectId, id), eq(tools.id, tool.id)));
-          await this.auditService.logDelete('tool', tool.id, { id: tool.id, name: tool.name, projectId: tool.projectId }, context?.adminId);
+          await this.auditService.logDelete('tool', tool.id, { id: tool.id, name: tool.name, projectId: tool.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: toolRecords.length }, 'Deleted tools');
 
@@ -239,7 +239,7 @@ export class ProjectService extends BaseService {
         const transformerRecords = await tx.query.contextTransformers.findMany({ where: eq(contextTransformers.projectId, id) });
         for (const transformer of transformerRecords) {
           await tx.delete(contextTransformers).where(and(eq(contextTransformers.projectId, id), eq(contextTransformers.id, transformer.id)));
-          await this.auditService.logDelete('context_transformer', transformer.id, { id: transformer.id, name: transformer.name, projectId: transformer.projectId }, context?.adminId);
+          await this.auditService.logDelete('context_transformer', transformer.id, { id: transformer.id, name: transformer.name, projectId: transformer.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: transformerRecords.length }, 'Deleted contextTransformers');
 
@@ -247,7 +247,7 @@ export class ProjectService extends BaseService {
         const classifierRecords = await tx.query.classifiers.findMany({ where: eq(classifiers.projectId, id) });
         for (const classifier of classifierRecords) {
           await tx.delete(classifiers).where(and(eq(classifiers.projectId, id), eq(classifiers.id, classifier.id)));
-          await this.auditService.logDelete('classifier', classifier.id, { id: classifier.id, name: classifier.name, projectId: classifier.projectId }, context?.adminId);
+          await this.auditService.logDelete('classifier', classifier.id, { id: classifier.id, name: classifier.name, projectId: classifier.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: classifierRecords.length }, 'Deleted classifiers');
 
@@ -255,7 +255,7 @@ export class ProjectService extends BaseService {
         const agentRecords = await tx.query.agents.findMany({ where: eq(agents.projectId, id) });
         for (const agent of agentRecords) {
           await tx.delete(agents).where(and(eq(agents.projectId, id), eq(agents.id, agent.id)));
-          await this.auditService.logDelete('agent', agent.id, { id: agent.id, name: agent.name, projectId: agent.projectId }, context?.adminId);
+          await this.auditService.logDelete('agent', agent.id, { id: agent.id, name: agent.name, projectId: agent.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: agentRecords.length }, 'Deleted agents');
 
@@ -263,7 +263,7 @@ export class ProjectService extends BaseService {
         const conversationRecords = await tx.query.conversations.findMany({ where: eq(conversations.projectId, id) });
         for (const conversation of conversationRecords) {
           await tx.delete(conversations).where(and(eq(conversations.projectId, id), eq(conversations.id, conversation.id)));
-          await this.auditService.logDelete('conversation', conversation.id, { id: conversation.id, projectId: conversation.projectId }, context?.adminId);
+          await this.auditService.logDelete('conversation', conversation.id, { id: conversation.id, projectId: conversation.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: conversationRecords.length }, 'Deleted conversations');
 
@@ -271,13 +271,13 @@ export class ProjectService extends BaseService {
         const issueRecords = await tx.query.issues.findMany({ where: eq(issues.projectId, id) });
         for (const issue of issueRecords) {
           await tx.delete(issues).where(and(eq(issues.projectId, id), eq(issues.id, issue.id)));
-          await this.auditService.logDelete('issue', String(issue.id), { id: issue.id, category: issue.category, bugDescription: issue.bugDescription, projectId: issue.projectId }, context?.adminId);
+          await this.auditService.logDelete('issue', String(issue.id), { id: issue.id, category: issue.category, bugDescription: issue.bugDescription, projectId: issue.projectId }, context?.operatorId);
         }
         logger.debug({ projectId: id, count: issueRecords.length }, 'Deleted issues');
 
         // 12. Finally delete the project itself
         await tx.delete(projects).where(eq(projects.id, id));
-        await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata }, context?.adminId);
+        await this.auditService.logDelete('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata }, context?.operatorId);
       });
 
       logger.info({ projectId: id }, 'Project and all related entities deleted successfully');

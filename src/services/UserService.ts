@@ -32,14 +32,14 @@ export class UserService extends BaseService {
   async createUser(input: CreateUserRequest, context: RequestContext): Promise<UserResponse> {
     this.requirePermission(context, PERMISSIONS.USER_WRITE);
     const userId = input.id ?? generateId(ID_PREFIXES.USER);
-    logger.info({ userId, adminId: context?.adminId }, 'Creating user');
+    logger.info({ userId, operatorId: context?.operatorId }, 'Creating user');
 
     try {
       const user = await db.insert(users).values({ id: userId, profile: input.profile }).returning();
 
       const createdUser = user[0];
 
-      await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, profile: createdUser.profile }, context?.adminId);
+      await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, profile: createdUser.profile }, context?.operatorId);
 
       logger.info({ userId: createdUser.id }, 'User created successfully');
 
@@ -148,7 +148,7 @@ export class UserService extends BaseService {
    */
   async updateUser(id: string, input: UpdateUserRequest, context: RequestContext): Promise<UserResponse> {
     this.requirePermission(context, PERMISSIONS.USER_WRITE);
-    logger.info({ userId: id, adminId: context?.adminId }, 'Updating user');
+    logger.info({ userId: id, operatorId: context?.operatorId }, 'Updating user');
 
     try {
       const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -165,7 +165,7 @@ export class UserService extends BaseService {
 
       const user = updatedUser[0];
 
-      await this.auditService.logUpdate('user', user.id, { id: existingUser.id, profile: existingUser.profile }, { id: user.id, profile: user.profile }, context?.adminId);
+      await this.auditService.logUpdate('user', user.id, { id: existingUser.id, profile: existingUser.profile }, { id: user.id, profile: user.profile }, context?.operatorId);
 
       logger.info({ userId: user.id }, 'User updated successfully');
 
@@ -183,7 +183,7 @@ export class UserService extends BaseService {
    */
   async deleteUser(id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.USER_DELETE);
-    logger.info({ userId: id, adminId: context?.adminId }, 'Deleting user');
+    logger.info({ userId: id, operatorId: context?.operatorId }, 'Deleting user');
 
     try {
       const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
@@ -198,7 +198,7 @@ export class UserService extends BaseService {
         throw new NotFoundError(`User with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('user', id, { id: existingUser.id, profile: existingUser.profile }, context?.adminId);
+      await this.auditService.logDelete('user', id, { id: existingUser.id, profile: existingUser.profile }, context?.operatorId);
 
       logger.info({ userId: id }, 'User deleted successfully');
     } catch (error) {

@@ -19,7 +19,7 @@ export function checkPermissions(req: Request, requiredPermissions: Permission[]
   const hasRequired = hasAllPermissions(userRoles, requiredPermissions);
 
   if (!hasRequired) {
-    logger.warn({ adminId: req.user.adminId, roles: userRoles, requiredPermissions, method: req.method, url: req.url }, 'Permission denied');
+    logger.warn({ operatorId: req.user.operatorId, roles: userRoles, requiredPermissions, method: req.method, url: req.url }, 'Permission denied');
     throw new ForbiddenError(`Missing required permissions: ${requiredPermissions.join(', ')}`);
   }
 }

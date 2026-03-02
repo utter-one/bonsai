@@ -23,7 +23,7 @@ export class AuthController {
         path: '/api/auth/login',
         tags: ['Authentication'],
         summary: 'Login with credentials',
-        description: 'Authenticate an admin user with email/ID and password. Returns access and refresh tokens.',
+        description: 'Authenticate an operator user with email/ID and password. Returns access and refresh tokens.',
         request: {
           body: {
             content: {

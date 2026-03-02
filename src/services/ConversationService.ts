@@ -50,7 +50,7 @@ export class ConversationService extends BaseService {
    */
   async createConversation(input: CreateConversationInput, context?: RequestContext): Promise<ConversationResponse> {
     const conversationId = input.id ?? generateId(ID_PREFIXES.CONVERSATION);
-    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, adminId: context?.adminId }, 'Creating conversation');
+    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, operatorId: context?.operatorId }, 'Creating conversation');
 
     try {
       const conversationData = {
@@ -68,8 +68,8 @@ export class ConversationService extends BaseService {
       const result = await db.insert(conversations).values(conversationData).returning();
       const createdConversation = result[0];
 
-      if (context?.adminId) {
-        await this.auditService.logCreate('conversation', createdConversation.id, { id: createdConversation.id, projectId: createdConversation.projectId, userId: createdConversation.userId, clientId: createdConversation.clientId, stageId: createdConversation.stageId, status: createdConversation.status }, context.adminId);
+      if (context?.operatorId) {
+        await this.auditService.logCreate('conversation', createdConversation.id, { id: createdConversation.id, projectId: createdConversation.projectId, userId: createdConversation.userId, clientId: createdConversation.clientId, stageId: createdConversation.stageId, status: createdConversation.status }, context.operatorId);
       }
 
       logger.info({ conversationId: createdConversation.id }, 'Conversation created successfully');
@@ -320,7 +320,7 @@ export class ConversationService extends BaseService {
    */
   async deleteConversation(projectId: string, id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.CONVERSATION_DELETE);
-    logger.info({ conversationId: id, adminId: context?.adminId }, 'Deleting conversation');
+    logger.info({ conversationId: id, operatorId: context?.operatorId }, 'Deleting conversation');
 
     try {
       const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
@@ -335,7 +335,7 @@ export class ConversationService extends BaseService {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, projectId: existingConversation.projectId, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.adminId);
+      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, projectId: existingConversation.projectId, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.operatorId);
 
       logger.info({ conversationId: id }, 'Conversation deleted successfully');
     } catch (error) {
