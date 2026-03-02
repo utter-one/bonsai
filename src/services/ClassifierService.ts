@@ -190,7 +190,7 @@ export class ClassifierService extends BaseService {
 
       const classifier = updatedClassifier[0];
 
-      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, llmSettings: classifier.llmSettings, tags: classifier.tags, metadata: classifier.metadata }, context?.adminId);
+      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, llmSettings: classifier.llmSettings, tags: classifier.tags, metadata: classifier.metadata }, context?.adminId, projectId);
 
       logger.info({ classifierId: classifier.id, newVersion: classifier.version }, 'Classifier updated successfully');
 

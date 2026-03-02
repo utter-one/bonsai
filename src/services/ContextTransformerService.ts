@@ -191,7 +191,7 @@ export class ContextTransformerService extends BaseService {
 
       const transformer = updatedTransformer[0];
 
-      await this.auditService.logUpdate('context_transformer', transformer.id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProviderId: existingTransformer.llmProviderId, llmSettings: existingTransformer.llmSettings, tags: existingTransformer.tags, metadata: existingTransformer.metadata }, { id: transformer.id, name: transformer.name, description: transformer.description, prompt: transformer.prompt, contextFields: transformer.contextFields, llmProviderId: transformer.llmProviderId, llmSettings: transformer.llmSettings, tags: transformer.tags, metadata: transformer.metadata }, context?.adminId);
+      await this.auditService.logUpdate('context_transformer', transformer.id, { id: existingTransformer.id, name: existingTransformer.name, description: existingTransformer.description, prompt: existingTransformer.prompt, contextFields: existingTransformer.contextFields, llmProviderId: existingTransformer.llmProviderId, llmSettings: existingTransformer.llmSettings, tags: existingTransformer.tags, metadata: existingTransformer.metadata }, { id: transformer.id, name: transformer.name, description: transformer.description, prompt: transformer.prompt, contextFields: transformer.contextFields, llmProviderId: transformer.llmProviderId, llmSettings: transformer.llmSettings, tags: transformer.tags, metadata: transformer.metadata }, context?.adminId, projectId);
 
       logger.info({ transformerId: transformer.id, newVersion: transformer.version }, 'Context transformer updated successfully');
 

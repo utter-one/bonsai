@@ -162,7 +162,7 @@ export class KnowledgeService extends BaseService {
 
       const category = await db.query.knowledgeCategories.findFirst({ where: eq(knowledgeCategories.id, id), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
-      await this.auditService.logUpdate('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, { id: category!.id, name: category!.name, promptTrigger: category!.promptTrigger, knowledgeTags: category!.tags, order: category!.order }, context?.adminId);
+      await this.auditService.logUpdate('knowledge_category', id, { id: existingCategory.id, name: existingCategory.name, promptTrigger: existingCategory.promptTrigger, knowledgeTags: existingCategory.tags, order: existingCategory.order }, { id: category!.id, name: category!.name, promptTrigger: category!.promptTrigger, knowledgeTags: category!.tags, order: category!.order }, context?.adminId, projectId);
 
       logger.info({ categoryId: category!.id, newVersion: category!.version }, 'Knowledge category updated successfully');
 
@@ -351,7 +351,7 @@ export class KnowledgeService extends BaseService {
 
       const item = updatedItem[0];
 
-      await this.auditService.logUpdate('knowledge_item', item.id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, { id: item.id, categoryId: item.categoryId, question: item.question, answer: item.answer, order: item.order }, context?.adminId);
+      await this.auditService.logUpdate('knowledge_item', item.id, { id: existingItem.id, categoryId: existingItem.categoryId, question: existingItem.question, answer: existingItem.answer, order: existingItem.order }, { id: item.id, categoryId: item.categoryId, question: item.question, answer: item.answer, order: item.order }, context?.adminId, projectId);
 
       logger.info({ itemId: item.id, newVersion: item.version }, 'Knowledge item updated successfully');
 

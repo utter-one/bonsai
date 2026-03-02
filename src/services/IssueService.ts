@@ -173,7 +173,7 @@ export class IssueService extends BaseService {
 
       const issue = updatedIssue[0];
 
-      await this.auditService.logUpdate('issue', String(issue.id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, { id: issue.id, environment: issue.environment, severity: issue.severity, status: issue.status }, context?.adminId);
+      await this.auditService.logUpdate('issue', String(issue.id), { id: existingIssue.id, environment: existingIssue.environment, severity: existingIssue.severity, status: existingIssue.status }, { id: issue.id, environment: issue.environment, severity: issue.severity, status: issue.status }, context?.adminId, projectId);
 
       logger.info({ issueId: issue.id }, 'Issue updated successfully');
 

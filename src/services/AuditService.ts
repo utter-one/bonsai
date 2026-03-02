@@ -98,6 +98,7 @@ export class AuditService {
    * @param oldEntity - The entity data before the update
    * @param newEntity - The entity data after the update
    * @param userId - Optional ID of the user who updated the entity
+   * @param projectId - Optional project ID the entity belongs to (preferred over projectId extracted from entity snapshots)
    * @returns The created audit log entry
    */
   async logUpdate(
@@ -105,7 +106,8 @@ export class AuditService {
     entityId: string,
     oldEntity: Record<string, any>,
     newEntity: Record<string, any>,
-    userId?: string
+    userId?: string,
+    projectId?: string
   ): Promise<AuditLog> {
     return this.logChange({
       userId,
@@ -114,7 +116,7 @@ export class AuditService {
       entityId,
       oldEntity,
       newEntity,
-      projectId: newEntity?.projectId || oldEntity?.projectId, // Use projectId from newEntity or fallback to oldEntity
+      projectId: projectId ?? newEntity?.projectId ?? oldEntity?.projectId,
     });
   }
 

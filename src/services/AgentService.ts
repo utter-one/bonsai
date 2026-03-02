@@ -179,7 +179,7 @@ export class AgentService extends BaseService {
 
       const agent = updatedAgent[0];
 
-      await this.auditService.logUpdate('agent', agent.id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata }, { id: agent.id, name: agent.name, description: agent.description, prompt: agent.prompt, ttsProviderId: agent.ttsProviderId, ttsSettings: agent.ttsSettings, tags: agent.tags, metadata: agent.metadata }, context?.adminId);
+      await this.auditService.logUpdate('agent', agent.id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata }, { id: agent.id, name: agent.name, description: agent.description, prompt: agent.prompt, ttsProviderId: agent.ttsProviderId, ttsSettings: agent.ttsSettings, tags: agent.tags, metadata: agent.metadata }, context?.adminId, projectId);
 
       logger.info({ agentId: agent.id, newVersion: agent.version }, 'Agent updated successfully');
 
