@@ -8,19 +8,19 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 export const issueRouteParamsSchema = z.object({
-  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Issue ID'),
 });
 
 /**
  * Schema for creating a new issue
- * Required fields: environment, buildVersion, severity, category, bugDescription, expectedBehaviour, status
- * Optional fields: beat, sessionId, eventIndex, userId, comments
+ * Required fields: projectId, environment, buildVersion, severity, category, bugDescription, expectedBehaviour, status
+ * Optional fields: stage, sessionId, eventIndex, userId, comments
  */
 export const createIssueSchema = z.object({
-  environment: z.string().min(1).describe('Environment where issue occurred (e.g., production, staging, development)'),
+  projectId: z.string().min(1).describe('ID of the project this issue belongs to'),
+  environment: z.string().describe('Environment where issue occurred (e.g., production, staging, development)'),
   buildVersion: z.string().min(1).describe('Application build version where the issue was encountered'),
-  beat: z.string().optional().describe('Beat/sprint identifier for tracking purposes'),
+  stage: z.string().optional().describe('Stage identifier for tracking purposes'),
   sessionId: z.string().optional().describe('Reference to related conversation session ID'),
   eventIndex: z.number().int().optional().describe('Index of event in session where issue occurred'),
   userId: z.string().optional().describe('User ID who reported or encountered the issue'),
@@ -38,9 +38,9 @@ export const createIssueSchema = z.object({
  * Query parameters: filters[field][operator]=value (e.g., filters[status][eq]=open)
  */
 export const updateIssueBodySchema = z.object({
-  environment: z.string().min(1).optional().describe('Environment where issue occurred'),
+  environment: z.string().optional().describe('Environment where issue occurred'),
   buildVersion: z.string().min(1).optional().describe('Application build version'),
-  beat: z.string().optional().describe('Beat/sprint identifier'),
+  stage: z.string().optional().describe('Stage identifier'),
   sessionId: z.string().optional().describe('Related conversation session ID'),
   eventIndex: z.number().int().optional().describe('Event index in session'),
   userId: z.string().optional().describe('User ID who reported the issue'),
@@ -61,7 +61,7 @@ export const issueResponseSchema = z.object({
   projectId: z.string().describe('ID of the project this issue belongs to'),
   environment: z.string().describe('Environment where issue occurred'),
   buildVersion: z.string().describe('Application build version'),
-  beat: z.string().nullable().describe('Beat/sprint identifier'),
+  stage: z.string().nullable().describe('Stage identifier'),
   sessionId: z.string().nullable().describe('Related conversation session ID'),
   eventIndex: z.number().int().nullable().describe('Event index in session'),
   userId: z.string().nullable().describe('User ID who reported the issue'),

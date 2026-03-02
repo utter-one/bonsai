@@ -134,6 +134,20 @@
       "when": 1772393514296,
       "tag": "0018_lively_forgotten_one",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1772441780957,
+      "tag": "0019_sticky_mephistopheles",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1772445371820,
+      "tag": "0020_tiresome_sugar_man",
+      "breakpoints": true
     }
   ]
 }
