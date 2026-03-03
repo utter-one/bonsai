@@ -39,11 +39,11 @@ export class ProjectService extends BaseService {
 
     try {
       const id = generateId(ID_PREFIXES.PROJECT);
-      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, userProfileVariableDescriptors: input.userProfileVariableDescriptors ?? [], version: 1 }).returning();
+      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, autoCreateUsers: input.autoCreateUsers ?? false, userProfileVariableDescriptors: input.userProfileVariableDescriptors ?? [], version: 1 }).returning();
 
       const createdProject = project[0];
 
-      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, storageConfig: createdProject.storageConfig, constants: createdProject.constants, metadata: createdProject.metadata, timezone: createdProject.timezone, userProfileVariableDescriptors: createdProject.userProfileVariableDescriptors }, context?.operatorId);
+      await this.auditService.logCreate('project', createdProject.id, { id: createdProject.id, name: createdProject.name, description: createdProject.description, asrConfig: createdProject.asrConfig, acceptVoice: createdProject.acceptVoice, generateVoice: createdProject.generateVoice, storageConfig: createdProject.storageConfig, constants: createdProject.constants, metadata: createdProject.metadata, timezone: createdProject.timezone, autoCreateUsers: createdProject.autoCreateUsers, userProfileVariableDescriptors: createdProject.userProfileVariableDescriptors }, context?.operatorId);
 
       logger.info({ projectId: createdProject.id }, 'Project created successfully');
 
@@ -146,14 +146,14 @@ export class ProjectService extends BaseService {
         throw new OptimisticLockError('Project');
       }
 
-      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, userProfileVariableDescriptors: input.userProfileVariableDescriptors, version: existingProject.version + 1, updatedAt: new Date() };
+      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, autoCreateUsers: input.autoCreateUsers, userProfileVariableDescriptors: input.userProfileVariableDescriptors, version: existingProject.version + 1, updatedAt: new Date() };
       const updatedProject = await db.update(projects).set(updateData).where(eq(projects.id, id)).returning();
 
       if (!updatedProject[0]) {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata, timezone: existingProject.timezone, userProfileVariableDescriptors: existingProject.userProfileVariableDescriptors }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata, timezone: updatedProject[0].timezone, userProfileVariableDescriptors: updatedProject[0].userProfileVariableDescriptors }, context?.operatorId, id);
+      await this.auditService.logUpdate('project', id, { id: existingProject.id, name: existingProject.name, description: existingProject.description, asrConfig: existingProject.asrConfig, acceptVoice: existingProject.acceptVoice, generateVoice: existingProject.generateVoice, storageConfig: existingProject.storageConfig, constants: existingProject.constants, metadata: existingProject.metadata, timezone: existingProject.timezone, autoCreateUsers: existingProject.autoCreateUsers, userProfileVariableDescriptors: existingProject.userProfileVariableDescriptors }, { id: updatedProject[0].id, name: updatedProject[0].name, description: updatedProject[0].description, asrConfig: updatedProject[0].asrConfig, acceptVoice: updatedProject[0].acceptVoice, generateVoice: updatedProject[0].generateVoice, storageConfig: updatedProject[0].storageConfig, constants: updatedProject[0].constants, metadata: updatedProject[0].metadata, timezone: updatedProject[0].timezone, autoCreateUsers: updatedProject[0].autoCreateUsers, userProfileVariableDescriptors: updatedProject[0].userProfileVariableDescriptors }, context?.operatorId, id);
 
       logger.info({ projectId: id }, 'Project updated successfully');
 

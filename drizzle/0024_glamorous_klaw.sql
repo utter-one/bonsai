@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "auto_create_users" boolean DEFAULT false NOT NULL;
