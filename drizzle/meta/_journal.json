@@ -169,6 +169,13 @@
       "when": 1772529299901,
       "tag": "0023_small_tana_nile",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1772532468229,
+      "tag": "0024_glamorous_klaw",
+      "breakpoints": true
     }
   ]
 }

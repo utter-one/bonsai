@@ -214,6 +214,36 @@ export class UserService extends BaseService {
   }
 
   /**
+   * Ensures a user exists within a project, creating them with an empty profile if they do not.
+   * This is used internally when a project has autoCreateUsers enabled to allow clients to
+   * provide arbitrary user IDs that are automatically registered on first use.
+   * @param projectId - The project the user belongs to
+   * @param userId - The ID of the user to ensure exists
+   * @returns The existing or newly created user
+   */
+  async ensureUserExists(projectId: string, userId: string): Promise<UserResponse> {
+    logger.info({ userId, projectId }, 'Ensuring user exists (auto-create)');
+
+    try {
+      const existing = await db.query.users.findFirst({ where: and(eq(users.projectId, projectId), eq(users.id, userId)) });
+
+      if (existing) {
+        return userResponseSchema.parse(existing);
+      }
+
+      const created = await db.insert(users).values({ id: userId, projectId, profile: {} }).returning();
+      const createdUser = created[0];
+
+      logger.info({ userId: createdUser.id, projectId }, 'User auto-created successfully');
+
+      return userResponseSchema.parse(createdUser);
+    } catch (error) {
+      logger.error({ error, userId, projectId }, 'Failed to ensure user exists');
+      throw error;
+    }
+  }
+
+  /**
    * Retrieves all audit log entries for a specific user
    * @param userId - The unique identifier of the user
    * @returns Array of audit log entries for the user

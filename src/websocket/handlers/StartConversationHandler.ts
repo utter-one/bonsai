@@ -40,10 +40,19 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
     }
 
     try {
-      // Check if user exists within the project
-      const user = await this.userService.getUserById(context.connection.projectId, message.userId);
-      if (!user) {
-        throw new NotFoundError('User not found');
+      // Get project first to check autoCreateUsers flag and resolve timezone later
+      const project = await this.projectService.getProjectById(context.connection.projectId);
+
+      // Look up the user; auto-create if the project allows it
+      let user;
+      try {
+        user = await this.userService.getUserById(context.connection.projectId, message.userId);
+      } catch (userError) {
+        if (userError instanceof NotFoundError && project.autoCreateUsers) {
+          user = await this.userService.ensureUserExists(context.connection.projectId, message.userId);
+        } else {
+          throw userError;
+        }
       }
       
       // Get stage to extract projectId
@@ -55,7 +64,6 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       }
 
       // Resolve timezone with 4-level precedence: message > userProfile > project > null (UTC fallback at render time)
-      const project = await this.projectService.getProjectById(stage.projectId);
       const profileTimezone = user.profile.timezone as string | undefined;
       const resolvedTimezone = message.timezone ?? profileTimezone ?? project.timezone ?? null;
 
