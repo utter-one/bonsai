@@ -40,8 +40,8 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
     }
 
     try {
-      // Check if user exists
-      const user = await this.userService.getUserById(message.userId);
+      // Check if user exists within the project
+      const user = await this.userService.getUserById(context.connection.projectId, message.userId);
       if (!user) {
         throw new NotFoundError('User not found');
       }

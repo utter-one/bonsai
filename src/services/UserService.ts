@@ -24,71 +24,75 @@ export class UserService extends BaseService {
   }
 
   /**
-   * Creates a new user and logs the creation in the audit trail
+   * Creates a new user scoped to a project
+   * @param projectId - The project this user belongs to
    * @param input - User creation data including id and profile
    * @param context - Request context for auditing and authorization
    * @returns The created user
    */
-  async createUser(input: CreateUserRequest, context: RequestContext): Promise<UserResponse> {
+  async createUser(projectId: string, input: CreateUserRequest, context: RequestContext): Promise<UserResponse> {
     this.requirePermission(context, PERMISSIONS.USER_WRITE);
     const userId = input.id ?? generateId(ID_PREFIXES.USER);
-    logger.info({ userId, operatorId: context?.operatorId }, 'Creating user');
+    logger.info({ userId, projectId, operatorId: context?.operatorId }, 'Creating user');
 
     try {
-      const user = await db.insert(users).values({ id: userId, profile: input.profile }).returning();
+      const user = await db.insert(users).values({ id: userId, projectId, profile: input.profile }).returning();
 
       const createdUser = user[0];
 
-      await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, profile: createdUser.profile }, context?.operatorId);
+      await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, projectId: createdUser.projectId, profile: createdUser.profile }, context?.operatorId);
 
-      logger.info({ userId: createdUser.id }, 'User created successfully');
+      logger.info({ userId: createdUser.id, projectId }, 'User created successfully');
 
       return userResponseSchema.parse(createdUser);
     } catch (error) {
-      logger.error({ error, userId: input.id }, 'Failed to create user');
+      logger.error({ error, userId: input.id, projectId }, 'Failed to create user');
       throw error;
     }
   }
 
   /**
-   * Retrieves a user by their unique identifier
+   * Retrieves a user by their project-scoped identifier
+   * @param projectId - The project the user belongs to
    * @param id - The unique identifier of the user
    * @returns The user if found
    * @throws {NotFoundError} When user is not found
    */
-  async getUserById(id: string): Promise<UserResponse> {
-    logger.debug({ userId: id }, 'Fetching user by ID');
+  async getUserById(projectId: string, id: string): Promise<UserResponse> {
+    logger.debug({ userId: id, projectId }, 'Fetching user by ID');
 
     try {
-      const user = await db.query.users.findFirst({ where: eq(users.id, id) });
+      const user = await db.query.users.findFirst({ where: and(eq(users.projectId, projectId), eq(users.id, id)) });
 
       if (!user) {
-        throw new NotFoundError(`User with id ${id} not found`);
+        throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
       return userResponseSchema.parse(user);
     } catch (error) {
-      logger.error({ error, userId: id }, 'Failed to fetch user');
+      logger.error({ error, userId: id, projectId }, 'Failed to fetch user');
       throw error;
     }
   }
 
   /**
-   * Lists users with flexible filtering, sorting, and pagination
+   * Lists users for a project with flexible filtering, sorting, and pagination
+   * @param projectId - The project to list users for
    * @param params - List parameters including filters, sorting, pagination, and text search
    * @returns Paginated array of users matching the criteria
    */
-  async listUsers(params?: ListParams): Promise<UserListResponse> {
-    logger.debug({ params }, 'Listing users');
+  async listUsers(projectId: string, params?: ListParams): Promise<UserListResponse> {
+    logger.debug({ projectId, params }, 'Listing users');
 
     try {
-      const conditions: SQL[] = [];
+      const conditions: SQL[] = [eq(users.projectId, projectId)];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
 
       // Column map for filter and order by operations
       const columnMap = {
         id: users.id,
+        projectId: users.projectId,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
       };
@@ -114,13 +118,13 @@ export class UserService extends BaseService {
 
       // Get total count
       const totalResult = await db.query.users.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
+        where: and(...conditions),
       });
       const total = totalResult.length;
 
       // Get paginated results
       const userList = await db.query.users.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
+        where: and(...conditions),
         orderBy: orderByClause.length > 0 ? orderByClause : [desc(users.createdAt)],
         limit: limit ?? undefined,
         offset,
@@ -133,69 +137,71 @@ export class UserService extends BaseService {
         limit,
       });
     } catch (error) {
-      logger.error({ error, params }, 'Failed to list users');
+      logger.error({ error, projectId, params }, 'Failed to list users');
       throw error;
     }
   }
 
   /**
-   * Updates a user
+   * Updates a user within a project
+   * @param projectId - The project the user belongs to
    * @param id - The unique identifier of the user to update
    * @param input - User update data including profile
    * @param context - Request context for auditing and authorization
    * @returns The updated user
    * @throws {NotFoundError} When user is not found
    */
-  async updateUser(id: string, input: UpdateUserRequest, context: RequestContext): Promise<UserResponse> {
+  async updateUser(projectId: string, id: string, input: UpdateUserRequest, context: RequestContext): Promise<UserResponse> {
     this.requirePermission(context, PERMISSIONS.USER_WRITE);
-    logger.info({ userId: id, operatorId: context?.operatorId }, 'Updating user');
+    logger.info({ userId: id, projectId, operatorId: context?.operatorId }, 'Updating user');
 
     try {
-      const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
+      const existingUser = await db.query.users.findFirst({ where: and(eq(users.projectId, projectId), eq(users.id, id)) });
 
       if (!existingUser) {
-        throw new NotFoundError(`User with id ${id} not found`);
+        throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
-      const updatedUser = await db.update(users).set({ profile: input.profile, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+      const updatedUser = await db.update(users).set({ profile: input.profile, updatedAt: new Date() }).where(and(eq(users.projectId, projectId), eq(users.id, id))).returning();
 
       if (updatedUser.length === 0) {
-        throw new NotFoundError(`User with id ${id} not found`);
+        throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
       const user = updatedUser[0];
 
-      await this.auditService.logUpdate('user', user.id, { id: existingUser.id, profile: existingUser.profile }, { id: user.id, profile: user.profile }, context?.operatorId);
+      await this.auditService.logUpdate('user', user.id, { id: existingUser.id, projectId: existingUser.projectId, profile: existingUser.profile }, { id: user.id, projectId: user.projectId, profile: user.profile }, context?.operatorId);
 
-      logger.info({ userId: user.id }, 'User updated successfully');
+      logger.info({ userId: user.id, projectId }, 'User updated successfully');
 
       return userResponseSchema.parse(user);
     } catch (error) {
-      logger.error({ error, userId: id }, 'Failed to update user');
+      logger.error({ error, userId: id, projectId }, 'Failed to update user');
       throw error;
     }
   }
 
   /**
-   * Deletes a user
+   * Deletes a user within a project
+   * @param projectId - The project the user belongs to
    * @param id - The unique identifier of the user to delete
    * @param context - Request context for auditing and authorization
    */
-  async deleteUser(id: string, context: RequestContext): Promise<void> {
+  async deleteUser(projectId: string, id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.USER_DELETE);
-    logger.info({ userId: id, operatorId: context?.operatorId }, 'Deleting user');
+    logger.info({ userId: id, projectId, operatorId: context?.operatorId }, 'Deleting user');
 
     try {
-      const existingUser = await db.query.users.findFirst({ where: eq(users.id, id) });
+      const existingUser = await db.query.users.findFirst({ where: and(eq(users.projectId, projectId), eq(users.id, id)) });
 
       if (!existingUser) {
-        throw new NotFoundError(`User with id ${id} not found`);
+        throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
-      const deleted = await db.delete(users).where(eq(users.id, id)).returning();
+      const deleted = await db.delete(users).where(and(eq(users.projectId, projectId), eq(users.id, id))).returning();
 
       if (deleted.length === 0) {
-        throw new NotFoundError(`User with id ${id} not found`);
+        throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
       await this.auditService.logDelete('user', id, { id: existingUser.id, profile: existingUser.profile }, context?.operatorId);

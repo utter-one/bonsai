@@ -890,14 +890,14 @@ export class ConversationRunner {
 
     // Load current user from database
     const { users } = await import('../../db/schema');
-    const { eq } = await import('drizzle-orm');
+    const { eq, and } = await import('drizzle-orm');
 
     const currentUser = await db.query.users.findFirst({
-      where: eq(users.id, this.conversation.userId),
+      where: and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)),
     });
 
     if (!currentUser) {
-      throw new NotFoundError(`User with ID ${this.conversation.userId} not found`);
+      throw new NotFoundError(`User with ID ${this.conversation.userId} not found in project ${this.conversation.projectId}`);
     }
 
     // Update profile field
@@ -911,7 +911,7 @@ export class ConversationRunner {
     // Update user in database
     await db.update(users)
       .set({ profile: updatedProfile, updatedAt: new Date() })
-      .where(eq(users.id, this.conversation.userId));
+      .where(and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)));
 
     logger.info({ conversationId: this.conversation.id, fieldName }, `Successfully set user profile field ${fieldName}`);
   }
@@ -925,14 +925,14 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, fieldName }, `Getting user profile field ${fieldName}`);
 
     const { users } = await import('../../db/schema');
-    const { eq } = await import('drizzle-orm');
+    const { eq, and } = await import('drizzle-orm');
 
     const user = await db.query.users.findFirst({
-      where: eq(users.id, this.conversation.userId),
+      where: and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)),
     });
 
     if (!user) {
-      throw new NotFoundError(`User with ID ${this.conversation.userId} not found`);
+      throw new NotFoundError(`User with ID ${this.conversation.userId} not found in project ${this.conversation.projectId}`);
     }
 
     const value = user.profile[fieldName];
