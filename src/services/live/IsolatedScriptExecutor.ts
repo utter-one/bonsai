@@ -163,6 +163,7 @@ export class IsolatedScriptExecutor {
       await jail.set('userInputSource', new ivm.ExternalCopy(context.userInputSource || null).copyInto());
       await jail.set('stageVars', new ivm.ExternalCopy(context.stageVars || null).copyInto());
       await jail.set('events', new ivm.ExternalCopy(context.events).copyInto());
+      await jail.set('consts', new ivm.ExternalCopy(context.consts || null).copyInto());
 
       // Inject mutable objects that scripts can modify
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());
