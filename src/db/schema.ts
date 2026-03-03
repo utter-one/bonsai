@@ -15,17 +15,20 @@ export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProvider
 
 // User table
 export const users = pgTable('users', {
-  id: text('id').primaryKey(),
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
   profile: jsonb('profile').notNull().$type<Record<string, any>>(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+]);
 
 // Conversation table
 export const conversations = pgTable('conversations', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
-  userId: text('user_id').notNull().references(() => users.id),
+  userId: text('user_id').notNull(),
   clientId: text('client_id').notNull(),
   stageId: text('stage_id').notNull(),
   stageVars: jsonb('stage_vars').$type<Record<string, Record<string, any>>>(),
@@ -36,6 +39,7 @@ export const conversations = pgTable('conversations', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
+  foreignKey({ columns: [table.projectId, table.userId], foreignColumns: [users.projectId, users.id] }),
 ]);
 
 // ConversationEvent table
@@ -360,7 +364,11 @@ export const conversationArtifacts = pgTable('conversation_artifacts', {
 ]);
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [users.projectId],
+    references: [projects.id],
+  }),
   conversations: many(conversations),
 }));
 
@@ -370,8 +378,8 @@ export const conversationsRelations = relations(conversations, ({ one, many }) =
     references: [projects.id],
   }),
   user: one(users, {
-    fields: [conversations.userId],
-    references: [users.id],
+    fields: [conversations.projectId, conversations.userId],
+    references: [users.projectId, users.id],
   }),
   events: many(conversationEvents),
   artifacts: many(conversationArtifacts),
@@ -386,6 +394,7 @@ export const conversationEventsRelations = relations(conversationEvents, ({ one 
 
 export const projectsRelations = relations(projects, ({ many }) => ({
   conversations: many(conversations),
+  users: many(users),
   agents: many(agents),
   stages: many(stages),
   classifiers: many(classifiers),

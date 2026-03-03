@@ -8,9 +8,19 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /**
- * Schema for user route parameters
+ * Schema for project-level route parameters (e.g. /api/projects/:projectId/users)
+ */
+export const userProjectRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
+});
+
+export type UserProjectRouteParams = z.infer<typeof userProjectRouteParamsSchema>;
+
+/**
+ * Schema for user route parameters (e.g. /api/projects/:projectId/users/:id)
  */
 export const userRouteParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project ID'),
   id: z.string().min(1).describe('User ID'),
 });
 
@@ -18,7 +28,7 @@ export type UserRouteParams = z.infer<typeof userRouteParamsSchema>;
 
 /**
  * Schema for creating a new user
- * Required fields: id, profile
+ * Required fields: profile
  * Profile is a flexible JSON object containing user-specific data
  */
 export const createUserSchema = z.object({
@@ -37,10 +47,11 @@ export const updateUserBodySchema = z.object({
 
 /**
  * Schema for user response
- * Includes: id, profile, createdAt, updatedAt
+ * Includes: id, projectId, profile, createdAt, updatedAt
  */
 export const userResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the user'),
+  projectId: z.string().describe('Project this user belongs to'),
   profile: z.record(z.string(), z.unknown()).describe('User profile data as key-value pairs'),
   createdAt: z.coerce.date().describe('Timestamp when the user was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the user was last updated'),
