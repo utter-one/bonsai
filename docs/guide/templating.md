@@ -15,6 +15,9 @@ Templates have access to these data contexts:
 | `history` | Conversation message history (auto-injected) |
 | `context.results` | Results from tool calls, webhooks, and actions |
 | `time` | Current date/time context, timezone-aware (see [Time Context](#time-context)) |
+| `agent` | The agent's personality `prompt` text — **must be explicitly placed** in the template (see [Agent & Knowledge Variables](#agent--knowledge-variables)) |
+| `faq` | Array of `{ question, answer }` objects from knowledge classification — stage system prompts only, **must be explicitly placed** (see [Agent & Knowledge Variables](#agent--knowledge-variables)) |
+
 
 ## Basic Syntax
 
@@ -146,6 +149,42 @@ https://api.example.com/orders/{{vars.orderId}}/status
 - **Use constants for shared values** — Avoid hardcoding company names, URLs, etc.
 - **Leverage variables** — Use stage variables to build progressive context across turns
 - **Test with edge cases** — Consider what happens when variables are empty or unset
+
+---
+
+## Agent & Knowledge Variables
+
+### `agent`
+
+Expands to the personality `prompt` text of the agent linked to the current stage. Available in stage system prompts, classifier prompts, and context transformer prompts.
+
+> **Important:** <code v-pre>{{agent}}</code> is **not auto-injected**. The agent's personality only reaches the LLM if you explicitly include <code v-pre>{{agent}}</code> in your prompt template. Without it, the agent's `prompt` field has no effect.
+
+Recommended placement is at the top of the system prompt, followed by stage-specific instructions:
+
+```handlebars
+{{agent}}
+
+You are handling order support for {{consts.companyName}}.
+```
+
+### `faq`
+
+Expands to an array of `{ question, answer }` objects matched from the knowledge base during the current (or most recent) knowledge classification. Available **only in stage system prompts** — not in classifier or transformer prompts.
+
+> **Important:** <code v-pre>{{faq}}</code> is **not auto-injected**. If knowledge classification matched results but your prompt does not include <code v-pre>{{faq}}</code>, those results are silently discarded and the LLM never sees them.
+
+The `faq` array persists across turns until a new knowledge classification fires. Use <code v-pre>{{#hasItems faq}}</code> to guard against the empty case:
+
+```handlebars
+{{#hasItems faq}}
+Relevant knowledge:
+{{#each faq}}
+Q: {{this.question}}
+A: {{this.answer}}
+{{/each}}
+{{/hasItems}}
+```
 
 ---
 

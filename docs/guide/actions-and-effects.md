@@ -13,7 +13,7 @@ Each action in the `actions` map has a key (the action ID) and a value with thes
 | `triggerOnUserInput` | Whether this action can be triggered by user speech/text (default: `true`) |
 | `triggerOnClientCommand` | Whether this action can be triggered by a client command |
 | `triggerOnTransformation` | Whether this action runs after context transformation |
-| `classificationTrigger` | Label the classifier outputs to match this action |
+| `classificationTrigger` | Descriptive label shown to the classifier LLM that tells it when this action should fire; the LLM matches user intent against this label and returns the action **ID** in its response |
 | `overrideClassifierId` | Use a specific classifier instead of the stage default |
 | `parameters` | Parameters extracted by the classifier when triggering |
 | `effects` | Ordered array of effects to execute |
@@ -214,6 +214,29 @@ Explicitly triggers AI response generation. Two modes:
 ```
 
 Selection strategies: `random` (pick randomly) or `round_robin` (cycle through).
+
+## Effect Execution Priority
+
+Effects from **all** triggered actions are gathered into a single global list, sorted by priority, and then conflict-resolved before execution. Effects within the same priority tier run in the order they appeared across all actions.
+
+| Priority | Effect type |
+|---|---|
+| 1 | `call_webhook` |
+| 2 | `call_tool` |
+| 3 | `modify_variables` |
+| 4 | `modify_user_profile` |
+| 5 | `modify_user_input` |
+| 6 | `run_script` |
+| 7 | `generate_response` |
+| 8 | `end_conversation` |
+| 9 | `abort_conversation` |
+| 10 | `go_to_stage` |
+
+### Conflict Resolution
+
+- **Multiple `go_to_stage`** — only the first one (lowest priority index) is kept; the rest are discarded
+- **`abort_conversation` + `end_conversation`** — `abort_conversation` wins; `end_conversation` is removed
+- **Multiple `modify_user_input`** — all are applied in sequence, each receiving the output of the previous
 
 ## Execution Flow
 
