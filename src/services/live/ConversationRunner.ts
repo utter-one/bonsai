@@ -79,6 +79,10 @@ export class ConversationRunner {
   private responseOutputTurnStarted: boolean = false;
   /** Filler sentence generated for the current turn, passed as assistant prefix to the LLM so it continues naturally */
   private lastFillerSentence: string | null = null;
+  /** Tracks the call depth of goToStage to distinguish top-level calls from recursive ones triggered by on_enter/on_leave actions */
+  private navigationDepth = 0;
+  /** Guards against multiple AI responses being generated within the same turn (e.g. when chained stage jumps each try to generate a response) */
+  private responseGeneratedInTurn = false;
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -532,6 +536,7 @@ export class ConversationRunner {
   }
 
   async startConversation() {
+    this.responseGeneratedInTurn = false;
     if (this.conversation.status !== 'initialized') {
       throw new Error(`Cannot start conversation in current state: ${this.conversation.status}`);
     }
@@ -699,6 +704,15 @@ export class ConversationRunner {
    * @param stageId - ID of the stage to navigate to
    */
   async goToStage(stageId: string): Promise<void> {
+    // Track nesting depth so only the outermost goToStage call resets the per-turn response guard.
+    // This prevents chained on_enter stage jumps from each generating their own response.
+    const isTopLevel = this.navigationDepth === 0;
+    this.navigationDepth++;
+    if (isTopLevel) {
+      this.responseGeneratedInTurn = false;
+    }
+
+    try {
     logger.info({ conversationId: this.conversation.id, currentStageId: this.stageData.id, targetStageId: stageId }, `Navigating to stage ${stageId}`);
 
     if (this.conversation.status !== 'awaiting_user_input' && this.conversation.status !== 'processing_user_input') {
@@ -799,6 +813,9 @@ export class ConversationRunner {
     }
 
     logger.info({ conversationId: this.conversation.id, stageId }, `Successfully navigated to stage ${stageId}`);
+    } finally {
+      this.navigationDepth--;
+    }
   }
 
   /**
@@ -1128,6 +1145,7 @@ export class ConversationRunner {
    * @param userInput The user input text to process
    */
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
+    this.responseGeneratedInTurn = false;
     await this.changeState('processing_user_input');
 
     // Start filler sentence immediately — opens the response turn early by sending
@@ -1276,6 +1294,12 @@ export class ConversationRunner {
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
     const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
     if (shouldGenerateResponse) {
+      if (this.responseGeneratedInTurn) {
+        logger.warn({ conversationId: this.conversation.id }, 'Response already generated/scheduled for this turn — skipping duplicate response generation');
+        return;
+      }
+      this.responseGeneratedInTurn = true;
+
       if (this.responseOutputTurnStarted) {
         // Filler already opened the turn: outputTurnId, start_ai_generation_output and TTS start
         // were handled in processUserInput — skip all of that here.
