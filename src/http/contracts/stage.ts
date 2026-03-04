@@ -120,16 +120,16 @@ export const actionsSchema = z.record(z.string(), stageActionSchema).describe('A
 
 /**
  * Schema for creating a new stage
- * Required fields: id, prompt, agentId
- * Optional fields: llmProviderId, enterBehavior, useKnowledge, useGlobalActions, globalActions, variableDescriptors, actions, defaultClassifierId, transformerIds, metadata
+ * Required fields: id, name, prompt, agentId, llmProviderId, llmSettings
+ * Optional fields: enterBehavior, useKnowledge, useGlobalActions, globalActions, variableDescriptors, actions, defaultClassifierId, transformerIds, metadata
  */
 export const createStageSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the stage (auto-generated if not provided)'),
   name: z.string().min(1).describe('Display name for the stage'),
   description: z.string().optional().describe('Detailed description of the stage purpose'),
   prompt: z.string().min(1).describe('System prompt that defines the stage behavior and instructions'),
-  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this stage'),
-  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this stage'),
+  llmProviderId: z.string().min(1).describe('ID of the LLM provider to use for this stage'),
+  llmSettings: llmSettingsSchema.unwrap().unwrap().describe('LLM provider-specific settings for this stage'),
   agentId: z.string().min(1).describe('ID of the agent associated with this stage'),
   enterBehavior: enterBehaviorSchema.optional().default('generate_response').describe('What should happen when entering the stage'),
   useKnowledge: z.boolean().optional().default(false).describe('Whether to use knowledge base in this stage'),
@@ -152,8 +152,8 @@ export const updateStageBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name for the stage'),
   description: z.string().optional().describe('Updated detailed description of the stage'),
   prompt: z.string().min(1).optional().describe('Updated system prompt'),
-  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
-  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
+  llmProviderId: z.string().min(1).optional().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.unwrap().unwrap().optional().describe('Updated LLM provider-specific settings'),
   agentId: z.string().min(1).optional().describe('Updated agent ID'),
   enterBehavior: enterBehaviorSchema.optional().describe('Updated behavior when entering this stage'),
   useKnowledge: z.boolean().optional().describe('Updated knowledge usage flag'),

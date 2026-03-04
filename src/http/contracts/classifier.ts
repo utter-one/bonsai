@@ -17,16 +17,16 @@ export const classifierRouteParamsSchema = z.object({
 
 /**
  * Schema for creating a new classifier
- * Required fields: id, name, prompt
- * Optional fields: description, llmProviderId, metadata
+ * Required fields: id, name, prompt, llmProviderId, llmSettings
+ * Optional fields: description, metadata
  */
 export const createClassifierSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the classifier (auto-generated if not provided)'),
   name: z.string().min(1).describe('Display name of the classifier'),
   description: z.string().nullable().optional().describe('Detailed description of the classifier\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the classification logic and instructions'),
-  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this classifier'),
-  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this classifier'),
+  llmProviderId: z.string().min(1).describe('ID of the LLM provider to use for this classifier'),
+  llmSettings: llmSettingsSchema.unwrap().unwrap().describe('LLM provider-specific settings for this classifier'),
   tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this classifier'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional classifier-specific metadata'),
 });
@@ -39,8 +39,8 @@ export const updateClassifierBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
   description: z.string().nullable().optional().describe('Updated description'),
   prompt: z.string().min(1).optional().describe('Updated classification prompt'),
-  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
-  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
+  llmProviderId: z.string().min(1).optional().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.unwrap().unwrap().optional().describe('Updated LLM provider-specific settings'),
   tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
