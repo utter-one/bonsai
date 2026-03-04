@@ -972,6 +972,10 @@ export class ConversationRunner {
       throw new Error(`Cannot run action in current state: ${this.conversation.status}`);
     }
 
+    // Reset the per-turn response guard so a client-initiated action can generate a response,
+    // just like processUserInput does at the start of each user turn.
+    this.responseGeneratedInTurn = false;
+
     // Load the action from the database
     const globalAction = await db.query.globalActions.findFirst({
       where: (globalActions, { and, eq }) => and(
