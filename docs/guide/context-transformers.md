@@ -21,24 +21,61 @@ A **Context Transformer** is an LLM-powered component that extracts structured d
 
 1. A stage references transformers via its `transformerIds` array
 2. On each user input, all referenced transformers run **in parallel** with classifiers
-3. Each transformer receives the conversation context, user input, and existing variables
-4. The LLM extracts values for the specified `contextFields`
-5. Extracted values are written into the stage's variables
+3. Each transformer receives the conversation context, user input, and existing variable values
+4. The LLM returns a JSON object whose schema is described by `{{schema}}`
+5. Only fields declared in `contextFields` are accepted; any extra fields are discarded
+6. The returned values are **merged** into the stage's variable store — fields omitted from the LLM response keep their current values
+7. All variable writes from all transformers are flushed to the database in a single batch update
 
 ## Extraction Prompt
 
-The `prompt` field guides the LLM on what to extract. It's a Handlebars template:
+The `prompt` field guides the LLM on what to extract. It's a Handlebars template with access to the full conversation context.
+
+### Template Variables
+
+| Variable | Description |
+|---|---|
+| `{{schema}}` | **Pseudo-JSON schema** of the expected output — field names and their types derived from `contextFields` cross-referenced with the stage's `variableDescriptors`. Include this in your prompt so the LLM knows the exact JSON structure to return. |
+| `{{json context}}` | **Current values** of the transformer's context fields. Shows what is already populated so the LLM can decide what to update or leave unchanged. |
+| `{{vars.*}}` | All stage variables (e.g. `{{vars.customerName}}`). |
+| `{{userInput}}` | The current user message being processed. |
+| `{{history}}` | Conversation history (array of `{role, content}` entries). |
+| `{{userProfile.*}}` | User profile fields. |
+| `{{time.*}}` | Time context anchored to the conversation's timezone. |
+
+A typical prompt using these variables:
 
 ```
 Extract the following information from the user's message.
 Only extract values that are explicitly stated or clearly implied.
 Return null for any fields not mentioned.
 
-Fields to extract:
-- customerName: The user's full name
-- orderNumber: Any order or reference number mentioned
-- issueType: Category of the issue (billing, technical, shipping)
+Return a JSON object matching this schema:
+{{schema}}
+
+Current values (only update fields that changed):
+{{{json context}}}
 ```
+
+### Schema Format
+
+`{{schema}}` is a JSON-like object where each value is the field's type label:
+
+```json
+{
+  "customerName": "string",
+  "orderNumber": "string",
+  "issueType": "string",
+  "itemCount": "number",
+  "tags": ["string"],
+  "address": {
+    "street": "string",
+    "city": "string"
+  }
+}
+```
+
+The LLM should respond with a JSON object using the same shape, with actual values instead of type labels.
 
 ## Context Fields
 
@@ -48,7 +85,7 @@ The `contextFields` array lists the variable names the transformer will populate
 ["customerName", "orderNumber", "issueType"]
 ```
 
-These field names correspond to the stage's `variableDescriptors`. When the transformer extracts a value, it's written directly to the stage's variable store.
+These field names correspond to the stage's `variableDescriptors`. When the transformer extracts a value, it's **merged into** the stage's variable store — only the fields present in the LLM's JSON response are updated. Fields not returned by the LLM retain their existing values. Unrecognized fields (not listed in `contextFields`) are silently discarded.
 
 ## Triggering Actions
 
