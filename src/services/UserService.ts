@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, or, and, like, SQL, desc, sql } from 'drizzle-orm';
 import { db } from '../db/index';
 import { users } from '../db/schema';
 import type { CreateUserRequest, UpdateUserRequest, UserResponse, UserListResponse } from '../http/contracts/user';
@@ -107,10 +107,10 @@ export class UserService extends BaseService {
         }
       }
 
-      // Apply text search (searches id only for users)
+      // Apply text search (searches profile.name via JSONB extraction)
       if (params?.textSearch) {
         const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(users.id, searchTerm));
+        conditions.push(or(like(users.id, searchTerm), sql`(${users.profile}->>'name') ilike ${searchTerm}`));
       }
 
       // Build order by clause

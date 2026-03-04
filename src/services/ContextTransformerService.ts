@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc, sql } from 'drizzle-orm';
+import { eq, and, SQL, desc, sql } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { contextTransformers } from '../db/schema';
 import type { CreateContextTransformerRequest, UpdateContextTransformerRequest, ContextTransformerResponse, ContextTransformerListResponse, CloneContextTransformerRequest } from '../http/contracts/contextTransformer';
@@ -113,10 +114,10 @@ export class ContextTransformerService extends BaseService {
         }
       }
 
-      // Apply text search (searches name and description)
+      // Apply text search (searches name by ilike, or tags JSONB containment for "tag:" prefix)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(contextTransformers.name, searchTerm));
+        const searchCondition = buildTextSearchCondition(params.textSearch, [contextTransformers.name], contextTransformers.tags);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause

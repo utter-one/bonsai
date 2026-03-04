@@ -1,7 +1,8 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, ilike, or, inArray, and, SQL, desc, sql } from 'drizzle-orm';
+import { parseTextSearch } from '../utils/textSearch';
 import { db } from '../db/index';
-import { issues } from '../db/schema';
+import { issues, projects } from '../db/schema';
 import type { CreateIssueRequest, UpdateIssueRequest, IssueResponse, IssueListResponse } from '../http/contracts/issue';
 import type { ListParams } from '../http/contracts/common';
 import { issueResponseSchema, issueListResponseSchema } from '../http/contracts/issue';
@@ -111,10 +112,14 @@ export class IssueService extends BaseService {
         }
       }
 
-      // Apply text search (searches bugDescription, expectedBehaviour, comments, category)
+      // Apply text search (searches id, bugDescription, severity, category, status by ilike; project name via subquery)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(issues.bugDescription, searchTerm));
+        const parsed = parseTextSearch(params.textSearch);
+        if (parsed.type === 'text') {
+          const searchTerm = `%${parsed.value}%`;
+          const projectSubQuery = db.select({ id: projects.id }).from(projects).where(ilike(projects.name, searchTerm));
+          conditions.push(or(sql`${issues.id}::text ilike ${searchTerm}`, ilike(issues.bugDescription, searchTerm), ilike(issues.severity, searchTerm), ilike(issues.category, searchTerm), ilike(issues.status, searchTerm), inArray(issues.projectId, projectSubQuery))!);
+        }
       }
 
       // Build order by clause

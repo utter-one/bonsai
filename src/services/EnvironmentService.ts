@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, and, SQL, desc } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { environments } from '../db/schema';
 import type { CreateEnvironmentRequest, UpdateEnvironmentRequest, EnvironmentResponse, EnvironmentListResponse } from '../http/contracts/environment';
@@ -109,10 +110,10 @@ export class EnvironmentService extends BaseService {
         }
       }
 
-      // Apply text search (searches description and url)
+      // Apply text search (searches id, description, url, login by ilike)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(environments.description, searchTerm));
+        const searchCondition = buildTextSearchCondition(params.textSearch, [environments.id, environments.description, environments.url, environments.login]);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause

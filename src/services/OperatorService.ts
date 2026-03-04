@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, gte, lte, like, SQL, desc } from 'drizzle-orm';
+import { eq, ilike, or, and, SQL, desc, sql } from 'drizzle-orm';
+import { parseTextSearch } from '../utils/textSearch';
 import { db } from '../db/index';
 import { operators } from '../db/schema';
 import type { CreateOperatorRequest, UpdateOperatorRequest, OperatorResponse, OperatorListResponse, UpdateProfileRequest, ProfileResponse } from '../http/contracts/operator';
@@ -13,7 +14,6 @@ import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS, ROLES } from '../permissions';
-import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
 /**
  * Service for managing operator users with full CRUD operations and audit logging
@@ -36,7 +36,7 @@ export class OperatorService extends BaseService {
     if (!operatorId) {
       throw new InvalidOperationError('Operator ID (email) must be provided when creating an operator');
     }
-    
+
     logger.info({ operatorId, name: input.name, roles: input.roles, contextOperatorId: context?.operatorId }, 'Creating operator');
 
     try {
@@ -112,6 +112,11 @@ export class OperatorService extends BaseService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
+          if (field === 'roles') {
+            const rolesArray = Array.isArray(filter) ? filter as string[] : [filter as string];
+            conditions.push(sql`${operators.roles} @> ${JSON.stringify(rolesArray)}::jsonb`);
+            continue;
+          }
           const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
@@ -119,10 +124,15 @@ export class OperatorService extends BaseService {
         }
       }
 
-      // Apply text search (searches name and id)
+      // Apply text search: ilike on id (email) and name; for "tag:" prefix use JSONB containment on roles
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(operators.name, searchTerm));
+        const parsed = parseTextSearch(params.textSearch);
+        if (parsed.type === 'tag') {
+          conditions.push(sql`${operators.roles} @> ${JSON.stringify([parsed.value])}::jsonb`);
+        } else {
+          const searchTerm = `%${parsed.value}%`;
+          conditions.push(or(ilike(operators.id, searchTerm), ilike(operators.name, searchTerm), sql`${operators.roles}::text ilike ${searchTerm}`)!);
+        }
       }
 
       // Build order by clause
@@ -142,25 +152,8 @@ export class OperatorService extends BaseService {
         offset,
       });
 
-      // Filter by roles if needed (array contains check not supported in SQL easily)
-      let filteredList = operatorList;
-      if (params?.filters?.roles) {
-        const rolesFilter = params.filters.roles;
-        let roleValues: string[] = [];
-        
-        if (Array.isArray(rolesFilter)) {
-          roleValues = rolesFilter as string[];
-        } else if (typeof rolesFilter === 'object' && 'value' in rolesFilter && Array.isArray(rolesFilter.value)) {
-          roleValues = rolesFilter.value as string[];
-        }
-        
-        if (roleValues.length > 0) {
-          filteredList = operatorList.filter(operator => operator.roles.some(role => roleValues.includes(role)));
-        }
-      }
-
       return operatorListResponseSchema.parse({
-        items: filteredList,
+        items: operatorList,
         total,
         offset,
         limit,
@@ -294,7 +287,7 @@ export class OperatorService extends BaseService {
   private validateRoles(roles: string[]): void {
     const validRoles = Object.keys(ROLES);
     const invalidRoles = roles.filter(role => !(role in ROLES));
-    
+
     if (invalidRoles.length > 0) {
       throw new Error(`Invalid roles: ${invalidRoles.join(', ')}. Valid roles are: ${validRoles.join(', ')}`);
     }
@@ -380,7 +373,7 @@ export class OperatorService extends BaseService {
       // Log the update for audit purposes
       const oldData: any = { id: existingOperator.id, name: existingOperator.name };
       const newData: any = { id: operator.id, name: operator.name };
-      
+
       if (input.newPassword) {
         oldData.passwordChanged = false;
         newData.passwordChanged = true;

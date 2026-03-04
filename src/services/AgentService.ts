@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc, sql } from 'drizzle-orm';
+import { eq, and, SQL, desc, sql } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { agents } from '../db/schema';
 import type { CreateAgentRequest, UpdateAgentRequest, AgentResponse, AgentListResponse, CloneAgentRequest } from '../http/contracts/agent';
@@ -111,10 +112,10 @@ export class AgentService extends BaseService {
         }
       }
 
-      // Apply text search (searches name and id)
+      // Apply text search (searches name by ilike, or tags JSONB containment for "tag:" prefix)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(agents.name, searchTerm));
+        const searchCondition = buildTextSearchCondition(params.textSearch, [agents.name], agents.tags);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause

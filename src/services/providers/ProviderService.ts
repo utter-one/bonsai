@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, desc, SQL } from 'drizzle-orm';
+import { eq, and, desc, sql, SQL } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../../utils/textSearch';
 import { db } from '../../db/index';
 import { providers } from '../../db/schema';
 import type { CreateProviderRequest, UpdateProviderRequest, ProviderResponse, ProviderListResponse } from '../../http/contracts/provider';
@@ -109,6 +110,11 @@ export class ProviderService extends BaseService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
+          if (field === 'tags') {
+            const tagsArray = Array.isArray(filter) ? filter as string[] : [filter as string];
+            conditions.push(sql`${providers.tags} @> ${JSON.stringify(tagsArray)}::jsonb`);
+            continue;
+          }
           const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
@@ -116,11 +122,10 @@ export class ProviderService extends BaseService {
         }
       }
 
-      // Apply text search (searches name, description, and id)
+      // Apply text search (searches name, id, providerType, apiType — or tag JSONB containment for "tag:" prefix)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        const { like, or } = await import('drizzle-orm');
-        conditions.push(or(like(providers.name, searchTerm), like(providers.description, searchTerm), like(providers.id, searchTerm))!);
+        const searchCondition = buildTextSearchCondition(params.textSearch, [providers.name, providers.id, providers.providerType, providers.apiType], providers.tags);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause
@@ -140,25 +145,8 @@ export class ProviderService extends BaseService {
         offset,
       });
 
-      // Filter by tags if needed (array contains check)
-      let filteredList = providerList;
-      if (params?.filters?.tags) {
-        const tagsFilter = params.filters.tags;
-        let tagValues: string[] = [];
-
-        if (Array.isArray(tagsFilter)) {
-          tagValues = tagsFilter as string[];
-        } else if (typeof tagsFilter === 'object' && 'value' in tagsFilter && Array.isArray(tagsFilter.value)) {
-          tagValues = tagsFilter.value as string[];
-        }
-
-        if (tagValues.length > 0) {
-          filteredList = providerList.filter(provider => provider.tags?.some(tag => tagValues.includes(tag)));
-        }
-      }
-
       return providerListResponseSchema.parse({
-        items: filteredList,
+        items: providerList,
         total,
         offset,
         limit,

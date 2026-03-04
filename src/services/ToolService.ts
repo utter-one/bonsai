@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc, sql } from 'drizzle-orm';
+import { eq, and, SQL, desc, sql } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { tools } from '../db/schema';
 import type { CreateToolRequest, UpdateToolRequest, ToolResponse, ToolListResponse, CloneToolRequest } from '../http/contracts/tool';
@@ -115,10 +116,10 @@ export class ToolService extends BaseService {
         }
       }
 
-      // Apply text search (searches name and description)
+      // Apply text search (searches name by ilike, or tags JSONB containment for "tag:" prefix)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(tools.name, searchTerm));
+        const searchCondition = buildTextSearchCondition(params.textSearch, [tools.name], tools.tags);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause
