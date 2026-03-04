@@ -17,8 +17,8 @@ export const contextTransformerRouteParamsSchema = z.object({
 
 /**
  * Schema for creating a new context transformer
- * Required fields: id, name, prompt
- * Optional fields: description, contextFields, llmProviderId, metadata
+ * Required fields: id, name, prompt, llmProviderId, llmSettings
+ * Optional fields: description, contextFields, metadata
  */
 export const createContextTransformerSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the context transformer (auto-generated if not provided)'),
@@ -26,8 +26,8 @@ export const createContextTransformerSchema = z.object({
   description: z.string().nullable().optional().describe('Detailed description of the transformer\'s purpose and behavior'),
   prompt: z.string().min(1).describe('Prompt that defines the transformation logic and instructions'),
   contextFields: z.array(z.string()).optional().describe('List of context field names to be transformed'),
-  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this transformer'),
-  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this transformer'),
+  llmProviderId: z.string().min(1).describe('ID of the LLM provider to use for this transformer'),
+  llmSettings: llmSettingsSchema.unwrap().unwrap().describe('LLM provider-specific settings for this transformer'),
   tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this context transformer'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional transformer-specific metadata'),
 });
@@ -41,8 +41,8 @@ export const updateContextTransformerBodySchema = z.object({
   description: z.string().nullable().optional().describe('Updated description'),
   prompt: z.string().min(1).optional().describe('Updated transformation prompt'),
   contextFields: z.array(z.string()).optional().describe('Updated context field names'),
-  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
-  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
+  llmProviderId: z.string().min(1).optional().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.unwrap().unwrap().optional().describe('Updated LLM provider-specific settings'),
   tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
