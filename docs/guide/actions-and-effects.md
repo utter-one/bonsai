@@ -13,7 +13,7 @@ Each action in the `actions` map has a key (the action ID) and a value with thes
 | `triggerOnUserInput` | Whether this action can be triggered by user speech/text (default: `true`) |
 | `triggerOnClientCommand` | Whether this action can be triggered by a client command |
 | `triggerOnTransformation` | Whether this action runs after context transformation |
-| `classificationTrigger` | Label the classifier outputs to match this action |
+| `classificationTrigger` | Descriptive label shown to the classifier LLM that tells it when this action should fire; the LLM matches user intent against this label and returns the action **ID** in its response |
 | `overrideClassifierId` | Use a specific classifier instead of the stage default |
 | `parameters` | Parameters extracted by the classifier when triggering |
 | `effects` | Ordered array of effects to execute |
@@ -29,13 +29,13 @@ Stages support three reserved lifecycle actions with special names (prefixed wit
 
 Runs when the conversation enters this stage — either at the start of a conversation or via a `go_to_stage` effect. Executes **before** the `enterBehavior` (generate response or await input).
 
-Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`.
+Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
 
 ### `__on_leave`
 
 Runs when the conversation is about to leave this stage (before loading the new stage). Useful for cleanup or persisting state.
 
-Restricted effects: cannot use `go_to_stage` or `generate_response`.
+Restricted effects: cannot use `go_to_stage` or `generate_response`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
 
 ### `__on_fallback`
 
@@ -214,6 +214,29 @@ Explicitly triggers AI response generation. Two modes:
 ```
 
 Selection strategies: `random` (pick randomly) or `round_robin` (cycle through).
+
+## Effect Execution Priority
+
+Effects from **all** triggered actions are gathered into a single global list, sorted by priority, and then conflict-resolved before execution. Effects within the same priority tier run in the order they appeared across all actions.
+
+| Priority | Effect type |
+|---|---|
+| 1 | `call_webhook` |
+| 2 | `call_tool` |
+| 3 | `modify_variables` |
+| 4 | `modify_user_profile` |
+| 5 | `modify_user_input` |
+| 6 | `run_script` |
+| 7 | `generate_response` |
+| 8 | `end_conversation` |
+| 9 | `abort_conversation` |
+| 10 | `go_to_stage` |
+
+### Conflict Resolution
+
+- **Multiple `go_to_stage`** — only the first one (lowest priority index) is kept; the rest are discarded
+- **`abort_conversation` + `end_conversation`** — `abort_conversation` wins; `end_conversation` is removed
+- **Multiple `modify_user_input`** — all are applied in sequence, each receiving the output of the previous
 
 ## Execution Flow
 

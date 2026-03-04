@@ -31,18 +31,81 @@ During each conversation turn, classifiers run in parallel to analyze the user's
 
 ## Classification Prompt
 
-The `prompt` field guides how the LLM classifies input. It's a Handlebars template with access to stage variables and conversation context:
+The `prompt` field is a Handlebars template that guides how the LLM classifies input. It has access to the full conversation context **and** the list of available actions for the current stage.
 
+### Template Context
+
+In addition to all standard [template variables](./templating), the classifier prompt receives:
+
+| Variable | Description |
+|---|---|
+| `stage.availableActions` | Array of actions eligible for classification (conditions already evaluated) |
+| `userInput` | The current user's message |
+
+Each entry in `stage.availableActions` exposes:
+
+| Field | Description |
+|---|---|
+| `id` | Action ID — **this is what the LLM must return as the JSON key** |
+| `name` | Display name |
+| `trigger` | The `classificationTrigger` label describing when to fire this action |
+| `examples` | Example user phrases |
+| `parameters` | Parameter definitions (name, type, description, required) |
+
+### Example Prompt
+
+```handlebars
+You are a classification assistant. Your task is to analyze user input and extract actions with parameters.
+
+{{#if stage}}
+Available actions in this stage:
+{{#each stage.availableActions}}
+- **{{name}}** (ID: {{id}})
+  {{#if examples}}
+  Examples: {{join examples ", "}}
+  {{/if}}
+  {{#if parameters}}
+  Parameters:
+  {{#each parameters}}
+    - {{name}} ({{type}}){{#if required}} *required*{{/if}}: {{description}}
+  {{/each}}
+  {{/if}}
+{{/each}}
+{{/if}}
+
+Instructions:
+1. Determine the user's actions from their input using the defined actions above.
+2. Extract any parameters that match the defined actions for this stage
+3. For parameters extraction:
+   - Only extract parameters that are explicitly mentioned or strongly implied in the user input
+   - For "text" type parameters, extract the relevant text value
+   - For "number" type parameters, extract numeric values
+4. For action classification:
+   - Prioritize defined actions when the user input matches their trigger descriptions
+   - Consider the action associated with each intent when making classification decisions
+   - Fall back to general actions when no specific intent matches
+5. You can only use existing actions.
 ```
-Analyze the user's message and determine which of the following actions
-best matches their intent. Consider the conversation context and any
-previous interactions.
 
-If the user's message is a simple acknowledgment or doesn't match any
-action, return no matches.
+### Required Output Format
+
+The LLM **must** respond with a JSON object in the following format:
+
+```json
+{
+  "actions": {
+    "<actionId>": {
+      "paramName": "paramValue"
+    },
+    "<anotherActionId>": {}
+  }
+}
 ```
 
-The system automatically appends the available actions list and user input to this prompt.
+- Keys are **action IDs** (the `id` field from `stage.availableActions`), not trigger labels or action names
+- The value is an object of extracted parameter key–value pairs
+- Use an empty object `{}` when the action has no parameters (or none were extracted)
+- Omit actions that were not matched — do not include them with empty objects unless they were genuinely triggered
 
 ## Multiple Classifiers
 

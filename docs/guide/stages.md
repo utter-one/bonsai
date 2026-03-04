@@ -37,14 +37,22 @@ When a conversation enters a stage (at start or via `go_to_stage`), the `enterBe
 
 The `prompt` field is a [Handlebars template](./templating) that defines the AI's system prompt for this stage. It has access to:
 
+- <code v-pre>{{agent}}</code> — Agent personality prompt (**must be explicitly placed — see warning below**)
 - <code v-pre>{{vars.&lt;key&gt;}}</code> — Stage variables
 - <code v-pre>{{userProfile.&lt;key&gt;}}</code> — User profile data
 - <code v-pre>{{consts.&lt;key&gt;}}</code> — Project-level constants
 - <code v-pre>{{history}}</code> — Conversation history (auto-injected)
+- <code v-pre>{{faq}}</code> — Knowledge base results (**must be explicitly placed — see warning below**)
+
+> **Warning — `agent` is not auto-injected.** The agent linked via `agentId` defines the AI's personality, but that personality text only reaches the LLM if you explicitly write <code v-pre>{{agent}}</code> somewhere in your stage prompt. Without it, the agent's `prompt` field has no effect on the conversation.
+
+> **Warning — `faq` is not auto-injected.** When knowledge classification matches FAQ items, those results are only visible to the LLM if you explicitly include <code v-pre>{{faq}}</code> in your stage prompt. Without it, matched knowledge results are silently discarded.
 
 Example prompt:
 
 ```handlebars
+{{agent}}
+
 You are a customer service agent for {{consts.companyName}}.
 The customer's name is {{userProfile.name}}.
 
@@ -54,6 +62,14 @@ Help them resolve this issue step by step.
 {{else}}
 Ask the customer what they need help with today.
 {{/if}}
+
+{{#hasItems faq}}
+Relevant knowledge:
+{{#each faq}}
+Q: {{this.question}}
+A: {{this.answer}}
+{{/each}}
+{{/hasItems}}
 ```
 
 ## Variable Descriptors
