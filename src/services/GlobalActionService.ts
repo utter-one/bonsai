@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc, sql } from 'drizzle-orm';
+import { eq, and, SQL, desc, sql } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { globalActions } from '../db/schema';
 import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, GlobalActionResponse, GlobalActionListResponse, CloneGlobalActionRequest } from '../http/contracts/globalAction';
@@ -112,10 +113,10 @@ export class GlobalActionService extends BaseService {
         }
       }
 
-      // Apply text search (searches name only)
+      // Apply text search (searches name, classificationTrigger, condition by ilike, or tags JSONB for "tag:" prefix)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(globalActions.name, searchTerm));
+        const searchCondition = buildTextSearchCondition(params.textSearch, [globalActions.name, globalActions.classificationTrigger, globalActions.condition], globalActions.tags);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause

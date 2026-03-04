@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc, inArray, sql } from 'drizzle-orm';
+import { eq, and, SQL, desc, inArray, sql } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { stages, agents, classifiers, contextTransformers, globalActions, knowledgeCategories } from '../db/schema';
 import type { CreateStageRequest, UpdateStageRequest, StageResponse, StageListResponse, CloneStageRequest } from '../http/contracts/stage';
@@ -169,11 +170,10 @@ export class StageService extends BaseService {
         }
       }
 
-      // Apply text search (searches name and id)
+      // Apply text search (searches name by ilike, or tags JSONB containment for "tag:" prefix)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        const { or } = await import('drizzle-orm');
-        conditions.push(or(like(stages.name, searchTerm), like(stages.id, searchTerm))!);
+        const searchCondition = buildTextSearchCondition(params.textSearch, [stages.name], stages.tags);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause

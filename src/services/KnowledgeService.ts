@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, ilike, or, inArray, and, like, SQL, desc, sql } from 'drizzle-orm';
+import { parseTextSearch } from '../utils/textSearch';
 import { db } from '../db/index';
 import { knowledgeCategories, knowledgeItems } from '../db/schema';
 import type { CreateKnowledgeCategoryRequest, UpdateKnowledgeCategoryRequest, KnowledgeCategoryResponse, KnowledgeCategoryListResponse, CreateKnowledgeItemRequest, UpdateKnowledgeItemRequest, KnowledgeItemResponse, KnowledgeItemListResponse } from '../http/contracts/knowledge';
@@ -111,8 +112,14 @@ export class KnowledgeService extends BaseService {
       }
 
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(knowledgeCategories.name, searchTerm));
+        const parsed = parseTextSearch(params.textSearch);
+        if (parsed.type === 'tag') {
+          conditions.push(sql`${knowledgeCategories.tags} @> ${JSON.stringify([parsed.value])}::jsonb`);
+        } else {
+          const searchTerm = `%${parsed.value}%`;
+          const itemSubQuery = db.select({ id: knowledgeItems.categoryId }).from(knowledgeItems).where(and(eq(knowledgeItems.projectId, projectId), or(ilike(knowledgeItems.question, searchTerm), ilike(knowledgeItems.answer, searchTerm))!));
+          conditions.push(or(ilike(knowledgeCategories.name, searchTerm), ilike(knowledgeCategories.promptTrigger, searchTerm), inArray(knowledgeCategories.id, itemSubQuery))!);
+        }
       }
 
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);

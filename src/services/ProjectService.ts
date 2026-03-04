@@ -1,5 +1,6 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, SQL, desc, and } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, agents, conversations, issues } from '../db/schema';
 import type { CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse } from '../http/contracts/project';
@@ -101,10 +102,15 @@ export class ProjectService extends BaseService {
         }
       }
 
+      if (params?.textSearch) {
+        const searchCondition = buildTextSearchCondition(params.textSearch, [projects.name]);
+        if (searchCondition) conditions.push(searchCondition);
+      }
+
       const orderBy = buildOrderBy(params?.orderBy, columnMap) ?? desc(projects.createdAt);
-      const whereCondition = conditions.length > 0 ? conditions : undefined;
-      const projectList = await db.query.projects.findMany({ where: whereCondition ? (whereCondition.length === 1 ? whereCondition[0] : undefined) : undefined, orderBy, offset, limit: limit ?? undefined });
-      const totalQuery = await db.select({ count: projects.id }).from(projects).where(whereCondition ? (whereCondition.length === 1 ? whereCondition[0] : undefined) : undefined);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+      const projectList = await db.query.projects.findMany({ where: whereCondition, orderBy, offset, limit: limit ?? undefined });
+      const totalQuery = await db.select({ count: projects.id }).from(projects).where(whereCondition);
       const total = totalQuery.length;
 
       logger.debug({ count: projectList.length, total }, 'Projects listed successfully');

@@ -1,5 +1,6 @@
 import { injectable } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { and, SQL, desc } from 'drizzle-orm';
+import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { auditLogs } from '../db/schema';
 import type { AuditLog } from '../types/models';
@@ -29,7 +30,7 @@ export class AuditService {
    * @returns The created audit log entry
    */
   async logChange(input: AuditLogInput): Promise<AuditLog> {
-    logger.info({ action: input.action, entityType: input.entityType, entityId: input.entityId, userId: input.userId, }, 'Logging audit change' );
+    logger.info({ action: input.action, entityType: input.entityType, entityId: input.entityId, userId: input.userId, }, 'Logging audit change');
 
     try {
       const auditLog = await db
@@ -241,10 +242,10 @@ export class AuditService {
         }
       }
 
-      // Apply text search (searches action, entityId, and entityType)
+      // Apply text search (searches action, entityType, entityId, userId by ilike)
       if (params?.textSearch) {
-        const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(auditLogs.action, searchTerm));
+        const searchCondition = buildTextSearchCondition(params.textSearch, [auditLogs.action, auditLogs.entityType, auditLogs.entityId, auditLogs.userId]);
+        if (searchCondition) conditions.push(searchCondition);
       }
 
       // Build order by clause

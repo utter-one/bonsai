@@ -1,14 +1,15 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, SQL, desc, and } from 'drizzle-orm';
+import { eq, ilike, or, inArray, SQL, desc, and } from 'drizzle-orm';
 import crypto from 'crypto';
 import { db } from '../db/index';
-import { apiKeys } from '../db/schema';
+import { apiKeys, projects } from '../db/schema';
 import type { CreateApiKeyRequest, UpdateApiKeyRequest, ApiKeyResponse, ApiKeyListResponse } from '../http/contracts/apiKey';
 import type { ListParams } from '../http/contracts/common';
 import { apiKeyResponseSchema, apiKeyListResponseSchema } from '../http/contracts/apiKey';
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { parseTextSearch } from '../utils/textSearch';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
@@ -152,8 +153,18 @@ export class ApiKeyService extends BaseService {
         }
       }
 
+      if (params?.textSearch) {
+        const parsed = parseTextSearch(params.textSearch);
+        if (parsed.type === 'text') {
+          const searchTerm = `%${parsed.value}%`;
+          const projectSubQuery = db.select({ id: projects.id }).from(projects).where(ilike(projects.name, searchTerm));
+          conditions.push(or(ilike(apiKeys.name, searchTerm), inArray(apiKeys.projectId, projectSubQuery))!);
+        }
+        // API keys have no tags column, so tag searches are ignored
+      }
+
       const orderBy = buildOrderBy(params?.orderBy, columnMap) ?? desc(apiKeys.createdAt);
-      const whereCondition = conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : undefined) : undefined;
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
       const apiKeyList = await db.query.apiKeys.findMany({ where: whereCondition, orderBy, offset, limit: limit ?? undefined });
       const totalQuery = await db.select({ count: apiKeys.id }).from(apiKeys).where(whereCondition);
       const total = totalQuery.length;
