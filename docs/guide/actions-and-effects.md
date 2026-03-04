@@ -29,13 +29,13 @@ Stages support three reserved lifecycle actions with special names (prefixed wit
 
 Runs when the conversation enters this stage — either at the start of a conversation or via a `go_to_stage` effect. Executes **before** the `enterBehavior` (generate response or await input).
 
-Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`.
+Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
 
 ### `__on_leave`
 
 Runs when the conversation is about to leave this stage (before loading the new stage). Useful for cleanup or persisting state.
 
-Restricted effects: cannot use `go_to_stage` or `generate_response`.
+Restricted effects: cannot use `go_to_stage` or `generate_response`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
 
 ### `__on_fallback`
 

@@ -200,6 +200,8 @@ All signals are queued and applied after the script finishes — the script alwa
 
 Transition to a different stage after the script.
 
+> **Note:** `goToStage()` is **silently ignored** when called inside a `run_script` effect that belongs to a lifecycle action (`__on_enter` or `__on_leave`). Use it only in regular user-triggered or command-triggered actions.
+
 ```javascript
 if (vars.retryCount >= 3) {
   goToStage('escalation-stage-id');
