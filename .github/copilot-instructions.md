@@ -238,3 +238,21 @@ All WebSocket message contracts are defined in `/src/websocket/contracts/` using
 - `command.ts` - Client commands (go to stage, variables, actions)
 - `aiResponse.ts` - AI voice output messages
 
+
+## Documentation Conventions
+
+Docs are built with VitePress (`npm run docs:build`). VitePress uses Vue under the hood, so `{{ }}` outside of fenced code blocks is interpreted as Vue template interpolation and will break the build.
+
+### Handlebars / Template Expressions in Docs
+
+Any Handlebars-style expression (e.g. `{{schema}}`, `{{vars.name}}`, `{{{json context}}}`) referenced **outside a fenced code block** — such as in prose, tables, or bullet points — must be wrapped in `<code v-pre>` instead of backticks:
+
+```markdown
+<!-- ✗ breaks the build -->
+`{{schema}}`
+
+<!-- ✓ correct -->
+<code v-pre>{{schema}}</code>
+```
+
+Inside fenced code blocks (` ``` `) the expressions are safe as-is and do not need `v-pre`.

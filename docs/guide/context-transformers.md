@@ -22,7 +22,7 @@ A **Context Transformer** is an LLM-powered component that extracts structured d
 1. A stage references transformers via its `transformerIds` array
 2. On each user input, all referenced transformers run **in parallel** with classifiers
 3. Each transformer receives the conversation context, user input, and existing variable values
-4. The LLM returns a JSON object whose schema is described by `{{schema}}`
+4. The LLM returns a JSON object whose schema is described by <code v-pre>{{schema}}</code>
 5. Only fields declared in `contextFields` are accepted; any extra fields are discarded
 6. The returned values are **merged** into the stage's variable store — fields omitted from the LLM response keep their current values
 7. All variable writes from all transformers are flushed to the database in a single batch update
@@ -35,13 +35,13 @@ The `prompt` field guides the LLM on what to extract. It's a Handlebars template
 
 | Variable | Description |
 |---|---|
-| `{{schema}}` | **Pseudo-JSON schema** of the expected output — field names and their types derived from `contextFields` cross-referenced with the stage's `variableDescriptors`. Include this in your prompt so the LLM knows the exact JSON structure to return. |
-| `{{json context}}` | **Current values** of the transformer's context fields. Shows what is already populated so the LLM can decide what to update or leave unchanged. |
-| `{{vars.*}}` | All stage variables (e.g. `{{vars.customerName}}`). |
-| `{{userInput}}` | The current user message being processed. |
-| `{{history}}` | Conversation history (array of `{role, content}` entries). |
-| `{{userProfile.*}}` | User profile fields. |
-| `{{time.*}}` | Time context anchored to the conversation's timezone. |
+| <code v-pre>{{schema}}</code> | **Pseudo-JSON schema** of the expected output — field names and their types derived from `contextFields` cross-referenced with the stage's `variableDescriptors`. Include this in your prompt so the LLM knows the exact JSON structure to return. |
+| <code v-pre>{{json context}}</code> | **Current values** of the transformer's context fields. Shows what is already populated so the LLM can decide what to update or leave unchanged. |
+| <code v-pre>{{vars.*}}</code> | All stage variables (e.g. <code v-pre>{{vars.customerName}}</code>). |
+| <code v-pre>{{userInput}}</code> | The current user message being processed. |
+| <code v-pre>{{history}}</code> | Conversation history (array of `{role, content}` entries). |
+| <code v-pre>{{userProfile.*}}</code> | User profile fields. |
+| <code v-pre>{{time.*}}</code> | Time context anchored to the conversation's timezone. |
 
 A typical prompt using these variables:
 
@@ -54,12 +54,12 @@ Return a JSON object matching this schema:
 {{schema}}
 
 Current values (only update fields that changed):
-{{{json context}}}
+{{json context}}
 ```
 
 ### Schema Format
 
-`{{schema}}` is a JSON-like object where each value is the field's type label:
+<code v-pre>{{schema}}</code> is a JSON-like object where each value is the field's type label:
 
 ```json
 {
