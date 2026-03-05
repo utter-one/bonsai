@@ -18,6 +18,8 @@ export const toolExecutionResultSchema = z.object({
   result: z.array(llmContentSchema).optional().describe('Optional field for tool output'),
   renderedPrompt: z.string().optional(),
   llmSettings: z.any().optional(),
+  /** Total duration of the tool execution in milliseconds, including LLM call */
+  durationMs: z.number().optional(),
 });
 
 export type ToolExecutionResult = z.infer<typeof toolExecutionResultSchema>;
@@ -46,6 +48,7 @@ export class ToolExecutor {
       throw new NotFoundError(`LLM provider with ID "${tool.llmProviderId}" not found for tool "${tool.name}"`);
     }
 
+    const toolStartMs = Date.now();
     try {
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, tool.llmSettings);
       const actualContext = { ...context, tool: { parameters } };
@@ -71,11 +74,11 @@ export class ToolExecutor {
       });
 
       const result = await llmProvider.generate(messages, { outputFormat: this.getOutputFormat(tool) });
-      
-      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings };
+      const durationMs = Date.now() - toolStartMs;
+      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings, durationMs };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
-      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution' };
+      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution', durationMs: Date.now() - toolStartMs };
     }
   }
 

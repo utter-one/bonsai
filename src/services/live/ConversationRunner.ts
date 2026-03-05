@@ -42,6 +42,30 @@ export type TransformerRuntimeData = {
   llmProvider: ILlmProvider;
 }
 
+/**
+ * Holds all per-turn runtime state: correlation IDs, wall-clock timing markers,
+ * and references needed to back-fill event metadata once async operations complete.
+ * Reset at the start of every user-input turn via processUserInput.
+ */
+export type TurnData = {
+  /** ID of the current input turn (assigned when user input is received) */
+  inputTurnId?: string;
+  /** ID of the current output turn (assigned when response generation begins) */
+  outputTurnId?: string;
+  /** Unix timestamp (ms) when the current turn started processing */
+  startMs: number | null;
+  /** Unix timestamp (ms) when LLM completion generation was started */
+  llmStartMs: number | null;
+  /** Unix timestamp (ms) when the first LLM completion token was received */
+  firstTokenMs: number | null;
+  /** Unix timestamp (ms) when the first audio chunk was delivered to the client (including filler) */
+  firstAudioMs: number | null;
+  /** Event ID of the saved assistant message event; used to back-fill totalTurnDurationMs after TTS completes */
+  assistantMessageEventId: string | null;
+  /** Duration of the filler sentence LLM call in milliseconds; null when no filler was generated */
+  fillerDurationMs: number | null;
+};
+
 export type StageRuntimeData = {
   id: string;
   conversation: Conversation;
@@ -60,8 +84,6 @@ export type StageRuntimeData = {
   agent: AgentResponse;
   /** LLM provider used to generate filler sentences, preloaded from agent.fillerSettings */
   fillerLlmProvider?: ILlmProvider;
-  inputTurnId?: string;
-  outputTurnId?: string;
   /** FAQ items gathered from knowledge base, persisted between turns until new knowledge actions are detected */
   faq: FaqItem[];
 }
@@ -83,6 +105,9 @@ export class ConversationRunner {
   private navigationDepth = 0;
   /** Guards against multiple AI responses being generated within the same turn (e.g. when chained stage jumps each try to generate a response) */
   private responseGeneratedInTurn = false;
+
+  /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
+  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -290,7 +315,7 @@ export class ConversationRunner {
               chunkId,
               chunkText: text,
               ordinal: chunkOrdinal++,
-              inputTurnId: this.stageData.inputTurnId,
+              inputTurnId: this.turnData.inputTurnId,
               isFinal: false,
               sessionId: this.session.id,
               requestId: null
@@ -310,7 +335,7 @@ export class ConversationRunner {
               chunkId,
               chunkText: text,
               ordinal: chunkOrdinal++,
-              inputTurnId: this.stageData.inputTurnId,
+              inputTurnId: this.turnData.inputTurnId,
               isFinal: true,
               sessionId: this.session.id,
               requestId: null
@@ -374,11 +399,17 @@ export class ConversationRunner {
           firstTtsChunkGenerated = false;
           isGenerating = false;
 
+          // Record total turn duration now that all audio has been sent
+          const totalTurnDurationMs = this.turnData.startMs !== null ? Date.now() - this.turnData.startMs : undefined;
+          if (totalTurnDurationMs !== undefined && this.turnData.assistantMessageEventId) {
+            await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, this.turnData.assistantMessageEventId, { totalTurnDurationMs });
+          }
+
           // Send AI response end notification to client through WebSocket
           const message = {
             type: 'end_ai_generation_output',
             conversationId,
-            outputTurnId: this.stageData.outputTurnId,
+            outputTurnId: this.turnData.outputTurnId,
             sessionId: this.session.id,
             requestId: null,
             fullText: this.stageData.lastCompletionResult?.content || '' // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
@@ -392,13 +423,17 @@ export class ConversationRunner {
           if (!firstTtsChunkGenerated) {
             logger.info({ conversationId, chunkId: chunk.chunkId }, `First TTS chunk generated for conversation ${conversationId}`);
             firstTtsChunkGenerated = true;
+            // Record the timestamp of the first audio chunk if not already captured
+            if (this.turnData.firstAudioMs === null) {
+              this.turnData.firstAudioMs = Date.now();
+            }
           }
 
           // Send TTS audio chunk to client through WebSocket
           const message = {
             type: 'send_ai_voice_chunk',
             conversationId,
-            outputTurnId: this.stageData.outputTurnId,
+            outputTurnId: this.turnData.outputTurnId,
             ...chunk,
             audio: undefined, // don't send raw audio buffer through WebSocket message, instead convert to base64 string
             audioData: chunk.audio.toString('base64'),
@@ -435,6 +470,10 @@ export class ConversationRunner {
 
       completionLlmProvider.setOnChunk(async (chunk: LlmChunk) => {
         logger.debug({ conversationId, chunkLength: chunk.content.length }, `LLM completion chunk for conversation ${conversationId}: ${chunk.content.length} characters`);
+        // Record the timestamp of the first token if not already captured
+        if (this.turnData.firstTokenMs === null) {
+          this.turnData.firstTokenMs = Date.now();
+        }
         if (ttsProvider) {
           // Pass chunk text to TTS provider for speech synthesis
           await ttsProvider.sendText(chunk.content);
@@ -445,7 +484,7 @@ export class ConversationRunner {
           const message = {
             type: 'ai_transcribed_chunk',
             conversationId,
-            outputTurnId: this.stageData.outputTurnId,
+            outputTurnId: this.turnData.outputTurnId,
             chunkId: generateId(ID_PREFIXES.CHUNK),
             chunkText: chunk.content,
             ordinal: aiTextChunkOrdinal++,
@@ -460,11 +499,20 @@ export class ConversationRunner {
       completionLlmProvider.setOnGenerationCompleted(async (result) => {
         const textContent = extractTextFromContent(result.content);
         const contentSize = getContentSize(result.content);
+        const llmEndMs = Date.now();
 
         logger.info({ conversationId, totalTokens: result.usage?.totalTokens, contentBlocks: result.content.length }, `LLM completion finished for conversation ${conversationId}: ${contentSize} bytes in ${result.content.length} content blocks, ${result.usage?.totalTokens} tokens used`);
         this.stageData.lastCompletionResult = result;
 
-        // Save AI message event with usage info
+        // Compute turn timings available at LLM completion time
+        const llmDurationMs = this.turnData.llmStartMs !== null ? llmEndMs - this.turnData.llmStartMs : undefined;
+        const timeToFirstTokenMs = this.turnData.firstTokenMs !== null && this.turnData.llmStartMs !== null ? this.turnData.firstTokenMs - this.turnData.llmStartMs : undefined;
+        const timeToFirstTokenFromTurnStartMs = this.turnData.firstTokenMs !== null && this.turnData.startMs !== null ? this.turnData.firstTokenMs - this.turnData.startMs : undefined;
+        const timeToFirstAudioMs = this.turnData.firstAudioMs !== null && this.turnData.startMs !== null ? this.turnData.firstAudioMs - this.turnData.startMs : undefined;
+        // For the text-only path, total turn duration is known now; for the TTS path it will be updated in setOnGenerationEnded
+        const totalTurnDurationMs = !ttsProvider && this.turnData.startMs !== null ? llmEndMs - this.turnData.startMs : undefined;
+
+        // Save AI message event with usage info and timing metrics
         const messageEventData: MessageEventData = {
           text: textContent,
           role: 'assistant',
@@ -472,17 +520,22 @@ export class ConversationRunner {
           metadata: {
             llmUsage: result.usage || {},
             systemPrompt: this.stageData.lastCompletionPrompt,
-            llmSettings: this.stageData.stage.llmSettings
+            llmSettings: this.stageData.stage.llmSettings,
+            llmDurationMs,
+            timeToFirstTokenMs,
+            timeToFirstTokenFromTurnStartMs,
+            timeToFirstAudioMs,
+            totalTurnDurationMs,
           },
-        }
-        await this.saveAndSendEvent('message', messageEventData);
+        };
+        this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
 
         if (!ttsProvider) {
           // send end generation message to client to signal that response is complete and change state to awaiting user input
           const message = {
             type: 'end_ai_generation_output',
             conversationId,
-            outputTurnId: this.stageData.outputTurnId,
+            outputTurnId: this.turnData.outputTurnId,
             sessionId: this.session.id,
             requestId: null,
             fullText: textContent
@@ -612,9 +665,9 @@ export class ConversationRunner {
       throw new Error(`Cannot receive user input in current state: ${this.conversation.status}`);
     }
 
-    this.stageData.inputTurnId = generateId(ID_PREFIXES.INPUT);
+    this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
     await this.processUserInput(userInput, 'text');
-    return this.stageData.inputTurnId;
+    return this.turnData.inputTurnId;
   }
 
   async startUserVoiceInput(): Promise<string> {
@@ -629,11 +682,11 @@ export class ConversationRunner {
     }
 
     try {
-      this.stageData.inputTurnId = generateId(ID_PREFIXES.INPUT);
+      this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
       await this.stageData.asrProvider.start();
       await this.changeState('receiving_user_voice');
       logger.info({ conversationId: this.stageData.conversation.id }, `Started voice input for conversation ${this.stageData.conversation.id}`);
-      return this.stageData.inputTurnId;
+      return this.turnData.inputTurnId;
     } catch (error) {
       const errorMessage = `Failed to start voice input: ${error instanceof Error ? error.message : String(error)}`;
       await this.markAsFailed(errorMessage);
@@ -647,8 +700,8 @@ export class ConversationRunner {
       throw new Error(`Cannot receive user voice data in current state: ${this.conversation.status}`);
     }
 
-    if (this.stageData.inputTurnId !== inputTurnId) {
-      throw new Error(`Input turn ID mismatch: expected ${this.stageData.inputTurnId}, got ${inputTurnId}`);
+    if (this.turnData.inputTurnId !== inputTurnId) {
+      throw new Error(`Input turn ID mismatch: expected ${this.turnData.inputTurnId}, got ${inputTurnId}`);
     }
 
     if (!this.stageData.asrProvider) {
@@ -672,8 +725,8 @@ export class ConversationRunner {
     if (this.conversation.status !== 'receiving_user_voice') {
       throw new Error(`Cannot stop receiving user voice input in current state: ${this.conversation.status}`);
     }
-    if (this.stageData.inputTurnId !== inputTurnId) {
-      throw new Error(`Input turn ID mismatch: expected ${this.stageData.inputTurnId}, got ${inputTurnId}`);
+    if (this.turnData.inputTurnId !== inputTurnId) {
+      throw new Error(`Input turn ID mismatch: expected ${this.turnData.inputTurnId}, got ${inputTurnId}`);
     }
 
     if (!this.stageData.asrProvider) {
@@ -1057,7 +1110,8 @@ export class ConversationRunner {
       error: executeResult.failureReason,
       metadata: {
         systemPrompt: executeResult.renderedPrompt,
-        llmSettings: executeResult.llmSettings
+        llmSettings: executeResult.llmSettings,
+        durationMs: executeResult.durationMs,
       }
     };
     await this.saveAndSendEvent('tool_call', eventData);
@@ -1150,18 +1204,31 @@ export class ConversationRunner {
    */
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
     this.responseGeneratedInTurn = false;
+    // Reset per-turn data, preserving inputTurnId which was assigned before processUserInput was called
+    this.turnData = {
+      inputTurnId: this.turnData.inputTurnId,
+      outputTurnId: undefined,
+      startMs: Date.now(),
+      llmStartMs: null,
+      firstTokenMs: null,
+      firstAudioMs: null,
+      assistantMessageEventId: null,
+      fillerDurationMs: null,
+    };
     await this.changeState('processing_user_input');
 
     // Start filler sentence immediately — opens the response turn early by sending
     // start_ai_generation_output and feeding the sentence into TTS before classification begins.
     this.lastFillerSentence = null;
+    const fillerStartMs = Date.now();
     const fillerSentence = await this.generateFillerSentence(userInput);
     if (fillerSentence) {
-      this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
+      this.turnData.fillerDurationMs = Date.now() - fillerStartMs;
+      this.turnData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
       const fillerStartMessage = {
         type: 'start_ai_generation_output',
         conversationId: this.conversation.id,
-        outputTurnId: this.stageData.outputTurnId,
+        outputTurnId: this.turnData.outputTurnId,
         sessionId: this.session.id,
         requestId: null,
         expectVoice: !!this.stageData.ttsProvider,
@@ -1175,7 +1242,7 @@ export class ConversationRunner {
         const chunkMessage = {
           type: 'ai_transcribed_chunk',
           conversationId: this.conversation.id,
-          outputTurnId: this.stageData.outputTurnId,
+          outputTurnId: this.turnData.outputTurnId,
           chunkId: generateId(ID_PREFIXES.CHUNK),
           chunkText: fillerSentence,
           ordinal: 0,
@@ -1189,7 +1256,9 @@ export class ConversationRunner {
       this.lastFillerSentence = fillerSentence;
     }
 
+    const processingStartMs = Date.now();
     const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
+    const processingDurationMs = Date.now() - processingStartMs;
 
     // Detect and handle knowledge actions - these are synthetic actions from the knowledge base
     const knowledgeResults = classificationResults.filter(r => r.name.startsWith('__knowledge_'));
@@ -1248,10 +1317,13 @@ export class ConversationRunner {
 
     // If no actions matched and __on_fallback is defined, execute it
     let executionOutcome: ActionsExecutionOutcome;
+    let actionsDurationMs: number;
     const onFallbackAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_FALLBACK];
     if (actions.length === 0 && onFallbackAction) {
       logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
+      const actionsStartMs = Date.now();
       executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
+      actionsDurationMs = Date.now() - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
 
       // Save/send tool call events from action execution
@@ -1265,7 +1337,9 @@ export class ConversationRunner {
       };
       await this.saveAndSendEvent('action', actionEventData);
     } else {
+      const actionsStartMs = Date.now();
       executionOutcome = await this.actionsExecutor.executeActions(actions, context);
+      actionsDurationMs = Date.now() - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
 
       // Save/send tool call events from action execution
@@ -1289,6 +1363,9 @@ export class ConversationRunner {
       originalText: context.originalUserInput || context.userInput || '',
       metadata: {
         source: context.userInputSource,
+        processingDurationMs,
+        actionsDurationMs,
+        fillerDurationMs: this.turnData.fillerDurationMs,
       }
     };
     await this.saveAndSendEvent('message', messageEventData);
@@ -1310,11 +1387,11 @@ export class ConversationRunner {
         this.responseOutputTurnStarted = false;
       } else {
         // Normal path: open the turn now.
-        this.stageData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
+        this.turnData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
         const message = {
           type: 'start_ai_generation_output',
           conversationId: this.conversation.id,
-          outputTurnId: this.stageData.outputTurnId,
+          outputTurnId: this.turnData.outputTurnId,
           sessionId: this.session.id,
           requestId: null,
           expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null
@@ -1330,6 +1407,7 @@ export class ConversationRunner {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
         this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        this.turnData.llmStartMs = Date.now();
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
       }
       this.lastFillerSentence = null;
@@ -1422,7 +1500,7 @@ export class ConversationRunner {
       const chunkMessage = {
         type: 'ai_transcribed_chunk',
         conversationId,
-        outputTurnId: this.stageData.outputTurnId,
+        outputTurnId: this.turnData.outputTurnId,
         chunkId: generateId(ID_PREFIXES.CHUNK),
         chunkText: text,
         ordinal: 0,
@@ -1447,7 +1525,7 @@ export class ConversationRunner {
       const endMessage = {
         type: 'end_ai_generation_output',
         conversationId,
-        outputTurnId: this.stageData.outputTurnId,
+        outputTurnId: this.turnData.outputTurnId,
         sessionId: this.session.id,
         requestId: null,
         fullText: text,
@@ -1479,18 +1557,20 @@ export class ConversationRunner {
   }
 
   /**
-   * Helper method to save a conversation event and send it to connected clients via WebSocket
+   * Helper method to save a conversation event and send it to connected clients via WebSocket.
+   * @returns The generated event ID
    */
-  private async saveAndSendEvent(eventType: any, eventData: any): Promise<void> {
-    const inputTurnId = this.stageData.inputTurnId;
-    const outputTurnId = this.stageData.outputTurnId;
+  private async saveAndSendEvent(eventType: any, eventData: any): Promise<string> {
+    const inputTurnId = this.turnData.inputTurnId;
+    const outputTurnId = this.turnData.outputTurnId;
     if (!eventData.metadata) {
       eventData.metadata = {};
     }
     eventData.metadata['currentVariables'] = this.conversation.stageVars?.[this.stageData.id] || {};
 
-    await this.conversationService.saveConversationEvent(this.conversation.projectId, this.conversation.id, eventType, eventData);
+    const eventId = await this.conversationService.saveConversationEvent(this.conversation.projectId, this.conversation.id, eventType, eventData);
     this.connectionManager.sendConversationEvent(this.conversation.id, eventType, eventData, inputTurnId, outputTurnId);
+    return eventId;
   }
 
   /**
@@ -1508,7 +1588,8 @@ export class ConversationRunner {
           error: toolCallEvent.error,
           metadata: {
             systemPrompt: toolCallEvent.systemPrompt,
-            llmSettings: toolCallEvent.llmSettings
+            llmSettings: toolCallEvent.llmSettings,
+            durationMs: toolCallEvent.durationMs,
           }
         };
         await this.saveAndSendEvent('tool_call', eventData);

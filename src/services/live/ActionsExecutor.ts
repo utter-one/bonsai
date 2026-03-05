@@ -38,6 +38,7 @@ export type ActionsExecutionOutcome = {
     error?: string;
     systemPrompt?: string;
     llmSettings?: any;
+    durationMs?: number;
   }>;
 };
 
@@ -64,6 +65,7 @@ export type EffectOutcome = {
     error?: string;
     systemPrompt?: string;
     llmSettings?: any;
+    durationMs?: number;
   };
 };
 
@@ -741,7 +743,8 @@ export class ActionsExecutor {
           result: executionResult.result,
           error: executionResult.failureReason,
           systemPrompt: executionResult.renderedPrompt,
-          llmSettings: executionResult.llmSettings
+          llmSettings: executionResult.llmSettings,
+          durationMs: executionResult.durationMs,
         }
       };
     } catch (error) {
