@@ -141,7 +141,7 @@ function generateWebSocketSchemas(): void {
         $schema: 'https://json-schema.org/draft/2020-12/schema',
         $id: 'https://bonsai-backend.utter.one/schemas/websocket-contracts.json',
         title: 'WebSocket Message Contracts',
-        description: 'JSON Schema definitions for all WebSocket message types in the Bonsai Backed API',
+        description: 'JSON Schema definitions for all WebSocket message types in the Bonsai Backend API',
         version: '1.0.0',
         definitions: convertedSchemas,
       },

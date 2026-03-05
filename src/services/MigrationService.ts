@@ -37,7 +37,7 @@ function isSelectAll(sel: MigrationSelection): boolean {
 }
 
 /**
- * Service for migrating config data between Bonsai Backed instances.
+ * Service for migrating config data between Bonsai Backend instances.
  *
  * Export entity order (FK-safe):
  *   providers → projects → agents → classifiers → contextTransformers
