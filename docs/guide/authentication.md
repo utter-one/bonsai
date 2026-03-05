@@ -1,6 +1,6 @@
 # Authentication & Permissions
 
-Bonsai Backed uses two authentication mechanisms: **JWT tokens** for operator REST API access, and **API keys** for WebSocket conversation sessions.
+Bonsai Backend uses two authentication mechanisms: **JWT tokens** for operator REST API access, and **API keys** for WebSocket conversation sessions.
 
 ## Operator Authentication (JWT)
 

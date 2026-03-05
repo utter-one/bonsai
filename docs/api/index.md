@@ -1,6 +1,6 @@
 # API Reference
 
-This section covers the full HTTP REST API and WebSocket API provided by the Bonsai Backed.
+This section covers the full HTTP REST API and WebSocket API provided by the Bonsai Backend.
 
 ## Base URL
 

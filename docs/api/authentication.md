@@ -1,6 +1,6 @@
 # Authentication
 
-Bonsai Backed uses **JWT-based authentication** for operator access and **API key authentication** for programmatic access.
+Bonsai Backend uses **JWT-based authentication** for operator access and **API key authentication** for programmatic access.
 
 For more information, see the [Authentication & Permissions](../guide/authentication) guide.
 

@@ -1,6 +1,6 @@
 # Configuration
 
-Bonsai Backed is configured through environment variables. Copy the `.env.example` file to `.env` and adjust the values for your deployment.
+Bonsai Backend is configured through environment variables. Copy the `.env.example` file to `.env` and adjust the values for your deployment.
 
 ## Environment Variables
 

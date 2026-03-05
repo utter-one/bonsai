@@ -1,6 +1,6 @@
 # Scripting
 
-Bonsai Backed supports executing custom JavaScript within conversation actions via the `run_script` effect. Scripts run in a secure, isolated sandbox with strict resource limits.
+Bonsai Backend supports executing custom JavaScript within conversation actions via the `run_script` effect. Scripts run in a secure, isolated sandbox with strict resource limits.
 
 ## Sandbox Environment
 

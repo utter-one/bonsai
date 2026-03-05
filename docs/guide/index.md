@@ -1,10 +1,10 @@
 # Introduction
 
-Bonsai Backed is a powerful, extensible backend service for building conversational AI applications. It provides a complete platform for designing, deploying, and managing AI-powered voice and text conversations at scale.
+Bonsai Backend is a powerful, extensible backend service for building conversational AI applications. It provides a complete platform for designing, deploying, and managing AI-powered voice and text conversations at scale.
 
 ## Overview
 
-Bonsai Backed provides:
+Bonsai Backend provides:
 
 - **REST API** — Manage projects, agents, stages, classifiers, knowledge bases, and more
 - **WebSocket API** — Real-time bidirectional communication for live conversational AI sessions with streaming audio and text support
@@ -15,7 +15,7 @@ Bonsai Backed provides:
 
 ## How It Works
 
-At a high level, Bonsai Backed lets you design **Projects** — self-contained conversational AI experiences. Each project is composed of **Stages** (conversation phases), **Agents** (AI personalities with voice settings), **Classifiers** (intent detectors), **Knowledge** (FAQ data), and **Actions** (behaviors triggered by user input).
+At a high level, Bonsai Backend lets you design **Projects** — self-contained conversational AI experiences. Each project is composed of **Stages** (conversation phases), **Agents** (AI personalities with voice settings), **Classifiers** (intent detectors), **Knowledge** (FAQ data), and **Actions** (behaviors triggered by user input).
 
 When an end user connects via WebSocket and starts a conversation, the system:
 
