@@ -90,6 +90,7 @@ export class UserInputProcessor {
             systemPrompt: result.renderedPrompt,
             llmSettings: classifier?.classifier.llmSettings,
             currentVariables: conversation?.stageVars[stage.id] || {},
+            durationMs: result.durationMs,
           },
         };
         await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
@@ -137,7 +138,8 @@ export class UserInputProcessor {
     } 
   }
 
-  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string }> {
+  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number }> {
+    const classifyStartMs = Date.now();
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
       const llmProvider = classifierData.llmProvider;
@@ -173,6 +175,7 @@ export class UserInputProcessor {
         classifierName: classifier.name,
         actions,
         renderedPrompt,
+        durationMs: Date.now() - classifyStartMs,
       };
     } catch (error) {
       logger.error({ error, sessionId: session.id, classifierId: classifierData.classifier.id }, 'Error classifying text input');
@@ -181,6 +184,7 @@ export class UserInputProcessor {
         classifierName: classifierData.classifier.name,
         actions: [],
         renderedPrompt: null,
+        durationMs: Date.now() - classifyStartMs,
       };
     }
   }

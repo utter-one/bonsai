@@ -126,9 +126,9 @@ export class ConversationService extends BaseService {
    * @param conversationId - The unique identifier of the conversation
    * @param eventType - The type of event being recorded
    * @param eventData - The data associated with the event
-   * @param metadata - Optional metadata for the event
+   * @returns The generated event ID
    */
-  async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<void> {
+  async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<string> {
     logger.debug({ conversationId, eventType }, 'Saving conversation event');
 
     try {
@@ -149,9 +149,34 @@ export class ConversationService extends BaseService {
       await db.insert(conversationEvents).values(eventRecord);
 
       logger.debug({ conversationId, eventId, eventType }, 'Conversation event saved successfully');
+      return eventId;
     } catch (error) {
       logger.error({ error, conversationId, eventType }, 'Failed to save conversation event');
       throw error;
+    }
+  }
+
+  /**
+   * Merges additional metadata into an existing conversation event's eventData.metadata.
+   * Used to add timing information that becomes available after the event was initially saved
+   * (e.g. total turn duration which is only known once TTS synthesis completes).
+   * @param projectId - The project the event belongs to
+   * @param eventId - The unique identifier of the event to update
+   * @param metadataUpdate - Key/value pairs to merge into the existing metadata
+   */
+  async updateConversationEventMetadata(projectId: string, eventId: string, metadataUpdate: Record<string, any>): Promise<void> {
+    try {
+      const existing = await db.query.conversationEvents.findFirst({ where: and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId)) });
+      if (!existing) {
+        logger.warn({ projectId, eventId }, 'Cannot update metadata: conversation event not found');
+        return;
+      }
+      const existingData = existing.eventData as Record<string, any>;
+      const updatedEventData = { ...existingData, metadata: { ...(existingData.metadata || {}), ...metadataUpdate } };
+      await db.update(conversationEvents).set({ eventData: updatedEventData as ConversationEventData }).where(and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId)));
+      logger.debug({ projectId, eventId }, 'Conversation event metadata updated successfully');
+    } catch (error) {
+      logger.error({ error, projectId, eventId }, 'Failed to update conversation event metadata');
     }
   }
 

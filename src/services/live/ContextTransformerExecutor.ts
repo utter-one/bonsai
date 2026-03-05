@@ -32,6 +32,8 @@ type TransformerExecutionResult = {
   renderedPrompt: string | null;
   /** Error message if the transformer failed, undefined otherwise */
   error?: string;
+  /** Total duration of the transformer execution in milliseconds, including LLM call */
+  durationMs: number;
 };
 
 /**
@@ -119,6 +121,7 @@ export class ContextTransformerExecutor {
           systemPrompt: result.renderedPrompt,
           llmSettings: transformerData?.transformer.llmSettings,
           updatedVariables: stageVars,
+          durationMs: result.durationMs,
           ...(result.error ? { error: result.error } : {}),
         },
       };
@@ -205,6 +208,7 @@ export class ContextTransformerExecutor {
    */
   private async executeTransformer(session: Connection, transformerData: TransformerRuntimeData, context: ConversationContext): Promise<TransformerExecutionResult> {
     const { transformer, llmProvider } = transformerData;
+    const startMs = Date.now();
 
     try {
       logger.debug({ sessionId: session.id, transformerId: transformer.id }, 'Executing context transformer');
@@ -240,10 +244,10 @@ export class ContextTransformerExecutor {
         }
       }
 
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, durationMs: Date.now() - startMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id, transformerId: transformer.id }, 'Error executing context transformer');
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt: null, error: String(error) };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt: null, error: String(error), durationMs: Date.now() - startMs };
     }
   }
 }
