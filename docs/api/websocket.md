@@ -460,6 +460,8 @@ When `receiveEvents` is enabled, the server pushes conversation events:
 | `conversation_failed` | Conversation failed | `reason`, `stageId` |
 | `jump_to_stage` | Stage transition | `fromStageId`, `toStageId` |
 
+The `eventData.metadata` object of `message`, `classification`, `transformation`, and `tool_call` events carries timing measurements. See [Event Metadata — Timing Fields](./conversations#event-metadata-timing-fields) for the full field reference.
+
 ---
 
 ## Audio Formats

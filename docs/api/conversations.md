@@ -126,3 +126,44 @@ Returns audit log entries for the specified conversation. See [Audit Logs](./aud
 | `conversation_aborted` | Conversation aborted |
 | `conversation_failed` | Conversation failed |
 | `jump_to_stage` | Stage transition occurred |
+
+### Event Metadata — Timing Fields
+
+The `metadata` object of certain events carries timing measurements (all durations in milliseconds).
+
+#### `message` event — user role
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | `"voice"` \| `"text"` | Input modality |
+| `processingDurationMs` | `number` | Wall-clock time from turn start to LLM invocation (classification + transformation) |
+| `actionsDurationMs` | `number` | Time spent executing actions triggered during input processing |
+| `fillerDurationMs` | `number` \| `null` | Time spent generating the filler sentence, or `null` if no filler was used |
+
+#### `message` event — assistant role
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `llmDurationMs` | `number` | Time from first LLM token to generation completion |
+| `timeToFirstTokenMs` | `number` | Time from LLM invocation to the first token received |
+| `timeToFirstTokenFromTurnStartMs` | `number` | Time from turn start to the first LLM token |
+| `timeToFirstAudioMs` | `number` \| `null` | Time from turn start to the first TTS audio chunk (voice turns only; `null` for text turns) |
+| `totalTurnDurationMs` | `number` \| `null` | Full turn duration from turn start to TTS completion. For voice turns this is **back-filled** after TTS finishes; for text turns it is set at LLM completion. |
+
+#### `classification` event
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `durationMs` | `number` | Time taken to run the classifier |
+
+#### `transformation` event
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `durationMs` | `number` | Time taken to run the context transformer |
+
+#### `tool_call` event
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `durationMs` | `number` | Time taken to execute the tool |

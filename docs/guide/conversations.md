@@ -72,6 +72,32 @@ Every significant occurrence during a conversation is recorded as an event:
 
 Events provide a full audit trail of the conversation for debugging, analytics, and compliance.
 
+### Timing Metadata
+
+Select event types include a `metadata` object with timing measurements (all values in milliseconds). These are useful for latency analysis and performance monitoring.
+
+**User `message` event**
+
+| Field | Description |
+|-------|-------------|
+| `processingDurationMs` | Time from turn start to LLM invocation (classification + transformation) |
+| `actionsDurationMs` | Time spent executing actions during input processing |
+| `fillerDurationMs` | Time to generate the filler sentence (`null` if unused) |
+
+**Assistant `message` event**
+
+| Field | Description |
+|-------|-------------|
+| `llmDurationMs` | Time from first token to generation completion |
+| `timeToFirstTokenMs` | Time from LLM invocation to the first token |
+| `timeToFirstTokenFromTurnStartMs` | Time from turn start to the first token (includes classification, transformation, and actions) |
+| `timeToFirstAudioMs` | Time from turn start to the first TTS audio chunk (voice turns only) |
+| `totalTurnDurationMs` | Full turn duration from turn start to TTS completion (back-filled after TTS finishes on voice turns) |
+
+**`classification` and `transformation` events** include `durationMs` — the time taken to run the respective classifier or transformer.
+
+**`tool_call` events** include `durationMs` — the time taken to execute the tool.
+
 ## Conversation Artifacts
 
 Artifacts are binary or text data associated with a conversation:
