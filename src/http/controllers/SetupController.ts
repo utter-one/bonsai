@@ -40,7 +40,7 @@ export class SetupController {
         path: '/api/setup/initial-operator',
         tags: ['Setup'],
         summary: 'Create initial operator account',
-        description: 'Creates the first operator account with super_operator role. This endpoint only works when no operator accounts exist. Returns operator details and authentication tokens for immediate login.',
+        description: 'Creates the first operator account with super_admin role. This endpoint only works when no operator accounts exist. Returns operator details and authentication tokens for immediate login.',
         request: {
           body: {
             content: {
