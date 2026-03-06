@@ -33,6 +33,7 @@ export class ContextTransformerService extends BaseService {
    */
   async createContextTransformer(projectId: string, input: CreateContextTransformerRequest, context: RequestContext): Promise<ContextTransformerResponse> {
     this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const transformerId = input.id ?? generateId(ID_PREFIXES.CONTEXT_TRANSFORMER);
     logger.info({ transformerId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating context transformer');
 
@@ -68,7 +69,8 @@ export class ContextTransformerService extends BaseService {
         throw new NotFoundError(`Context transformer with id ${id} not found`);
       }
 
-      return contextTransformerResponseSchema.parse(transformer);
+      const archived = !(await this.isProjectActive(projectId));
+      return contextTransformerResponseSchema.parse({ ...transformer, archived });
     } catch (error) {
       logger.error({ error, transformerId: id }, 'Failed to fetch context transformer');
       throw error;
@@ -137,8 +139,9 @@ export class ContextTransformerService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return contextTransformerListResponseSchema.parse({
-        items: transformerList,
+        items: transformerList.map(t => ({ ...t, archived })),
         total,
         offset,
         limit,
@@ -160,6 +163,7 @@ export class ContextTransformerService extends BaseService {
    */
   async updateContextTransformer(projectId: string, id: string, input: UpdateContextTransformerRequest, context: RequestContext): Promise<ContextTransformerResponse> {
     this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ transformerId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating context transformer');
 
@@ -213,6 +217,7 @@ export class ContextTransformerService extends BaseService {
    */
   async deleteContextTransformer(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ transformerId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting context transformer');
 
     try {
@@ -251,6 +256,7 @@ export class ContextTransformerService extends BaseService {
    */
   async cloneContextTransformer(projectId: string, id: string, input: CloneContextTransformerRequest, context: RequestContext): Promise<ContextTransformerResponse> {
     this.requirePermission(context, PERMISSIONS.CONTEXT_TRANSFORMER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ id, operatorId: context?.operatorId }, 'Cloning context transformer');
 
     try {

@@ -50,6 +50,7 @@ export const conversationResponseSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata associated with the conversation'),
   createdAt: z.coerce.date().describe('Timestamp when the conversation was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the conversation was last updated'),
+  archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
 });
 
 /**

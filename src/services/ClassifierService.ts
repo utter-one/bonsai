@@ -33,6 +33,7 @@ export class ClassifierService extends BaseService {
    */
   async createClassifier(projectId: string, input: CreateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const classifierId = input.id ?? generateId(ID_PREFIXES.CLASSIFIER);
     logger.info({ classifierId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating classifier');
 
@@ -68,7 +69,8 @@ export class ClassifierService extends BaseService {
         throw new NotFoundError(`Classifier with id ${id} not found`);
       }
 
-      return classifierResponseSchema.parse(classifier);
+      const archived = !(await this.isProjectActive(projectId));
+      return classifierResponseSchema.parse({ ...classifier, archived });
     } catch (error) {
       logger.error({ error, classifierId: id }, 'Failed to fetch classifier');
       throw error;
@@ -137,8 +139,9 @@ export class ClassifierService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return classifierListResponseSchema.parse({
-        items: classifierList,
+        items: classifierList.map(c => ({ ...c, archived })),
         total,
         offset,
         limit,
@@ -160,6 +163,7 @@ export class ClassifierService extends BaseService {
    */
   async updateClassifier(projectId: string, id: string, input: UpdateClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ classifierId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating classifier');
 
@@ -212,6 +216,7 @@ export class ClassifierService extends BaseService {
    */
   async deleteClassifier(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ classifierId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting classifier');
 
     try {
@@ -250,6 +255,7 @@ export class ClassifierService extends BaseService {
    */
   async cloneClassifier(projectId: string, id: string, input: CloneClassifierRequest, context: RequestContext): Promise<ClassifierResponse> {
     this.requirePermission(context, PERMISSIONS.CLASSIFIER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ id, operatorId: context?.operatorId }, 'Cloning classifier');
 
     try {

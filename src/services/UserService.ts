@@ -32,6 +32,7 @@ export class UserService extends BaseService {
    */
   async createUser(projectId: string, input: CreateUserRequest, context: RequestContext): Promise<UserResponse> {
     this.requirePermission(context, PERMISSIONS.USER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const userId = input.id ?? generateId(ID_PREFIXES.USER);
     logger.info({ userId, projectId, operatorId: context?.operatorId }, 'Creating user');
 
@@ -68,7 +69,8 @@ export class UserService extends BaseService {
         throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
-      return userResponseSchema.parse(user);
+      const archived = !(await this.isProjectActive(projectId));
+      return userResponseSchema.parse({ ...user, archived });
     } catch (error) {
       logger.error({ error, userId: id, projectId }, 'Failed to fetch user');
       throw error;
@@ -130,8 +132,9 @@ export class UserService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return userListResponseSchema.parse({
-        items: userList,
+        items: userList.map(u => ({ ...u, archived })),
         total,
         offset,
         limit,
@@ -153,6 +156,7 @@ export class UserService extends BaseService {
    */
   async updateUser(projectId: string, id: string, input: UpdateUserRequest, context: RequestContext): Promise<UserResponse> {
     this.requirePermission(context, PERMISSIONS.USER_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ userId: id, projectId, operatorId: context?.operatorId }, 'Updating user');
 
     try {
@@ -189,6 +193,7 @@ export class UserService extends BaseService {
    */
   async deleteUser(projectId: string, id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.USER_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ userId: id, projectId, operatorId: context?.operatorId }, 'Deleting user');
 
     try {

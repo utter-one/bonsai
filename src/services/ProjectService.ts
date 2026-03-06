@@ -1,13 +1,12 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, SQL, desc, and } from 'drizzle-orm';
+import { eq, SQL, desc, and, isNull, isNotNull } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, agents, conversations, issues } from '../db/schema';
-import type { CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse } from '../http/contracts/project';
-import type { ListParams } from '../http/contracts/common';
+import type { CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse, ArchiveProjectRequest, ListProjectsQuery } from '../http/contracts/project';
 import { projectResponseSchema, projectListResponseSchema } from '../http/contracts/project';
 import { AuditService } from './AuditService';
-import { OptimisticLockError, NotFoundError, InvalidOperationError } from '../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, ArchivedProjectError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
@@ -80,16 +79,23 @@ export class ProjectService extends BaseService {
 
   /**
    * Lists projects with flexible filtering, sorting, and pagination
-   * @param params - List parameters including filters, sorting, pagination, and text search
+   * @param params - List parameters including filters, sorting, pagination, text search, and archived flag
    * @returns Paginated array of projects matching the criteria
    */
-  async listProjects(params?: ListParams): Promise<ProjectListResponse> {
+  async listProjects(params?: ListProjectsQuery): Promise<ProjectListResponse> {
     logger.debug({ params }, 'Listing projects');
 
     try {
       const conditions: SQL[] = [];
       const offset = params?.offset ?? 0;
       const limit = params?.limit ?? null;
+
+      // Filter by archived status: default to active (non-archived) projects
+      if (params?.archived) {
+        conditions.push(isNotNull(projects.archivedAt));
+      } else {
+        conditions.push(isNull(projects.archivedAt));
+      }
 
       const columnMap = { id: projects.id, name: projects.name, version: projects.version, createdAt: projects.createdAt, updatedAt: projects.updatedAt };
 
@@ -123,16 +129,20 @@ export class ProjectService extends BaseService {
   }
 
   /**
-   * Updates an existing project with optimistic locking to prevent concurrent modification issues
+   * Updates an existing project with optimistic locking to prevent concurrent modification issues.
+   * Archive status (archivedAt / archivedBy) cannot be changed via this method —
+   * use archiveProject / unarchiveProject for that purpose.
    * @param id - The project identifier
    * @param input - Update data with version for optimistic locking
    * @param context - Request context for auditing and authorization
    * @returns The updated project
    * @throws {NotFoundError} When project is not found
+   * @throws {ArchivedProjectError} When the project is archived
    * @throws {OptimisticLockError} When the version does not match, indicating concurrent modification
    */
   async updateProject(id: string, input: UpdateProjectRequest, context: RequestContext): Promise<ProjectResponse> {
     this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
+    await this.requireProjectNotArchived(id);
     logger.info({ projectId: id, operatorId: context?.operatorId }, 'Updating project');
 
     // Validate storage provider if being updated
@@ -289,6 +299,98 @@ export class ProjectService extends BaseService {
       logger.info({ projectId: id }, 'Project and all related entities deleted successfully');
     } catch (error) {
       logger.error({ error, projectId: id }, 'Failed to delete project');
+      throw error;
+    }
+  }
+
+  /**
+   * Archives a project, blocking all modifications to its entities
+   * @param id - The project identifier
+   * @param input - Archive request with version for optimistic locking
+   * @param context - Request context for auditing and authorization
+   * @returns The archived project
+   * @throws {NotFoundError} When project is not found
+   * @throws {ArchivedProjectError} When the project is already archived
+   * @throws {OptimisticLockError} When the version does not match
+   */
+  async archiveProject(id: string, input: ArchiveProjectRequest, context: RequestContext): Promise<ProjectResponse> {
+    this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
+    logger.info({ projectId: id, operatorId: context?.operatorId }, 'Archiving project');
+
+    try {
+      const existingProject = await db.query.projects.findFirst({ where: eq(projects.id, id) });
+
+      if (!existingProject) {
+        throw new NotFoundError(`Project with id ${id} not found`);
+      }
+
+      if (existingProject.archivedAt !== null) {
+        throw new ArchivedProjectError(`Project ${id} is already archived`);
+      }
+
+      if (existingProject.version !== input.version) {
+        logger.warn({ projectId: id, expectedVersion: input.version, actualVersion: existingProject.version }, 'Optimistic lock version mismatch');
+        throw new OptimisticLockError('Project');
+      }
+
+      const updatedProject = await db.update(projects).set({ archivedAt: new Date(), archivedBy: context.operatorId, version: existingProject.version + 1, updatedAt: new Date() }).where(and(eq(projects.id, id), eq(projects.version, input.version))).returning();
+
+      if (!updatedProject[0]) {
+        throw new OptimisticLockError('Project');
+      }
+
+      await this.auditService.logUpdate('project', id, { archivedAt: null, archivedBy: null }, { archivedAt: updatedProject[0].archivedAt, archivedBy: updatedProject[0].archivedBy }, context?.operatorId, id);
+      logger.info({ projectId: id }, 'Project archived successfully');
+
+      return projectResponseSchema.parse(updatedProject[0]);
+    } catch (error) {
+      logger.error({ error, projectId: id }, 'Failed to archive project');
+      throw error;
+    }
+  }
+
+  /**
+   * Restores a previously archived project, re-enabling all modifications to its entities
+   * @param id - The project identifier
+   * @param input - Unarchive request with version for optimistic locking
+   * @param context - Request context for auditing and authorization
+   * @returns The restored project
+   * @throws {NotFoundError} When project is not found
+   * @throws {InvalidOperationError} When the project is not archived
+   * @throws {OptimisticLockError} When the version does not match
+   */
+  async unarchiveProject(id: string, input: ArchiveProjectRequest, context: RequestContext): Promise<ProjectResponse> {
+    this.requirePermission(context, PERMISSIONS.PROJECT_WRITE);
+    logger.info({ projectId: id, operatorId: context?.operatorId }, 'Unarchiving project');
+
+    try {
+      const existingProject = await db.query.projects.findFirst({ where: eq(projects.id, id) });
+
+      if (!existingProject) {
+        throw new NotFoundError(`Project with id ${id} not found`);
+      }
+
+      if (existingProject.archivedAt === null) {
+        throw new InvalidOperationError(`Project ${id} is not archived`);
+      }
+
+      if (existingProject.version !== input.version) {
+        logger.warn({ projectId: id, expectedVersion: input.version, actualVersion: existingProject.version }, 'Optimistic lock version mismatch');
+        throw new OptimisticLockError('Project');
+      }
+
+      const updatedProject = await db.update(projects).set({ archivedAt: null, archivedBy: null, version: existingProject.version + 1, updatedAt: new Date() }).where(and(eq(projects.id, id), eq(projects.version, input.version))).returning();
+
+      if (!updatedProject[0]) {
+        throw new OptimisticLockError('Project');
+      }
+
+      await this.auditService.logUpdate('project', id, { archivedAt: existingProject.archivedAt, archivedBy: existingProject.archivedBy }, { archivedAt: null, archivedBy: null }, context?.operatorId, id);
+      logger.info({ projectId: id }, 'Project unarchived successfully');
+
+      return projectResponseSchema.parse(updatedProject[0]);
+    } catch (error) {
+      logger.error({ error, projectId: id }, 'Failed to unarchive project');
       throw error;
     }
   }

@@ -3,7 +3,7 @@ import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHand
 import type { ResumeConversationRequest, ResumeConversationResponse } from '../contracts/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
-import { NotFoundError, InvalidOperationError } from '../../errors';
+import { NotFoundError, InvalidOperationError, ArchivedProjectError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 
@@ -40,6 +40,10 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
     // Validate that the conversation belongs to the project the API key is authorized for
     if (conversation.projectId !== context.connection.projectId) {
       throw new NotFoundError('Conversation not found');
+    }
+
+    if (conversation.archived) {
+      throw new ArchivedProjectError('Cannot resume a conversation belonging to an archived project');
     }
 
     await this.connectionManager.attachConversationToSession(message.sessionId, message.conversationId);

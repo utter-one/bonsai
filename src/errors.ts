@@ -78,3 +78,13 @@ export class NotConfiguredError extends Error {
     this.name = 'NotConfiguredError';
   }
 }
+
+/**
+ * Error thrown when an operation is blocked because the project is archived
+ */
+export class ArchivedProjectError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ArchivedProjectError';
+  }
+}

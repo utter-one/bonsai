@@ -33,6 +33,7 @@ export class ToolService extends BaseService {
    */
   async createTool(projectId: string, input: CreateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const toolId = input.id ?? generateId(ID_PREFIXES.TOOL);
     logger.info({ toolId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating tool');
 
@@ -68,7 +69,8 @@ export class ToolService extends BaseService {
         throw new NotFoundError(`Tool with id ${id} not found`);
       }
 
-      return toolResponseSchema.parse(tool);
+      const archived = !(await this.isProjectActive(projectId));
+      return toolResponseSchema.parse({ ...tool, archived });
     } catch (error) {
       logger.error({ error, toolId: id }, 'Failed to fetch tool');
       throw error;
@@ -139,8 +141,9 @@ export class ToolService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return toolListResponseSchema.parse({
-        items: toolList,
+        items: toolList.map(t => ({ ...t, archived })),
         total,
         offset,
         limit,
@@ -162,6 +165,7 @@ export class ToolService extends BaseService {
    */
   async updateTool(projectId: string, id: string, input: UpdateToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ toolId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating tool');
 
@@ -217,6 +221,7 @@ export class ToolService extends BaseService {
    */
   async deleteTool(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.TOOL_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ toolId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting tool');
 
     try {
@@ -255,6 +260,7 @@ export class ToolService extends BaseService {
    */
   async cloneTool(projectId: string, id: string, input: CloneToolRequest, context: RequestContext): Promise<ToolResponse> {
     this.requirePermission(context, PERMISSIONS.TOOL_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ id, operatorId: context?.operatorId }, 'Cloning tool');
 
     try {

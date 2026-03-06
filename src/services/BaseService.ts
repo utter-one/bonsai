@@ -1,7 +1,10 @@
+import { eq } from 'drizzle-orm';
+import { db } from '../db/index';
+import { activeProjects, archivedProjects } from '../db/schema';
 import type { RequestContext } from './RequestContext';
 import type { Permission } from '../permissions';
 import { hasAllPermissions } from '../permissions';
-import { ForbiddenError } from '../errors';
+import { ForbiddenError, ArchivedProjectError } from '../errors';
 import { logger } from '../utils/logger';
 
 /**
@@ -46,5 +49,28 @@ export abstract class BaseService {
    */
   protected logOperation(context: RequestContext | undefined, operation: string, details: Record<string, any> = {}): void {
     logger.info({ operatorId: context?.operatorId, ip: context?.ip, requestId: context?.requestId, operation, ...details }, `Operation: ${operation}`);
+  }
+
+  /**
+   * Throw an error if the given project is archived
+   * @param projectId - The project identifier to check
+   * @throws {ArchivedProjectError} When the project is archived
+   */
+  protected async requireProjectNotArchived(projectId: string): Promise<void> {
+    const result = await db.select({ id: archivedProjects.id }).from(archivedProjects).where(eq(archivedProjects.id, projectId)).limit(1);
+    logger.info({ projectId, isArchived: JSON.stringify(result) }, 'Checked if project is archived');
+    if (result.length > 0) {
+      throw new ArchivedProjectError(`Project ${projectId} is archived and cannot be modified`);
+    }
+  }
+
+  /**
+   * Check whether the given project is active (not archived)
+   * @param projectId - The project identifier to check
+   * @returns True if the project exists and is not archived
+   */
+  protected async isProjectActive(projectId: string): Promise<boolean> {
+    const result = await db.select({ id: activeProjects.id }).from(activeProjects).where(eq(activeProjects.id, projectId)).limit(1);
+    return result.length > 0;
   }
 }

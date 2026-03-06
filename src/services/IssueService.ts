@@ -1,8 +1,8 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, ilike, or, inArray, and, SQL, desc, sql } from 'drizzle-orm';
+import { eq, ilike, or, inArray, and, SQL, desc, sql, notInArray } from 'drizzle-orm';
 import { parseTextSearch } from '../utils/textSearch';
 import { db } from '../db/index';
-import { issues, projects } from '../db/schema';
+import { issues, projects, archivedProjects } from '../db/schema';
 import type { CreateIssueRequest, UpdateIssueRequest, IssueResponse, IssueListResponse } from '../http/contracts/issue';
 import type { ListParams } from '../http/contracts/common';
 import { issueResponseSchema, issueListResponseSchema } from '../http/contracts/issue';
@@ -31,6 +31,7 @@ export class IssueService extends BaseService {
    */
   async createIssue(input: CreateIssueRequest, context: RequestContext): Promise<IssueResponse> {
     this.requirePermission(context, PERMISSIONS.ISSUE_WRITE);
+    await this.requireProjectNotArchived(input.projectId);
     logger.info({ projectId: input.projectId, environment: input.environment, severity: input.severity, operatorId: context?.operatorId }, 'Creating issue');
 
     try {
@@ -169,6 +170,8 @@ export class IssueService extends BaseService {
       if (!existingIssue) {
         throw new NotFoundError(`Issue with id ${id} not found`);
       }
+
+      await this.requireProjectNotArchived(existingIssue.projectId);
 
       const updatedIssue = await db.update(issues).set({ ...input, updatedAt: new Date() }).where(eq(issues.id, id)).returning();
 

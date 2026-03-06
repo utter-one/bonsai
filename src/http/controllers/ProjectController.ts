@@ -3,8 +3,8 @@ import type { Request, Response, NextFunction, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ProjectService } from '../../services/ProjectService';
-import { createProjectSchema, updateProjectSchema, projectRouteParamsSchema, projectResponseSchema, projectListResponseSchema } from '../contracts/project';
-import type { UpdateProjectRequest } from '../contracts/project';
+import { createProjectSchema, updateProjectSchema, projectRouteParamsSchema, projectResponseSchema, projectListResponseSchema, archiveProjectSchema, listProjectsQuerySchema } from '../contracts/project';
+import type { UpdateProjectRequest, ArchiveProjectRequest, ListProjectsQuery } from '../contracts/project';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -78,9 +78,9 @@ export class ProjectController {
         path: '/api/projects',
         tags: ['Projects'],
         summary: 'List projects',
-        description: 'Retrieves a paginated list of projects with optional filtering, sorting, and searching',
+        description: 'Retrieves a paginated list of projects with optional filtering, sorting, and searching. Use ?archived=true to list archived projects.',
         request: {
-          query: listParamsSchema,
+          query: listProjectsQuerySchema,
         },
         responses: {
           200: {
@@ -137,6 +137,65 @@ export class ProjectController {
           404: { description: 'Project not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/projects/{id}/archive',
+        tags: ['Projects'],
+        summary: 'Archive project',
+        description: 'Archives a project. Archived projects cannot be modified. Pass current version for optimistic locking.',
+        request: {
+          params: projectIdParamSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: archiveProjectSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Project archived successfully',
+            content: {
+              'application/json': {
+                schema: projectResponseSchema,
+              },
+            },
+          },
+          404: { description: 'Project not found' },
+          409: { description: 'Version conflict or project already archived' },
+        },
+      },
+      {
+        method: 'post',
+        path: '/api/projects/{id}/unarchive',
+        tags: ['Projects'],
+        summary: 'Unarchive project',
+        description: 'Restores an archived project to active status. Pass current version for optimistic locking.',
+        request: {
+          params: projectIdParamSchema,
+          body: {
+            content: {
+              'application/json': {
+                schema: archiveProjectSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Project unarchived successfully',
+            content: {
+              'application/json': {
+                schema: projectResponseSchema,
+              },
+            },
+          },
+          404: { description: 'Project not found' },
+          409: { description: 'Version conflict' },
+          400: { description: 'Project is not archived' },
+        },
+      },
     ];
   }
 
@@ -149,6 +208,8 @@ export class ProjectController {
     router.get('/api/projects', asyncHandler(this.listProjects.bind(this)));
     router.put('/api/projects/:id', asyncHandler(this.updateProject.bind(this)));
     router.delete('/api/projects/:id', asyncHandler(this.deleteProject.bind(this)));
+    router.post('/api/projects/:id/archive', asyncHandler(this.archiveProject.bind(this)));
+    router.post('/api/projects/:id/unarchive', asyncHandler(this.unarchiveProject.bind(this)));
   }
 
   /**
@@ -178,8 +239,10 @@ export class ProjectController {
    * List projects with optional filters
    */
   private async listProjects(req: Request, res: Response): Promise<void> {
+    logger.info({ query: req.query }, 'Listing projects with query parameters');
     checkPermissions(req, [PERMISSIONS.PROJECT_READ]);
-    const query = listParamsSchema.parse(req.query);
+    const query = listProjectsQuerySchema.parse(req.query);
+    logger.info({ parsedQuery: query }, 'Parsed query parameters for listing projects');
     const projects = await this.projectService.listProjects(query);
     res.status(200).json(projects);
   }
@@ -205,5 +268,29 @@ export class ProjectController {
     const params = projectRouteParamsSchema.parse(req.params);
     await this.projectService.deleteProject(params.id, req.context);
     res.status(204).send();
+  }
+
+  /**
+   * POST /api/projects/:id/archive
+   * Archive a project
+   */
+  private async archiveProject(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.PROJECT_WRITE]);
+    const params = projectRouteParamsSchema.parse(req.params);
+    const body = archiveProjectSchema.parse(req.body);
+    const project = await this.projectService.archiveProject(params.id, body as ArchiveProjectRequest, req.context);
+    res.status(200).json(project);
+  }
+
+  /**
+   * POST /api/projects/:id/unarchive
+   * Unarchive a project
+   */
+  private async unarchiveProject(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.PROJECT_WRITE]);
+    const params = projectRouteParamsSchema.parse(req.params);
+    const body = archiveProjectSchema.parse(req.body);
+    const project = await this.projectService.unarchiveProject(params.id, body as ArchiveProjectRequest, req.context);
+    res.status(200).json(project);
   }
 }

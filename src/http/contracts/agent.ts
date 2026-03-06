@@ -93,6 +93,7 @@ export const agentResponseSchema = z.object({
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the agent was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the agent was last updated'),
+  archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
 });
 
 /**

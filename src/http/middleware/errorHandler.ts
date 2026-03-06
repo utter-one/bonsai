@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError } from '../../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError, ArchivedProjectError } from '../../errors';
 import logger from '../../utils/logger';
 
 /**
@@ -24,6 +24,11 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
   }
 
   if (err instanceof OptimisticLockError) {
+    res.status(409).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof ArchivedProjectError) {
     res.status(409).json({ error: err.message });
     return;
   }
