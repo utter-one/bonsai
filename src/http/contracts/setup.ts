@@ -15,7 +15,7 @@ export const setupStatusResponseSchema = z.object({
 /**
  * Schema for creating the initial operator account during system setup
  * Required fields: id, name, password
- * The operator will automatically receive all permissions (super_operator role)
+ * The operator will automatically receive all permissions (super_admin role)
  */
 export const initialOperatorSetupSchema = z.object({
   id: z.string().min(1).describe('Unique identifier for the operator user (typically an email address)'),

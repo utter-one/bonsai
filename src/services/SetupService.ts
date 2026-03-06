@@ -39,7 +39,7 @@ export class SetupService {
   }
 
   /**
-   * Create the initial operator account with super_operator role
+   * Create the initial operator account with super_admin role
    * This endpoint can only be used when no operator accounts exist
    * @param input - Initial operator creation data (id, name, password, optional metadata)
    * @returns Operator details and authentication tokens for immediate login
@@ -59,8 +59,8 @@ export class SetupService {
       // Hash password before storing
       const hashedPassword = await this.authService.hashPassword(input.password);
 
-      // Create operator with super_operator role (all permissions)
-      const operator = await db.insert(operators).values({ id: input.id, name: input.name, roles: ['super_operator'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
+      // Create operator with super_admin role (all permissions)
+      const operator = await db.insert(operators).values({ id: input.id, name: input.name, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
 
       const createdOperator = operator[0];
 
