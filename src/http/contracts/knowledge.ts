@@ -96,6 +96,7 @@ export const knowledgeCategoryResponseSchema = z.object({
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the category was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the category was last updated'),
+  archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
 });
 
 /**
@@ -175,6 +176,7 @@ export const knowledgeItemResponseSchema = z.object({
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the item was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the item was last updated'),
+  archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
 });
 
 /**

@@ -57,6 +57,7 @@ export const apiKeyResponseSchema = z.object({
   version: z.number().describe('Version number for optimistic locking'),
   createdAt: z.string().describe('ISO timestamp of creation'),
   updatedAt: z.string().describe('ISO timestamp of last update'),
+  archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
 });
 
 export type ApiKeyResponse = z.infer<typeof apiKeyResponseSchema>;

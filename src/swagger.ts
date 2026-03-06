@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createOperatorSchema, updateOperatorBodySchema, deleteOperatorBodySchema, operatorResponseSchema, operatorListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/operator';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
-import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema } from './http/contracts/project';
+import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema, archiveProjectSchema, listProjectsQuerySchema } from './http/contracts/project';
 import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema, fillerSettingsSchema } from './http/contracts/agent';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
 import { initialOperatorSetupSchema, setupStatusResponseSchema, initialOperatorSetupResponseSchema } from './http/contracts/setup';
@@ -85,6 +85,8 @@ export function getOpenAPISpec(): any {
 
   // Common schemas
   registry.register('ListParams', listParamsSchema);
+  registry.register('ArchiveProject', archiveProjectSchema);
+  registry.register('ListProjectsQuery', listProjectsQuerySchema);
 
   // LLM settings schemas (provider-specific)
   registry.register('OpenAILlmSettings', openAILlmSettingsSchema);

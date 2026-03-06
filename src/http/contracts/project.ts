@@ -10,6 +10,7 @@ import { parameterValueSchema, fieldDescriptorSchema } from '../../types/paramet
 import { deepgramAsrSettingsSchema } from '../../services/providers/asr/DeepgramAsrProvider';
 import { assemblyAiAsrSettingsSchema } from '../../services/providers/asr/AssemblyAiAsrProvider';
 import { speechmaticsAsrSettingsSchema } from '../../services/providers/asr/SpeechmaticsAsrProvider';
+import { listParamsSchema } from './common';
 
 extendZodWithOpenApi(z);
 
@@ -81,7 +82,9 @@ export const createProjectSchema = z.object({
 export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
 
 /**
- * Schema for updating an existing project
+ * Schema for updating an existing project.
+ * Archive status (archivedAt / archivedBy) is intentionally excluded — use the
+ * dedicated archive/unarchive endpoints to change a project's archive state.
  */
 export const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional().describe('The updated name of the project'),
@@ -119,6 +122,8 @@ export const projectResponseSchema = z.object({
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),
   updatedAt: z.coerce.date().describe('The timestamp when the project was last updated'),
+  archivedAt: z.coerce.date().nullable().describe('The timestamp when the project was archived, or null if the project is not archived'),
+  archivedBy: z.string().nullable().describe('The ID of the operator who archived the project, or null if the project is not archived'),
 });
 
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;
@@ -141,3 +146,21 @@ export const projectRouteParamsSchema = z.object({
 });
 
 export type ProjectRouteParams = z.infer<typeof projectRouteParamsSchema>;
+
+/**
+ * Schema for archive/unarchive project request body
+ */
+export const archiveProjectSchema = z.object({
+  version: z.number().int().describe('The current version number for optimistic locking'),
+});
+
+export type ArchiveProjectRequest = z.infer<typeof archiveProjectSchema>;
+
+/**
+ * Schema for listing projects with an optional archived filter
+ */
+export const listProjectsQuerySchema = listParamsSchema.extend({
+  archived: z.enum(['true', 'false']).transform(v => v === 'true').optional().describe('When true, returns only archived projects. When omitted or false, returns only active (non-archived) projects.'),
+});
+
+export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;

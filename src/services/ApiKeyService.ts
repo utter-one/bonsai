@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, ilike, or, inArray, SQL, desc, and } from 'drizzle-orm';
+import { eq, ilike, or, inArray, SQL, desc, and, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import { db } from '../db/index';
 import { apiKeys, projects } from '../db/schema';
@@ -54,6 +54,7 @@ export class ApiKeyService extends BaseService {
    */
   async createApiKey(projectId: string, input: CreateApiKeyRequest, context: RequestContext): Promise<ApiKeyResponse> {
     this.requirePermission(context, PERMISSIONS.API_KEY_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ projectId, name: input.name, operatorId: context.operatorId }, 'Creating API key');
 
     try {
@@ -92,7 +93,8 @@ export class ApiKeyService extends BaseService {
         throw new NotFoundError(`API key with id ${id} not found`);
       }
 
-      return apiKeyResponseSchema.parse({ ...apiKey, keyPreview: this.getKeyPreview(apiKey.key), lastUsedAt: apiKey.lastUsedAt?.toISOString() ?? null, createdAt: apiKey.createdAt.toISOString(), updatedAt: apiKey.updatedAt.toISOString() });
+      const archived = !(await this.isProjectActive(projectId));
+      return apiKeyResponseSchema.parse({ ...apiKey, keyPreview: this.getKeyPreview(apiKey.key), lastUsedAt: apiKey.lastUsedAt?.toISOString() ?? null, createdAt: apiKey.createdAt.toISOString(), updatedAt: apiKey.updatedAt.toISOString(), archived });
     } catch (error) {
       logger.error({ error, apiKeyId: id }, 'Failed to fetch API key');
       throw error;
@@ -169,7 +171,22 @@ export class ApiKeyService extends BaseService {
       const totalQuery = await db.select({ count: apiKeys.id }).from(apiKeys).where(whereCondition);
       const total = totalQuery.length;
 
-      const responseItems = apiKeyList.map(item => ({ ...item, keyPreview: this.getKeyPreview(item.key), lastUsedAt: item.lastUsedAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }));
+      // Determine archived status per api key by examining its project's archivedAt field
+      const projectIds = Array.from(new Set(apiKeyList.map(k => k.projectId)));
+      let archivedSet = new Set<string>();
+      if (projectIds.length > 0) {
+        const archivedRows = await db.select({ id: projects.id }).from(projects).where(and(inArray(projects.id, projectIds), isNotNull(projects.archivedAt)));
+        archivedSet = new Set(archivedRows.map(r => r.id));
+      }
+
+      const responseItems = apiKeyList.map(item => ({
+        ...item,
+        keyPreview: this.getKeyPreview(item.key),
+        lastUsedAt: item.lastUsedAt?.toISOString() ?? null,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+        archived: archivedSet.has(item.projectId),
+      }));
 
       logger.debug({ count: apiKeyList.length, total }, 'API keys listed successfully');
 
@@ -191,6 +208,7 @@ export class ApiKeyService extends BaseService {
    */
   async updateApiKey(projectId: string, id: string, input: UpdateApiKeyRequest, context: RequestContext): Promise<ApiKeyResponse> {
     this.requirePermission(context, PERMISSIONS.API_KEY_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ apiKeyId: id, operatorId: context.operatorId }, 'Updating API key');
 
     try {
@@ -229,6 +247,7 @@ export class ApiKeyService extends BaseService {
    */
   async deleteApiKey(projectId: string, id: string, version: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.API_KEY_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ apiKeyId: id, operatorId: context.operatorId }, 'Deleting API key');
 
     try {

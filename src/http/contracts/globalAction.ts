@@ -129,6 +129,7 @@ export const globalActionResponseSchema = z.object({
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the global action was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the global action was last updated'),
+  archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
 });
 
 /**

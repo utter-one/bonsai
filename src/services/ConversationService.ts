@@ -52,6 +52,8 @@ export class ConversationService extends BaseService {
     const conversationId = input.id ?? generateId(ID_PREFIXES.CONVERSATION);
     logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, operatorId: context?.operatorId }, 'Creating conversation');
 
+    await this.requireProjectNotArchived(input.projectId);
+
     try {
       const conversationData = {
         id: conversationId,
@@ -88,8 +90,10 @@ export class ConversationService extends BaseService {
     status: ConversationState,
     statusDetails?: string | null,
     stageVars?: Record<string, Record<string, any>>
-   ) {
+  ) {
     logger.debug({ conversationId }, 'Saving conversation state');
+
+    await this.requireProjectNotArchived(projectId);
 
     try {
       const updateData: Partial<{
@@ -130,6 +134,8 @@ export class ConversationService extends BaseService {
    */
   async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<string> {
     logger.debug({ conversationId, eventType }, 'Saving conversation event');
+
+    await this.requireProjectNotArchived(projectId);
 
     try {
       const eventId = generateId(ID_PREFIXES.EVENT);
@@ -196,7 +202,8 @@ export class ConversationService extends BaseService {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
 
-      return conversationResponseSchema.parse(conversation);
+      const archived = !(await this.isProjectActive(projectId));
+      return conversationResponseSchema.parse({ ...conversation, archived });
     } catch (error) {
       logger.error({ error, conversationId: id }, 'Failed to fetch conversation');
       throw error;
@@ -262,8 +269,9 @@ export class ConversationService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return conversationListResponseSchema.parse({
-        items: conversationList,
+        items: conversationList.map(c => ({ ...c, archived })),
         total,
         offset,
         limit,
@@ -282,6 +290,8 @@ export class ConversationService extends BaseService {
   async finishConversation(projectId: string, id: string, reason: string = ''): Promise<void> {
     logger.info({ conversationId: id }, 'Ending conversation');
 
+    await this.requireProjectNotArchived(projectId);
+
     try {
       const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
 
@@ -295,7 +305,7 @@ export class ConversationService extends BaseService {
       }
 
       await db.update(conversations)
-        .set({ 
+        .set({
           status: 'finished',
           updatedAt: new Date()
         })
@@ -316,6 +326,8 @@ export class ConversationService extends BaseService {
   async failConversation(projectId: string, id: string, reason: string): Promise<void> {
     logger.info({ conversationId: id, reason }, `Marking conversation as failed: ${reason}`);
 
+    await this.requireProjectNotArchived(projectId);
+
     try {
       const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
 
@@ -324,7 +336,7 @@ export class ConversationService extends BaseService {
       }
 
       await db.update(conversations)
-        .set({ 
+        .set({
           status: 'failed',
           statusDetails: reason,
           updatedAt: new Date()
@@ -346,6 +358,8 @@ export class ConversationService extends BaseService {
   async deleteConversation(projectId: string, id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.CONVERSATION_DELETE);
     logger.info({ conversationId: id, operatorId: context?.operatorId }, 'Deleting conversation');
+
+    await this.requireProjectNotArchived(projectId);
 
     try {
       const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });

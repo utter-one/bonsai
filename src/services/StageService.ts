@@ -84,6 +84,7 @@ export class StageService extends BaseService {
    */
   async createStage(projectId: string, input: CreateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const stageId = input.id ?? generateId(ID_PREFIXES.STAGE);
     logger.info({ id: stageId, projectId, name: input.name, agentId: input.agentId, operatorId: context?.operatorId }, 'Creating stage');
 
@@ -121,7 +122,8 @@ export class StageService extends BaseService {
         throw new NotFoundError(`Stage with id ${id} not found`);
       }
 
-      return stageResponseSchema.parse(stage);
+      const archived = !(await this.isProjectActive(projectId));
+      return stageResponseSchema.parse({ ...stage, archived });
     } catch (error) {
       logger.error({ error, id }, 'Failed to fetch stage');
       throw error;
@@ -193,8 +195,9 @@ export class StageService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return stageListResponseSchema.parse({
-        items: stageList,
+        items: stageList.map(s => ({ ...s, archived })),
         total,
         offset,
         limit,
@@ -216,6 +219,7 @@ export class StageService extends BaseService {
    */
   async updateStage(projectId: string, id: string, input: UpdateStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ id, expectedVersion, operatorId: context?.operatorId }, 'Updating stage');
 
@@ -286,6 +290,7 @@ export class StageService extends BaseService {
    */
   async deleteStage(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.STAGE_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ id, expectedVersion, operatorId: context?.operatorId }, 'Deleting stage');
 
     try {
@@ -324,6 +329,7 @@ export class StageService extends BaseService {
    */
   async cloneStage(projectId: string, id: string, input: CloneStageRequest, context: RequestContext): Promise<StageResponse> {
     this.requirePermission(context, PERMISSIONS.STAGE_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ id, operatorId: context?.operatorId }, 'Cloning stage');
 
     try {

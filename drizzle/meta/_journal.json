@@ -176,6 +176,13 @@
       "when": 1772532468229,
       "tag": "0024_glamorous_klaw",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1772722381964,
+      "tag": "0025_adorable_hex",
+      "breakpoints": true
     }
   ]
 }

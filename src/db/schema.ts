@@ -1,5 +1,5 @@
-import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView } from 'drizzle-orm/pg-core';
+import { relations, isNull, isNotNull } from 'drizzle-orm';
 import { StageAction, Effect, ToolParameter, StageActionParameter } from '../types/actions';
 import { FieldDescriptor } from '../types/parameters';
 import { ConversationState } from '../types/conversationEvents';
@@ -93,7 +93,23 @@ export const projects = pgTable('projects', {
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  archivedAt: timestamp('archived_at'),
+  archivedBy: text('archived_by').references(() => operators.id),
 });
+
+/**
+ * View of active (non-archived) projects.
+ * Use in list operations to exclude entities belonging to archived projects.
+ */
+export const activeProjects = pgView('active_projects').as((qb) =>
+  qb.select().from(projects).where(isNull(projects.archivedAt)));
+
+/**
+ * View of archived projects.
+ * Use in update operations to detect and block modifications to archived projects.
+ */
+export const archivedProjects = pgView('archived_projects').as((qb) =>
+  qb.select().from(projects).where(isNotNull(projects.archivedAt)));
 
 // Agent table
 export const agents = pgTable('agents', {

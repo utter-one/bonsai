@@ -1,0 +1,5 @@
+ALTER TABLE "projects" ADD COLUMN "archived_at" timestamp;--> statement-breakpoint
+ALTER TABLE "projects" ADD COLUMN "archived_by" text;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_archived_by_operators_id_fk" FOREIGN KEY ("archived_by") REFERENCES "public"."operators"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE VIEW "public"."active_projects" AS (select "id", "name", "description", "asr_config", "accept_voice", "generate_voice", "storage_config", "constants", "metadata", "timezone", "auto_create_users", "user_profile_variable_descriptors", "version", "created_at", "updated_at", "archived_at", "archived_by" from "projects" where "projects"."archived_at" is null);--> statement-breakpoint
+CREATE VIEW "public"."archived_projects" AS (select "id", "name", "description", "asr_config", "accept_voice", "generate_voice", "storage_config", "constants", "metadata", "timezone", "auto_create_users", "user_profile_variable_descriptors", "version", "created_at", "updated_at", "archived_at", "archived_by" from "projects" where "projects"."archived_at" is not null);

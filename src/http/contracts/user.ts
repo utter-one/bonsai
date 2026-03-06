@@ -55,6 +55,7 @@ export const userResponseSchema = z.object({
   profile: z.record(z.string(), z.unknown()).describe('User profile data as key-value pairs'),
   createdAt: z.coerce.date().describe('Timestamp when the user was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the user was last updated'),
+  archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
 });
 
 /**

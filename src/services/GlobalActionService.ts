@@ -33,6 +33,7 @@ export class GlobalActionService extends BaseService {
    */
   async createGlobalAction(projectId: string, input: CreateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const globalActionId = input.id ?? generateId(ID_PREFIXES.GLOBAL_ACTION);
     logger.info({ globalActionId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating global action');
 
@@ -68,7 +69,8 @@ export class GlobalActionService extends BaseService {
         throw new NotFoundError(`Global action with id ${id} not found`);
       }
 
-      return globalActionResponseSchema.parse(globalAction);
+      const archived = !(await this.isProjectActive(projectId));
+      return globalActionResponseSchema.parse({ ...globalAction, archived });
     } catch (error) {
       logger.error({ error, globalActionId: id }, 'Failed to fetch global action');
       throw error;
@@ -136,8 +138,9 @@ export class GlobalActionService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return globalActionListResponseSchema.parse({
-        items: globalActionList,
+        items: globalActionList.map(a => ({ ...a, archived })),
         total,
         offset,
         limit,
@@ -159,6 +162,7 @@ export class GlobalActionService extends BaseService {
    */
   async updateGlobalAction(projectId: string, id: string, input: UpdateGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ globalActionId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating global action');
 
@@ -215,6 +219,7 @@ export class GlobalActionService extends BaseService {
    */
   async deleteGlobalAction(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ globalActionId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting global action');
 
     try {
@@ -253,6 +258,7 @@ export class GlobalActionService extends BaseService {
    */
   async cloneGlobalAction(projectId: string, id: string, input: CloneGlobalActionRequest, context: RequestContext): Promise<GlobalActionResponse> {
     this.requirePermission(context, PERMISSIONS.GLOBAL_ACTION_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ id, operatorId: context?.operatorId }, 'Cloning global action');
 
     try {

@@ -37,6 +37,7 @@ export class KnowledgeService extends BaseService {
    */
   async createKnowledgeCategory(projectId: string, input: CreateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const categoryId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_CATEGORY);
     logger.info({ categoryId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating knowledge category');
 
@@ -72,7 +73,8 @@ export class KnowledgeService extends BaseService {
         throw new NotFoundError(`Knowledge category with id ${id} not found`);
       }
 
-      return knowledgeCategoryResponseSchema.parse(category);
+      const archived = !(await this.isProjectActive(projectId));
+      return knowledgeCategoryResponseSchema.parse({ ...category, archived });
     } catch (error) {
       logger.error({ error, categoryId: id }, 'Failed to fetch knowledge category');
       throw error;
@@ -129,7 +131,8 @@ export class KnowledgeService extends BaseService {
 
       const categoryList = await db.query.knowledgeCategories.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined, orderBy: orderByClause.length > 0 ? orderByClause : [desc(knowledgeCategories.order)], limit: limit ?? undefined, offset, with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
-      return knowledgeCategoryListResponseSchema.parse({ items: categoryList, total, offset, limit });
+      const archived = !(await this.isProjectActive(projectId));
+      return knowledgeCategoryListResponseSchema.parse({ items: categoryList.map(c => ({ ...c, archived })), total, offset, limit });
     } catch (error) {
       logger.error({ error, params }, 'Failed to list knowledge categories');
       throw error;
@@ -147,6 +150,7 @@ export class KnowledgeService extends BaseService {
    */
   async updateKnowledgeCategory(projectId: string, id: string, input: UpdateKnowledgeCategoryRequest, context: RequestContext): Promise<KnowledgeCategoryResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ categoryId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating knowledge category');
 
@@ -190,6 +194,7 @@ export class KnowledgeService extends BaseService {
    */
   async deleteKnowledgeCategory(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ categoryId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting knowledge category');
 
     try {
@@ -230,6 +235,7 @@ export class KnowledgeService extends BaseService {
    */
   async createKnowledgeItem(projectId: string, input: CreateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const itemId = input.id ?? generateId(ID_PREFIXES.KNOWLEDGE_ITEM);
     logger.info({ itemId, categoryId: input.categoryId, operatorId: context?.operatorId }, 'Creating knowledge item');
 
@@ -265,7 +271,8 @@ export class KnowledgeService extends BaseService {
         throw new NotFoundError(`Knowledge item with id ${id} not found`);
       }
 
-      return knowledgeItemResponseSchema.parse(item);
+      const archived = !(await this.isProjectActive(projectId));
+      return knowledgeItemResponseSchema.parse({ ...item, archived });
     } catch (error) {
       logger.error({ error, itemId: id }, 'Failed to fetch knowledge item');
       throw error;
@@ -318,7 +325,8 @@ export class KnowledgeService extends BaseService {
 
       const itemList = await db.query.knowledgeItems.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined, orderBy: orderByClause.length > 0 ? orderByClause : [desc(knowledgeItems.order)], limit: limit ?? undefined, offset });
 
-      return knowledgeItemListResponseSchema.parse({ items: itemList, total, offset, limit });
+      const archived = !(await this.isProjectActive(projectId));
+      return knowledgeItemListResponseSchema.parse({ items: itemList.map(i => ({ ...i, archived })), total, offset, limit });
     } catch (error) {
       logger.error({ error, params }, 'Failed to list knowledge items');
       throw error;
@@ -336,6 +344,7 @@ export class KnowledgeService extends BaseService {
    */
   async updateKnowledgeItem(projectId: string, id: string, input: UpdateKnowledgeItemRequest, context: RequestContext): Promise<KnowledgeItemResponse> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ itemId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating knowledge item');
 
@@ -379,6 +388,7 @@ export class KnowledgeService extends BaseService {
    */
   async deleteKnowledgeItem(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.KNOWLEDGE_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ itemId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting knowledge item');
 
     try {

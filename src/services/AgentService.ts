@@ -32,6 +32,7 @@ export class AgentService extends BaseService {
    */
   async createAgent(projectId: string, input: CreateAgentRequest, context: RequestContext): Promise<AgentResponse> {
     this.requirePermission(context, PERMISSIONS.AGENT_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const agentId = input.id ?? generateId(ID_PREFIXES.AGENT);
     logger.info({ agentId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating agent');
 
@@ -67,7 +68,8 @@ export class AgentService extends BaseService {
         throw new NotFoundError(`Agent with id ${id} not found`);
       }
 
-      return agentResponseSchema.parse(agent);
+      const archived = !(await this.isProjectActive(projectId));
+      return agentResponseSchema.parse({ ...agent, archived });
     } catch (error) {
       logger.error({ error, agentId: id }, 'Failed to fetch agent');
       throw error;
@@ -135,8 +137,9 @@ export class AgentService extends BaseService {
         offset,
       });
 
+      const archived = !(await this.isProjectActive(projectId));
       return agentListResponseSchema.parse({
-        items: agentList,
+        items: agentList.map(a => ({ ...a, archived })),
         total,
         offset,
         limit,
@@ -158,6 +161,7 @@ export class AgentService extends BaseService {
    */
   async updateAgent(projectId: string, id: string, input: UpdateAgentRequest, context: RequestContext): Promise<AgentResponse> {
     this.requirePermission(context, PERMISSIONS.AGENT_WRITE);
+    await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ agentId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating agent');
 
@@ -201,6 +205,7 @@ export class AgentService extends BaseService {
    */
   async deleteAgent(projectId: string, id: string, expectedVersion: number, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.AGENT_DELETE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ agentId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting agent');
 
     try {
@@ -239,6 +244,7 @@ export class AgentService extends BaseService {
    */
   async cloneAgent(projectId: string, id: string, input: CloneAgentRequest, context: RequestContext): Promise<AgentResponse> {
     this.requirePermission(context, PERMISSIONS.AGENT_WRITE);
+    await this.requireProjectNotArchived(projectId);
     logger.info({ id, operatorId: context?.operatorId }, 'Cloning agent');
 
     try {
