@@ -239,4 +239,10 @@ export interface ILlmProvider {
    * Check if provider is initialized
    */
   isInitialized(): boolean;
+
+  /**
+   * Releases all resources held by the provider.
+   * Must be called when the provider is no longer needed (e.g. on client disconnect).
+   */
+  cleanup(): Promise<void>;
 }

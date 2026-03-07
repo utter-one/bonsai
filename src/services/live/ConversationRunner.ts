@@ -753,6 +753,40 @@ export class ConversationRunner {
   }
 
   /**
+   * Releases all ASR, TTS, and LLM provider resources held by this runner.
+   * Must be called when the associated WebSocket connection closes so that sockets,
+   * HTTP streams, and SDK sessions are properly torn down and do not leak.
+   */
+  async cleanup(): Promise<void> {
+    const conversationId = this.stageData?.conversation?.id ?? 'unknown';
+    logger.info({ conversationId }, 'Cleaning up ConversationRunner resources');
+
+    const cleanupProvider = async (provider: { cleanup(): Promise<void> } | undefined, label: string) => {
+      if (!provider) return;
+      try {
+        await provider.cleanup();
+      } catch (error) {
+        logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to clean up ${label} for conversation ${conversationId}`);
+      }
+    };
+
+    if (this.stageData) {
+      await cleanupProvider(this.stageData.asrProvider, 'ASR provider');
+      await cleanupProvider(this.stageData.ttsProvider, 'TTS provider');
+      await cleanupProvider(this.stageData.completionLlmProvider, 'completion LLM provider');
+      await cleanupProvider(this.stageData.fillerLlmProvider, 'filler LLM provider');
+      for (const classifierData of this.stageData.classifiers) {
+        await cleanupProvider(classifierData.llmProvider, `classifier LLM provider (${classifierData.classifier.id})`);
+      }
+      for (const transformerData of this.stageData.transformers) {
+        await cleanupProvider(transformerData.llmProvider, `transformer LLM provider (${transformerData.transformer.id})`);
+      }
+    }
+
+    logger.info({ conversationId }, 'ConversationRunner cleanup complete');
+  }
+
+  /**
    * Navigate to a specific stage in the conversation
    * @param stageId - ID of the stage to navigate to
    */

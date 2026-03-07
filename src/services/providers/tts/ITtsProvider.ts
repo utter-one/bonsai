@@ -114,4 +114,10 @@ export interface ITtsProvider<TChunk extends GeneratedAudioChunk = GeneratedAudi
    * @param cb Callback function that receives and processes each generated audio chunk
    */
   setOnSpeechGenerating(cb: SpeechGenerationCallback<TChunk>): void;
+
+  /**
+   * Releases all resources held by the provider.
+   * Must be called when the provider is no longer needed (e.g. on client disconnect).
+   */
+  cleanup(): Promise<void>;
 }

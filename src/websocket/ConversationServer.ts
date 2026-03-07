@@ -107,12 +107,17 @@ export class ConversationServer {
 
   /**
    * Handles WebSocket disconnection.
-   * Cleans up session and removes authentication status.
+   * Cleans up session resources and removes all associated mappings.
    * @param ws - The WebSocket connection that was disconnected.
    */
-  private handleDisconnect(ws: WebSocket): void {
-    // TODO: Find and suspend the session associated with this WebSocket if not already finished or failed.
-    logger.info('WebSocket connection closed');
+  private async handleDisconnect(ws: WebSocket): Promise<void> {
+    const connection = this.connectionManager.getConnectionForWebSocket(ws);
+    if (connection) {
+      logger.info({ sessionId: connection.id, conversationId: connection.conversationId || undefined }, 'WebSocket connection closed, cleaning up session');
+      await this.connectionManager.endSession(connection.id);
+    } else {
+      logger.info('WebSocket connection closed (no session found)');
+    }
   }
 
   /**
