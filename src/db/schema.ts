@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index } from 'drizzle-orm/pg-core';
 import { relations, isNull, isNotNull } from 'drizzle-orm';
 import { StageAction, Effect, ToolParameter, StageActionParameter } from '../types/actions';
 import { FieldDescriptor } from '../types/parameters';
@@ -40,6 +40,7 @@ export const conversations = pgTable('conversations', {
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
   foreignKey({ columns: [table.projectId, table.userId], foreignColumns: [users.projectId, users.id] }),
+  index('idx_conversations_project_user').on(table.projectId, table.userId),
 ]);
 
 // ConversationEvent table
@@ -54,6 +55,7 @@ export const conversationEvents = pgTable('conversation_events', {
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
   foreignKey({ columns: [table.projectId, table.conversationId], foreignColumns: [conversations.projectId, conversations.id] }).onDelete('cascade'),
+  index('idx_conversation_events_project_conversation').on(table.projectId, table.conversationId),
 ]);
 
 // Operator table
@@ -339,6 +341,7 @@ export const apiKeys = pgTable('api_keys', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
+  index('idx_api_keys_project_is_active').on(table.projectId, table.isActive),
 ]);
 
 // AuditLog table
@@ -353,7 +356,10 @@ export const auditLogs = pgTable('audit_logs', {
   newEntity: jsonb('new_entity').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+}, (table) => [
+  index('idx_audit_logs_project_id').on(table.projectId),
+  index('idx_audit_logs_created_at').on(table.createdAt),
+]);
 
 export type ArtifactType = 'user_voice' | 'user_transcript' | 'ai_voice' | 'ai_transcript' | 'tool_input' | 'tool_output' | 'other';
 

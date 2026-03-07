@@ -183,6 +183,13 @@
       "when": 1772722381964,
       "tag": "0025_adorable_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1772906483066,
+      "tag": "0026_nervous_ezekiel",
+      "breakpoints": true
     }
   ]
 }
