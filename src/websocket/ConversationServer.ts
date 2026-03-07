@@ -47,7 +47,8 @@ export class ConversationServer {
    * @param server - The HTTP server to attach the WebSocket server to.
    */
   initialize(server: Server): void {
-    this.wss = new WebSocketServer({ server, path: '/ws' });
+    const maxPayload = parseInt(process.env.WS_MAX_PAYLOAD_BYTES ?? String(10 * 1024 * 1024), 10);
+    this.wss = new WebSocketServer({ server, path: '/ws', maxPayload });
 
     this.wss.on('connection', (ws: WebSocket) => {
       logger.info('New WebSocket connection established');

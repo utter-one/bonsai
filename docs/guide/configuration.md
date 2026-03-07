@@ -11,6 +11,7 @@ Bonsai Backend is configured through environment variables. Copy the `.env.examp
 | `PORT` | `3000` | HTTP server port |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin(s). Set to a specific domain in production |
 | `NODE_ENV` | — | Set to `production` for production deployments |
+| `WS_MAX_PAYLOAD_BYTES` | `10485760` | Maximum WebSocket message payload size in bytes (default: 10 MB) |
 
 ### Database
 
