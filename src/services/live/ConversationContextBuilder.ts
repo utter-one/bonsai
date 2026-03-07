@@ -447,12 +447,12 @@ export class ConversationContextBuilder {
   async buildContextForAction(conversation: Conversation, actionName: string, action: StageAction | GlobalAction, parameters: Record<string, any>): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
-      where: eq(users.id, conversation.userId),
+      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
     });
 
     // Load stage with agent
     const stage = await db.query.stages.findFirst({
-      where: eq(stages.id, conversation.stageId),
+      where: and(eq(stages.projectId, conversation.projectId), eq(stages.id, conversation.stageId)),
       with: { agent: true },
     });
 
@@ -486,7 +486,7 @@ export class ConversationContextBuilder {
 
     // Get all events from database; history is a filtered view on message events
     const allEvents = await db.query.conversationEvents.findMany({
-      where: eq(conversationEvents.conversationId, conversation.id),
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
       orderBy: asc(conversationEvents.timestamp),
     });
     context.events = allEvents.map(e => ({
@@ -519,7 +519,7 @@ export class ConversationContextBuilder {
   async buildContextForFillerSentence(conversation: Conversation, stage: Stage, userInput: string): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
-      where: eq(users.id, conversation.userId),
+      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
     });
 
     // Load project constants
@@ -550,7 +550,7 @@ export class ConversationContextBuilder {
 
     // Load conversation history so templates can reference prior messages
     const allEvents = await db.query.conversationEvents.findMany({
-      where: eq(conversationEvents.conversationId, conversation.id),
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
       orderBy: asc(conversationEvents.timestamp),
     });
     context.events = allEvents.map(e => ({
@@ -579,12 +579,12 @@ export class ConversationContextBuilder {
   async buildContextForConversationStart(conversation: Conversation): Promise<ConversationContext> {
     // Load stage with agent
     const stage = await db.query.stages.findFirst({
-      where: eq(stages.id, conversation.stageId),
+      where: and(eq(stages.projectId, conversation.projectId), eq(stages.id, conversation.stageId)),
       with: { agent: true },
     });
 
     const user = await db.query.users.findFirst({
-      where: eq(users.id, conversation.userId),
+      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
     });
 
     // Load project constants
@@ -629,7 +629,7 @@ export class ConversationContextBuilder {
   async buildContextForClassifier(conversation: Conversation, stage: Stage, globalActions: GlobalAction[], classifierId: string, userInput?: string, originalUserInput?: string, knowledgeCategories?: KnowledgeCategoryResponse[]): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
-      where: eq(users.id, conversation.userId),
+      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
     });
 
     // Load project constants
@@ -666,7 +666,7 @@ export class ConversationContextBuilder {
 
     // Get all events from database; history is a filtered view on message events
     const allEvents = await db.query.conversationEvents.findMany({
-      where: eq(conversationEvents.conversationId, conversation.id),
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
       orderBy: asc(conversationEvents.timestamp),
     });
     context.events = allEvents.map(e => ({
@@ -701,7 +701,7 @@ export class ConversationContextBuilder {
   async buildContextForTransformer(conversation: Conversation, stage: Stage, globalActions: GlobalAction[], transformerId: string, contextFields: string[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
-      where: eq(users.id, conversation.userId),
+      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
     });
 
     // Load project constants
@@ -756,7 +756,7 @@ export class ConversationContextBuilder {
 
     // Get all events from database; history is a filtered view on message events
     const allEvents = await db.query.conversationEvents.findMany({
-      where: eq(conversationEvents.conversationId, conversation.id),
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
       orderBy: asc(conversationEvents.timestamp),
     });
     context.events = allEvents.map(e => ({
@@ -790,7 +790,7 @@ export class ConversationContextBuilder {
   async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string, faq?: FaqItem[]): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
-      where: eq(users.id, conversation.userId),
+      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
     });
 
     // Load project constants
@@ -826,7 +826,7 @@ export class ConversationContextBuilder {
 
     // Get all events from database; history is a filtered view on message events
     const allEvents = await db.query.conversationEvents.findMany({
-      where: eq(conversationEvents.conversationId, conversation.id),
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
       orderBy: asc(conversationEvents.timestamp),
     });
     context.events = allEvents.map(e => ({
