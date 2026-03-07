@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema, llmSettingsSchema } from './common';
+import { listParamsSchema, listResponseLimitSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
 import { fieldDescriptorSchema } from '../../types/parameters';
 import type { FieldDescriptor } from '../../types/parameters';
@@ -215,7 +215,7 @@ export const stageListResponseSchema = z.object({
   items: z.array(stageResponseSchema).describe('Array of stages in the current page'),
   total: z.number().int().min(0).describe('Total number of stages matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
+  limit: listResponseLimitSchema,
 });
 
 /**

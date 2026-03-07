@@ -8,6 +8,7 @@ import { conversationResponseSchema, conversationListResponseSchema, conversatio
 import { AuditService } from './AuditService';
 import { NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
@@ -221,7 +222,7 @@ export class ConversationService extends BaseService {
     try {
       const conditions: SQL[] = [eq(conversations.projectId, projectId)];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       // Column map for filter and order by operations
       const columnMap = {
@@ -254,18 +255,15 @@ export class ConversationService extends BaseService {
 
       // Build order by clause
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-      // Get total count
-      const totalResult = await db.query.conversations.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-      });
-      const total = totalResult.length;
+      const total = await countRows(conversations, whereCondition);
 
       // Get paginated results
       const conversationList = await db.query.conversations.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
+        where: whereCondition,
         orderBy: orderByClause.length > 0 ? orderByClause : [desc(conversations.createdAt)],
-        limit: limit ?? undefined,
+        limit,
         offset,
       });
 
@@ -403,7 +401,7 @@ export class ConversationService extends BaseService {
 
       const conditions: SQL[] = [eq(conversationEvents.projectId, projectId), eq(conversationEvents.conversationId, conversationId)];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       // Column map for filter and order by operations
       const columnMap = {
@@ -431,18 +429,15 @@ export class ConversationService extends BaseService {
 
       // Build order by clause
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-      // Get total count
-      const totalResult = await db.query.conversationEvents.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-      });
-      const total = totalResult.length;
+      const total = await countRows(conversationEvents, whereCondition);
 
       // Get paginated results
       const eventList = await db.query.conversationEvents.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
+        where: whereCondition,
         orderBy: orderByClause.length > 0 ? orderByClause : [desc(conversationEvents.timestamp)],
-        limit: limit ?? undefined,
+        limit,
         offset,
       });
 

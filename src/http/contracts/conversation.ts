@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema } from './common';
+import { listParamsSchema, listResponseLimitSchema } from './common';
 import type { ListParams } from './common';
 import { conversationEventDataSchema, conversationEventTypeSchema } from '../../types/conversationEvents';
 
@@ -61,7 +61,7 @@ export const conversationListResponseSchema = z.object({
   items: z.array(conversationResponseSchema).describe('Array of conversations in the current page'),
   total: z.number().int().min(0).describe('Total number of conversations matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
+  limit: listResponseLimitSchema,
 });
 
 /**
@@ -86,7 +86,7 @@ export const conversationEventListResponseSchema = z.object({
   items: z.array(conversationEventResponseSchema).describe('Array of conversation events in the current page'),
   total: z.number().int().min(0).describe('Total number of events matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
+  limit: listResponseLimitSchema,
 });
 
 /** Response for a single conversation */

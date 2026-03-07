@@ -9,6 +9,7 @@ import { apiKeyResponseSchema, apiKeyListResponseSchema } from '../http/contract
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { countRows, normalizeListLimit } from '../utils/pagination';
 import { parseTextSearch } from '../utils/textSearch';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
@@ -138,7 +139,7 @@ export class ApiKeyService extends BaseService {
 
     try {
       const offset = params?.offset || 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       const conditions: SQL[] = [];
       if (projectId) {
@@ -167,9 +168,8 @@ export class ApiKeyService extends BaseService {
 
       const orderBy = buildOrderBy(params?.orderBy, columnMap) ?? desc(apiKeys.createdAt);
       const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
-      const apiKeyList = await db.query.apiKeys.findMany({ where: whereCondition, orderBy, offset, limit: limit ?? undefined });
-      const totalQuery = await db.select({ count: apiKeys.id }).from(apiKeys).where(whereCondition);
-      const total = totalQuery.length;
+      const apiKeyList = await db.query.apiKeys.findMany({ where: whereCondition, orderBy, offset, limit });
+      const total = await countRows(apiKeys, whereCondition);
 
       // Determine archived status per api key by examining its project's archivedAt field
       const projectIds = Array.from(new Set(apiKeyList.map(k => k.projectId)));

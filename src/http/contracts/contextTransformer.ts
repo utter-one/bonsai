@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema, llmSettingsSchema } from './common';
+import { listParamsSchema, listResponseLimitSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
 
 extendZodWithOpenApi(z);
@@ -85,7 +85,7 @@ export const contextTransformerListResponseSchema = z.object({
   items: z.array(contextTransformerResponseSchema).describe('Array of context transformers in the current page'),
   total: z.number().int().min(0).describe('Total number of context transformers matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
+  limit: listResponseLimitSchema,
 });
 
 /** Request body for creating a new context transformer */

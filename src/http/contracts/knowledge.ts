@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema } from './common';
+import { listParamsSchema, listResponseLimitSchema } from './common';
 import type { ListParams } from './common';
 
 extendZodWithOpenApi(z);
@@ -106,7 +106,7 @@ export const knowledgeCategoryListResponseSchema = z.object({
   items: z.array(knowledgeCategoryResponseSchema).describe('Array of knowledge categories in the current page'),
   total: z.number().int().min(0).describe('Total number of categories matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
+  limit: listResponseLimitSchema,
 });
 
 /** Request body for creating a new knowledge category */
@@ -186,7 +186,7 @@ export const knowledgeItemListResponseSchema = z.object({
   items: z.array(knowledgeItemResponseSchema).describe('Array of knowledge items in the current page'),
   total: z.number().int().min(0).describe('Total number of items matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
+  limit: listResponseLimitSchema,
 });
 
 /** Request body for creating a new knowledge item */
