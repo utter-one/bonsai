@@ -21,7 +21,7 @@ import { UserInputProcessor } from "./UserInputProcessor";
 import { TtsSettings } from "../providers/tts/TtsProviderFactory";
 import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
 import { ToolExecutor } from "./ToolExecutor";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
@@ -134,7 +134,9 @@ export class ConversationRunner {
     this.ws = ws;
 
     // Load conversation data
-    this.conversation = await db.query.conversations.findFirst({ where: (conversations, { eq }) => eq(conversations.id, conversationId) });
+    this.conversation = await db.query.conversations.findFirst({
+      where: (conversations, { and, eq }) => and(eq(conversations.projectId, session.projectId), eq(conversations.id, conversationId))
+    });
     if (!this.conversation) {
       throw new NotFoundError(`Conversation with ID ${conversationId} not found`);
     }
@@ -150,7 +152,10 @@ export class ConversationRunner {
 
   private async buildStageData(conversation: Conversation): Promise<StageRuntimeData> {
     // Load current stage data with agent relation
-    const stage = await db.query.stages.findFirst({ where: (stages, { eq }) => eq(stages.id, conversation.stageId), with: { agent: true } });
+    const stage = await db.query.stages.findFirst({
+      where: (stages, { and, eq }) => and(eq(stages.projectId, conversation.projectId), eq(stages.id, conversation.stageId)),
+      with: { agent: true }
+    });
     if (!stage) {
       throw new NotFoundError(`Stage with ID ${conversation.stageId} not found`);
     }
@@ -207,7 +212,9 @@ export class ConversationRunner {
 
     // 2. Load all unique classifiers
     for (const classifierId of classifierIds) {
-      const classifier = await db.query.classifiers.findFirst({ where: (classifiers, { eq }) => eq(classifiers.id, classifierId) });
+      const classifier = await db.query.classifiers.findFirst({
+        where: (classifiers, { and, eq }) => and(eq(classifiers.projectId, conversation.projectId), eq(classifiers.id, classifierId))
+      });
       if (!classifier) {
         throw new NotFoundError(`Classifier with ID ${classifierId} not found`);
       }
@@ -218,7 +225,9 @@ export class ConversationRunner {
 
     // Load transformers for the stage
     for (const transformerId of stage.transformerIds) {
-      const transformer = await db.query.contextTransformers.findFirst({ where: (contextTransformers, { eq }) => eq(contextTransformers.id, transformerId) });
+      const transformer = await db.query.contextTransformers.findFirst({
+        where: (contextTransformers, { and, eq }) => and(eq(contextTransformers.projectId, conversation.projectId), eq(contextTransformers.id, transformerId))
+      });
       if (!transformer) {
         throw new NotFoundError(`Transformer with ID ${transformerId} not found`);
       }
@@ -851,7 +860,7 @@ export class ConversationRunner {
     // Update conversation in database
     await db.update(conversations)
       .set({ stageId, updatedAt: new Date() })
-      .where(eq(conversations.id, this.conversation.id));
+      .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
 
     // Re-wire providers for the new stage
     await this.wireUpProviders();
@@ -943,10 +952,10 @@ export class ConversationRunner {
 
     // Update conversation in database
     const { conversations } = await import('../../db/schema');
-    const { eq } = await import('drizzle-orm');
+    const { and, eq } = await import('drizzle-orm');
     await db.update(conversations)
       .set({ stageVars: this.conversation.stageVars, updatedAt: new Date() })
-      .where(eq(conversations.id, this.conversation.id));
+      .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
 
     logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Successfully set variable ${variableName}`);
   }
@@ -1120,16 +1129,11 @@ export class ConversationRunner {
 
     // Load the tool from the database
     const tool = await db.query.tools.findFirst({
-      where: (tools, { eq }) => eq(tools.id, toolId)
+      where: (tools, { and, eq }) => and(eq(tools.projectId, this.stageData.project.id), eq(tools.id, toolId))
     });
 
     if (!tool) {
       throw new NotFoundError(`Tool with id ${toolId} not found`);
-    }
-
-    // Verify tool belongs to the same project
-    if (tool.projectId !== this.stageData.project.id) {
-      throw new Error(`Tool ${toolId} does not belong to project ${this.stageData.project.id}`);
     }
 
     logger.info({ conversationId: this.conversation.id, toolId, toolName: tool.name }, `Executing tool ${tool.name}`);
@@ -1181,7 +1185,7 @@ export class ConversationRunner {
       const updatedStageVars = { ...this.conversation.stageVars, [this.stageData.id]: context.vars };
       await db.update(conversations)
         .set({ stageVars: updatedStageVars, updatedAt: new Date() })
-        .where(eq(conversations.id, this.conversation.id));
+        .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
       this.conversation.stageVars = updatedStageVars;
     }
 
@@ -1190,7 +1194,7 @@ export class ConversationRunner {
       logger.debug({ conversationId, userId: this.conversation.userId }, `User profile was modified during action execution`);
       await db.update(users)
         .set({ profile: context.userProfile, updatedAt: new Date() })
-        .where(eq(users.id, this.conversation.userId));
+        .where(and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)));
     }
 
     // Apply stage navigation if specified
@@ -1203,7 +1207,7 @@ export class ConversationRunner {
       logger.info({ conversationId }, `Conversation marked for abortion by action execution`);
       await db.update(conversations)
         .set({ status: 'aborted', updatedAt: new Date() })
-        .where(eq(conversations.id, this.conversation.id));
+        .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
       return false;
     }
 

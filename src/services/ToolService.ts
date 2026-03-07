@@ -9,6 +9,7 @@ import { toolResponseSchema, toolListResponseSchema } from '../http/contracts/to
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
@@ -88,7 +89,7 @@ export class ToolService extends BaseService {
     try {
       const conditions: SQL[] = [eq(tools.projectId, projectId)];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       // Column map for filter and order by operations
       const columnMap = {
@@ -126,18 +127,15 @@ export class ToolService extends BaseService {
 
       // Build order by clause
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-      // Get total count
-      const totalResult = await db.query.tools.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-      });
-      const total = totalResult.length;
+      const total = await countRows(tools, whereCondition);
 
       // Get paginated results
       const toolList = await db.query.tools.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
+        where: whereCondition,
         orderBy: orderByClause.length > 0 ? orderByClause : [desc(tools.createdAt)],
-        limit: limit ?? undefined,
+        limit,
         offset,
       });
 

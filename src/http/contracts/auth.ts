@@ -25,8 +25,8 @@ export const refreshTokenSchema = z.object({
  * Includes access token, refresh token, expiry, and user info
  */
 export const loginResponseSchema = z.object({
-  accessToken: z.string().describe('JWT access token (expires in 15 minutes)'),
-  refreshToken: z.string().describe('JWT refresh token (expires in 7 days)'),
+  accessToken: z.string().describe('JWT access token'),
+  refreshToken: z.string().describe('JWT refresh token'),
   expiresIn: z.number().int().positive().describe('Access token expiry time in seconds'),
   operatorId: z.string().describe('Operator user ID'),
   displayName: z.string().describe('Operator display name'),

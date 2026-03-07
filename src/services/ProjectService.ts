@@ -8,6 +8,7 @@ import { projectResponseSchema, projectListResponseSchema } from '../http/contra
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError, InvalidOperationError, ArchivedProjectError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
@@ -88,7 +89,7 @@ export class ProjectService extends BaseService {
     try {
       const conditions: SQL[] = [];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       // Filter by archived status: default to active (non-archived) projects
       if (params?.archived) {
@@ -115,9 +116,8 @@ export class ProjectService extends BaseService {
 
       const orderBy = buildOrderBy(params?.orderBy, columnMap) ?? desc(projects.createdAt);
       const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
-      const projectList = await db.query.projects.findMany({ where: whereCondition, orderBy, offset, limit: limit ?? undefined });
-      const totalQuery = await db.select({ count: projects.id }).from(projects).where(whereCondition);
-      const total = totalQuery.length;
+      const projectList = await db.query.projects.findMany({ where: whereCondition, orderBy, offset, limit });
+      const total = await countRows(projects, whereCondition);
 
       logger.debug({ count: projectList.length, total }, 'Projects listed successfully');
 

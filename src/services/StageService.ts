@@ -9,6 +9,7 @@ import { stageResponseSchema, stageListResponseSchema } from '../http/contracts/
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
@@ -34,18 +35,18 @@ export class StageService extends BaseService {
    * @param globalActionIds - Global action IDs to validate
    * @throws {NotFoundError} When any referenced entity does not exist
    */
-  private async validateReferencedEntities(agentId: string, defaultClassifierId?: string | null, transformerIds?: string[], globalActionIds?: string[]): Promise<void> {
+  private async validateReferencedEntities(projectId: string, agentId: string, defaultClassifierId?: string | null, transformerIds?: string[], globalActionIds?: string[]): Promise<void> {
     const errors: string[] = [];
 
     // Validate agent exists
-    const agent = await db.query.agents.findFirst({ where: eq(agents.id, agentId) });
+    const agent = await db.query.agents.findFirst({ where: and(eq(agents.projectId, projectId), eq(agents.id, agentId)) });
     if (!agent) {
       errors.push(`Agent with id ${agentId} not found`);
     }
 
     // Validate default classifier exists if provided
     if (defaultClassifierId) {
-      const classifier = await db.query.classifiers.findFirst({ where: eq(classifiers.id, defaultClassifierId) });
+      const classifier = await db.query.classifiers.findFirst({ where: and(eq(classifiers.projectId, projectId), eq(classifiers.id, defaultClassifierId)) });
       if (!classifier) {
         errors.push(`Default classifier with id ${defaultClassifierId} not found`);
       }
@@ -53,7 +54,7 @@ export class StageService extends BaseService {
 
     // Validate transformers exist
     if (transformerIds && transformerIds.length > 0) {
-      const existingTransformers = await db.query.contextTransformers.findMany({ where: inArray(contextTransformers.id, transformerIds) });
+      const existingTransformers = await db.query.contextTransformers.findMany({ where: and(eq(contextTransformers.projectId, projectId), inArray(contextTransformers.id, transformerIds)) });
       const existingIds = new Set(existingTransformers.map(t => t.id));
       const missingIds = transformerIds.filter(id => !existingIds.has(id));
       if (missingIds.length > 0) {
@@ -63,7 +64,7 @@ export class StageService extends BaseService {
 
     // Validate global actions exist
     if (globalActionIds && globalActionIds.length > 0) {
-      const existingActions = await db.query.globalActions.findMany({ where: inArray(globalActions.id, globalActionIds) });
+      const existingActions = await db.query.globalActions.findMany({ where: and(eq(globalActions.projectId, projectId), inArray(globalActions.id, globalActionIds)) });
       const existingIds = new Set(existingActions.map(a => a.id));
       const missingIds = globalActionIds.filter(id => !existingIds.has(id));
       if (missingIds.length > 0) {
@@ -90,7 +91,7 @@ export class StageService extends BaseService {
 
     try {
       // Validate referenced entities exist
-      await this.validateReferencedEntities(input.agentId, input.defaultClassifierId, input.transformerIds, input.globalActions);
+      await this.validateReferencedEntities(projectId, input.agentId, input.defaultClassifierId, input.transformerIds, input.globalActions);
 
       const stage = await db.insert(stages).values({ id: stageId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, agentId: input.agentId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeTags: input.knowledgeTags ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variableDescriptors: input.variableDescriptors ?? [], actions: input.actions ?? {}, defaultClassifierId: input.defaultClassifierId ?? null, transformerIds: input.transformerIds ?? [], tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
@@ -141,7 +142,7 @@ export class StageService extends BaseService {
     try {
       const conditions: SQL[] = [eq(stages.projectId, projectId)];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       // Column map for filter and order by operations
       const columnMap = {
@@ -180,18 +181,15 @@ export class StageService extends BaseService {
 
       // Build order by clause
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-      // Get total count
-      const totalResult = await db.query.stages.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-      });
-      const total = totalResult.length;
+      const total = await countRows(stages, whereCondition);
 
       // Get paginated results
       const stageList = await db.query.stages.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
+        where: whereCondition,
         orderBy: orderByClause.length > 0 ? orderByClause : [desc(stages.createdAt)],
-        limit: limit ?? undefined,
+        limit,
         offset,
       });
 
@@ -240,7 +238,7 @@ export class StageService extends BaseService {
       const transformerIdsToValidate = updateData.transformerIds !== undefined ? updateData.transformerIds : existingStage.transformerIds;
       const globalActionsToValidate = updateData.globalActions !== undefined ? updateData.globalActions : existingStage.globalActions;
 
-      await this.validateReferencedEntities(agentIdToValidate, defaultClassifierIdToValidate, transformerIdsToValidate, globalActionsToValidate);
+      await this.validateReferencedEntities(projectId, agentIdToValidate, defaultClassifierIdToValidate, transformerIdsToValidate, globalActionsToValidate);
 
       const updatePayload: any = { version: existingStage.version + 1, updatedAt: new Date() };
       if (updateData.name !== undefined) updatePayload.name = updateData.name;

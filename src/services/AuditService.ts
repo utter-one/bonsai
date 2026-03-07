@@ -6,6 +6,7 @@ import { auditLogs } from '../db/schema';
 import type { AuditLog } from '../types/models';
 import { logger } from '../utils/logger';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { countRows, normalizeListLimit } from '../utils/pagination';
 import type { ListParams } from '../http/contracts/common';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 
@@ -218,7 +219,7 @@ export class AuditService {
     try {
       const conditions: SQL[] = [];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       // Column map for filter and order by operations
       const columnMap = {
@@ -250,18 +251,15 @@ export class AuditService {
 
       // Build order by clause
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-      // Get total count
-      const totalResult = await db.query.auditLogs.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-      });
-      const total = totalResult.length;
+      const total = await countRows(auditLogs, whereCondition);
 
       // Get paginated results
       const logsList = await db.query.auditLogs.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
+        where: whereCondition,
         orderBy: orderByClause.length > 0 ? orderByClause : [desc(auditLogs.createdAt)],
-        limit: limit ?? undefined,
+        limit,
         offset,
       });
 

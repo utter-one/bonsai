@@ -9,6 +9,7 @@ import { knowledgeCategoryResponseSchema, knowledgeCategoryListResponseSchema, k
 import { AuditService } from './AuditService';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
+import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
@@ -92,7 +93,7 @@ export class KnowledgeService extends BaseService {
     try {
       const conditions: SQL[] = [eq(knowledgeCategories.projectId, projectId)];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       const columnMap = {
         id: knowledgeCategories.id,
@@ -125,11 +126,11 @@ export class KnowledgeService extends BaseService {
       }
 
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const totalResult = await db.query.knowledgeCategories.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined });
-      const total = totalResult.length;
+      const total = await countRows(knowledgeCategories, whereCondition);
 
-      const categoryList = await db.query.knowledgeCategories.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined, orderBy: orderByClause.length > 0 ? orderByClause : [desc(knowledgeCategories.order)], limit: limit ?? undefined, offset, with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
+      const categoryList = await db.query.knowledgeCategories.findMany({ where: whereCondition, orderBy: orderByClause.length > 0 ? orderByClause : [desc(knowledgeCategories.order)], limit, offset, with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
       const archived = !(await this.isProjectActive(projectId));
       return knowledgeCategoryListResponseSchema.parse({ items: categoryList.map(c => ({ ...c, archived })), total, offset, limit });
@@ -290,7 +291,7 @@ export class KnowledgeService extends BaseService {
     try {
       const conditions: SQL[] = [eq(knowledgeItems.projectId, projectId)];
       const offset = params?.offset ?? 0;
-      const limit = params?.limit ?? null;
+      const limit = normalizeListLimit(params?.limit);
 
       const columnMap = {
         id: knowledgeItems.id,
@@ -319,11 +320,11 @@ export class KnowledgeService extends BaseService {
       }
 
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const totalResult = await db.query.knowledgeItems.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined });
-      const total = totalResult.length;
+      const total = await countRows(knowledgeItems, whereCondition);
 
-      const itemList = await db.query.knowledgeItems.findMany({ where: conditions.length > 0 ? and(...conditions) : undefined, orderBy: orderByClause.length > 0 ? orderByClause : [desc(knowledgeItems.order)], limit: limit ?? undefined, offset });
+      const itemList = await db.query.knowledgeItems.findMany({ where: whereCondition, orderBy: orderByClause.length > 0 ? orderByClause : [desc(knowledgeItems.order)], limit, offset });
 
       const archived = !(await this.isProjectActive(projectId));
       return knowledgeItemListResponseSchema.parse({ items: itemList.map(i => ({ ...i, archived })), total, offset, limit });

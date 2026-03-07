@@ -9,6 +9,7 @@ import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsP
 import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
 import { cartesiaTtsSettingsSchema } from '../../services/providers/tts/CartesiaTtsProvider';
 import { azureTtsSettingsSchema } from '../../services/providers/tts/AzureTtsProvider';
+import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from '../../utils/pagination';
 
 extendZodWithOpenApi(z);
 
@@ -46,6 +47,12 @@ const listFilterSchema = z.union([
   listFilterOperationSchema,
 ]);
 
+const listLimitValueSchema = z.coerce.number().int().positive().max(MAX_LIST_LIMIT);
+
+export const listLimitSchema = z.preprocess(value => value === undefined ? DEFAULT_LIST_LIMIT : value, listLimitValueSchema.nullable()).transform(value => value ?? DEFAULT_LIST_LIMIT).describe(`Maximum number of items to return. Defaults to ${DEFAULT_LIST_LIMIT}; maximum ${MAX_LIST_LIMIT}`);
+
+export const listResponseLimitSchema = listLimitValueSchema.nullable().default(DEFAULT_LIST_LIMIT).describe(`Maximum number of items requested for the current page. Defaults to ${DEFAULT_LIST_LIMIT}; maximum ${MAX_LIST_LIMIT}`);
+
 /**
  * Schema for list query parameters supporting filtering, sorting, pagination, and search
  * Query params:
@@ -58,7 +65,7 @@ const listFilterSchema = z.union([
  */
 export const listParamsSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0).describe('Starting index for pagination (default: 0)'),
-  limit: z.coerce.number().int().positive().nullable().optional().describe('Maximum number of items to return (optional, null for no limit)'),
+  limit: listLimitSchema,
   textSearch: z.string().nullable().optional().describe('Full-text search query string (optional)'),
   orderBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to sort by. Use "-" prefix for descending order (e.g., "-createdAt")'),
   groupBy: z.union([z.string(), z.array(z.string())]).nullable().optional().describe('Field(s) to group results by (optional)'),

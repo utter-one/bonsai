@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { listParamsSchema, ttsSettingsSchema, llmSettingsSchema } from './common';
+import { listParamsSchema, listResponseLimitSchema, ttsSettingsSchema, llmSettingsSchema } from './common';
 import { audioFormatValues } from '../../types/audio';
 import type { ListParams } from './common';
 
@@ -104,7 +104,7 @@ export const agentListResponseSchema = z.object({
   items: z.array(agentResponseSchema).describe('Array of agents in the current page'),
   total: z.number().int().min(0).describe('Total number of agents matching the query'),
   offset: z.number().int().min(0).describe('Starting index of the current page'),
-  limit: z.number().int().positive().nullable().describe('Maximum number of items per page (null if no limit)'),
+  limit: listResponseLimitSchema,
 });
 
 /**
