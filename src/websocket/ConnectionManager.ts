@@ -113,12 +113,20 @@ export class ConnectionManager {
   }
 
   /**
-   * Ends a session and removes all associated mappings.
+   * Ends a session, cleans up provider resources, and removes all associated mappings.
    * @param sessionId - The session ID to end.
    */
-  endSession(sessionId: string) {
+  async endSession(sessionId: string): Promise<void> {
     const socket = this.connectionMap.get(sessionId);
     if (socket) {
+      const session = this.socketMap.get(socket);
+      if (session?.runner) {
+        try {
+          await session.runner.cleanup();
+        } catch (error) {
+          logger.error({ sessionId, error: error instanceof Error ? error.message : String(error) }, 'Failed to clean up ConversationRunner during session end');
+        }
+      }
       this.socketMap.delete(socket);
       this.connectionMap.delete(sessionId);
     }

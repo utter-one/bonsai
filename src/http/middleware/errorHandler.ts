@@ -48,11 +48,6 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
     return;
   }
 
-  if (err instanceof RemoteConnectionError) {
-    res.status(502).json({ error: err.message });
-    return;
-  }
-
   if (err instanceof AccessDeniedError) {
     res.status(403).json({ error: err.message });
     return;

@@ -47,7 +47,8 @@ export class ConversationServer {
    * @param server - The HTTP server to attach the WebSocket server to.
    */
   initialize(server: Server): void {
-    this.wss = new WebSocketServer({ server, path: '/ws' });
+    const maxPayload = parseInt(process.env.WS_MAX_PAYLOAD_BYTES ?? String(10 * 1024 * 1024), 10);
+    this.wss = new WebSocketServer({ server, path: '/ws', maxPayload });
 
     this.wss.on('connection', (ws: WebSocket) => {
       logger.info('New WebSocket connection established');
@@ -107,12 +108,17 @@ export class ConversationServer {
 
   /**
    * Handles WebSocket disconnection.
-   * Cleans up session and removes authentication status.
+   * Cleans up session resources and removes all associated mappings.
    * @param ws - The WebSocket connection that was disconnected.
    */
-  private handleDisconnect(ws: WebSocket): void {
-    // TODO: Find and suspend the session associated with this WebSocket if not already finished or failed.
-    logger.info('WebSocket connection closed');
+  private async handleDisconnect(ws: WebSocket): Promise<void> {
+    const connection = this.connectionManager.getConnectionForWebSocket(ws);
+    if (connection) {
+      logger.info({ sessionId: connection.id, conversationId: connection.conversationId || undefined }, 'WebSocket connection closed, cleaning up session');
+      await this.connectionManager.endSession(connection.id);
+    } else {
+      logger.info('WebSocket connection closed (no session found)');
+    }
   }
 
   /**

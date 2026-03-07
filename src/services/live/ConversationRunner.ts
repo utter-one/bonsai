@@ -325,7 +325,7 @@ export class ConversationRunner {
         });
 
         asrProvider.setOnRecognized(async (chunkId, text) => {
-          logger.info({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}: "${text}"`);
+          logger.debug({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}`);
 
           // Send final recognition result to client through WebSocket if enabled
           if (this.session.sessionSettings.receiveTranscriptionUpdates) {
@@ -355,7 +355,7 @@ export class ConversationRunner {
           const fullText = allTextChunks.map(chunk => chunk.text).join(' ').trim();
 
           if (fullText) {
-            logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
+            logger.debug({ conversationId, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}`);
             const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [/** TODO */], fullText, fullText);
             context.userInputSource = 'voice';
             await this.processUserInput(fullText, 'voice');
@@ -399,24 +399,27 @@ export class ConversationRunner {
           firstTtsChunkGenerated = false;
           isGenerating = false;
 
+          // Snapshot turn data before any awaits to avoid reading mutated values
+          const { startMs, assistantMessageEventId, outputTurnId } = this.turnData;
+
           // Record total turn duration now that all audio has been sent
-          const totalTurnDurationMs = this.turnData.startMs !== null ? Date.now() - this.turnData.startMs : undefined;
-          if (totalTurnDurationMs !== undefined && this.turnData.assistantMessageEventId) {
-            await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, this.turnData.assistantMessageEventId, { totalTurnDurationMs });
+          const totalTurnDurationMs = startMs !== null ? Date.now() - startMs : undefined;
+          if (totalTurnDurationMs !== undefined && assistantMessageEventId) {
+            await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, { totalTurnDurationMs });
           }
 
           // Send AI response end notification to client through WebSocket
           const message = {
             type: 'end_ai_generation_output',
             conversationId,
-            outputTurnId: this.turnData.outputTurnId,
+            outputTurnId: outputTurnId,
             sessionId: this.session.id,
             requestId: null,
             fullText: this.stageData.lastCompletionResult?.content || '' // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
           } as EndAiGenerationOutputMessage;
           this.ws.send(JSON.stringify(message));
 
-          this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
+          await this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
         });
 
         ttsProvider.setOnSpeechGenerating(async (chunk) => {
@@ -753,10 +756,44 @@ export class ConversationRunner {
   }
 
   /**
+   * Releases all ASR, TTS, and LLM provider resources held by this runner.
+   * Must be called when the associated WebSocket connection closes so that sockets,
+   * HTTP streams, and SDK sessions are properly torn down and do not leak.
+   */
+  async cleanup(): Promise<void> {
+    const conversationId = this.stageData?.conversation?.id ?? 'unknown';
+    logger.info({ conversationId }, 'Cleaning up ConversationRunner resources');
+
+    const cleanupProvider = async (provider: { cleanup(): Promise<void> } | undefined, label: string) => {
+      if (!provider) return;
+      try {
+        await provider.cleanup();
+      } catch (error) {
+        logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to clean up ${label} for conversation ${conversationId}`);
+      }
+    };
+
+    if (this.stageData) {
+      await cleanupProvider(this.stageData.asrProvider, 'ASR provider');
+      await cleanupProvider(this.stageData.ttsProvider, 'TTS provider');
+      await cleanupProvider(this.stageData.completionLlmProvider, 'completion LLM provider');
+      await cleanupProvider(this.stageData.fillerLlmProvider, 'filler LLM provider');
+      for (const classifierData of this.stageData.classifiers) {
+        await cleanupProvider(classifierData.llmProvider, `classifier LLM provider (${classifierData.classifier.id})`);
+      }
+      for (const transformerData of this.stageData.transformers) {
+        await cleanupProvider(transformerData.llmProvider, `transformer LLM provider (${transformerData.transformer.id})`);
+      }
+    }
+
+    logger.info({ conversationId }, 'ConversationRunner cleanup complete');
+  }
+
+  /**
    * Navigate to a specific stage in the conversation
    * @param stageId - ID of the stage to navigate to
    */
-  async goToStage(stageId: string): Promise<void> {
+  async goToStage(stageId: string, isProcessingUserInput: boolean = false): Promise<void> {
     // Track nesting depth so only the outermost goToStage call resets the per-turn response guard.
     // This prevents chained on_enter stage jumps from each generating their own response.
     const isTopLevel = this.navigationDepth === 0;
@@ -768,7 +805,10 @@ export class ConversationRunner {
     try {
     logger.info({ conversationId: this.conversation.id, currentStageId: this.stageData.id, targetStageId: stageId }, `Navigating to stage ${stageId}`);
 
-    if (this.conversation.status !== 'awaiting_user_input' && this.conversation.status !== 'processing_user_input') {
+    const allowed = isProcessingUserInput
+      ? this.conversation.status === 'awaiting_user_input' || this.conversation.status === 'processing_user_input'
+      : this.conversation.status === 'awaiting_user_input';
+    if (!allowed) {
       throw new Error(`Cannot navigate to stage in current state: ${this.conversation.status}`);
     }
 
@@ -860,7 +900,7 @@ export class ConversationRunner {
         shouldEndConversation: false,
         shouldGenerateResponse: true
       };
-      this.generateResponse(context, executionOutcome);
+      await this.generateResponse(context, executionOutcome);
     } else {
       await this.changeState('awaiting_user_input');
     }
@@ -886,7 +926,7 @@ export class ConversationRunner {
     }
 
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName }, `Setting variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Setting variable ${variableName}`);
 
     // Initialize stageVars if it doesn't exist
     if (!this.conversation.stageVars) {
@@ -908,7 +948,7 @@ export class ConversationRunner {
       .set({ stageVars: this.conversation.stageVars, updatedAt: new Date() })
       .where(eq(conversations.id, this.conversation.id));
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName }, `Successfully set variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Successfully set variable ${variableName}`);
   }
 
   /**
@@ -922,11 +962,11 @@ export class ConversationRunner {
       throw new Error(`Stage ID mismatch: expected ${this.stageData.id}, got ${stageId}`);
     }
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName }, `Getting variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Getting variable ${variableName}`);
 
     const value = this.conversation.stageVars?.[stageId]?.[variableName];
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName, hasValue: value !== undefined }, `Retrieved variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName, hasValue: value !== undefined }, `Retrieved variable ${variableName}`);
 
     return value;
   }
@@ -941,11 +981,11 @@ export class ConversationRunner {
       throw new Error(`Stage ID mismatch: expected ${this.stageData.id}, got ${stageId}`);
     }
 
-    logger.info({ conversationId: this.conversation.id, stageId }, `Getting all variables`);
+    logger.debug({ conversationId: this.conversation.id, stageId }, `Getting all variables`);
 
     const variables = this.conversation.stageVars?.[stageId] || {};
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableCount: Object.keys(variables).length }, `Retrieved all variables`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableCount: Object.keys(variables).length }, `Retrieved all variables`);
 
     return variables;
   }
@@ -1046,7 +1086,7 @@ export class ConversationRunner {
     const actionToExecute = stageAction || globalAction;
     logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
     const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionName, actionToExecute, parameters);
-    logger.info({ context }, `Built context for action ${actionName}`);
+    logger.debug({ conversationId: this.conversation.id, actionName }, `Built context for action ${actionName}`);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
 
     // Save/send tool call events from action execution
@@ -1156,7 +1196,7 @@ export class ConversationRunner {
     // Apply stage navigation if specified
     if (outcome.goToStageId && outcome.goToStageId !== this.stageData.id) {
       logger.info({ conversationId, currentStageId: this.stageData.id, targetStageId: outcome.goToStageId }, `Applying stage navigation`);
-      await this.goToStage(outcome.goToStageId);
+      await this.goToStage(outcome.goToStageId, true);
     }
 
     if (outcome.shouldAbortConversation) {

@@ -139,6 +139,17 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   }
 
   /**
+   * Releases all resources held by the provider.
+   * Subclasses can override this to perform provider-specific cleanup.
+   */
+  async cleanup(): Promise<void> {
+    this.onChunkCallback = undefined;
+    this.onGenerationCompletedCallback = undefined;
+    this.onGenerationStartedCallback = undefined;
+    this.onErrorCallback = undefined;
+  }
+
+  /**
    * Ensure provider is initialized before operations
    */
   protected ensureInitialized(): void {

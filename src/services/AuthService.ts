@@ -113,7 +113,7 @@ export class AuthService {
       return {
         accessToken,
         refreshToken,
-        expiresIn: 900, // 15 minutes in seconds
+        expiresIn: this.jwtTimeToSeconds(ACCESS_TOKEN_EXPIRY),
         operatorId: operator.id,
         name: operator.name,
         roles: operator.roles,
@@ -161,7 +161,7 @@ export class AuthService {
 
       return {
         accessToken: newAccessToken,
-        expiresIn: 900, // 15 minutes in seconds
+        expiresIn: this.jwtTimeToSeconds(ACCESS_TOKEN_EXPIRY),
       };
     } catch (error) {
       if (error instanceof jwt.JsonWebTokenError) {
@@ -177,6 +177,27 @@ export class AuthService {
       }
       logger.error({ error }, 'Refresh failed');
       throw new UnauthorizedError('Token refresh failed');
+    }
+  }
+
+  private jwtTimeToSeconds(time: string): number {
+    const match = time.match(/^(\d+)([smhd])$/);
+    if (!match) {
+      throw new InvalidOperationError(`Invalid time format: ${time}`);
+    }
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    switch (unit) {
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 3600;
+      case 'd':
+        return value * 86400;
+      default:
+        throw new InvalidOperationError(`Unsupported time unit: ${unit}`);
     }
   }
 }

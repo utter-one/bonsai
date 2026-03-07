@@ -101,4 +101,10 @@ export interface IAsrProvider {
    * @returns Array of all recognized text chunks with their metadata
    */
   getAllTextChunks(): TextChunk[];
+
+  /**
+   * Releases all resources held by the provider.
+   * Must be called when the provider is no longer needed (e.g. on client disconnect).
+   */
+  cleanup(): Promise<void>;
 }
