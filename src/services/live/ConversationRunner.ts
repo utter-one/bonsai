@@ -325,7 +325,7 @@ export class ConversationRunner {
         });
 
         asrProvider.setOnRecognized(async (chunkId, text) => {
-          logger.info({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}: "${text}"`);
+          logger.debug({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}`);
 
           // Send final recognition result to client through WebSocket if enabled
           if (this.session.sessionSettings.receiveTranscriptionUpdates) {
@@ -355,7 +355,7 @@ export class ConversationRunner {
           const fullText = allTextChunks.map(chunk => chunk.text).join(' ').trim();
 
           if (fullText) {
-            logger.info({ conversationId, recognizedText: fullText, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}: "${fullText}"`);
+            logger.debug({ conversationId, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}`);
             const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [/** TODO */], fullText, fullText);
             context.userInputSource = 'voice';
             await this.processUserInput(fullText, 'voice');
@@ -926,7 +926,7 @@ export class ConversationRunner {
     }
 
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName }, `Setting variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Setting variable ${variableName}`);
 
     // Initialize stageVars if it doesn't exist
     if (!this.conversation.stageVars) {
@@ -948,7 +948,7 @@ export class ConversationRunner {
       .set({ stageVars: this.conversation.stageVars, updatedAt: new Date() })
       .where(eq(conversations.id, this.conversation.id));
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName }, `Successfully set variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Successfully set variable ${variableName}`);
   }
 
   /**
@@ -962,11 +962,11 @@ export class ConversationRunner {
       throw new Error(`Stage ID mismatch: expected ${this.stageData.id}, got ${stageId}`);
     }
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName }, `Getting variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Getting variable ${variableName}`);
 
     const value = this.conversation.stageVars?.[stageId]?.[variableName];
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableName, hasValue: value !== undefined }, `Retrieved variable ${variableName}`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableName, hasValue: value !== undefined }, `Retrieved variable ${variableName}`);
 
     return value;
   }
@@ -981,11 +981,11 @@ export class ConversationRunner {
       throw new Error(`Stage ID mismatch: expected ${this.stageData.id}, got ${stageId}`);
     }
 
-    logger.info({ conversationId: this.conversation.id, stageId }, `Getting all variables`);
+    logger.debug({ conversationId: this.conversation.id, stageId }, `Getting all variables`);
 
     const variables = this.conversation.stageVars?.[stageId] || {};
 
-    logger.info({ conversationId: this.conversation.id, stageId, variableCount: Object.keys(variables).length }, `Retrieved all variables`);
+    logger.debug({ conversationId: this.conversation.id, stageId, variableCount: Object.keys(variables).length }, `Retrieved all variables`);
 
     return variables;
   }
@@ -1086,7 +1086,7 @@ export class ConversationRunner {
     const actionToExecute = stageAction || globalAction;
     logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
     const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionName, actionToExecute, parameters);
-    logger.info({ context }, `Built context for action ${actionName}`);
+    logger.debug({ conversationId: this.conversation.id, actionName }, `Built context for action ${actionName}`);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
 
     // Save/send tool call events from action execution

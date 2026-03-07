@@ -54,7 +54,7 @@ export class ToolExecutor {
       const actualContext = { ...context, tool: { parameters } };
       await llmProvider.init();
       const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);
-      logger.info({ toolId: tool.id, renderedPrompt, actualContext }, `Rendered prompt for tool "${tool.name}"`);
+      logger.debug({ toolId: tool.id, renderedPrompt }, `Rendered prompt for tool "${tool.name}"`);
 
       const messages: LlmMessage[] = [
         {
