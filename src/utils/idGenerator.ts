@@ -1,3 +1,5 @@
+import { v7 as uuidv7 } from 'uuid';
+
 /**
  * Entity type prefixes for ID generation
  */
@@ -30,15 +32,19 @@ export const ID_PREFIXES = {
 type EntityPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];
 
 /**
- * Generates a unique ID with a timestamp and random component
- * Format: {prefix}_{timestamp}_{random}
- * Example: proj_1737980123456_abc123def
- * 
+ * Generates a unique, time-sortable ID using UUIDv7.
+ *
+ * UUIDv7 embeds a millisecond-precision Unix timestamp in the most-significant
+ * bits and fills the remainder with cryptographically secure random bytes
+ * (`crypto.getRandomValues`), providing both natural sort order and
+ * collision resistance.
+ *
+ * Format: {prefix}_{uuidv7}
+ * Example: proj_019cc9b7-bf52-7577-a915-25c17a83c4e6
+ *
  * @param prefix - Entity type prefix (e.g., 'proj', 'conv', 'audit')
  * @returns Generated unique ID string
  */
 export function generateId(prefix: EntityPrefix | string): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 9);
-  return `${prefix}_${timestamp}_${random}`;
+  return `${prefix}_${uuidv7()}`;
 }
