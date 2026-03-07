@@ -399,24 +399,27 @@ export class ConversationRunner {
           firstTtsChunkGenerated = false;
           isGenerating = false;
 
+          // Snapshot turn data before any awaits to avoid reading mutated values
+          const { startMs, assistantMessageEventId, outputTurnId } = this.turnData;
+
           // Record total turn duration now that all audio has been sent
-          const totalTurnDurationMs = this.turnData.startMs !== null ? Date.now() - this.turnData.startMs : undefined;
-          if (totalTurnDurationMs !== undefined && this.turnData.assistantMessageEventId) {
-            await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, this.turnData.assistantMessageEventId, { totalTurnDurationMs });
+          const totalTurnDurationMs = startMs !== null ? Date.now() - startMs : undefined;
+          if (totalTurnDurationMs !== undefined && assistantMessageEventId) {
+            await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, { totalTurnDurationMs });
           }
 
           // Send AI response end notification to client through WebSocket
           const message = {
             type: 'end_ai_generation_output',
             conversationId,
-            outputTurnId: this.turnData.outputTurnId,
+            outputTurnId: outputTurnId,
             sessionId: this.session.id,
             requestId: null,
             fullText: this.stageData.lastCompletionResult?.content || '' // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
           } as EndAiGenerationOutputMessage;
           this.ws.send(JSON.stringify(message));
 
-          this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
+          await this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
         });
 
         ttsProvider.setOnSpeechGenerating(async (chunk) => {
@@ -790,7 +793,7 @@ export class ConversationRunner {
    * Navigate to a specific stage in the conversation
    * @param stageId - ID of the stage to navigate to
    */
-  async goToStage(stageId: string): Promise<void> {
+  async goToStage(stageId: string, isProcessingUserInput: boolean = false): Promise<void> {
     // Track nesting depth so only the outermost goToStage call resets the per-turn response guard.
     // This prevents chained on_enter stage jumps from each generating their own response.
     const isTopLevel = this.navigationDepth === 0;
@@ -802,7 +805,10 @@ export class ConversationRunner {
     try {
     logger.info({ conversationId: this.conversation.id, currentStageId: this.stageData.id, targetStageId: stageId }, `Navigating to stage ${stageId}`);
 
-    if (this.conversation.status !== 'awaiting_user_input' && this.conversation.status !== 'processing_user_input') {
+    const allowed = isProcessingUserInput
+      ? this.conversation.status === 'awaiting_user_input' || this.conversation.status === 'processing_user_input'
+      : this.conversation.status === 'awaiting_user_input';
+    if (!allowed) {
       throw new Error(`Cannot navigate to stage in current state: ${this.conversation.status}`);
     }
 
@@ -894,7 +900,7 @@ export class ConversationRunner {
         shouldEndConversation: false,
         shouldGenerateResponse: true
       };
-      this.generateResponse(context, executionOutcome);
+      await this.generateResponse(context, executionOutcome);
     } else {
       await this.changeState('awaiting_user_input');
     }
@@ -1190,7 +1196,7 @@ export class ConversationRunner {
     // Apply stage navigation if specified
     if (outcome.goToStageId && outcome.goToStageId !== this.stageData.id) {
       logger.info({ conversationId, currentStageId: this.stageData.id, targetStageId: outcome.goToStageId }, `Applying stage navigation`);
-      await this.goToStage(outcome.goToStageId);
+      await this.goToStage(outcome.goToStageId, true);
     }
 
     if (outcome.shouldAbortConversation) {
