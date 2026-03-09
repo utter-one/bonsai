@@ -4,6 +4,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
 import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+import type { LlmModelInfo } from '../ProviderCatalogService';
 
 extendZodWithOpenApi(z);
 
@@ -276,6 +277,53 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
       await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
       throw error;
     }
+  }
+
+  /**
+   * Enumerate available models using the Anthropic models API.
+   * Falls back to a static list of well-known Claude models if the API call fails or the client is not yet initialized.
+   */
+  async enumerateModels(): Promise<LlmModelInfo[]> {
+    if (this.client) {
+      try {
+        const page = await this.client.models.list();
+        if (page.data.length > 0) {
+          return page.data.map(m => AnthropicLlmProvider.mapModelToInfo(m.id, m.display_name));
+        }
+      } catch (error) {
+        logger.warn(`Failed to enumerate Anthropic models via API: ${error instanceof Error ? error.message : String(error)}, using static list`);
+      }
+    }
+    return AnthropicLlmProvider.getStaticModels();
+  }
+
+  private static mapModelToInfo(id: string, displayName: string): LlmModelInfo {
+    const isOpus = id.includes('opus');
+    const supportsReasoning = isOpus || id.includes('-4-') || /claude-[4-9]/.test(id);
+    return {
+      id,
+      displayName,
+      supportsToolCalling: true,
+      supportsJsonOutput: true,
+      supportsStreaming: true,
+      supportsVision: true,
+      supportsReasoning,
+    };
+  }
+
+  private static getStaticModels(): LlmModelInfo[] {
+    return [
+      // Claude 4.6 series (latest)
+      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', recommended: true, description: 'Most intelligent model for building agents and coding', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 200000 },
+      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', description: 'Best combination of speed and intelligence', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 200000 },
+      // Claude 4.5 series
+      { id: 'claude-haiku-4-5', displayName: 'Claude Haiku 4.5', description: 'Fastest model with near-frontier intelligence', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 200000 },
+      { id: 'claude-sonnet-4-5', displayName: 'Claude Sonnet 4.5', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 200000 },
+      // Claude 3.5 series (legacy)
+      { id: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5 Sonnet', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 200000 },
+      { id: 'claude-3-5-haiku-20241022', displayName: 'Claude 3.5 Haiku', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 200000 },
+      { id: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 200000 },
+    ];
   }
 
   /**

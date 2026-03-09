@@ -5,6 +5,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
 import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+import type { LlmModelInfo } from '../ProviderCatalogService';
 
 extendZodWithOpenApi(z);
 
@@ -282,6 +283,46 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
       await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
       throw error;
     }
+  }
+
+  /**
+   * Enumerate available models using the OpenAI models API.
+   * Useful for OpenAI-compatible APIs (e.g. Groq) that expose their own model list.
+   * Falls back to a static list of well-known OpenAI models if the API call fails or the client is not yet initialized.
+   */
+  async enumerateModels(): Promise<LlmModelInfo[]> {
+    if (this.client) {
+      try {
+        const page = await this.client.models.list();
+        if (page.data.length > 0) {
+          const chatModels = page.data.filter(m => /^(gpt-|o\d|chatgpt-|llama|mixtral|gemma|deepseek|qwen|mistral)/.test(m.id));
+          const modelsToReturn = chatModels.length > 0 ? chatModels : page.data;
+          return modelsToReturn.map(m => ({ id: m.id, displayName: m.id, supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true }));
+        }
+      } catch (error) {
+        logger.warn(`Failed to enumerate OpenAI-compatible models via API: ${error instanceof Error ? error.message : String(error)}, using static list`);
+      }
+    }
+    return OpenAILegacyLlmProvider.getStaticModels();
+  }
+
+  private static getStaticModels(): LlmModelInfo[] {
+    return [
+      // GPT-5 series
+      { id: 'gpt-5.4', displayName: 'GPT-5.4', recommended: true, description: 'Most capable model for professional work', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1050000 },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', description: 'Faster, cost-efficient version of GPT-5', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 400000 },
+      { id: 'gpt-5', displayName: 'GPT-5', description: 'Previous flagship reasoning model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 200000 },
+      // GPT-4.1 series (non-reasoning, 1M context)
+      { id: 'gpt-4.1', displayName: 'GPT-4.1', description: 'Smartest non-reasoning model with 1M context', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 1047576 },
+      { id: 'gpt-4.1-mini', displayName: 'GPT-4.1 Mini', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 1047576 },
+      // GPT-4o series
+      { id: 'gpt-4o', displayName: 'GPT-4o', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      { id: 'gpt-4o-mini', displayName: 'GPT-4o Mini', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      // Legacy
+      { id: 'gpt-4-turbo', displayName: 'GPT-4 Turbo', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      { id: 'gpt-4', displayName: 'GPT-4', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, contextWindow: 8192 },
+      { id: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, contextWindow: 16385 },
+    ];
   }
 
   /**

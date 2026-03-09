@@ -2,6 +2,7 @@ import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
 import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptions, LlmGenerationResult, LlmMessage } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
 import { log } from 'handlebars';
+import { LlmModelInfo } from '../ProviderCatalogService';
 
 /**
  * Abstract base class for LLM provider implementations
@@ -202,4 +203,10 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
       return msg.content.filter((c) => c.type === 'text').map((c) => (c as any).text).join(' ');
     }).join('\n');
   }
+
+  /**
+   * Enumerate available models from the provider, returning an array of model information.
+   * Must be implemented by subclasses to return provider-specific model details.
+   */
+   abstract enumerateModels(): Promise<LlmModelInfo[]>;
 }
