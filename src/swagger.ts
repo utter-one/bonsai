@@ -17,7 +17,7 @@ import { createContextTransformerSchema, updateContextTransformerBodySchema, del
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
-import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema } from './http/contracts/provider';
+import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
@@ -29,6 +29,15 @@ import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvi
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmSettingsSchema } from './services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmSettingsSchema } from './services/providers/llm/GeminiLlmProvider';
+import { groqLlmSettingsSchema } from './services/providers/llm/GroqLlmProvider';
+import { mistralLlmSettingsSchema } from './services/providers/llm/MistralLlmProvider';
+import { deepSeekLlmSettingsSchema } from './services/providers/llm/DeepSeekLlmProvider';
+import { openRouterLlmSettingsSchema } from './services/providers/llm/OpenRouterLlmProvider';
+import { togetherAILlmSettingsSchema } from './services/providers/llm/TogetherAILlmProvider';
+import { fireworksAILlmSettingsSchema } from './services/providers/llm/FireworksAILlmProvider';
+import { perplexityLlmSettingsSchema } from './services/providers/llm/PerplexityLlmProvider';
+import { cohereLlmSettingsSchema } from './services/providers/llm/CohereLlmProvider';
+import { xAILlmSettingsSchema } from './services/providers/llm/XAILlmProvider';
 import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from './services/providers/tts/DeepgramTtsProvider';
@@ -94,6 +103,15 @@ export function getOpenAPISpec(): any {
   registry.register('OpenAILegacyLlmSettings', openAILegacyLlmSettingsSchema);
   registry.register('AnthropicLlmSettings', anthropicLlmSettingsSchema);
   registry.register('GeminiLlmSettings', geminiLlmSettingsSchema);
+  registry.register('GroqLlmSettings', groqLlmSettingsSchema);
+  registry.register('MistralLlmSettings', mistralLlmSettingsSchema);
+  registry.register('DeepSeekLlmSettings', deepSeekLlmSettingsSchema);
+  registry.register('OpenRouterLlmSettings', openRouterLlmSettingsSchema);
+  registry.register('TogetherAILlmSettings', togetherAILlmSettingsSchema);
+  registry.register('FireworksAILlmSettings', fireworksAILlmSettingsSchema);
+  registry.register('PerplexityLlmSettings', perplexityLlmSettingsSchema);
+  registry.register('CohereLlmSettings', cohereLlmSettingsSchema);
+  registry.register('XAILlmSettings', xAILlmSettingsSchema);
   registry.register('LlmSettings', llmSettingsSchema);
 
   // TTS settings schemas (provider-specific)
@@ -225,6 +243,7 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteProviderRequest', deleteProviderBodySchema);
   registry.register('ProviderResponse', providerResponseSchema);
   registry.register('ProviderListResponse', providerListResponseSchema);
+  registry.register('ProviderModelsResponse', providerModelsResponseSchema);
   // Register reusable sub-schemas first for proper $ref resolution
   registry.register('AsrModelInfo', asrModelInfoSchema);
   registry.register('LlmModelInfo', llmModelInfoSchema);

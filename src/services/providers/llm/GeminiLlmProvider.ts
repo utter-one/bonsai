@@ -4,6 +4,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
 import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+import type { LlmModelInfo } from '../ProviderCatalogService';
 
 extendZodWithOpenApi(z);
 
@@ -415,6 +416,58 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
       await this.notifyError(error instanceof Error ? error : new Error(errorMessage));
       throw error;
     }
+  }
+
+  /**
+   * Enumerate available models using the Google AI models API.
+   * Falls back to a static list of well-known Gemini models if the API call fails or the client is not yet initialized.
+   */
+  async enumerateModels(): Promise<LlmModelInfo[]> {
+    if (this.client) {
+      try {
+        const pager = await this.client.models.list();
+        const models: LlmModelInfo[] = [];
+        for await (const model of pager) {
+          const id = (model.name ?? '').replace(/^models\//, '');
+          if (!id || !id.startsWith('gemini-')) continue;
+          models.push(GeminiLlmProvider.mapModelToInfo(id, model.displayName ?? id, model.description, model.inputTokenLimit));
+        }
+        if (models.length > 0) return models;
+      } catch (error) {
+        logger.warn(`Failed to enumerate Gemini models via API: ${error instanceof Error ? error.message : String(error)}, using static list`);
+      }
+    }
+    return GeminiLlmProvider.getStaticModels();
+  }
+
+  private static mapModelToInfo(id: string, displayName: string, description?: string, contextWindow?: number): LlmModelInfo {
+    const supportsReasoning = id.includes('2.5') || id.includes('3.') || id.includes('pro');
+    return {
+      id,
+      displayName,
+      description,
+      supportsToolCalling: true,
+      supportsJsonOutput: true,
+      supportsStreaming: true,
+      supportsVision: true,
+      supportsReasoning,
+      contextWindow,
+    };
+  }
+
+  private static getStaticModels(): LlmModelInfo[] {
+    return [
+      // Gemini 3 series (preview, frontier)
+      { id: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro Preview', recommended: true, description: 'Advanced intelligence with complex problem-solving and agentic capabilities', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1048576 },
+      { id: 'gemini-3-flash-preview', displayName: 'Gemini 3 Flash Preview', description: 'Frontier-class performance for multimodal understanding and agentic tasks', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1048576 },
+      { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash-Lite Preview', description: 'Frontier-class performance at a fraction of the cost', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1048576 },
+      // Gemini 2.5 series (stable)
+      { id: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', description: 'Most advanced stable model for complex tasks with deep reasoning', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1048576 },
+      { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', description: 'Best price-performance model for low-latency, high-volume tasks', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1048576 },
+      { id: 'gemini-2.5-flash-lite', displayName: 'Gemini 2.5 Flash-Lite', description: 'Most cost-efficient multimodal model for high-frequency lightweight tasks', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1048576 },
+      // Gemini 2.0 series (deprecated but accessible)
+      { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash', description: 'Second generation workhorse model (deprecated, migrate to 2.5)', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 1048576 },
+    ];
   }
 
   /**

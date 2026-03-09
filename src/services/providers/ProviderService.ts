@@ -7,7 +7,7 @@ import type { CreateProviderRequest, UpdateProviderRequest, ProviderResponse, Pr
 import type { ListParams } from '../../http/contracts/common';
 import { providerResponseSchema, providerListResponseSchema } from '../../http/contracts/provider';
 import { AuditService } from '../AuditService';
-import { OptimisticLockError, NotFoundError } from '../../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError } from '../../errors';
 import { buildFilterCondition, buildOrderBy } from '../../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../../utils/pagination';
 import { logger } from '../../utils/logger';
@@ -15,13 +15,18 @@ import { BaseService } from '../BaseService';
 import type { RequestContext } from '../RequestContext';
 import { PERMISSIONS } from '../../permissions';
 import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
+import { LlmProviderFactory } from './llm/LlmProviderFactory';
+import type { LlmModelInfo } from './ProviderCatalogService';
 
 /**
  * Service for managing provider configurations with full CRUD operations and audit logging
  */
 @injectable()
 export class ProviderService extends BaseService {
-  constructor(@inject(AuditService) private readonly auditService: AuditService) {
+  constructor(
+    @inject(AuditService) private readonly auditService: AuditService,
+    @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
+  ) {
     super();
   }
 
@@ -245,6 +250,38 @@ export class ProviderService extends BaseService {
     } catch (error) {
       logger.error({ error, providerId: id }, 'Failed to delete provider');
       throw error;
+    }
+  }
+
+  /**
+   * Enumerates available models for a configured LLM provider by calling its API.
+   * Falls back to static model lists when the provider API is unavailable.
+   * @param id - The unique identifier of the provider
+   * @param context - Request context for authorization
+   * @returns Array of available LLM models
+   * @throws {NotFoundError} When provider is not found
+   * @throws {InvalidOperationError} When provider is not an LLM provider
+   */
+  async enumerateModels(id: string, context: RequestContext): Promise<LlmModelInfo[]> {
+    this.requirePermission(context, PERMISSIONS.PROVIDER_READ);
+    logger.debug({ providerId: id }, 'Enumerating models for provider');
+
+    const provider = await db.query.providers.findFirst({ where: eq(providers.id, id) });
+
+    if (!provider) {
+      throw new NotFoundError(`Provider with id ${id} not found`);
+    }
+
+    if (provider.providerType !== 'llm') {
+      throw new InvalidOperationError(`Provider ${id} is not an LLM provider (type: ${provider.providerType})`);
+    }
+
+    const instance = this.llmProviderFactory.createProviderForEnumeration(provider);
+    await instance.init();
+    try {
+      return await instance.enumerateModels();
+    } finally {
+      await instance.cleanup();
     }
   }
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
+import { LlmModelInfo } from '../ProviderCatalogService';
 
 /**
  * Represents the role of a message in a conversation
@@ -245,4 +246,9 @@ export interface ILlmProvider {
    * Must be called when the provider is no longer needed (e.g. on client disconnect).
    */
   cleanup(): Promise<void>;
+
+  /**
+   * Enumerate available models from the provider, returning an array of model information.
+   */
+  enumerateModels(): Promise<LlmModelInfo[]>;
 }

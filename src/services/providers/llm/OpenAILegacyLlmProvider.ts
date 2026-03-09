@@ -5,8 +5,17 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
 import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+import type { LlmModelInfo } from '../ProviderCatalogService';
 
 extendZodWithOpenApi(z);
+
+/**
+ * Minimal config shape required by all OpenAI-compatible providers
+ */
+export type OpenAICompatibleConfig = {
+  apiKey: string;
+  baseUrl?: string;
+};
 
 /**
  * Schema for OpenAI-specific configuration for legacy Chat Completions API
@@ -37,14 +46,29 @@ export type OpenAILegacyLlmSettings = z.infer<typeof openAILegacyLlmSettingsSche
  * OpenAI LLM provider implementation using the legacy Chat Completions API
  * Supports both streaming and non-streaming generation with multi-modal messages
  * Use this for compatibility with older models or OpenAI-compatible APIs
+ * @template TConfig - Provider-specific config type extending OpenAICompatibleConfig
  */
-export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProviderConfig> {
-  private client?: OpenAI;
-  private settings: OpenAILegacyLlmSettings;
+export class OpenAILegacyLlmProvider<TConfig extends OpenAICompatibleConfig = OpenAILegacyLlmProviderConfig> extends LlmProviderBase<TConfig> {
+  protected client?: OpenAI;
+  protected settings: OpenAILegacyLlmSettings;
 
-  constructor(config: OpenAILegacyLlmProviderConfig, settings: OpenAILegacyLlmSettings) {
+  constructor(config: TConfig, settings: OpenAILegacyLlmSettings) {
     super(config);
     this.settings = settings;
+  }
+
+  /**
+   * Creates the OpenAI client instance.
+   * Subclasses can override this to set provider-specific base URLs or options.
+   */
+  protected createClient(): OpenAI {
+    const cfg = this.config as OpenAILegacyLlmProviderConfig;
+    return new OpenAI({
+      apiKey: cfg.apiKey,
+      organization: cfg.organizationId,
+      baseURL: cfg.baseUrl,
+      timeout: this.settings.timeout,
+    });
   }
 
   /**
@@ -52,14 +76,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
    */
   async init(): Promise<void> {
     await super.init();
-
-    this.client = new OpenAI({
-      apiKey: this.config!.apiKey,
-      organization: this.config!.organizationId,
-      baseURL: this.config!.baseUrl,
-      timeout: this.settings.timeout,
-    });
-
+    this.client = this.createClient();
     logger.info(`OpenAI Legacy LLM provider initialized with model: ${this.settings.model}`);
   }
 
@@ -108,7 +125,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Generate an image-based response.
    */
-  private async generateImageBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async generateImageBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     // Placeholder for image-based response generation logic
     // This would involve calling the OpenAI API with appropriate parameters to generate an image and returning the result in the expected format
     throw new Error('Image-based response generation not supported');
@@ -117,7 +134,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Generate an audio-based response.
    */
-  private async generateAudioBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async generateAudioBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     // Placeholder for audio-based response generation logic
     // This would involve calling the OpenAI API with appropriate parameters to generate audio and returning the result in the expected format
     throw new Error('Audio-based response generation not supported');
@@ -126,7 +143,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Generate a text-based response and handle JSON output verification for JSON output format.
    */
-  private async generateTextBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async generateTextBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     if (!this.client) {
       throw new Error('OpenAI client not initialized');
     }
@@ -134,7 +151,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
     const completion = await this.client.chat.completions.create({
       model: this.settings.model,
       messages: openAIMessages,
-      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens ?? 4096,
       temperature: this.settings.defaultTemperature,
       top_p: this.settings.defaultTopP,
       //stop: this.settings.stopSequences,
@@ -209,7 +226,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
       const stream = await this.client.chat.completions.create({
         model: this.settings.model,
         messages: openAIMessages,
-        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens ?? 4096,
         temperature: this.settings.defaultTemperature,
         top_p: this.settings.defaultTopP,
         //stop: options?.stopSequences ?? this.settings.stopSequences,
@@ -285,9 +302,49 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   }
 
   /**
+   * Enumerate available models using the OpenAI models API.
+   * Useful for OpenAI-compatible APIs (e.g. Groq) that expose their own model list.
+   * Falls back to a static list of well-known OpenAI models if the API call fails or the client is not yet initialized.
+   */
+  async enumerateModels(): Promise<LlmModelInfo[]> {
+    if (this.client) {
+      try {
+        const page = await this.client.models.list();
+        if (page.data.length > 0) {
+          const chatModels = page.data.filter(m => /^(gpt-|o\d|chatgpt-|llama|mixtral|gemma|deepseek|qwen|mistral)/.test(m.id));
+          const modelsToReturn = chatModels.length > 0 ? chatModels : page.data;
+          return modelsToReturn.map(m => ({ id: m.id, displayName: m.id, supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true }));
+        }
+      } catch (error) {
+        logger.warn(`Failed to enumerate OpenAI-compatible models via API: ${error instanceof Error ? error.message : String(error)}, using static list`);
+      }
+    }
+    return OpenAILegacyLlmProvider.getStaticModels();
+  }
+
+  protected static getStaticModels(): LlmModelInfo[] {
+    return [
+      // GPT-5 series
+      { id: 'gpt-5.4', displayName: 'GPT-5.4', recommended: true, description: 'Most capable model for professional work', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1050000 },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', description: 'Faster, cost-efficient version of GPT-5', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 400000 },
+      { id: 'gpt-5', displayName: 'GPT-5', description: 'Previous flagship reasoning model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 200000 },
+      // GPT-4.1 series (non-reasoning, 1M context)
+      { id: 'gpt-4.1', displayName: 'GPT-4.1', description: 'Smartest non-reasoning model with 1M context', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 1047576 },
+      { id: 'gpt-4.1-mini', displayName: 'GPT-4.1 Mini', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 1047576 },
+      // GPT-4o series
+      { id: 'gpt-4o', displayName: 'GPT-4o', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      { id: 'gpt-4o-mini', displayName: 'GPT-4o Mini', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      // Legacy
+      { id: 'gpt-4-turbo', displayName: 'GPT-4 Turbo', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      { id: 'gpt-4', displayName: 'GPT-4', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, contextWindow: 8192 },
+      { id: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, contextWindow: 16385 },
+    ];
+  }
+
+  /**
    * Convert our message format to OpenAI Chat Completions format
    */
-  private convertToOpenAIMessages(messages: LlmMessage[]): ChatCompletionMessageParam[] {
+  protected convertToOpenAIMessages(messages: LlmMessage[]): ChatCompletionMessageParam[] {
     return messages.map((msg) => {
       // Simple text message
       if (typeof msg.content === 'string') {
@@ -352,7 +409,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Map OpenAI's finish reason to our format
    */
-  private mapFinishReason(reason: string | null): 'stop' | 'length' | 'tool_calls' | 'content_filter' {
+  protected mapFinishReason(reason: string | null): 'stop' | 'length' | 'tool_calls' | 'content_filter' {
     switch (reason) {
       case 'stop':
         return 'stop';

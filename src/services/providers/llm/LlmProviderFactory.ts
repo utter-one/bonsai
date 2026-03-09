@@ -6,21 +6,30 @@ import { OpenAILlmProvider, OpenAILlmProviderConfig, openAILlmProviderConfigSche
 import { OpenAILegacyLlmProvider, OpenAILegacyLlmProviderConfig, openAILegacyLlmProviderConfigSchema, OpenAILegacyLlmSettings } from './OpenAILegacyLlmProvider';
 import { AnthropicLlmProvider, AnthropicLlmProviderConfig, anthropicLlmProviderConfigSchema, AnthropicLlmSettings } from './AnthropicLlmProvider';
 import { GeminiLlmProvider, GeminiLlmProviderConfig, geminiLlmProviderConfigSchema, GeminiLlmSettings } from './GeminiLlmProvider';
+import { GroqLlmProvider, GroqLlmProviderConfig, groqLlmProviderConfigSchema, GroqLlmSettings } from './GroqLlmProvider';
+import { MistralLlmProvider, MistralLlmProviderConfig, mistralLlmProviderConfigSchema, MistralLlmSettings } from './MistralLlmProvider';
+import { DeepSeekLlmProvider, DeepSeekLlmProviderConfig, deepSeekLlmProviderConfigSchema, DeepSeekLlmSettings } from './DeepSeekLlmProvider';
+import { OpenRouterLlmProvider, OpenRouterLlmProviderConfig, openRouterLlmProviderConfigSchema, OpenRouterLlmSettings } from './OpenRouterLlmProvider';
+import { TogetherAILlmProvider, TogetherAILlmProviderConfig, togetherAILlmProviderConfigSchema, TogetherAILlmSettings } from './TogetherAILlmProvider';
+import { FireworksAILlmProvider, FireworksAILlmProviderConfig, fireworksAILlmProviderConfigSchema, FireworksAILlmSettings } from './FireworksAILlmProvider';
+import { PerplexityLlmProvider, PerplexityLlmProviderConfig, perplexityLlmProviderConfigSchema, PerplexityLlmSettings } from './PerplexityLlmProvider';
+import { CohereLlmProvider, CohereLlmProviderConfig, cohereLlmProviderConfigSchema, CohereLlmSettings } from './CohereLlmProvider';
+import { XAILlmProvider, XAILlmProviderConfig, xAILlmProviderConfigSchema, XAILlmSettings } from './XAILlmProvider';
 
 /**
  * Supported LLM provider API types
  */
-export type LlmProviderApiType = 'openai' | 'openai-legacy' | 'anthropic' | 'gemini' | 'groq' | 'vertex';
+export type LlmProviderApiType = 'openai' | 'openai-legacy' | 'anthropic' | 'gemini' | 'groq' | 'mistral' | 'deepseek' | 'openrouter' | 'together-ai' | 'fireworks-ai' | 'perplexity' | 'cohere' | 'xai';
 
 /**
  * Union type for all LLM provider settings
  */
-export type LlmSettings = OpenAILlmSettings | OpenAILegacyLlmSettings | AnthropicLlmSettings | GeminiLlmSettings;
+export type LlmSettings = OpenAILlmSettings | OpenAILegacyLlmSettings | AnthropicLlmSettings | GeminiLlmSettings | GroqLlmSettings | MistralLlmSettings | DeepSeekLlmSettings | OpenRouterLlmSettings | TogetherAILlmSettings | FireworksAILlmSettings | PerplexityLlmSettings | CohereLlmSettings | XAILlmSettings;
 
 /**
  * Union type for all LLM provider configurations
  */
-export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProviderConfig | AnthropicLlmProviderConfig | GeminiLlmProviderConfig;
+export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProviderConfig | AnthropicLlmProviderConfig | GeminiLlmProviderConfig | GroqLlmProviderConfig | MistralLlmProviderConfig | DeepSeekLlmProviderConfig | OpenRouterLlmProviderConfig | TogetherAILlmProviderConfig | FireworksAILlmProviderConfig | PerplexityLlmProviderConfig | CohereLlmProviderConfig | XAILlmProviderConfig;
 
 /**
  * Factory service for creating LLM provider instances based on provider entity configuration
@@ -31,127 +40,99 @@ export class LlmProviderFactory {
   /**
    * Creates an LLM provider instance from a provider entity
    * @param provider - Provider entity from database containing configuration
-   * @returns Configured LLM provider instance
-   * @throws {Error} When provider type is not 'llm' or when API type is not supported
+   * @param settings - LLM settings including the required model field
+   * @returns Configured and initialized LLM provider instance
+   * @throws {Error} When provider type is not 'llm', API type is not supported, or model is missing
    */
   createProvider(provider: Provider, settings: LlmSettings): ILlmProvider {
-    // Validate provider type
     if (provider.providerType !== 'llm') {
       const errorMessage = `Provider ${provider.id} is not an LLM provider. Expected providerType 'llm', got '${provider.providerType}'`;
       logger.error(errorMessage);
       throw new Error(errorMessage);
     }
 
-    // Create provider instance based on API type
+    if (!settings.model) {
+      const errorMessage = `Invalid LLM provider settings for provider ${provider.id}. Required field: model`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    logger.info(`Creating ${provider.apiType} LLM provider for provider ${provider.id} with model ${settings.model}`);
+    const instance = this.instantiateProvider(provider, settings);
+    instance.init();
+    return instance;
+  }
+
+  /**
+   * Creates an LLM provider instance with minimal/default settings for model enumeration purposes.
+   * The returned instance should only be used to call `enumerateModels()`, not for generation.
+   * @param provider - Provider entity from database containing configuration
+   * @returns LLM provider instance suitable for calling enumerateModels()
+   * @throws {Error} When provider type is not 'llm' or API type is not supported
+   */
+  createProviderForEnumeration(provider: Provider): ILlmProvider {
+    if (provider.providerType !== 'llm') {
+      const errorMessage = `Provider ${provider.id} is not an LLM provider. Expected providerType 'llm', got '${provider.providerType}'`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    return this.instantiateProvider(provider, { model: '' } as LlmSettings);
+  }
+
+  /**
+   * Parses provider config and instantiates the correct provider class without validation or init.
+   * @param provider - Provider entity
+   * @param settings - LLM settings (may have empty model for enumeration)
+   * @returns Uninitialised LLM provider instance
+   */
+  private instantiateProvider(provider: Provider, settings: LlmSettings): ILlmProvider {
     switch (provider.apiType) {
       case 'openai':
-        return this.createOpenAIProvider(provider, settings as OpenAILlmSettings);
+        return new OpenAILlmProvider(openAILlmProviderConfigSchema.parse(provider.config), settings as OpenAILlmSettings);
 
       case 'openai-legacy':
-      case 'groq': // Groq uses OpenAI-compatible API        
-        return this.createOpenAILegacyProvider(provider, settings as OpenAILegacyLlmSettings);
+        return new OpenAILegacyLlmProvider(openAILegacyLlmProviderConfigSchema.parse(provider.config), settings as OpenAILegacyLlmSettings);
 
       case 'anthropic':
-        return this.createAnthropicProvider(provider, settings as AnthropicLlmSettings);
+        return new AnthropicLlmProvider(anthropicLlmProviderConfigSchema.parse(provider.config), settings as AnthropicLlmSettings);
 
       case 'gemini':
-      case 'vertex': // Vertex AI uses Gemini API
-        return this.createGeminiProvider(provider, settings as GeminiLlmSettings);
-      default:
-        const errorMessage = `Unsupported LLM provider API type: ${provider.apiType}. Supported types: openai, openai-legacy, anthropic, gemini, groq, vertex`;
+        return new GeminiLlmProvider(geminiLlmProviderConfigSchema.parse(provider.config), settings as GeminiLlmSettings);
+
+      case 'groq':
+        return new GroqLlmProvider(groqLlmProviderConfigSchema.parse(provider.config), settings as GroqLlmSettings);
+
+      case 'mistral':
+        return new MistralLlmProvider(mistralLlmProviderConfigSchema.parse(provider.config), settings as MistralLlmSettings);
+
+      case 'deepseek':
+        return new DeepSeekLlmProvider(deepSeekLlmProviderConfigSchema.parse(provider.config), settings as DeepSeekLlmSettings);
+
+      case 'openrouter':
+        return new OpenRouterLlmProvider(openRouterLlmProviderConfigSchema.parse(provider.config), settings as OpenRouterLlmSettings);
+
+      case 'together-ai':
+        return new TogetherAILlmProvider(togetherAILlmProviderConfigSchema.parse(provider.config), settings as TogetherAILlmSettings);
+
+      case 'fireworks-ai':
+        return new FireworksAILlmProvider(fireworksAILlmProviderConfigSchema.parse(provider.config), settings as FireworksAILlmSettings);
+
+      case 'perplexity':
+        return new PerplexityLlmProvider(perplexityLlmProviderConfigSchema.parse(provider.config), settings as PerplexityLlmSettings);
+
+      case 'cohere':
+        return new CohereLlmProvider(cohereLlmProviderConfigSchema.parse(provider.config), settings as CohereLlmSettings);
+
+      case 'xai':
+        return new XAILlmProvider(xAILlmProviderConfigSchema.parse(provider.config), settings as XAILlmSettings);
+
+      default: {
+        const errorMessage = `Unsupported LLM provider API type: ${provider.apiType}. Supported types: openai, openai-legacy, anthropic, gemini, groq, mistral, deepseek, openrouter, together-ai, fireworks-ai, perplexity, cohere, xai`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
+      }
     }
-  }
-
-  /**
-   * Creates an OpenAI LLM provider instance from provider entity
-   * Also supports OpenAI-compatible APIs like Groq
-   * @param provider - Provider entity with OpenAI-specific configuration
-   * @returns Configured OpenAI LLM provider
-   * @throws {Error} When required OpenAI configuration fields are missing
-   */
-  private createOpenAIProvider(provider: Provider, settings: OpenAILlmSettings): OpenAILlmProvider {
-    const config = openAILlmProviderConfigSchema.parse(provider.config);
-
-    // Validate required fields in settings
-    if (!settings.model) {
-      const errorMessage = `Invalid OpenAI LLM provider settings for provider ${provider.id}. Required field: model`;
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    logger.info(`Creating OpenAI LLM provider for provider ${provider.id} with model ${settings.model}`);
-    const instance = new OpenAILlmProvider(config, settings);
-    instance.init();
-    return instance;
-  }
-
-  /**
-   * Creates an OpenAI Legacy LLM provider instance from provider entity
-   * @param provider - Provider entity with OpenAI Legacy-specific configuration
-   * @returns Configured OpenAI Legacy LLM provider
-   * @throws {Error} When required OpenAI Legacy configuration fields are missing
-   */
-  private createOpenAILegacyProvider(provider: Provider, settings: OpenAILegacyLlmSettings): OpenAILegacyLlmProvider {
-    const config = openAILegacyLlmProviderConfigSchema.parse(provider.config);
-
-    // Validate required fields in settings
-    if (!settings.model) {
-      const errorMessage = `Invalid OpenAI Legacy LLM provider settings for provider ${provider.id}. Required field: model`;
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    logger.info(`Creating OpenAI Legacy LLM provider for provider ${provider.id} with model ${settings.model}`);
-    const instance = new OpenAILegacyLlmProvider(config, settings);
-    instance.init();
-    return instance;
-  }
-
-  /**
-   * Creates an Anthropic LLM provider instance from provider entity
-   * @param provider - Provider entity with Anthropic-specific configuration
-   * @returns Configured Anthropic LLM provider
-   * @throws {Error} When required Anthropic configuration fields are missing
-   */
-  private createAnthropicProvider(provider: Provider, settings: AnthropicLlmSettings): AnthropicLlmProvider {
-    const config = anthropicLlmProviderConfigSchema.parse(provider.config);
-
-    // Validate required fields in settings
-    if (!settings.model) {
-      const errorMessage = `Invalid Anthropic LLM provider settings for provider ${provider.id}. Required field: model`;
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    logger.info(`Creating Anthropic LLM provider for provider ${provider.id} with model ${settings.model}`);
-    const instance = new AnthropicLlmProvider(config, settings);
-    instance.init();
-    return instance;
-  }
-
-  /**
-   * Creates a Gemini LLM provider instance from provider entity
-   * Also supports Vertex AI which uses the same Gemini API
-   * @param provider - Provider entity with Gemini-specific configuration
-   * @returns Configured Gemini LLM provider
-   * @throws {Error} When required Gemini configuration fields are missing
-   */
-  private createGeminiProvider(provider: Provider, settings: GeminiLlmSettings): GeminiLlmProvider {
-    const config = geminiLlmProviderConfigSchema.parse(provider.config);
-
-    // Validate required fields in settings
-    if (!settings.model) {
-      const errorMessage = `Invalid Gemini LLM provider settings for provider ${provider.id}. Required field: model`;
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    logger.info(`Creating Gemini LLM provider for provider ${provider.id} with model ${settings.model}`);
-    const instance = new GeminiLlmProvider(config, settings);
-    instance.init();
-    return instance;
   }
 
   /**
@@ -164,7 +145,7 @@ export class LlmProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: LlmProviderApiType[] = ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'vertex'];
+    const supportedApiTypes: LlmProviderApiType[] = ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai'];
     return supportedApiTypes.includes(provider.apiType as LlmProviderApiType);
   }
 
@@ -173,6 +154,6 @@ export class LlmProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): LlmProviderApiType[] {
-    return ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'vertex'];
+    return ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai'];
   }
 }

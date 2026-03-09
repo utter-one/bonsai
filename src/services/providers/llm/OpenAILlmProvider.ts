@@ -4,6 +4,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { LlmProviderBase } from './LlmProviderBase';
 import { ImageContent, LlmContent, LlmGenerationOptions, LlmGenerationResult, LlmMessage, TextContent } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
+import type { LlmModelInfo } from '../ProviderCatalogService';
 
 extendZodWithOpenApi(z);
 
@@ -413,5 +414,61 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
     }
   }
 
+  /**
+   * Enumerate available models using the OpenAI models API.
+   * Falls back to a static list of well-known models if the API call fails or the client is not yet initialized.
+   */
+  async enumerateModels(): Promise<LlmModelInfo[]> {
+    if (this.client) {
+      try {
+        const page = await this.client.models.list();
+        const chatModels = page.data.filter(m => /^(gpt-|o\d|chatgpt-)/.test(m.id));
+        if (chatModels.length > 0) {
+          return chatModels.map(m => OpenAILlmProvider.mapModelToInfo(m.id));
+        }
+      } catch (error) {
+        logger.warn(`Failed to enumerate OpenAI models via API: ${error instanceof Error ? error.message : String(error)}, using static list`);
+      }
+    }
+    return OpenAILlmProvider.getStaticModels();
+  }
 
+  private static mapModelToInfo(id: string): LlmModelInfo {
+    const isOSeries = /^o\d/.test(id);
+    const isGpt5 = id.startsWith('gpt-5');
+    const isGpt4Plus = id.startsWith('gpt-4o') || id.startsWith('gpt-4.') || id.startsWith('gpt-4-') || id.startsWith('chatgpt-4o');
+    return {
+      id,
+      displayName: id,
+      supportsToolCalling: true,
+      supportsJsonOutput: !isOSeries,
+      supportsStreaming: true,
+      supportsVision: isGpt5 || (!isOSeries && isGpt4Plus),
+      supportsReasoning: isOSeries || isGpt5,
+    };
+  }
+
+  private static getStaticModels(): LlmModelInfo[] {
+    return [
+      // GPT-5 series (frontier, configurable reasoning effort)
+      { id: 'gpt-5.4', displayName: 'GPT-5.4', recommended: true, description: 'Most capable model for professional work', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1050000 },
+      { id: 'gpt-5.4-pro', displayName: 'GPT-5.4 Pro', description: 'Smarter and more precise version of GPT-5.4', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1050000 },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', description: 'Faster, cost-efficient version of GPT-5 for well-defined tasks', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 400000 },
+      { id: 'gpt-5', displayName: 'GPT-5', description: 'Previous intelligent reasoning model for coding and agentic tasks', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 200000 },
+      // GPT-4.1 series (non-reasoning, large context)
+      { id: 'gpt-4.1', displayName: 'GPT-4.1', description: 'Smartest non-reasoning model with 1M token context', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 1047576 },
+      { id: 'gpt-4.1-mini', displayName: 'GPT-4.1 Mini', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 1047576 },
+      // GPT-4o series
+      { id: 'gpt-4o', displayName: 'GPT-4o', description: 'Fast, intelligent, flexible model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      { id: 'gpt-4o-mini', displayName: 'GPT-4o Mini', description: 'Fast, affordable small model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      // o-series reasoning models
+      { id: 'o4-mini', displayName: 'o4 Mini', description: 'Fast, cost-efficient reasoning model', supportsToolCalling: true, supportsJsonOutput: false, supportsStreaming: true, supportsReasoning: true, contextWindow: 200000 },
+      { id: 'o3', displayName: 'o3', description: 'Reasoning model for complex tasks', supportsToolCalling: true, supportsJsonOutput: false, supportsStreaming: true, supportsReasoning: true, contextWindow: 200000 },
+      { id: 'o3-mini', displayName: 'o3 Mini', description: 'Small model alternative to o3', supportsToolCalling: true, supportsJsonOutput: false, supportsStreaming: true, supportsReasoning: true, contextWindow: 200000 },
+      { id: 'o1', displayName: 'o1', description: 'Previous full o-series reasoning model', supportsToolCalling: true, supportsJsonOutput: false, supportsStreaming: true, supportsReasoning: true, contextWindow: 200000 },
+      // Legacy
+      { id: 'gpt-4-turbo', displayName: 'GPT-4 Turbo', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, contextWindow: 128000 },
+      { id: 'gpt-3.5-turbo', displayName: 'GPT-3.5 Turbo', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, contextWindow: 16385 },
+    ];
+  }
 }

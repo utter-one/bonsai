@@ -100,6 +100,39 @@ GET /api/providers/:id/audit-logs
 
 Returns audit log entries for the specified provider. See [Audit Logs](./audit-logs) for response format.
 
+## Enumerate LLM Models
+
+```http
+GET /api/providers/:id/models
+```
+
+**Required permission:** `provider:read`
+
+Queries the provider's API to return a live list of available models. Falls back to a static model list when the provider API is unavailable. Only valid for providers with `providerType: llm`.
+
+**Response** `200 OK`
+
+```json
+{
+  "models": [
+    {
+      "id": "gpt-4o",
+      "displayName": "GPT-4o",
+      "description": "...",
+      "recommended": true,
+      "supportsToolCalling": true,
+      "supportsJsonOutput": true,
+      "supportsStreaming": true,
+      "supportsVision": true,
+      "supportsReasoning": false,
+      "contextWindow": 128000
+    }
+  ]
+}
+```
+
+**Errors:** `400` Provider is not an LLM provider | `404` Provider not found
+
 ---
 
 ## Provider Response
@@ -126,10 +159,19 @@ Configuration varies by provider type and API type:
 
 | API Type | Key Config Fields |
 |----------|------------------|
-| `openai` | `apiKey`, `baseUrl`, `organization` |
-| `openai-legacy` | `apiKey`, `baseUrl`, `organization` |
-| `anthropic` | `apiKey`, `baseUrl` |
-| `gemini` | `apiKey`, `baseUrl` |
+| `openai` | `apiKey`, `organizationId` (optional), `baseUrl` (optional) |
+| `openai-legacy` | `apiKey`, `organizationId` (optional), `baseUrl` (optional) |
+| `anthropic` | `apiKey`, `baseUrl` (optional) |
+| `gemini` | `apiKey` |
+| `groq` | `apiKey`, `baseUrl` (optional) |
+| `mistral` | `apiKey`, `baseUrl` (optional) |
+| `deepseek` | `apiKey`, `baseUrl` (optional) |
+| `openrouter` | `apiKey`, `baseUrl` (optional) |
+| `together-ai` | `apiKey`, `baseUrl` (optional) |
+| `fireworks-ai` | `apiKey`, `baseUrl` (optional) |
+| `perplexity` | `apiKey`, `baseUrl` (optional) |
+| `cohere` | `apiKey`, `baseUrl` (optional) |
+| `xai` | `apiKey`, `baseUrl` (optional) |
 
 ### TTS Providers
 
