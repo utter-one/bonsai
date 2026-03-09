@@ -1266,9 +1266,11 @@ export class ConversationRunner {
     // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
     // This prevents inappropriate content from reaching provider APIs and risking account bans.
     const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
-    if (moderationResult.flagged) {
-      const moderationEventData: ModerationEventData = { input: userInput, flagged: true, categories: moderationResult.categories, durationMs: moderationResult.durationMs };
+    if (moderationResult.categories.length > 0) {
+      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, categories: moderationResult.categories, durationMs: moderationResult.durationMs };
       await this.saveAndSendEvent('moderation', moderationEventData);
+    }
+    if (moderationResult.flagged) {
       logger.warn({ conversationId: this.conversation.id, categories: moderationResult.categories }, 'User input blocked by content moderation');
 
       // Execute __moderation_blocked global action if configured, otherwise abort silently
