@@ -161,7 +161,6 @@ export class AgentService extends BaseService {
     this.requirePermission(context, PERMISSIONS.AGENT_WRITE);
     await this.requireProjectNotArchived(projectId);
     const { version: expectedVersion, ...updateData } = input;
-    logger.info({ agentId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating agent');
 
     try {
       const existingAgent = await db.query.agents.findFirst({ where: and(eq(agents.projectId, projectId), eq(agents.id, id)) });
@@ -174,7 +173,18 @@ export class AgentService extends BaseService {
         throw new OptimisticLockError(`Agent version mismatch. Expected ${expectedVersion}, got ${existingAgent.version}`);
       }
 
-      const updatedAgent = await db.update(agents).set({ name: updateData.name, description: updateData.description, prompt: updateData.prompt, ttsProviderId: updateData.ttsProviderId, ttsSettings: updateData.ttsSettings, tags: updateData.tags, metadata: updateData.metadata, fillerSettings: updateData.fillerSettings, version: existingAgent.version + 1, updatedAt: new Date() }).where(and(eq(agents.projectId, projectId), eq(agents.id, id), eq(agents.version, expectedVersion))).returning();
+      const updatedAgent = await db.update(agents).set({
+        name: updateData.name,
+        description: updateData.description,
+        prompt: updateData.prompt,
+        ttsProviderId: updateData.ttsProviderId,
+        ttsSettings: updateData.ttsSettings,
+        tags: updateData.tags,
+        metadata: updateData.metadata,
+        fillerSettings: updateData.fillerSettings || null,
+        version: existingAgent.version + 1,
+        updatedAt: new Date()
+      }).where(and(eq(agents.projectId, projectId), eq(agents.id, id), eq(agents.version, expectedVersion))).returning();
 
       if (updatedAgent.length === 0) {
         throw new OptimisticLockError(`Failed to update agent due to version conflict`);
