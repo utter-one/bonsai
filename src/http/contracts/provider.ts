@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema, listResponseLimitSchema } from './common';
 import type { ListParams } from './common';
+import { llmModelInfoSchema } from '../../services/providers/ProviderCatalogService';
 
 // Import provider config schemas
 import { openAILlmProviderConfigSchema } from '../../services/providers/llm/OpenAILlmProvider';
@@ -186,3 +187,13 @@ export type ProviderType = z.infer<typeof providerTypeSchema>;
 
 /** Type for provider names */
 export type ProviderName = z.infer<typeof providerNameSchema>;
+
+/**
+ * Schema for LLM model enumeration response
+ */
+export const providerModelsResponseSchema = z.object({
+  models: z.array(llmModelInfoSchema).describe('Available models for the provider'),
+});
+
+/** Response for model enumeration */
+export type ProviderModelsResponse = z.infer<typeof providerModelsResponseSchema>;

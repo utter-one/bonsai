@@ -318,7 +318,7 @@ export const providers = pgTable('providers', {
   name: text('name').notNull(),
   description: text('description'),
   providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings, storage
-  apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, vertex, s3, azure-blob, gcs, local
+  apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, s3, azure-blob, gcs, local
   config: jsonb('config').notNull().$type<ProviderConfig>(),
   createdBy: text('created_by').references(() => operators.id),
   tags: jsonb('tags').$type<string[]>(),

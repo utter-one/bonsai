@@ -3,7 +3,7 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ProviderService } from '../../services/providers/ProviderService';
-import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerRouteParamsSchema, providerResponseSchema, providerListResponseSchema } from '../contracts/provider';
+import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerRouteParamsSchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from '../contracts/provider';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -159,6 +159,28 @@ export class ProviderController {
           404: { description: 'Provider not found' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/providers/{id}/models',
+        tags: ['Providers'],
+        summary: 'Enumerate LLM models',
+        description: 'Enumerates available models for a configured LLM provider by querying the provider API. Falls back to a static model list when the API is unavailable.',
+        request: {
+          params: providerRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'List of available models',
+            content: {
+              'application/json': {
+                schema: providerModelsResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Provider is not an LLM provider' },
+          404: { description: 'Provider not found' },
+        },
+      },
     ];
   }
 
@@ -172,6 +194,7 @@ export class ProviderController {
     router.put('/api/providers/:id', asyncHandler(this.updateProvider.bind(this)));
     router.delete('/api/providers/:id', asyncHandler(this.deleteProvider.bind(this)));
     router.get('/api/providers/:id/audit-logs', asyncHandler(this.getProviderAuditLogs.bind(this)));
+    router.get('/api/providers/:id/models', asyncHandler(this.enumerateModels.bind(this)));
   }
 
   /**
@@ -241,5 +264,16 @@ export class ProviderController {
     const params = providerRouteParamsSchema.parse(req.params);
     const auditLogs = await this.providerService.getProviderAuditLogs(params.id, req.context);
     res.status(200).json(auditLogs);
+  }
+
+  /**
+   * GET /api/providers/:id/models
+   * Enumerate available LLM models for a provider
+   */
+  private async enumerateModels(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.PROVIDER_READ]);
+    const params = providerRouteParamsSchema.parse(req.params);
+    const models = await this.providerService.enumerateModels(params.id, req.context);
+    res.status(200).json({ models });
   }
 }
