@@ -10,6 +10,14 @@ import type { LlmModelInfo } from '../ProviderCatalogService';
 extendZodWithOpenApi(z);
 
 /**
+ * Minimal config shape required by all OpenAI-compatible providers
+ */
+export type OpenAICompatibleConfig = {
+  apiKey: string;
+  baseUrl?: string;
+};
+
+/**
  * Schema for OpenAI-specific configuration for legacy Chat Completions API
  */
 export const openAILegacyLlmProviderConfigSchema = z.strictObject({
@@ -38,14 +46,29 @@ export type OpenAILegacyLlmSettings = z.infer<typeof openAILegacyLlmSettingsSche
  * OpenAI LLM provider implementation using the legacy Chat Completions API
  * Supports both streaming and non-streaming generation with multi-modal messages
  * Use this for compatibility with older models or OpenAI-compatible APIs
+ * @template TConfig - Provider-specific config type extending OpenAICompatibleConfig
  */
-export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProviderConfig> {
-  private client?: OpenAI;
-  private settings: OpenAILegacyLlmSettings;
+export class OpenAILegacyLlmProvider<TConfig extends OpenAICompatibleConfig = OpenAILegacyLlmProviderConfig> extends LlmProviderBase<TConfig> {
+  protected client?: OpenAI;
+  protected settings: OpenAILegacyLlmSettings;
 
-  constructor(config: OpenAILegacyLlmProviderConfig, settings: OpenAILegacyLlmSettings) {
+  constructor(config: TConfig, settings: OpenAILegacyLlmSettings) {
     super(config);
     this.settings = settings;
+  }
+
+  /**
+   * Creates the OpenAI client instance.
+   * Subclasses can override this to set provider-specific base URLs or options.
+   */
+  protected createClient(): OpenAI {
+    const cfg = this.config as OpenAILegacyLlmProviderConfig;
+    return new OpenAI({
+      apiKey: cfg.apiKey,
+      organization: cfg.organizationId,
+      baseURL: cfg.baseUrl,
+      timeout: this.settings.timeout,
+    });
   }
 
   /**
@@ -53,14 +76,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
    */
   async init(): Promise<void> {
     await super.init();
-
-    this.client = new OpenAI({
-      apiKey: this.config!.apiKey,
-      organization: this.config!.organizationId,
-      baseURL: this.config!.baseUrl,
-      timeout: this.settings.timeout,
-    });
-
+    this.client = this.createClient();
     logger.info(`OpenAI Legacy LLM provider initialized with model: ${this.settings.model}`);
   }
 
@@ -109,7 +125,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Generate an image-based response.
    */
-  private async generateImageBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async generateImageBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     // Placeholder for image-based response generation logic
     // This would involve calling the OpenAI API with appropriate parameters to generate an image and returning the result in the expected format
     throw new Error('Image-based response generation not supported');
@@ -118,7 +134,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Generate an audio-based response.
    */
-  private async generateAudioBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async generateAudioBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     // Placeholder for audio-based response generation logic
     // This would involve calling the OpenAI API with appropriate parameters to generate audio and returning the result in the expected format
     throw new Error('Audio-based response generation not supported');
@@ -127,7 +143,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Generate a text-based response and handle JSON output verification for JSON output format.
    */
-  private async generateTextBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async generateTextBasedResponse(openAIMessages: ChatCompletionMessageParam[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     if (!this.client) {
       throw new Error('OpenAI client not initialized');
     }
@@ -306,7 +322,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
     return OpenAILegacyLlmProvider.getStaticModels();
   }
 
-  private static getStaticModels(): LlmModelInfo[] {
+  protected static getStaticModels(): LlmModelInfo[] {
     return [
       // GPT-5 series
       { id: 'gpt-5.4', displayName: 'GPT-5.4', recommended: true, description: 'Most capable model for professional work', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: true, contextWindow: 1050000 },
@@ -328,7 +344,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Convert our message format to OpenAI Chat Completions format
    */
-  private convertToOpenAIMessages(messages: LlmMessage[]): ChatCompletionMessageParam[] {
+  protected convertToOpenAIMessages(messages: LlmMessage[]): ChatCompletionMessageParam[] {
     return messages.map((msg) => {
       // Simple text message
       if (typeof msg.content === 'string') {
@@ -393,7 +409,7 @@ export class OpenAILegacyLlmProvider extends LlmProviderBase<OpenAILegacyLlmProv
   /**
    * Map OpenAI's finish reason to our format
    */
-  private mapFinishReason(reason: string | null): 'stop' | 'length' | 'tool_calls' | 'content_filter' {
+  protected mapFinishReason(reason: string | null): 'stop' | 'length' | 'tool_calls' | 'content_filter' {
     switch (reason) {
       case 'stop':
         return 'stop';
