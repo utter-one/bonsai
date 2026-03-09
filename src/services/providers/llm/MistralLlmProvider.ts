@@ -262,6 +262,20 @@ export class MistralLlmProvider extends LlmProviderBase<MistralLlmProviderConfig
   }
 
   /**
+   * Moderate user input using the Mistral moderation API.
+   * Uses the mistral-moderation-latest model to detect policy violations.
+   * @param input - User input text to moderate
+   * @returns Flagged status and list of violated categories
+   */
+  async moderateUserInput(input: string): Promise<{ flagged: boolean; categories: string[] }> {
+    this.ensureInitialized();
+    const response = await this.client!.classifiers.moderate({ model: 'mistral-moderation-latest', inputs: [input] });
+    const result = response.results[0];
+    const categories = Object.entries(result.categories ?? {}).filter(([, v]) => v).map(([k]) => k);
+    return { flagged: categories.length > 0, categories };
+  }
+
+  /**
    * Convert our internal LlmMessage format to Mistral SDK Messages format.
    * If the last message has role "assistant", it is treated as a prefill by setting `prefix: true`,
    * which is required by Mistral when the conversation ends with an assistant turn.

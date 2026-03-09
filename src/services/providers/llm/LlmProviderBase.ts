@@ -209,4 +209,14 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
    * Must be implemented by subclasses to return provider-specific model details.
    */
    abstract enumerateModels(): Promise<LlmModelInfo[]>;
+
+    /**
+     * Moderate user input for content policy violations. Returns whether the input was flagged and any applicable categories.
+     * By default, this method throws an error indicating that moderation is not supported. Subclasses can override this to provide actual moderation functionality if supported by the provider.
+     * @param input User input to moderate
+     * @returns Object containing flagged status and categories of violation
+     */
+    async moderateUserInput(input: string): Promise<{ flagged: boolean; categories: string[]; }> {
+     throw new Error('Moderation is not supported by this provider');
+   }
 }

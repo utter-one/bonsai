@@ -152,6 +152,43 @@ export const storageProviderInfoSchema = z.object({
 export type StorageProviderInfo = z.infer<typeof storageProviderInfoSchema>;
 
 /**
+ * Schema for a single content category detected by a moderation model.
+ * The `name` field is the exact string to use in `moderationConfig.blockedCategories`.
+ */
+export const moderationCategoryInfoSchema = z.object({
+  name: z.string().describe('Category identifier — use this exact string in moderationConfig.blockedCategories'),
+  displayName: z.string().describe('Human-readable category name'),
+  description: z.string().optional().describe('What kind of content this category covers'),
+}).openapi('ModerationCategoryInfo');
+
+export type ModerationCategoryInfo = z.infer<typeof moderationCategoryInfoSchema>;
+
+/**
+ * Schema for information about a moderation model
+ */
+export const moderationModelInfoSchema = z.object({
+  id: z.string().describe('Model identifier to use in configuration'),
+  displayName: z.string().describe('Human-readable display name'),
+  description: z.string().optional().describe('Description of the model\'s capabilities'),
+  recommended: z.boolean().optional().describe('Whether this is the recommended model for the provider'),
+  categories: z.array(moderationCategoryInfoSchema).describe('Content categories detected by this model'),
+}).openapi('ModerationModelInfo');
+
+export type ModerationModelInfo = z.infer<typeof moderationModelInfoSchema>;
+
+/**
+ * Schema for moderation provider capabilities
+ */
+export const moderationProviderInfoSchema = z.object({
+  apiType: z.string().describe('Provider API type — must match an LLM provider configured in the system'),
+  displayName: z.string().describe('Human-readable provider name'),
+  description: z.string().optional().describe('Additional information'),
+  models: z.array(moderationModelInfoSchema).describe('Moderation models available for this provider'),
+}).openapi('ModerationProviderInfo');
+
+export type ModerationProviderInfo = z.infer<typeof moderationProviderInfoSchema>;
+
+/**
  * Schema for complete provider catalog
  */
 export const providerCatalogSchema = z.object({
@@ -159,6 +196,7 @@ export const providerCatalogSchema = z.object({
   tts: z.array(ttsProviderInfoSchema).describe('TTS providers'),
   llm: z.array(llmProviderInfoSchema).describe('LLM providers'),
   storage: z.array(storageProviderInfoSchema).describe('Storage providers'),
+  moderation: z.array(moderationProviderInfoSchema).describe('Moderation providers'),
 });
 
 export type ProviderCatalog = z.infer<typeof providerCatalogSchema>;
@@ -174,6 +212,7 @@ export class ProviderCatalogService {
       tts: this.getTtsProviders(),
       llm: this.getLlmProviders(),
       storage: this.getStorageProviders(),
+      moderation: this.getModerationProviders(),
     };
   }
 
@@ -203,6 +242,13 @@ export class ProviderCatalogService {
    */
   getStorageProvider(apiType: string): StorageProviderInfo | undefined {
     return this.getStorageProviders().find((p) => p.apiType === apiType);
+  }
+
+  /**
+   * Gets information about a specific moderation provider by API type
+   */
+  getModerationProvider(apiType: string): ModerationProviderInfo | undefined {
+    return this.getModerationProviders().find((p) => p.apiType === apiType);
   }
 
   /**
@@ -11681,6 +11727,66 @@ export class ProviderCatalogService {
         displayName: 'Local Filesystem',
         description: 'Local filesystem storage (for development and testing)',
         features: ['Token-based URLs', 'Metadata sidecar files', 'Configurable base path', 'Optional HTTP serving'],
+      },
+    ];
+  }
+
+  /**
+   * Gets all moderation provider information
+   */
+  private getModerationProviders(): ModerationProviderInfo[] {
+    return [
+      {
+        apiType: 'openai',
+        displayName: 'OpenAI',
+        description: 'OpenAI moderation API using the omni-moderation-latest model. Free to use — no additional cost beyond the existing OpenAI provider configuration.',
+        models: [
+          {
+            id: 'omni-moderation-latest',
+            displayName: 'Omni Moderation (Latest)',
+            description: 'Most capable OpenAI moderation model, supports text and image inputs',
+            recommended: true,
+            categories: [
+              { name: 'harassment', displayName: 'Harassment', description: 'Content that expresses, incites, or promotes harassing language towards any target' },
+              { name: 'harassment/threatening', displayName: 'Harassment / Threatening', description: 'Harassment content that also includes violence or serious harm towards any target' },
+              { name: 'hate', displayName: 'Hate', description: 'Content promoting hate based on race, gender, ethnicity, religion, nationality, sexual orientation, disability status, or caste' },
+              { name: 'hate/threatening', displayName: 'Hate / Threatening', description: 'Hateful content that also includes violence or serious harm towards the targeted group' },
+              { name: 'illicit', displayName: 'Illicit', description: 'Content that includes instructions or advice facilitating the planning or execution of wrongdoing' },
+              { name: 'illicit/violent', displayName: 'Illicit / Violent', description: 'Illicit content that also includes violence, or advice on procuring weapons' },
+              { name: 'self-harm', displayName: 'Self-Harm', description: 'Content that promotes, encourages, or depicts acts of self-harm such as suicide, cutting, or eating disorders' },
+              { name: 'self-harm/instructions', displayName: 'Self-Harm / Instructions', description: 'Content that gives instructions or advice on how to commit acts of self-harm' },
+              { name: 'self-harm/intent', displayName: 'Self-Harm / Intent', description: 'Content where the speaker expresses intent to engage in acts of self-harm' },
+              { name: 'sexual', displayName: 'Sexual', description: 'Content meant to arouse sexual excitement or that promotes sexual services (excluding sex education and wellness)' },
+              { name: 'sexual/minors', displayName: 'Sexual / Minors', description: 'Sexual content involving individuals under 18 years old' },
+              { name: 'violence', displayName: 'Violence', description: 'Content that depicts death, violence, or physical injury' },
+              { name: 'violence/graphic', displayName: 'Violence / Graphic', description: 'Content that depicts death, violence, or physical injury in graphic detail' },
+            ],
+          },
+        ],
+      },
+      {
+        apiType: 'mistral',
+        displayName: 'Mistral AI',
+        description: 'Mistral moderation API using the mistral-moderation-latest model.',
+        models: [
+          {
+            id: 'mistral-moderation-latest',
+            displayName: 'Mistral Moderation (Latest)',
+            description: 'Mistral moderation model with focus on safety and PII detection',
+            recommended: true,
+            categories: [
+              { name: 'sexual', displayName: 'Sexual', description: 'Sexual content' },
+              { name: 'hate_and_discrimination', displayName: 'Hate and Discrimination', description: 'Hate speech and discriminatory content based on protected characteristics' },
+              { name: 'violence_and_threats', displayName: 'Violence and Threats', description: 'Content depicting or threatening violence' },
+              { name: 'dangerous_and_criminal_content', displayName: 'Dangerous and Criminal Content', description: 'Content facilitating dangerous or criminal activities' },
+              { name: 'selfharm', displayName: 'Self-Harm', description: 'Content promoting or depicting self-harm' },
+              { name: 'health', displayName: 'Health Misinformation', description: 'Dangerous health misinformation' },
+              { name: 'financial', displayName: 'Financial Misinformation', description: 'Dangerous financial misinformation or fraud' },
+              { name: 'law', displayName: 'Legal Misinformation', description: 'Dangerous legal misinformation or advice' },
+              { name: 'pii', displayName: 'PII', description: 'Personally identifiable information' },
+            ],
+          },
+        ],
       },
     ];
   }

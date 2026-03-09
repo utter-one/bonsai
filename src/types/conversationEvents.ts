@@ -32,6 +32,7 @@ export const conversationEventTypeSchema = z.enum([
   'conversation_aborted',
   'conversation_failed',
   'jump_to_stage',
+  'moderation',
 ]);
 
 export type ConversationEventType = z.infer<typeof conversationEventTypeSchema>;
@@ -149,6 +150,26 @@ export const conversationFailedEventDataSchema = z.object({
 
 export type ConversationFailedEventData = z.infer<typeof conversationFailedEventDataSchema>;
 
+/**
+ * Schema for content moderation event data.
+ * Recorded when moderation is enabled and the user input is checked.
+ */
+export const moderationEventDataSchema = z.object({
+  /** The user input that was moderated */
+  input: z.string(),
+  /** Whether the input was flagged as violating content policy */
+  flagged: z.boolean(),
+  /** Moderation categories that were violated (empty when not flagged) */
+  blockingCategories: z.array(z.string()),
+  /** All detected moderation categories, regardless of whether they are blocking */
+  detectedCategories: z.array(z.string()),
+  /** Duration of the moderation API call in milliseconds */
+  durationMs: z.number(),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type ModerationEventData = z.infer<typeof moderationEventDataSchema>;
+
 export const conversationEventDataSchema = z.union([
   messageEventDataSchema,
   classificationEventDataSchema,
@@ -162,6 +183,7 @@ export const conversationEventDataSchema = z.union([
   conversationAbortedEventDataSchema,
   conversationFailedEventDataSchema,
   jumpToStageEventDataSchema,
+  moderationEventDataSchema,
 ]);
 
 export type ConversationEventData = z.infer<typeof conversationEventDataSchema>;

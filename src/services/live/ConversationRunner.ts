@@ -5,7 +5,7 @@ import { Classifier, ContextTransformer, Conversation, GlobalAction, Project, St
 import { StageAction, LIFECYCLE_ACTION_NAMES } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
@@ -29,6 +29,7 @@ import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput
 import { TemplatingEngine } from "./TemplatingEngine";
 import { extractTextFromContent, getContentSize } from "../../utils/llm";
 import { KnowledgeService } from "../KnowledgeService";
+import { ModerationService } from "../ModerationService";
 import type { FaqItem } from "./ConversationContextBuilder";
 import type { AgentResponse } from "../../http/contracts/agent";
 
@@ -64,6 +65,8 @@ export type TurnData = {
   assistantMessageEventId: string | null;
   /** Duration of the filler sentence LLM call in milliseconds; null when no filler was generated */
   fillerDurationMs: number | null;
+  /** Duration of the moderation API call in milliseconds; null when moderation was not performed */
+  moderationDurationMs: number | null;
 };
 
 export type StageRuntimeData = {
@@ -107,7 +110,7 @@ export class ConversationRunner {
   private responseGeneratedInTurn = false;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null };
+  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -123,6 +126,7 @@ export class ConversationRunner {
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
+    @inject(ModerationService) private moderationService: ModerationService,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -236,26 +240,42 @@ export class ConversationRunner {
       stageData.transformers.push({ transformer, llmProvider });
     }
 
-    // Load global actions for the stage if enabled
-    if (stage.useGlobalActions) {
+    // Load global actions for the stage.
+    // Meta actions (name starts with '__') are always loaded regardless of useGlobalActions.
+    // When useGlobalActions is enabled, the stage's configured actions are loaded on top.
+    {
       const { globalActions: globalActionsTable } = await import('../../db/schema');
-      const { inArray } = await import('drizzle-orm');
+      const { inArray, like, and, eq, or } = await import('drizzle-orm');
 
-      // If stage.globalActions is empty, load all global actions for the project
-      // Otherwise, load only the specified global actions
-      if (stage.globalActions.length === 0) {
-        const allGlobalActions = await db.query.globalActions.findMany({
-          where: (globalActions, { eq }) => eq(globalActions.projectId, project.id)
-        });
-        stageData.globalActions = allGlobalActions;
+      if (stage.useGlobalActions) {
+        if (stage.globalActions.length === 0) {
+          // All global actions for the project (includes meta actions)
+          const allGlobalActions = await db.query.globalActions.findMany({
+            where: (globalActions, { eq }) => eq(globalActions.projectId, project.id)
+          });
+          stageData.globalActions = allGlobalActions;
+        } else {
+          // Selected actions + always include meta actions
+          const selectedGlobalActions = await db.query.globalActions.findMany({
+            where: (globalActions, { and, eq, or, inArray, like }) => and(
+              eq(globalActions.projectId, project.id),
+              or(
+                inArray(globalActions.id, stage.globalActions),
+                like(globalActions.name, '__%')
+              )
+            )
+          });
+          stageData.globalActions = selectedGlobalActions;
+        }
       } else {
-        const selectedGlobalActions = await db.query.globalActions.findMany({
-          where: (globalActions, { and, eq }) => and(
+        // Global actions disabled — load only meta actions
+        const metaActions = await db.query.globalActions.findMany({
+          where: (globalActions, { and, eq, like }) => and(
             eq(globalActions.projectId, project.id),
-            inArray(globalActions.id, stage.globalActions)
+            like(globalActions.name, '__%')
           )
         });
-        stageData.globalActions = selectedGlobalActions;
+        stageData.globalActions = metaActions;
       }
     }
 
@@ -538,6 +558,7 @@ export class ConversationRunner {
             timeToFirstTokenFromTurnStartMs,
             timeToFirstAudioMs,
             totalTurnDurationMs,
+            moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
           },
         };
         this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
@@ -1258,8 +1279,39 @@ export class ConversationRunner {
       firstAudioMs: null,
       assistantMessageEventId: null,
       fillerDurationMs: null,
+      moderationDurationMs: null,
     };
     await this.changeState('processing_user_input');
+
+    // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
+    // This prevents inappropriate content from reaching provider APIs and risking account bans.
+    const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
+    this.turnData.moderationDurationMs = moderationResult.durationMs > 0 ? moderationResult.durationMs : null;
+    if (moderationResult.detectedCategories.length > 0) {
+      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs };
+      await this.saveAndSendEvent('moderation', moderationEventData);
+    }
+    if (moderationResult.flagged) {
+      logger.warn({ conversationId: this.conversation.id, categories: moderationResult.blockingCategories }, 'User input blocked by content moderation');
+
+      // Execute __moderation_blocked global action if configured, otherwise abort silently
+      logger.info({ globalActions: this.stageData.globalActions }, 'Checking for __moderation_blocked global action');
+      const moderationBlockedAction = this.stageData.globalActions.find(ga => ga.id === '__moderation_blocked');
+      if (moderationBlockedAction) {
+        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
+        const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context);
+        await this.applyActionOutcome(context, executionOutcome);
+        const messageEventData: MessageEventData = { text: '[Content removed by moderation]', originalText: userInput, role: 'user', metadata: { moderationDurationMs: this.turnData.moderationDurationMs } };
+        await this.saveAndSendEvent('message', messageEventData);
+        await this.saveAndSendOutcomeEvents(executionOutcome);
+        const actionEventData: ActionEventData = { actionName: moderationBlockedAction.name || '', stageId: this.stageData.id, effects: moderationBlockedAction.effects };
+        await this.saveAndSendEvent('action', actionEventData);
+        await this.generateResponse(context, executionOutcome);
+        return;
+      }
+      // No moderation block action defined - carry on
+      userInput = '[Content removed by moderation]';
+    }
 
     // Start filler sentence immediately — opens the response turn early by sending
     // start_ai_generation_output and feeding the sentence into TTS before classification begins.
@@ -1407,6 +1459,7 @@ export class ConversationRunner {
       originalText: context.originalUserInput || context.userInput || '',
       metadata: {
         source: context.userInputSource,
+        moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
         processingDurationMs,
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,

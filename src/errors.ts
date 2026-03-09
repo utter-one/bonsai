@@ -88,3 +88,13 @@ export class ArchivedProjectError extends Error {
     this.name = 'ArchivedProjectError';
   }
 }
+
+/**
+ * Error thrown when user input is blocked by content moderation
+ */
+export class ContentModerationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ContentModerationError';
+  }
+}

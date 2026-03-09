@@ -251,4 +251,11 @@ export interface ILlmProvider {
    * Enumerate available models from the provider, returning an array of model information.
    */
   enumerateModels(): Promise<LlmModelInfo[]>;
+
+  /**
+   * Moderate user input for content policy violations. Returns whether the input was flagged and any applicable categories.
+   * @param input User input to moderate
+   * @returns Object containing flagged status and categories of violation
+   */
+  moderateUserInput(input: string): Promise<{ flagged: boolean; categories: string[] }>;
 }

@@ -494,7 +494,7 @@ export class ActionsExecutor {
     effect: RunScriptEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
-    logger.info({ effect, context }, `Executing run_script effect`);
+    logger.info({ effect }, `Executing run_script effect`);
     const result = await this.scriptRunner.executeScript(effect.code, context);
 
     return {
