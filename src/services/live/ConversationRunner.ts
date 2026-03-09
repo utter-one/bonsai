@@ -240,26 +240,42 @@ export class ConversationRunner {
       stageData.transformers.push({ transformer, llmProvider });
     }
 
-    // Load global actions for the stage if enabled
-    if (stage.useGlobalActions) {
+    // Load global actions for the stage.
+    // Meta actions (name starts with '__') are always loaded regardless of useGlobalActions.
+    // When useGlobalActions is enabled, the stage's configured actions are loaded on top.
+    {
       const { globalActions: globalActionsTable } = await import('../../db/schema');
-      const { inArray } = await import('drizzle-orm');
+      const { inArray, like, and, eq, or } = await import('drizzle-orm');
 
-      // If stage.globalActions is empty, load all global actions for the project
-      // Otherwise, load only the specified global actions
-      if (stage.globalActions.length === 0) {
-        const allGlobalActions = await db.query.globalActions.findMany({
-          where: (globalActions, { eq }) => eq(globalActions.projectId, project.id)
-        });
-        stageData.globalActions = allGlobalActions;
+      if (stage.useGlobalActions) {
+        if (stage.globalActions.length === 0) {
+          // All global actions for the project (includes meta actions)
+          const allGlobalActions = await db.query.globalActions.findMany({
+            where: (globalActions, { eq }) => eq(globalActions.projectId, project.id)
+          });
+          stageData.globalActions = allGlobalActions;
+        } else {
+          // Selected actions + always include meta actions
+          const selectedGlobalActions = await db.query.globalActions.findMany({
+            where: (globalActions, { and, eq, or, inArray, like }) => and(
+              eq(globalActions.projectId, project.id),
+              or(
+                inArray(globalActions.id, stage.globalActions),
+                like(globalActions.name, '__%')
+              )
+            )
+          });
+          stageData.globalActions = selectedGlobalActions;
+        }
       } else {
-        const selectedGlobalActions = await db.query.globalActions.findMany({
-          where: (globalActions, { and, eq }) => and(
+        // Global actions disabled — load only meta actions
+        const metaActions = await db.query.globalActions.findMany({
+          where: (globalActions, { and, eq, like }) => and(
             eq(globalActions.projectId, project.id),
-            inArray(globalActions.id, stage.globalActions)
+            like(globalActions.name, '__%')
           )
         });
-        stageData.globalActions = selectedGlobalActions;
+        stageData.globalActions = metaActions;
       }
     }
 
@@ -1279,12 +1295,14 @@ export class ConversationRunner {
       logger.warn({ conversationId: this.conversation.id, categories: moderationResult.blockingCategories }, 'User input blocked by content moderation');
 
       // Execute __moderation_blocked global action if configured, otherwise abort silently
-      const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
-      const moderationBlockedAction = globalActionsMap.get('__moderation_blocked');
+      logger.info({ globalActions: this.stageData.globalActions }, 'Checking for __moderation_blocked global action');
+      const moderationBlockedAction = this.stageData.globalActions.find(ga => ga.id === '__moderation_blocked');
       if (moderationBlockedAction) {
         const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
         const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context);
         await this.applyActionOutcome(context, executionOutcome);
+        const messageEventData: MessageEventData = { text: '[Content removed by moderation]', originalText: userInput, role: 'user', metadata: { moderationDurationMs: this.turnData.moderationDurationMs } };
+        await this.saveAndSendEvent('message', messageEventData);
         await this.saveAndSendOutcomeEvents(executionOutcome);
         const actionEventData: ActionEventData = { actionName: moderationBlockedAction.name || '', stageId: this.stageData.id, effects: moderationBlockedAction.effects };
         await this.saveAndSendEvent('action', actionEventData);
@@ -1441,6 +1459,7 @@ export class ConversationRunner {
       originalText: context.originalUserInput || context.userInput || '',
       metadata: {
         source: context.userInputSource,
+        moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
         processingDurationMs,
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,
