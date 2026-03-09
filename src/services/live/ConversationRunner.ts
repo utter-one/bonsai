@@ -5,7 +5,7 @@ import { Classifier, ContextTransformer, Conversation, GlobalAction, Project, St
 import { StageAction, LIFECYCLE_ACTION_NAMES } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
@@ -29,6 +29,7 @@ import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput
 import { TemplatingEngine } from "./TemplatingEngine";
 import { extractTextFromContent, getContentSize } from "../../utils/llm";
 import { KnowledgeService } from "../KnowledgeService";
+import { ModerationService } from "../ModerationService";
 import type { FaqItem } from "./ConversationContextBuilder";
 import type { AgentResponse } from "../../http/contracts/agent";
 
@@ -123,6 +124,7 @@ export class ConversationRunner {
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
+    @inject(ModerationService) private moderationService: ModerationService,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -1260,6 +1262,31 @@ export class ConversationRunner {
       fillerDurationMs: null,
     };
     await this.changeState('processing_user_input');
+
+    // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
+    // This prevents inappropriate content from reaching provider APIs and risking account bans.
+    const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
+    if (moderationResult.flagged) {
+      const moderationEventData: ModerationEventData = { input: userInput, flagged: true, categories: moderationResult.categories, durationMs: moderationResult.durationMs };
+      await this.saveAndSendEvent('moderation', moderationEventData);
+      logger.warn({ conversationId: this.conversation.id, categories: moderationResult.categories }, 'User input blocked by content moderation');
+
+      // Execute __moderation_blocked global action if configured, otherwise abort silently
+      const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
+      const moderationBlockedAction = globalActionsMap.get('__moderation_blocked');
+      if (moderationBlockedAction) {
+        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
+        const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context);
+        await this.applyActionOutcome(context, executionOutcome);
+        await this.saveAndSendOutcomeEvents(executionOutcome);
+        const actionEventData: ActionEventData = { actionName: moderationBlockedAction.name || '', stageId: this.stageData.id, effects: moderationBlockedAction.effects };
+        await this.saveAndSendEvent('action', actionEventData);
+        await this.generateResponse(context, executionOutcome);
+        return;
+      }
+      // No moderation block action defined - carry on
+      userInput = '[Content removed by moderation]';
+    }
 
     // Start filler sentence immediately — opens the response turn early by sending
     // start_ai_generation_output and feeding the sentence into TTS before classification begins.

@@ -1008,7 +1008,8 @@
             "conversation_end",
             "conversation_aborted",
             "conversation_failed",
-            "jump_to_stage"
+            "jump_to_stage",
+            "moderation"
           ],
           "description": "Type of the conversation event"
         },
@@ -1468,6 +1469,38 @@
               "required": [
                 "fromStageId",
                 "toStageId"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string"
+                },
+                "flagged": {
+                  "type": "boolean"
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "durationMs": {
+                  "type": "number"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "input",
+                "flagged",
+                "categories",
+                "durationMs"
               ]
             }
           ],

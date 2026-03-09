@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createOperatorSchema, updateOperatorBodySchema, deleteOperatorBodySchema, operatorResponseSchema, operatorListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/operator';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
-import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema, archiveProjectSchema, listProjectsQuerySchema } from './http/contracts/project';
+import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema, archiveProjectSchema, listProjectsQuerySchema, moderationConfigSchema } from './http/contracts/project';
 import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema, fillerSettingsSchema } from './http/contracts/agent';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
 import { initialOperatorSetupSchema, setupStatusResponseSchema, initialOperatorSetupResponseSchema } from './http/contracts/setup';
@@ -18,7 +18,7 @@ import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolRespo
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
-import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema } from './http/contracts/providerCatalog';
+import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, moderationProvidersResponseSchema, moderationProviderInfoSchema, moderationModelInfoSchema, moderationCategoryInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
@@ -124,6 +124,7 @@ export function getOpenAPISpec(): any {
 
   // Voice and ASR configuration schemas
   registry.register('AsrConfig', asrConfigSchema);
+  registry.register('ModerationConfig', moderationConfigSchema);
   registry.register('FillerSettings', fillerSettingsSchema);
 
   // ASR provider settings schemas
@@ -250,6 +251,9 @@ export function getOpenAPISpec(): any {
   registry.register('VoiceInfo', voiceInfoSchema);
   registry.register('LanguageInfo', languageInfoSchema);
   registry.register('TtsModelInfo', ttsModelInfoSchema);
+  registry.register('ModerationCategoryInfo', moderationCategoryInfoSchema);
+  registry.register('ModerationModelInfo', moderationModelInfoSchema);
+  registry.register('ModerationProviderInfo', moderationProviderInfoSchema);
 
   registry.register('ProviderCatalog', providerCatalogSchema);
   registry.register('AsrProvidersResponse', asrProvidersResponseSchema);

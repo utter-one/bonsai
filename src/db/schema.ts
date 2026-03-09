@@ -87,6 +87,11 @@ export const projects = pgTable('projects', {
     storageProviderId?: string;
     settings?: unknown;
   }>(),
+  moderationConfig: jsonb('moderation_config').$type<{
+    enabled: boolean;
+    llmProviderId: string;
+    blockedCategories?: string[];
+  }>(),
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   timezone: text('timezone'),

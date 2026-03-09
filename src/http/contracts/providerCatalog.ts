@@ -1,20 +1,20 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema, providerCatalogSchema } from '../../services/providers/ProviderCatalogService';
+import { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema, moderationCategoryInfoSchema, moderationModelInfoSchema, moderationProviderInfoSchema, providerCatalogSchema } from '../../services/providers/ProviderCatalogService';
 
 extendZodWithOpenApi(z);
 
 /**
  * Export schemas from ProviderCatalogService for use in API contracts
  */
-export { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema, providerCatalogSchema };
-export type { AsrModelInfo, LlmModelInfo, VoiceInfo, LanguageInfo, TtsModelInfo, AsrProviderInfo, TtsProviderInfo, LlmProviderInfo, StorageProviderInfo, ProviderCatalog } from '../../services/providers/ProviderCatalogService';
+export { asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema, moderationCategoryInfoSchema, moderationModelInfoSchema, moderationProviderInfoSchema, providerCatalogSchema };
+export type { AsrModelInfo, LlmModelInfo, VoiceInfo, LanguageInfo, TtsModelInfo, AsrProviderInfo, TtsProviderInfo, LlmProviderInfo, StorageProviderInfo, ModerationCategoryInfo, ModerationModelInfo, ModerationProviderInfo, ProviderCatalog } from '../../services/providers/ProviderCatalogService';
 
 /**
  * Schema for provider type route parameter
  */
 export const providerTypeParamSchema = z.object({
-  type: z.enum(['asr', 'tts', 'llm', 'storage']).describe('Provider type (asr, tts, llm, or storage)'),
+  type: z.enum(['asr', 'tts', 'llm', 'storage', 'moderation']).describe('Provider type (asr, tts, llm, storage, or moderation)'),
 });
 
 export type ProviderTypeParam = z.infer<typeof providerTypeParamSchema>;
@@ -23,7 +23,7 @@ export type ProviderTypeParam = z.infer<typeof providerTypeParamSchema>;
  * Schema for specific provider route parameters
  */
 export const specificProviderParamsSchema = z.object({
-  type: z.enum(['asr', 'tts', 'llm', 'storage']).describe('Provider type (asr, tts, llm, or storage)'),
+  type: z.enum(['asr', 'tts', 'llm', 'storage', 'moderation']).describe('Provider type (asr, tts, llm, storage, or moderation)'),
   apiType: z.string().describe('Provider API type (e.g., azure, elevenlabs, openai, anthropic, s3, azure-blob, gcs, local)'),
 });
 
@@ -64,3 +64,12 @@ export const storageProvidersResponseSchema = z.object({
 });
 
 export type StorageProvidersResponse = z.infer<typeof storageProvidersResponseSchema>;
+
+/**
+ * Schema for moderation providers list response
+ */
+export const moderationProvidersResponseSchema = z.object({
+  providers: z.array(moderationProviderInfoSchema).describe('List of moderation providers'),
+});
+
+export type ModerationProvidersResponse = z.infer<typeof moderationProvidersResponseSchema>;

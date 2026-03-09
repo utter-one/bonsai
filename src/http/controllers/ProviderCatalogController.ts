@@ -3,7 +3,7 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ProviderCatalogService } from '../../services/providers/ProviderCatalogService';
-import { providerCatalogSchema, providerTypeParamSchema, specificProviderParamsSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, storageProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema } from '../contracts/providerCatalog';
+import { providerCatalogSchema, providerTypeParamSchema, specificProviderParamsSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, storageProvidersResponseSchema, moderationProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, storageProviderInfoSchema, moderationProviderInfoSchema } from '../contracts/providerCatalog';
 
 /**
  * Controller for provider catalog endpoints
@@ -105,6 +105,23 @@ export class ProviderCatalogController {
       },
       {
         method: 'get',
+        path: '/api/provider-catalog/moderation',
+        tags: ['Provider Catalog'],
+        summary: 'Get moderation providers',
+        description: 'Returns information about all available content moderation providers including supported models and detectable categories. Category names listed here are the exact strings to use in moderationConfig.blockedCategories.',
+        responses: {
+          200: {
+            description: 'List of moderation providers',
+            content: {
+              'application/json': {
+                schema: moderationProvidersResponseSchema,
+              },
+            },
+          },
+        },
+      },
+      {
+        method: 'get',
         path: '/api/provider-catalog/{type}/{apiType}',
         tags: ['Provider Catalog'],
         summary: 'Get specific provider information',
@@ -138,6 +155,7 @@ export class ProviderCatalogController {
     router.get('/api/provider-catalog/tts', asyncHandler(this.getTtsProviders.bind(this)));
     router.get('/api/provider-catalog/llm', asyncHandler(this.getLlmProviders.bind(this)));
     router.get('/api/provider-catalog/storage', asyncHandler(this.getStorageProviders.bind(this)));
+    router.get('/api/provider-catalog/moderation', asyncHandler(this.getModerationProviders.bind(this)));
     router.get('/api/provider-catalog/:type/:apiType', asyncHandler(this.getSpecificProvider.bind(this)));
   }
 
@@ -187,6 +205,15 @@ export class ProviderCatalogController {
   }
 
   /**
+   * GET /api/provider-catalog/moderation
+   * Returns all moderation providers
+   */
+  private async getModerationProviders(req: Request, res: Response): Promise<void> {
+    const catalog = this.catalogService.getCatalog();
+    res.status(200).json({ providers: catalog.moderation });
+  }
+
+  /**
    * GET /api/provider-catalog/:type/:apiType
    * Returns information about a specific provider
    */
@@ -206,6 +233,9 @@ export class ProviderCatalogController {
         break;
       case 'storage':
         provider = this.catalogService.getStorageProvider(params.apiType);
+        break;
+      case 'moderation':
+        provider = this.catalogService.getModerationProvider(params.apiType);
         break;
     }
 

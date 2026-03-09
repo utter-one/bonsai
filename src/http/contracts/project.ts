@@ -42,6 +42,22 @@ export const storageConfigSchema = z.object({
 export type StorageConfig = z.infer<typeof storageConfigSchema>;
 
 /**
+ * Schema for moderation configuration
+ */
+export const moderationConfigSchema = z.object({
+  enabled: z.boolean().describe('Whether content moderation is enabled for this project'),
+  llmProviderId: z.string().describe('ID of the LLM provider used for moderation (must support moderation API, e.g. OpenAI or Mistral)'),
+  blockedCategories: z.array(z.string()).optional().describe(
+    'List of category names that should cause the input to be blocked. If omitted or empty, any flagged category will block the input. '
+    + 'Category names are provider-specific. '
+    + 'OpenAI categories: harassment, harassment/threatening, hate, hate/threatening, illicit, illicit/violent, self-harm, self-harm/instructions, self-harm/intent, sexual, sexual/minors, violence, violence/graphic. '
+    + 'Mistral categories: sexual, hate_and_discrimination, violence_and_threats, dangerous_and_criminal_content, selfharm, health, financial, law, pii.'
+  ),
+}).openapi('ModerationConfig').describe('Content moderation configuration');
+
+export type ModerationConfig = z.infer<typeof moderationConfigSchema>;
+
+/**
  * Schema for ASR provider settings (union of all ASR provider settings)
  */
 export const asrSettingsSchema = z.union([
@@ -72,6 +88,7 @@ export const createProjectSchema = z.object({
   acceptVoice: z.boolean().optional().default(true).describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().default(true).describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.optional().describe('Optional storage configuration for conversation artifacts'),
+  moderationConfig: moderationConfigSchema.optional().describe('Optional content moderation configuration'),
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
   timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
@@ -93,6 +110,7 @@ export const updateProjectSchema = z.object({
   acceptVoice: z.boolean().optional().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.describe('Updated storage configuration settings'),
+  moderationConfig: moderationConfigSchema.optional().describe('Updated content moderation configuration'),
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
   timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
@@ -114,6 +132,7 @@ export const projectResponseSchema = z.object({
   acceptVoice: z.boolean().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.nullable().describe('Storage configuration for conversation artifacts'),
+  moderationConfig: moderationConfigSchema.nullable().describe('Content moderation configuration'),
   constants: z.record(z.string(), parameterValueSchema).nullable().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).nullable().describe('Additional metadata for the project'),
   timezone: z.string().nullable().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Null means UTC.'),

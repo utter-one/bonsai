@@ -433,6 +433,20 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
     return OpenAILlmProvider.getStaticModels();
   }
 
+  /**
+   * Moderate user input using the OpenAI moderation API.
+   * Uses the omni-moderation-latest model which detects harassment, hate speech, self-harm, sexual content, and violence.
+   * @param input - User input text to moderate
+   * @returns Flagged status and list of violated categories
+   */
+  async moderateUserInput(input: string): Promise<{ flagged: boolean; categories: string[] }> {
+    this.ensureInitialized();
+    const response = await this.client!.moderations.create({ model: 'omni-moderation-latest', input });
+    const result = response.results[0];
+    const categories = Object.entries(result.categories).filter(([, v]) => v).map(([k]) => k);
+    return { flagged: result.flagged, categories };
+  }
+
   private static mapModelToInfo(id: string): LlmModelInfo {
     const isOSeries = /^o\d/.test(id);
     const isGpt5 = id.startsWith('gpt-5');

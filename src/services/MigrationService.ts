@@ -651,6 +651,7 @@ export class MigrationService extends BaseService {
         acceptVoice: sql`excluded.accept_voice`,
         generateVoice: sql`excluded.generate_voice`,
         storageConfig: sql`excluded.storage_config`,
+        moderationConfig: sql`excluded.moderation_config`,
         constants: sql`excluded.constants`,
         metadata: sql`excluded.metadata`,
         version: sql`${projects.version} + 1`,
