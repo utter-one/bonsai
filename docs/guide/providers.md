@@ -24,35 +24,44 @@ Used for: response generation (stages), classification (classifiers), data extra
 
 | API Type | Description |
 |---|---|
-| `openai` | OpenAI API (GPT-4o, GPT-4, etc.) |
-| `openai-legacy` | OpenAI Legacy completions API |
+| `openai` | OpenAI Responses API (GPT-5, GPT-4o, o-series) |
+| `openai-legacy` | OpenAI Chat Completions API (legacy) |
 | `anthropic` | Anthropic API (Claude models) |
-| `gemini` | Google Gemini API |
+| `gemini` | Google Gemini API (also supports Vertex AI endpoints) |
+| `groq` | Groq Cloud (fast inference, Llama / Mixtral models) |
+| `mistral` | Mistral AI API |
+| `deepseek` | DeepSeek API |
+| `openrouter` | OpenRouter (unified gateway to many providers) |
+| `together-ai` | Together AI |
+| `fireworks-ai` | Fireworks AI |
+| `perplexity` | Perplexity AI |
+| `cohere` | Cohere API |
+| `xai` | xAI (Grok models) |
 
-**Configuration (OpenAI example):**
+**Configuration example (OpenAI):**
 
 ```json
 {
   "apiKey": "sk-...",
+  "organizationId": "org-...",
   "baseUrl": "https://api.openai.com/v1"
 }
 ```
 
 **LLM Settings** (per-reference, not in the provider config):
 
-Each entity referencing an LLM provider can customize settings like model selection, temperature, and max tokens:
+Each entity referencing an LLM provider can customize settings. Available fields depend on the provider's API type — see the Swagger UI for the full per-provider schema (e.g., `OpenAILlmSettings`, `AnthropicLlmSettings`). Common fields:
 
 ```json
 {
-  "provider": "openai",
   "model": "gpt-4o",
-  "temperature": 0.7,
-  "maxTokens": 2048,
-  "topP": 1.0,
-  "frequencyPenalty": 0.0,
-  "presencePenalty": 0.0
+  "defaultMaxTokens": 2048,
+  "defaultTemperature": 0.7,
+  "defaultTopP": 1.0
 }
 ```
+
+> To discover which models are available for a configured provider, use `GET /api/providers/:id/models`.
 
 ### TTS Providers
 
