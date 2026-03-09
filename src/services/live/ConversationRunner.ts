@@ -65,6 +65,8 @@ export type TurnData = {
   assistantMessageEventId: string | null;
   /** Duration of the filler sentence LLM call in milliseconds; null when no filler was generated */
   fillerDurationMs: number | null;
+  /** Duration of the moderation API call in milliseconds; null when moderation was not performed */
+  moderationDurationMs: number | null;
 };
 
 export type StageRuntimeData = {
@@ -108,7 +110,7 @@ export class ConversationRunner {
   private responseGeneratedInTurn = false;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null };
+  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -540,6 +542,7 @@ export class ConversationRunner {
             timeToFirstTokenFromTurnStartMs,
             timeToFirstAudioMs,
             totalTurnDurationMs,
+            moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
           },
         };
         this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
@@ -1260,12 +1263,14 @@ export class ConversationRunner {
       firstAudioMs: null,
       assistantMessageEventId: null,
       fillerDurationMs: null,
+      moderationDurationMs: null,
     };
     await this.changeState('processing_user_input');
 
     // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
     // This prevents inappropriate content from reaching provider APIs and risking account bans.
     const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
+    this.turnData.moderationDurationMs = moderationResult.durationMs > 0 ? moderationResult.durationMs : null;
     if (moderationResult.detectedCategories.length > 0) {
       const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs };
       await this.saveAndSendEvent('moderation', moderationEventData);
