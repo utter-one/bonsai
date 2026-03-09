@@ -136,7 +136,7 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
 
     const response = await this.client.messages.create({
       model: this.settings.model,
-      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens ?? 4096,
       messages: anthropicMessages,
       system: system || undefined,
       temperature: this.settings.thinkingMode ? undefined : this.settings.defaultTemperature,
@@ -214,7 +214,7 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
 
       const stream = this.client.messages.stream({
         model: this.settings.model,
-        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens ?? 4096,
         messages: anthropicMessages,
         system: system || undefined,
         temperature: this.settings.thinkingMode ? undefined : this.settings.defaultTemperature,

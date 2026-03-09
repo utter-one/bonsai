@@ -151,7 +151,7 @@ export class OpenAILegacyLlmProvider<TConfig extends OpenAICompatibleConfig = Op
     const completion = await this.client.chat.completions.create({
       model: this.settings.model,
       messages: openAIMessages,
-      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+      max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens ?? 4096,
       temperature: this.settings.defaultTemperature,
       top_p: this.settings.defaultTopP,
       //stop: this.settings.stopSequences,
@@ -226,7 +226,7 @@ export class OpenAILegacyLlmProvider<TConfig extends OpenAICompatibleConfig = Op
       const stream = await this.client.chat.completions.create({
         model: this.settings.model,
         messages: openAIMessages,
-        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens,
+        max_tokens: options?.maxTokens ?? this.settings.defaultMaxTokens ?? 4096,
         temperature: this.settings.defaultTemperature,
         top_p: this.settings.defaultTopP,
         //stop: options?.stopSequences ?? this.settings.stopSequences,
