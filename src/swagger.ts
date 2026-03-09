@@ -38,6 +38,7 @@ import { azureBlobStorageProviderConfigSchema, azureBlobStorageSettingsSchema } 
 import { gcsStorageProviderConfigSchema, gcsStorageSettingsSchema } from './services/providers/storage/GcsStorageProvider';
 import { localStorageProviderConfigSchema, localStorageSettingsSchema } from './services/providers/storage/LocalStorageProvider';
 import { cartesiaTtsSettingsSchema } from './services/providers/tts/CartesiaTtsProvider';
+import { amazonPollyTtsSettingsSchema } from './services/providers/tts/AmazonPollyTtsProvider';
 import { azureAsrSettingsSchema } from './services/providers/asr/AzureAsrProvider';
 import { elevenLabsAsrSettingsSchema } from './services/providers/asr/ElevenLabsAsrProvider';
 import { deepgramAsrSettingsSchema } from './services/providers/asr/DeepgramAsrProvider';
@@ -101,6 +102,7 @@ export function getOpenAPISpec(): any {
   registry.register('DeepgramTtsSettings', deepgramTtsSettingsSchema);
   registry.register('CartesiaTtsSettings', cartesiaTtsSettingsSchema);
   registry.register('AzureTtsSettings', azureTtsSettingsSchema);
+  registry.register('AmazonPollyTtsSettings', amazonPollyTtsSettingsSchema);
 
   // Voice and ASR configuration schemas
   registry.register('AsrConfig', asrConfigSchema);

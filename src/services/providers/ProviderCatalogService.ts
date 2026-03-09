@@ -9636,6 +9636,1570 @@ export class ProviderCatalogService {
           { code: 'tr-TR', displayName: 'Turkish (Turkey)' },
         ],
       },
+      {
+        apiType: 'amazon-polly',
+        displayName: 'Amazon Polly',
+        description: 'Amazon Web Services Polly text-to-speech with neural and standard voices, 20+ languages, and support for SSML. Synthesizes speech in batch mode (full text sent at once).',
+        models: [
+          {
+            id: 'neural',
+            displayName: 'Neural TTS',
+            description: 'High-quality neural text-to-speech with natural, human-like voices',
+            recommended: true,
+            languages: ['en-US', 'en-GB', 'en-AU', 'en-IN', 'en-IE', 'en-NZ', 'en-SG', 'en-ZA', 'es-US', 'es-ES', 'es-MX', 'fr-FR', 'fr-BE', 'fr-CA', 'de-DE', 'de-AT', 'de-CH', 'it-IT', 'pt-BR', 'pt-PT', 'ja-JP', 'ko-KR', 'hi-IN', 'ar-AE', 'nl-BE', 'nl-NL', 'pl-PL', 'sv-SE', 'tr-TR', 'ru-RU', 'nb-NO', 'da-DK', 'fi-FI', 'cy-GB', 'is-IS', 'ro-RO', 'ca-ES', 'cs-CZ', 'yue-CN', 'cmn-CN'],
+            supportedAudioFormats: ['mp3', 'pcm_8000', 'pcm_16000'],
+            supportsFullStreaming: false,
+            supportsVoiceSettings: false,
+            voices: [
+              {
+                "id": "Hala",
+                "displayName": "Hala (ar-AE)",
+                "gender": "female",
+                "languages": [
+                  "ar-AE"
+                ],
+                "description": "Arabic (Gulf) female neural voice"
+              },
+              {
+                "id": "Zayd",
+                "displayName": "Zayd (ar-AE)",
+                "gender": "male",
+                "languages": [
+                  "ar-AE"
+                ],
+                "description": "Arabic (Gulf) male neural voice"
+              },
+              {
+                "id": "Lisa",
+                "displayName": "Lisa (nl-BE)",
+                "gender": "female",
+                "languages": [
+                  "nl-BE"
+                ],
+                "description": "Dutch (Belgian) female neural voice"
+              },
+              {
+                "id": "Arlet",
+                "displayName": "Arlet (ca-ES)",
+                "gender": "female",
+                "languages": [
+                  "ca-ES"
+                ],
+                "description": "Catalan female neural voice"
+              },
+              {
+                "id": "Jitka",
+                "displayName": "Jitka (cs-CZ)",
+                "gender": "female",
+                "languages": [
+                  "cs-CZ"
+                ],
+                "description": "Czech female neural voice"
+              },
+              {
+                "id": "Hiujin",
+                "displayName": "Hiujin (yue-CN)",
+                "gender": "female",
+                "languages": [
+                  "yue-CN"
+                ],
+                "description": "Chinese (Cantonese) female neural voice"
+              },
+              {
+                "id": "Zhiyu",
+                "displayName": "Zhiyu (cmn-CN)",
+                "gender": "female",
+                "languages": [
+                  "cmn-CN"
+                ],
+                "description": "Chinese (Mandarin) female neural voice"
+              },
+              {
+                "id": "Sofie",
+                "displayName": "Sofie (da-DK)",
+                "gender": "female",
+                "languages": [
+                  "da-DK"
+                ],
+                "description": "Danish female neural voice"
+              },
+              {
+                "id": "Laura",
+                "displayName": "Laura (nl-NL)",
+                "gender": "female",
+                "languages": [
+                  "nl-NL"
+                ],
+                "description": "Dutch female neural voice"
+              },
+              {
+                "id": "Olivia",
+                "displayName": "Olivia (en-AU)",
+                "gender": "female",
+                "languages": [
+                  "en-AU"
+                ],
+                "description": "English (Australian) female neural voice"
+              },
+              {
+                "id": "Amy",
+                "displayName": "Amy* (en-GB)",
+                "gender": "female",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) female neural voice"
+              },
+              {
+                "id": "Emma",
+                "displayName": "Emma (en-GB)",
+                "gender": "female",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) female neural voice"
+              },
+              {
+                "id": "Brian",
+                "displayName": "Brian (en-GB)",
+                "gender": "male",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) male neural voice"
+              },
+              {
+                "id": "Arthur",
+                "displayName": "Arthur (en-GB)",
+                "gender": "male",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) male neural voice"
+              },
+              {
+                "id": "Kajal",
+                "displayName": "Kajal (en-IN)",
+                "gender": "female",
+                "languages": [
+                  "en-IN"
+                ],
+                "description": "English (Indian) female neural voice"
+              },
+              {
+                "id": "Niamh",
+                "displayName": "Niamh (en-IE)",
+                "gender": "female",
+                "languages": [
+                  "en-IE"
+                ],
+                "description": "English (Ireland) female neural voice"
+              },
+              {
+                "id": "Aria",
+                "displayName": "Aria (en-NZ)",
+                "gender": "female",
+                "languages": [
+                  "en-NZ"
+                ],
+                "description": "English (New Zealand) female neural voice"
+              },
+              {
+                "id": "Jasmine",
+                "displayName": "Jasmine (en-SG)",
+                "gender": "female",
+                "languages": [
+                  "en-SG"
+                ],
+                "description": "English (Singaporean) female neural voice"
+              },
+              {
+                "id": "Ayanda",
+                "displayName": "Ayanda (en-ZA)",
+                "gender": "female",
+                "languages": [
+                  "en-ZA"
+                ],
+                "description": "English (South African) female neural voice"
+              },
+              {
+                "id": "Danielle",
+                "displayName": "Danielle (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female neural voice"
+              },
+              {
+                "id": "Gregory",
+                "displayName": "Gregory (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male neural voice"
+              },
+              {
+                "id": "Ivy",
+                "displayName": "Ivy (en-US) (child)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female (child) neural voice"
+              },
+              {
+                "id": "Joanna",
+                "displayName": "Joanna* (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female neural voice"
+              },
+              {
+                "id": "Kendra",
+                "displayName": "Kendra (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female neural voice"
+              },
+              {
+                "id": "Kimberly",
+                "displayName": "Kimberly (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female neural voice"
+              },
+              {
+                "id": "Salli",
+                "displayName": "Salli (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female neural voice"
+              },
+              {
+                "id": "Joey",
+                "displayName": "Joey (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male neural voice"
+              },
+              {
+                "id": "Justin",
+                "displayName": "Justin (en-US) (child)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male (child) neural voice"
+              },
+              {
+                "id": "Kevin",
+                "displayName": "Kevin (en-US) (child)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male (child) neural voice"
+              },
+              {
+                "id": "Matthew",
+                "displayName": "Matthew* (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male neural voice"
+              },
+              {
+                "id": "Ruth",
+                "displayName": "Ruth (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female neural voice"
+              },
+              {
+                "id": "Stephen",
+                "displayName": "Stephen (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male neural voice"
+              },
+              {
+                "id": "Suvi",
+                "displayName": "Suvi (fi-FI)",
+                "gender": "female",
+                "languages": [
+                  "fi-FI"
+                ],
+                "description": "Finnish female neural voice"
+              },
+              {
+                "id": "Léa",
+                "displayName": "Léa (fr-FR)",
+                "gender": "female",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French female neural voice"
+              },
+              {
+                "id": "Rémi",
+                "displayName": "Rémi (fr-FR)",
+                "gender": "male",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French male neural voice"
+              },
+              {
+                "id": "Isabelle",
+                "displayName": "Isabelle (fr-BE)",
+                "gender": "female",
+                "languages": [
+                  "fr-BE"
+                ],
+                "description": "French (Belgian) female neural voice"
+              },
+              {
+                "id": "Gabrielle",
+                "displayName": "Gabrielle (fr-CA)",
+                "gender": "female",
+                "languages": [
+                  "fr-CA"
+                ],
+                "description": "French (Canadian) female neural voice"
+              },
+              {
+                "id": "Liam",
+                "displayName": "Liam (fr-CA)",
+                "gender": "male",
+                "languages": [
+                  "fr-CA"
+                ],
+                "description": "French (Canadian) male neural voice"
+              },
+              {
+                "id": "Vicki",
+                "displayName": "Vicki (de-DE)",
+                "gender": "female",
+                "languages": [
+                  "de-DE"
+                ],
+                "description": "German female neural voice"
+              },
+              {
+                "id": "Daniel",
+                "displayName": "Daniel (de-DE)",
+                "gender": "male",
+                "languages": [
+                  "de-DE"
+                ],
+                "description": "German male neural voice"
+              },
+              {
+                "id": "Hannah",
+                "displayName": "Hannah (de-AT)",
+                "gender": "female",
+                "languages": [
+                  "de-AT"
+                ],
+                "description": "German (Austrian) female neural voice"
+              },
+              {
+                "id": "Sabrina",
+                "displayName": "Sabrina (de-CH)",
+                "gender": "female",
+                "languages": [
+                  "de-CH"
+                ],
+                "description": "German (Swiss) female neural voice"
+              },
+              {
+                "id": "Kajal",
+                "displayName": "Kajal (hi-IN)",
+                "gender": "female",
+                "languages": [
+                  "hi-IN"
+                ],
+                "description": "Hindi female neural voice"
+              },
+              {
+                "id": "Bianca",
+                "displayName": "Bianca (it-IT)",
+                "gender": "female",
+                "languages": [
+                  "it-IT"
+                ],
+                "description": "Italian female neural voice"
+              },
+              {
+                "id": "Adriano",
+                "displayName": "Adriano (it-IT)",
+                "gender": "male",
+                "languages": [
+                  "it-IT"
+                ],
+                "description": "Italian male neural voice"
+              },
+              {
+                "id": "Takumi",
+                "displayName": "Takumi (ja-JP)",
+                "gender": "male",
+                "languages": [
+                  "ja-JP"
+                ],
+                "description": "Japanese male neural voice"
+              },
+              {
+                "id": "Kazuha",
+                "displayName": "Kazuha (ja-JP)",
+                "gender": "female",
+                "languages": [
+                  "ja-JP"
+                ],
+                "description": "Japanese female neural voice"
+              },
+              {
+                "id": "Tomoko",
+                "displayName": "Tomoko (ja-JP)",
+                "gender": "female",
+                "languages": [
+                  "ja-JP"
+                ],
+                "description": "Japanese female neural voice"
+              },
+              {
+                "id": "Seoyeon",
+                "displayName": "Seoyeon (ko-KR)",
+                "gender": "female",
+                "languages": [
+                  "ko-KR"
+                ],
+                "description": "Korean female neural voice"
+              },
+              {
+                "id": "Jihye",
+                "displayName": "Jihye (ko-KR)",
+                "gender": "female",
+                "languages": [
+                  "ko-KR"
+                ],
+                "description": "Korean female neural voice"
+              },
+              {
+                "id": "Ida",
+                "displayName": "Ida (nb-NO)",
+                "gender": "female",
+                "languages": [
+                  "nb-NO"
+                ],
+                "description": "Norwegian female neural voice"
+              },
+              {
+                "id": "Ola",
+                "displayName": "Ola (pl-PL)",
+                "gender": "female",
+                "languages": [
+                  "pl-PL"
+                ],
+                "description": "Polish female neural voice"
+              },
+              {
+                "id": "Camila",
+                "displayName": "Camila (pt-BR)",
+                "gender": "female",
+                "languages": [
+                  "pt-BR"
+                ],
+                "description": "Portuguese (Brazilian) female neural voice"
+              },
+              {
+                "id": "Vitória/Vitoria",
+                "displayName": "Vitória/Vitoria (pt-BR)",
+                "gender": "female",
+                "languages": [
+                  "pt-BR"
+                ],
+                "description": "Portuguese (Brazilian) female neural voice"
+              },
+              {
+                "id": "Thiago",
+                "displayName": "Thiago (pt-BR)",
+                "gender": "male",
+                "languages": [
+                  "pt-BR"
+                ],
+                "description": "Portuguese (Brazilian) male neural voice"
+              },
+              {
+                "id": "Inês/Ines",
+                "displayName": "Inês/Ines (pt-PT)",
+                "gender": "female",
+                "languages": [
+                  "pt-PT"
+                ],
+                "description": "Portuguese (European) female neural voice"
+              },
+              {
+                "id": "Lucia",
+                "displayName": "Lucia (es-ES)",
+                "gender": "female",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) female neural voice"
+              },
+              {
+                "id": "Sergio",
+                "displayName": "Sergio (es-ES)",
+                "gender": "male",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) male neural voice"
+              },
+              {
+                "id": "Mia",
+                "displayName": "Mia (es-MX)",
+                "gender": "female",
+                "languages": [
+                  "es-MX"
+                ],
+                "description": "Spanish (Mexican) female neural voice"
+              },
+              {
+                "id": "Andrés",
+                "displayName": "Andrés (es-MX)",
+                "gender": "male",
+                "languages": [
+                  "es-MX"
+                ],
+                "description": "Spanish (Mexican) male neural voice"
+              },
+              {
+                "id": "Lupe",
+                "displayName": "Lupe* (es-US)",
+                "gender": "female",
+                "languages": [
+                  "es-US"
+                ],
+                "description": "Spanish (US) female neural voice"
+              },
+              {
+                "id": "Pedro",
+                "displayName": "Pedro (es-US)",
+                "gender": "male",
+                "languages": [
+                  "es-US"
+                ],
+                "description": "Spanish (US) male neural voice"
+              },
+              {
+                "id": "Elin",
+                "displayName": "Elin (sv-SE)",
+                "gender": "female",
+                "languages": [
+                  "sv-SE"
+                ],
+                "description": "Swedish female neural voice"
+              },
+              {
+                "id": "Burcu",
+                "displayName": "Burcu (tr-TR)",
+                "gender": "female",
+                "languages": [
+                  "tr-TR"
+                ],
+                "description": "Turkish female neural voice"
+              }
+            ]
+          },
+          {
+            id: 'standard',
+            displayName: 'Standard TTS',
+            description: 'Cost-effective standard text-to-speech with wide language support',
+            languages: ['en-US', 'en-GB', 'en-AU', 'en-IN', 'en-GB-WLS', 'es-US', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'pt-BR', 'pt-PT', 'ja-JP', 'ko-KR', 'arb', 'cmn-CN', 'ru-RU', 'nl-NL', 'pl-PL', 'sv-SE', 'tr-TR', 'nb-NO', 'da-DK', 'fi-FI', 'cy-GB', 'is-IS', 'ro-RO', 'ca-ES'],
+            supportedAudioFormats: ['mp3', 'pcm_8000', 'pcm_16000'],
+            supportsFullStreaming: false,
+            supportsVoiceSettings: false,
+            voices: [
+              {
+                "id": "Zeina",
+                "displayName": "Zeina (arb)",
+                "gender": "female",
+                "languages": [
+                  "arb"
+                ],
+                "description": "Arabic female standard voice"
+              },
+              {
+                "id": "Zhiyu",
+                "displayName": "Zhiyu (cmn-CN)",
+                "gender": "female",
+                "languages": [
+                  "cmn-CN"
+                ],
+                "description": "Chinese (Mandarin) female standard voice"
+              },
+              {
+                "id": "Naja",
+                "displayName": "Naja (da-DK)",
+                "gender": "female",
+                "languages": [
+                  "da-DK"
+                ],
+                "description": "Danish female standard voice"
+              },
+              {
+                "id": "Mads",
+                "displayName": "Mads (da-DK)",
+                "gender": "male",
+                "languages": [
+                  "da-DK"
+                ],
+                "description": "Danish male standard voice"
+              },
+              {
+                "id": "Lotte",
+                "displayName": "Lotte (nl-NL)",
+                "gender": "female",
+                "languages": [
+                  "nl-NL"
+                ],
+                "description": "Dutch female standard voice"
+              },
+              {
+                "id": "Ruben",
+                "displayName": "Ruben (nl-NL)",
+                "gender": "male",
+                "languages": [
+                  "nl-NL"
+                ],
+                "description": "Dutch male standard voice"
+              },
+              {
+                "id": "Nicole",
+                "displayName": "Nicole (en-AU)",
+                "gender": "female",
+                "languages": [
+                  "en-AU"
+                ],
+                "description": "English (Australian) female standard voice"
+              },
+              {
+                "id": "Russell",
+                "displayName": "Russell (en-AU)",
+                "gender": "male",
+                "languages": [
+                  "en-AU"
+                ],
+                "description": "English (Australian) male standard voice"
+              },
+              {
+                "id": "Amy",
+                "displayName": "Amy* (en-GB)",
+                "gender": "female",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) female standard voice"
+              },
+              {
+                "id": "Emma",
+                "displayName": "Emma (en-GB)",
+                "gender": "female",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) female standard voice"
+              },
+              {
+                "id": "Brian",
+                "displayName": "Brian (en-GB)",
+                "gender": "male",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) male standard voice"
+              },
+              {
+                "id": "Aditi",
+                "displayName": "Aditi (en-IN)",
+                "gender": "female",
+                "languages": [
+                  "en-IN"
+                ],
+                "description": "English (Indian) female standard voice"
+              },
+              {
+                "id": "Raveena",
+                "displayName": "Raveena (en-IN)",
+                "gender": "female",
+                "languages": [
+                  "en-IN"
+                ],
+                "description": "English (Indian) female standard voice"
+              },
+              {
+                "id": "Ivy",
+                "displayName": "Ivy (en-US) (child)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female (child) standard voice"
+              },
+              {
+                "id": "Joanna",
+                "displayName": "Joanna* (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female standard voice"
+              },
+              {
+                "id": "Kendra",
+                "displayName": "Kendra (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female standard voice"
+              },
+              {
+                "id": "Kimberly",
+                "displayName": "Kimberly (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female standard voice"
+              },
+              {
+                "id": "Salli",
+                "displayName": "Salli (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female standard voice"
+              },
+              {
+                "id": "Joey",
+                "displayName": "Joey (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male standard voice"
+              },
+              {
+                "id": "Kevin",
+                "displayName": "Kevin (en-US) (child)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male (child) standard voice"
+              },
+              {
+                "id": "Geraint",
+                "displayName": "Geraint (en-GB-WLS)",
+                "gender": "male",
+                "languages": [
+                  "en-GB-WLS"
+                ],
+                "description": "English (Welsh) male standard voice"
+              },
+              {
+                "id": "Céline/Celine",
+                "displayName": "Céline/Celine (fr-FR)",
+                "gender": "female",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French female standard voice"
+              },
+              {
+                "id": "Léa",
+                "displayName": "Léa (fr-FR)",
+                "gender": "female",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French female standard voice"
+              },
+              {
+                "id": "Mathieu",
+                "displayName": "Mathieu (fr-FR)",
+                "gender": "male",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French male standard voice"
+              },
+              {
+                "id": "Chantal",
+                "displayName": "Chantal (fr-CA)",
+                "gender": "female",
+                "languages": [
+                  "fr-CA"
+                ],
+                "description": "French (Canadian) female standard voice"
+              },
+              {
+                "id": "Marlene",
+                "displayName": "Marlene (de-DE)",
+                "gender": "female",
+                "languages": [
+                  "de-DE"
+                ],
+                "description": "German female standard voice"
+              },
+              {
+                "id": "Vicki",
+                "displayName": "Vicki (de-DE)",
+                "gender": "female",
+                "languages": [
+                  "de-DE"
+                ],
+                "description": "German female standard voice"
+              },
+              {
+                "id": "Hans",
+                "displayName": "Hans (de-DE)",
+                "gender": "male",
+                "languages": [
+                  "de-DE"
+                ],
+                "description": "German male standard voice"
+              },
+              {
+                "id": "Aditi",
+                "displayName": "Aditi (hi-IN)",
+                "gender": "female",
+                "languages": [
+                  "hi-IN"
+                ],
+                "description": "Hindi female standard voice"
+              },
+              {
+                "id": "Dóra/Dora",
+                "displayName": "Dóra/Dora (is-IS)",
+                "gender": "female",
+                "languages": [
+                  "is-IS"
+                ],
+                "description": "Icelandic female standard voice"
+              },
+              {
+                "id": "Karl",
+                "displayName": "Karl (is-IS)",
+                "gender": "male",
+                "languages": [
+                  "is-IS"
+                ],
+                "description": "Icelandic male standard voice"
+              },
+              {
+                "id": "Carla",
+                "displayName": "Carla (it-IT)",
+                "gender": "female",
+                "languages": [
+                  "it-IT"
+                ],
+                "description": "Italian female standard voice"
+              },
+              {
+                "id": "Bianca",
+                "displayName": "Bianca (it-IT)",
+                "gender": "female",
+                "languages": [
+                  "it-IT"
+                ],
+                "description": "Italian female standard voice"
+              },
+              {
+                "id": "Giorgio",
+                "displayName": "Giorgio (it-IT)",
+                "gender": "male",
+                "languages": [
+                  "it-IT"
+                ],
+                "description": "Italian male standard voice"
+              },
+              {
+                "id": "Mizuki",
+                "displayName": "Mizuki (ja-JP)",
+                "gender": "female",
+                "languages": [
+                  "ja-JP"
+                ],
+                "description": "Japanese female standard voice"
+              },
+              {
+                "id": "Takumi",
+                "displayName": "Takumi (ja-JP)",
+                "gender": "male",
+                "languages": [
+                  "ja-JP"
+                ],
+                "description": "Japanese male standard voice"
+              },
+              {
+                "id": "Seoyeon",
+                "displayName": "Seoyeon (ko-KR)",
+                "gender": "female",
+                "languages": [
+                  "ko-KR"
+                ],
+                "description": "Korean female standard voice"
+              },
+              {
+                "id": "Liv",
+                "displayName": "Liv (nb-NO)",
+                "gender": "female",
+                "languages": [
+                  "nb-NO"
+                ],
+                "description": "Norwegian female standard voice"
+              },
+              {
+                "id": "Ewa",
+                "displayName": "Ewa (pl-PL)",
+                "gender": "female",
+                "languages": [
+                  "pl-PL"
+                ],
+                "description": "Polish female standard voice"
+              },
+              {
+                "id": "Maja",
+                "displayName": "Maja (pl-PL)",
+                "gender": "female",
+                "languages": [
+                  "pl-PL"
+                ],
+                "description": "Polish female standard voice"
+              },
+              {
+                "id": "Jacek",
+                "displayName": "Jacek (pl-PL)",
+                "gender": "male",
+                "languages": [
+                  "pl-PL"
+                ],
+                "description": "Polish male standard voice"
+              },
+              {
+                "id": "Jan",
+                "displayName": "Jan (pl-PL)",
+                "gender": "male",
+                "languages": [
+                  "pl-PL"
+                ],
+                "description": "Polish male standard voice"
+              },
+              {
+                "id": "Camila",
+                "displayName": "Camila (pt-BR)",
+                "gender": "female",
+                "languages": [
+                  "pt-BR"
+                ],
+                "description": "Portuguese (Brazilian) female standard voice"
+              },
+              {
+                "id": "Vitória/Vitoria",
+                "displayName": "Vitória/Vitoria (pt-BR)",
+                "gender": "female",
+                "languages": [
+                  "pt-BR"
+                ],
+                "description": "Portuguese (Brazilian) female standard voice"
+              },
+              {
+                "id": "Ricardo",
+                "displayName": "Ricardo (pt-BR)",
+                "gender": "male",
+                "languages": [
+                  "pt-BR"
+                ],
+                "description": "Portuguese (Brazilian) male standard voice"
+              },
+              {
+                "id": "Inês/Ines",
+                "displayName": "Inês/Ines (pt-PT)",
+                "gender": "female",
+                "languages": [
+                  "pt-PT"
+                ],
+                "description": "Portuguese (European) female standard voice"
+              },
+              {
+                "id": "Cristiano",
+                "displayName": "Cristiano (pt-PT)",
+                "gender": "male",
+                "languages": [
+                  "pt-PT"
+                ],
+                "description": "Portuguese (European) male standard voice"
+              },
+              {
+                "id": "Carmen",
+                "displayName": "Carmen (ro-RO)",
+                "gender": "female",
+                "languages": [
+                  "ro-RO"
+                ],
+                "description": "Romanian female standard voice"
+              },
+              {
+                "id": "Tatyana",
+                "displayName": "Tatyana (ru-RU)",
+                "gender": "female",
+                "languages": [
+                  "ru-RU"
+                ],
+                "description": "Russian female standard voice"
+              },
+              {
+                "id": "Maxim",
+                "displayName": "Maxim (ru-RU)",
+                "gender": "male",
+                "languages": [
+                  "ru-RU"
+                ],
+                "description": "Russian male standard voice"
+              },
+              {
+                "id": "Conchita",
+                "displayName": "Conchita (es-ES)",
+                "gender": "female",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) female standard voice"
+              },
+              {
+                "id": "Lucia",
+                "displayName": "Lucia (es-ES)",
+                "gender": "female",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) female standard voice"
+              },
+              {
+                "id": "Enrique",
+                "displayName": "Enrique (es-ES)",
+                "gender": "male",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) male standard voice"
+              },
+              {
+                "id": "Mia",
+                "displayName": "Mia (es-MX)",
+                "gender": "female",
+                "languages": [
+                  "es-MX"
+                ],
+                "description": "Spanish (Mexican) female standard voice"
+              },
+              {
+                "id": "Lupe",
+                "displayName": "Lupe* (es-US)",
+                "gender": "female",
+                "languages": [
+                  "es-US"
+                ],
+                "description": "Spanish (US) female standard voice"
+              },
+              {
+                "id": "Penélope/Penelope",
+                "displayName": "Penélope/Penelope (es-US)",
+                "gender": "female",
+                "languages": [
+                  "es-US"
+                ],
+                "description": "Spanish (US) female standard voice"
+              },
+              {
+                "id": "Miguel",
+                "displayName": "Miguel (es-US)",
+                "gender": "male",
+                "languages": [
+                  "es-US"
+                ],
+                "description": "Spanish (US) male standard voice"
+              },
+              {
+                "id": "Astrid",
+                "displayName": "Astrid (sv-SE)",
+                "gender": "female",
+                "languages": [
+                  "sv-SE"
+                ],
+                "description": "Swedish female standard voice"
+              },
+              {
+                "id": "Filiz",
+                "displayName": "Filiz (tr-TR)",
+                "gender": "female",
+                "languages": [
+                  "tr-TR"
+                ],
+                "description": "Turkish female standard voice"
+              },
+              {
+                "id": "Gwyneth",
+                "displayName": "Gwyneth (cy-GB)",
+                "gender": "female",
+                "languages": [
+                  "cy-GB"
+                ],
+                "description": "Welsh female standard voice"
+              }
+            ]
+          },
+          {
+            id: 'long-form',
+            displayName: 'Long-Form TTS',
+            description: 'Optimized for long-form content such as articles and blog posts',
+            languages: ['en-US', 'es-ES'],
+            supportedAudioFormats: ['mp3', 'pcm_8000', 'pcm_16000'],
+            supportsFullStreaming: false,
+            supportsVoiceSettings: false,
+            voices: [
+              {
+                "id": "Danielle",
+                "displayName": "Danielle (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female long form voice"
+              },
+              {
+                "id": "Gregory",
+                "displayName": "Gregory (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male long form voice"
+              },
+              {
+                "id": "Ruth",
+                "displayName": "Ruth (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female long form voice"
+              },
+              {
+                "id": "Patrick",
+                "displayName": "Patrick (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male long form voice"
+              },
+              {
+                "id": "Alba",
+                "displayName": "Alba (es-ES)",
+                "gender": "female",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) female long form voice"
+              },
+              {
+                "id": "Raúl",
+                "displayName": "Raúl (es-ES)",
+                "gender": "male",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) male long form voice"
+              }
+            ]
+          },
+          {
+            id: 'generative',
+            displayName: 'Generative TTS',
+            description: 'Most natural-sounding generative model for expressive, conversational speech',
+            languages: ['en-US', 'en-GB', 'en-IN', 'en-IE', 'en-ZA', 'en-AU', 'nl-BE', 'nl-NL', 'fr-FR', 'fr-BE', 'fr-CA', 'de-DE', 'de-AT', 'it-IT', 'pt-BR', 'es-US', 'es-ES', 'es-MX', 'ko-KR', 'pl-PL'],
+            supportedAudioFormats: ['mp3', 'pcm_8000', 'pcm_16000'],
+            supportsFullStreaming: false,
+            supportsVoiceSettings: false,
+            voices: [
+              {
+                "id": "Lisa",
+                "displayName": "Lisa (nl-BE)",
+                "gender": "female",
+                "languages": [
+                  "nl-BE"
+                ],
+                "description": "Dutch (Belgian) female generative voice"
+              },
+              {
+                "id": "Laura",
+                "displayName": "Laura (nl-NL)",
+                "gender": "female",
+                "languages": [
+                  "nl-NL"
+                ],
+                "description": "Dutch female generative voice"
+              },
+              {
+                "id": "Olivia",
+                "displayName": "Olivia (en-AU)",
+                "gender": "female",
+                "languages": [
+                  "en-AU"
+                ],
+                "description": "English (Australian) female generative voice"
+              },
+              {
+                "id": "Amy",
+                "displayName": "Amy* (en-GB)",
+                "gender": "female",
+                "languages": [
+                  "en-GB"
+                ],
+                "description": "English (British) female generative voice"
+              },
+              {
+                "id": "Kajal",
+                "displayName": "Kajal (en-IN)",
+                "gender": "female",
+                "languages": [
+                  "en-IN"
+                ],
+                "description": "English (Indian) female generative voice"
+              },
+              {
+                "id": "Niamh",
+                "displayName": "Niamh (en-IE)",
+                "gender": "female",
+                "languages": [
+                  "en-IE"
+                ],
+                "description": "English (Ireland) female generative voice"
+              },
+              {
+                "id": "Ayanda",
+                "displayName": "Ayanda (en-ZA)",
+                "gender": "female",
+                "languages": [
+                  "en-ZA"
+                ],
+                "description": "English (South African) female generative voice"
+              },
+              {
+                "id": "Danielle",
+                "displayName": "Danielle (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female generative voice"
+              },
+              {
+                "id": "Joanna",
+                "displayName": "Joanna* (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female generative voice"
+              },
+              {
+                "id": "Salli",
+                "displayName": "Salli (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female generative voice"
+              },
+              {
+                "id": "Matthew",
+                "displayName": "Matthew* (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male generative voice"
+              },
+              {
+                "id": "Ruth",
+                "displayName": "Ruth (en-US)",
+                "gender": "female",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) female generative voice"
+              },
+              {
+                "id": "Stephen",
+                "displayName": "Stephen (en-US)",
+                "gender": "male",
+                "languages": [
+                  "en-US"
+                ],
+                "description": "English (US) male generative voice"
+              },
+              {
+                "id": "Céline/Celine",
+                "displayName": "Céline/Celine (fr-FR)",
+                "gender": "female",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French female generative voice"
+              },
+              {
+                "id": "Léa",
+                "displayName": "Léa (fr-FR)",
+                "gender": "female",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French female generative voice"
+              },
+              {
+                "id": "Rémi",
+                "displayName": "Rémi (fr-FR)",
+                "gender": "male",
+                "languages": [
+                  "fr-FR"
+                ],
+                "description": "French male generative voice"
+              },
+              {
+                "id": "Isabelle",
+                "displayName": "Isabelle (fr-BE)",
+                "gender": "female",
+                "languages": [
+                  "fr-BE"
+                ],
+                "description": "French (Belgian) female generative voice"
+              },
+              {
+                "id": "Gabrielle",
+                "displayName": "Gabrielle (fr-CA)",
+                "gender": "female",
+                "languages": [
+                  "fr-CA"
+                ],
+                "description": "French (Canadian) female generative voice"
+              },
+              {
+                "id": "Liam",
+                "displayName": "Liam (fr-CA)",
+                "gender": "male",
+                "languages": [
+                  "fr-CA"
+                ],
+                "description": "French (Canadian) male generative voice"
+              },
+              {
+                "id": "Vicki",
+                "displayName": "Vicki (de-DE)",
+                "gender": "female",
+                "languages": [
+                  "de-DE"
+                ],
+                "description": "German female generative voice"
+              },
+              {
+                "id": "Daniel",
+                "displayName": "Daniel (de-DE)",
+                "gender": "male",
+                "languages": [
+                  "de-DE"
+                ],
+                "description": "German male generative voice"
+              },
+              {
+                "id": "Hannah",
+                "displayName": "Hannah (de-AT)",
+                "gender": "female",
+                "languages": [
+                  "de-AT"
+                ],
+                "description": "German (Austrian) female generative voice"
+              },
+              {
+                "id": "Bianca",
+                "displayName": "Bianca (it-IT)",
+                "gender": "female",
+                "languages": [
+                  "it-IT"
+                ],
+                "description": "Italian female generative voice"
+              },
+              {
+                "id": "Seoyeon",
+                "displayName": "Seoyeon (ko-KR)",
+                "gender": "female",
+                "languages": [
+                  "ko-KR"
+                ],
+                "description": "Korean female generative voice"
+              },
+              {
+                "id": "Ewa",
+                "displayName": "Ewa (pl-PL)",
+                "gender": "female",
+                "languages": [
+                  "pl-PL"
+                ],
+                "description": "Polish female generative voice"
+              },
+              {
+                "id": "Ola",
+                "displayName": "Ola (pl-PL)",
+                "gender": "female",
+                "languages": [
+                  "pl-PL"
+                ],
+                "description": "Polish female generative voice"
+              },
+              {
+                "id": "Camila",
+                "displayName": "Camila (pt-BR)",
+                "gender": "female",
+                "languages": [
+                  "pt-BR"
+                ],
+                "description": "Portuguese (Brazilian) female generative voice"
+              },
+              {
+                "id": "Lucia",
+                "displayName": "Lucia (es-ES)",
+                "gender": "female",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) female generative voice"
+              },
+              {
+                "id": "Sergio",
+                "displayName": "Sergio (es-ES)",
+                "gender": "male",
+                "languages": [
+                  "es-ES"
+                ],
+                "description": "Spanish (Spain) male generative voice"
+              },
+              {
+                "id": "Mia",
+                "displayName": "Mia (es-MX)",
+                "gender": "female",
+                "languages": [
+                  "es-MX"
+                ],
+                "description": "Spanish (Mexican) female generative voice"
+              },
+              {
+                "id": "Andrés",
+                "displayName": "Andrés (es-MX)",
+                "gender": "male",
+                "languages": [
+                  "es-MX"
+                ],
+                "description": "Spanish (Mexican) male generative voice"
+              },
+              {
+                "id": "Lupe",
+                "displayName": "Lupe* (es-US)",
+                "gender": "female",
+                "languages": [
+                  "es-US"
+                ],
+                "description": "Spanish (US) female generative voice"
+              },
+              {
+                "id": "Pedro",
+                "displayName": "Pedro (es-US)",
+                "gender": "male",
+                "languages": [
+                  "es-US"
+                ],
+                "description": "Spanish (US) male generative voice"
+              }
+            ]
+          },
+        ],
+        voices: [],
+        languages: [
+          { code: 'en-US', displayName: 'English (US)' },
+          { code: 'en-GB', displayName: 'English (UK)' },
+          { code: 'en-AU', displayName: 'English (Australia)' },
+          { code: 'en-IN', displayName: 'English (India)' },
+          { code: 'en-IE', displayName: 'English (Ireland)' },
+          { code: 'en-NZ', displayName: 'English (New Zealand)' },
+          { code: 'en-SG', displayName: 'English (Singapore)' },
+          { code: 'en-ZA', displayName: 'English (South Africa)' },
+          { code: 'en-GB-WLS', displayName: 'English (Welsh)' },
+          { code: 'es-US', displayName: 'Spanish (US)' },
+          { code: 'es-ES', displayName: 'Spanish (Spain)' },
+          { code: 'es-MX', displayName: 'Spanish (Mexico)' },
+          { code: 'fr-FR', displayName: 'French (France)' },
+          { code: 'fr-BE', displayName: 'French (Belgian)' },
+          { code: 'fr-CA', displayName: 'French (Canada)' },
+          { code: 'de-DE', displayName: 'German (Germany)' },
+          { code: 'de-AT', displayName: 'German (Austria)' },
+          { code: 'de-CH', displayName: 'German (Switzerland)' },
+          { code: 'it-IT', displayName: 'Italian (Italy)' },
+          { code: 'pt-BR', displayName: 'Portuguese (Brazil)' },
+          { code: 'pt-PT', displayName: 'Portuguese (Portugal)' },
+          { code: 'ja-JP', displayName: 'Japanese (Japan)' },
+          { code: 'ko-KR', displayName: 'Korean (South Korea)' },
+          { code: 'cmn-CN', displayName: 'Chinese (Mandarin)' },
+          { code: 'yue-CN', displayName: 'Chinese (Cantonese)' },
+          { code: 'arb', displayName: 'Arabic (Standard)' },
+          { code: 'ar-AE', displayName: 'Arabic (Gulf)' },
+          { code: 'hi-IN', displayName: 'Hindi (India)' },
+          { code: 'ru-RU', displayName: 'Russian (Russia)' },
+          { code: 'nl-NL', displayName: 'Dutch (Netherlands)' },
+          { code: 'nl-BE', displayName: 'Dutch (Belgian)' },
+          { code: 'pl-PL', displayName: 'Polish (Poland)' },
+          { code: 'sv-SE', displayName: 'Swedish (Sweden)' },
+          { code: 'tr-TR', displayName: 'Turkish (Turkey)' },
+          { code: 'nb-NO', displayName: 'Norwegian Bokmål (Norway)' },
+          { code: 'da-DK', displayName: 'Danish (Denmark)' },
+          { code: 'fi-FI', displayName: 'Finnish (Finland)' },
+          { code: 'cy-GB', displayName: 'Welsh (UK)' },
+          { code: 'is-IS', displayName: 'Icelandic (Iceland)' },
+          { code: 'ro-RO', displayName: 'Romanian (Romania)' },
+          { code: 'ca-ES', displayName: 'Catalan (Spain)' },
+          { code: 'cs-CZ', displayName: 'Czech (Czech Republic)' },
+        ],
+      },
     ];
   }
 
