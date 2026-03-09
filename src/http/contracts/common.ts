@@ -9,6 +9,7 @@ import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsP
 import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
 import { cartesiaTtsSettingsSchema } from '../../services/providers/tts/CartesiaTtsProvider';
 import { azureTtsSettingsSchema } from '../../services/providers/tts/AzureTtsProvider';
+import { amazonPollyTtsSettingsSchema } from '../../services/providers/tts/AmazonPollyTtsProvider';
 import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from '../../utils/pagination';
 
 extendZodWithOpenApi(z);
@@ -122,6 +123,7 @@ export const ttsSettingsSchema = z.discriminatedUnion('provider', [
   deepgramTtsSettingsSchema,
   cartesiaTtsSettingsSchema,
   azureTtsSettingsSchema,
+  amazonPollyTtsSettingsSchema,
 ]).openapi('TtsSettings').nullable().optional().describe('TTS provider-specific settings');
 
 export type TtsSettings = z.infer<typeof ttsSettingsSchema>;
