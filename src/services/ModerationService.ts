@@ -14,7 +14,8 @@ export type ModerationConfig = {
 
 export type ModerationResult = {
   flagged: boolean;
-  categories: string[];
+  blockingCategories: string[];
+  detectedCategories: string[];
   durationMs: number;
 };
 
@@ -38,13 +39,13 @@ export class ModerationService {
    */
   async moderate(input: string, config: ModerationConfig | null | undefined, projectId: string): Promise<ModerationResult> {
     if (!config || !config.enabled) {
-      return { flagged: false, categories: [], durationMs: 0 };
+      return { flagged: false, blockingCategories: [], detectedCategories: [], durationMs: 0 };
     }
 
     const providerEntity = await db.query.providers.findFirst({ where: eq(providers.id, config.llmProviderId) });
     if (!providerEntity) {
       logger.warn({ projectId, llmProviderId: config.llmProviderId }, 'Moderation provider not found, allowing message through');
-      return { flagged: false, categories: [], durationMs: 0 };
+      return { flagged: false, blockingCategories: [], detectedCategories: [], durationMs: 0 };
     }
 
     const provider = this.llmProviderFactory.createProviderForEnumeration(providerEntity);
@@ -54,7 +55,7 @@ export class ModerationService {
     try {
       const result = await provider.moderateUserInput(input);
       const effectiveCategories = this.applyBlocklist(result.categories, config.blockedCategories);
-      return { flagged: effectiveCategories.length > 0, categories: effectiveCategories, durationMs: Date.now() - startMs };
+      return { flagged: effectiveCategories.length > 0, blockingCategories: effectiveCategories, detectedCategories: result.categories, durationMs: Date.now() - startMs };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes('not supported')) {
@@ -62,7 +63,7 @@ export class ModerationService {
       } else {
         logger.error({ projectId, llmProviderId: config.llmProviderId, error: message }, 'Moderation check failed, allowing message through');
       }
-      return { flagged: false, categories: [], durationMs: Date.now() - startMs };
+      return { flagged: false, blockingCategories: [], detectedCategories: [], durationMs: Date.now() - startMs };
     }
   }
 

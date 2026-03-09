@@ -160,7 +160,9 @@ export const moderationEventDataSchema = z.object({
   /** Whether the input was flagged as violating content policy */
   flagged: z.boolean(),
   /** Moderation categories that were violated (empty when not flagged) */
-  categories: z.array(z.string()),
+  blockingCategories: z.array(z.string()),
+  /** All detected moderation categories, regardless of whether they are blocking */
+  detectedCategories: z.array(z.string()),
   /** Duration of the moderation API call in milliseconds */
   durationMs: z.number(),
   metadata: z.record(z.string(), z.any()).optional(),
