@@ -31,6 +31,7 @@ export default defineConfig({
             { text: 'Tools', link: '/guide/tools' },
             { text: 'Knowledge Base', link: '/guide/knowledge' },
             { text: 'Global Actions', link: '/guide/global-actions' },
+            { text: 'Guardrails', link: '/guide/guardrails' },
             { text: 'Providers', link: '/guide/providers' },
           ],
         },
@@ -78,6 +79,7 @@ export default defineConfig({
             { text: 'Context Transformers', link: '/api/context-transformers' },
             { text: 'Tools', link: '/api/tools' },
             { text: 'Global Actions', link: '/api/global-actions' },
+            { text: 'Guardrails', link: '/api/guardrails' },
           ],
         },
         {
