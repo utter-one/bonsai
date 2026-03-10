@@ -12,6 +12,7 @@ import {
   knowledgeCategories,
   knowledgeItems,
   globalActions,
+  guardrails,
   issues,
   environments,
   auditLogs,
@@ -34,6 +35,7 @@ export type Stage = InferSelectModel<typeof stages>;
 export type KnowledgeCategory = InferSelectModel<typeof knowledgeCategories>;
 export type KnowledgeItem = InferSelectModel<typeof knowledgeItems>;
 export type GlobalAction = InferSelectModel<typeof globalActions>;
+export type Guardrail = InferSelectModel<typeof guardrails>;
 export type Issue = InferSelectModel<typeof issues>;
 export type Environment = InferSelectModel<typeof environments>;
 export type AuditLog = InferSelectModel<typeof auditLogs>;

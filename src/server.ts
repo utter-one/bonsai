@@ -19,6 +19,7 @@ import { ClassifierController } from './http/controllers/ClassifierController';
 import { ContextTransformerController } from './http/controllers/ContextTransformerController';
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
+import { GuardrailController } from './http/controllers/GuardrailController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -138,6 +139,9 @@ export function createApp(): express.Application {
 
   const globalActionController = container.resolve(GlobalActionController);
   globalActionController.registerRoutes(app);
+
+  const guardrailController = container.resolve(GuardrailController);
+  guardrailController.registerRoutes(app);
 
   const issueController = container.resolve(IssueController);
   issueController.registerRoutes(app);

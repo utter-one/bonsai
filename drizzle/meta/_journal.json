@@ -197,6 +197,13 @@
       "when": 1773068848807,
       "tag": "0027_sleepy_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1773159078053,
+      "tag": "0028_closed_warbound",
+      "breakpoints": true
     }
   ]
 }

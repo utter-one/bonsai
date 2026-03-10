@@ -67,6 +67,7 @@ import { ClassifierController } from './http/controllers/ClassifierController';
 import { ContextTransformerController } from './http/controllers/ContextTransformerController';
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
+import { GuardrailController } from './http/controllers/GuardrailController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -351,6 +352,12 @@ export function getOpenAPISpec(): any {
   // Register GlobalAction routes from GlobalActionController
   const globalActionPaths = GlobalActionController.getOpenAPIPaths();
   for (const path of globalActionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Guardrail routes from GuardrailController
+  const guardrailPaths = GuardrailController.getOpenAPIPaths();
+  for (const path of guardrailPaths) {
     registry.registerPath(path);
   }
 

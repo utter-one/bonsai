@@ -2,7 +2,7 @@ import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
 import { Connection } from "../../websocket/ConnectionManager";
 import { inject, singleton } from "tsyringe";
-import { Conversation, GlobalAction, Stage } from "../../types/models";
+import { Conversation, GlobalAction, Guardrail, Stage } from "../../types/models";
 import { FieldDescriptor } from "../../types/parameters";
 import { StageAction } from "../../types/actions";
 import { ConversationEventData, MessageEventData } from "../../types/conversationEvents";
@@ -662,6 +662,98 @@ export class ConversationContextBuilder {
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext, knowledgeCategories),
+    };
+
+    // Get all events from database; history is a filtered view on message events
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
+      orderBy: asc(conversationEvents.timestamp),
+    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = allEvents
+      .filter(e => e.eventType === 'message')
+      .map(e => {
+        const eventData = e.eventData as MessageEventData;
+        return { role: eventData.role, content: eventData.text };
+      });
+
+    return context;
+  }
+
+  /**
+   * Builds the conversation context for the project-level guardrail classifier.
+   * Unlike the regular classifier context, only guardrail actions are included — no stage actions,
+   * no regular global actions, no knowledge categories, and no overrideClassifierId filtering
+   * (guardrails do not have per-action classifier overrides).
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity
+   * @param guardrails - All project guardrails to evaluate
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   */
+  async buildContextForGuardrailClassifier(conversation: Conversation, stage: Stage, guardrails: Guardrail[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+    // Load user data
+    const user = await db.query.users.findFirst({
+      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+    });
+
+    // Load project constants
+    const project = await db.query.projects.findFirst({
+      where: eq(projects.id, conversation.projectId),
+      columns: { constants: true },
+    });
+
+    // Build raw context for condition evaluation
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {});
+    rawContext.userInput = userInput;
+    rawContext.originalUserInput = originalUserInput;
+
+    // Evaluate active guardrails and map to available actions
+    const guardrailActionPromises = guardrails.map(async (guardrail) => {
+      const isActive = await isActionActive(guardrail, rawContext, this.scriptExecutor);
+      if (!isActive) return null;
+      return {
+        id: guardrail.id,
+        name: guardrail.id,
+        trigger: guardrail.classificationTrigger,
+        examples: guardrail.examples || undefined,
+      };
+    });
+    const guardrailActionsWithNulls = await Promise.all(guardrailActionPromises);
+    const availableActions = guardrailActionsWithNulls.filter(a => a !== null);
+
+    const context = {
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
+      userProfile: user?.profile || {},
+      consts: project?.constants || {},
+      agent: (stage as any).agent?.prompt,
+      history: [],
+      events: [],
+      actions: {},
+      userInput,
+      originalUserInput,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      stage: {
+        id: stage.id,
+        name: stage.name,
+        availableActions,
+        useKnowledge: false,
+        enterBehavior: stage.enterBehavior,
+        metadata: stage.metadata || undefined,
+      },
     };
 
     // Get all events from database; history is a filtered view on message events
