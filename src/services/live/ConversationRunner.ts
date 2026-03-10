@@ -635,10 +635,11 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, stageId: this.stageData.id }, 'Conversation started');
 
     // Execute __on_enter lifecycle action if defined
+    const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+    let enterOutcome: ActionsExecutionOutcome | null = null;
     const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
     if (onEnterAction) {
-      const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
-      const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
+      enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
       await this.applyActionOutcome(context, enterOutcome);
 
       // Save/send tool call events from action execution
@@ -658,8 +659,10 @@ export class ConversationRunner {
       }
     }
 
-    if (this.stageData.stage.enterBehavior === 'generate_response') {
-      const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+    if (enterOutcome?.shouldGenerateResponse) {
+      // on_enter action explicitly requested a response (may include a prescripted response)
+      await this.generateResponse(context, enterOutcome);
+    } else if (this.stageData.stage.enterBehavior === 'generate_response') {
       const outcome: ActionsExecutionOutcome = {
         hasModifiedUserInput: false,
         hasModifiedUserProfile: false,
@@ -668,8 +671,8 @@ export class ConversationRunner {
         shouldAbortConversation: false,
         shouldEndConversation: false,
         shouldGenerateResponse: true
-      }
-      await this.generateResponse(context, outcome)
+      };
+      await this.generateResponse(context, outcome);
     } else {
       await this.changeState('awaiting_user_input');
     }
@@ -833,109 +836,111 @@ export class ConversationRunner {
     }
 
     try {
-    logger.info({ conversationId: this.conversation.id, currentStageId: this.stageData.id, targetStageId: stageId }, `Navigating to stage ${stageId}`);
+      logger.info({ conversationId: this.conversation.id, currentStageId: this.stageData.id, targetStageId: stageId }, `Navigating to stage ${stageId}`);
 
-    const allowed = isProcessingUserInput
-      ? this.conversation.status === 'awaiting_user_input' || this.conversation.status === 'processing_user_input'
-      : this.conversation.status === 'awaiting_user_input';
-    if (!allowed) {
-      throw new Error(`Cannot navigate to stage in current state: ${this.conversation.status}`);
-    }
-
-    const fromStageId = this.stageData.id;
-    const oldStageData = this.stageData;
-
-    // Execute __on_leave lifecycle action if defined on current stage
-    const onLeaveAction = oldStageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_LEAVE];
-    if (onLeaveAction) {
-      logger.debug({ conversationId: this.conversation.id, stageId: fromStageId }, 'Executing __on_leave lifecycle action');
-      const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, [/** TODO */], '-', '-');
-      const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
-
-      await this.applyActionOutcome(context, leaveOutcome);
-
-      // Save/send tool call events from action execution
-      await this.saveAndSendOutcomeEvents(leaveOutcome);
-
-      // Register action event
-      const actionEventData: ActionEventData = {
-        actionName: onLeaveAction.name || '',
-        stageId: oldStageData.id,
-        effects: onLeaveAction.effects,
-      };
-      await this.saveAndSendEvent('action', actionEventData);
-
-      // If on_leave ended or aborted conversation, don't proceed
-      if (leaveOutcome.shouldEndConversation || leaveOutcome.shouldAbortConversation) {
-        return;
+      const allowed = isProcessingUserInput
+        ? this.conversation.status === 'awaiting_user_input' || this.conversation.status === 'processing_user_input'
+        : this.conversation.status === 'awaiting_user_input';
+      if (!allowed) {
+        throw new Error(`Cannot navigate to stage in current state: ${this.conversation.status}`);
       }
-    }
 
-    // Load new stage data
-    const newStageData = await this.buildStageData({ ...this.conversation, stageId });
+      const fromStageId = this.stageData.id;
+      const oldStageData = this.stageData;
 
-    // Update stage data and conversation
-    this.stageData = newStageData;
-    this.conversation.stageId = stageId;
+      // Execute __on_leave lifecycle action if defined on current stage
+      const onLeaveAction = oldStageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_LEAVE];
+      if (onLeaveAction) {
+        logger.debug({ conversationId: this.conversation.id, stageId: fromStageId }, 'Executing __on_leave lifecycle action');
+        const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, [/** TODO */], '-', '-');
+        const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
 
-    // Update conversation in database
-    await db.update(conversations)
-      .set({ stageId, updatedAt: new Date() })
-      .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+        await this.applyActionOutcome(context, leaveOutcome);
 
-    // Re-wire providers for the new stage
-    await this.wireUpProviders();
+        // Save/send tool call events from action execution
+        await this.saveAndSendOutcomeEvents(leaveOutcome);
 
-    const eventData: JumpToStageEventData = {
-      fromStageId,
-      toStageId: stageId,
-    };
-    await this.saveAndSendEvent('jump_to_stage', eventData);
+        // Register action event
+        const actionEventData: ActionEventData = {
+          actionName: onLeaveAction.name || '',
+          stageId: oldStageData.id,
+          effects: onLeaveAction.effects,
+        };
+        await this.saveAndSendEvent('action', actionEventData);
 
-    // Execute __on_enter lifecycle action if defined on new stage
-    const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
-    if (onEnterAction) {
-      logger.debug({ conversationId: this.conversation.id, stageId }, 'Executing __on_enter lifecycle action');
-      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */], '-', '-');
-      const enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
-
-      await this.applyActionOutcome(context, enterOutcome);
-
-      // Save/send tool call events from action execution
-      await this.saveAndSendOutcomeEvents(enterOutcome);
-
-      // Register action event
-      const actionEventData: ActionEventData = {
-        actionName: onEnterAction.name || '',
-        stageId: this.stageData.id,
-        effects: onEnterAction.effects,
-      };
-      await this.saveAndSendEvent('action', actionEventData);
-
-      // If on_enter ended or aborted conversation, don't proceed
-      if (enterOutcome.shouldEndConversation || enterOutcome.shouldAbortConversation) {
-        return;
+        // If on_leave ended or aborted conversation, don't proceed
+        if (leaveOutcome.shouldEndConversation || leaveOutcome.shouldAbortConversation) {
+          return;
+        }
       }
-    }
 
-    // TODO: not sure if this is a good place
-    if (this.stageData.stage.enterBehavior === 'generate_response') {
-      const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */], '-', '-');
-      const executionOutcome: ActionsExecutionOutcome = {
-        hasModifiedUserInput: false,
-        hasModifiedUserProfile: false,
-        hasModifiedVars: false,
-        success: true,
-        shouldAbortConversation: false,
-        shouldEndConversation: false,
-        shouldGenerateResponse: true
+      // Load new stage data
+      const newStageData = await this.buildStageData({ ...this.conversation, stageId });
+
+      // Update stage data and conversation
+      this.stageData = newStageData;
+      this.conversation.stageId = stageId;
+
+      // Update conversation in database
+      await db.update(conversations)
+        .set({ stageId, updatedAt: new Date() })
+        .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+
+      // Re-wire providers for the new stage
+      await this.wireUpProviders();
+
+      const eventData: JumpToStageEventData = {
+        fromStageId,
+        toStageId: stageId,
       };
-      await this.generateResponse(context, executionOutcome);
-    } else {
-      await this.changeState('awaiting_user_input');
-    }
+      await this.saveAndSendEvent('jump_to_stage', eventData);
 
-    logger.info({ conversationId: this.conversation.id, stageId }, `Successfully navigated to stage ${stageId}`);
+      // Execute __on_enter lifecycle action if defined on new stage
+      const enterContext = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */], '-', '-');
+      let enterOutcome: ActionsExecutionOutcome | null = null;
+      const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
+      if (onEnterAction) {
+        logger.debug({ conversationId: this.conversation.id, stageId }, 'Executing __on_enter lifecycle action');
+        enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], enterContext, 'on_enter');
+
+        await this.applyActionOutcome(enterContext, enterOutcome);
+
+        // Save/send tool call events from action execution
+        await this.saveAndSendOutcomeEvents(enterOutcome);
+
+        // Register action event
+        const actionEventData: ActionEventData = {
+          actionName: onEnterAction.name || '',
+          stageId: this.stageData.id,
+          effects: onEnterAction.effects,
+        };
+        await this.saveAndSendEvent('action', actionEventData);
+
+        // If on_enter ended or aborted conversation, don't proceed
+        if (enterOutcome.shouldEndConversation || enterOutcome.shouldAbortConversation) {
+          return;
+        }
+      }
+
+      if (enterOutcome?.shouldGenerateResponse) {
+        // on_enter action explicitly requested a response (may include a prescripted response)
+        await this.generateResponse(enterContext, enterOutcome);
+      } else if (this.stageData.stage.enterBehavior === 'generate_response') {
+        const executionOutcome: ActionsExecutionOutcome = {
+          hasModifiedUserInput: false,
+          hasModifiedUserProfile: false,
+          hasModifiedVars: false,
+          success: true,
+          shouldAbortConversation: false,
+          shouldEndConversation: false,
+          shouldGenerateResponse: true
+        };
+        await this.generateResponse(enterContext, executionOutcome);
+      } else {
+        await this.changeState('awaiting_user_input');
+      }
+
+      logger.info({ conversationId: this.conversation.id, stageId }, `Successfully navigated to stage ${stageId}`);
     } finally {
       this.navigationDepth--;
     }
