@@ -40,7 +40,7 @@ export class ProjectService extends BaseService {
 
     try {
       const id = generateId(ID_PREFIXES.PROJECT);
-      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, autoCreateUsers: input.autoCreateUsers ?? false, userProfileVariableDescriptors: input.userProfileVariableDescriptors ?? [], version: 1 }).returning();
+      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, autoCreateUsers: input.autoCreateUsers ?? false, userProfileVariableDescriptors: input.userProfileVariableDescriptors ?? [], defaultGuardrailClassifierId: input.defaultGuardrailClassifierId ?? null, version: 1 }).returning();
 
       const createdProject = project[0];
 
@@ -162,7 +162,7 @@ export class ProjectService extends BaseService {
         throw new OptimisticLockError('Project');
       }
 
-      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, autoCreateUsers: input.autoCreateUsers, userProfileVariableDescriptors: input.userProfileVariableDescriptors, version: existingProject.version + 1, updatedAt: new Date() };
+      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, autoCreateUsers: input.autoCreateUsers, userProfileVariableDescriptors: input.userProfileVariableDescriptors, defaultGuardrailClassifierId: input.defaultGuardrailClassifierId, version: existingProject.version + 1, updatedAt: new Date() };
       const updatedProject = await db.update(projects).set(updateData).where(eq(projects.id, id)).returning();
 
       if (!updatedProject[0]) {

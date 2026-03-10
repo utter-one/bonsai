@@ -97,6 +97,7 @@ export const projects = pgTable('projects', {
   timezone: text('timezone'),
   autoCreateUsers: boolean('auto_create_users').notNull().default(false),
   userProfileVariableDescriptors: jsonb('user_profile_variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
+  defaultGuardrailClassifierId: text('default_guardrail_classifier_id'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -283,6 +284,24 @@ export const globalActions = pgTable('global_actions', {
   primaryKey({ columns: [table.projectId, table.id] }),
 ]);
 
+// Guardrail table
+export const guardrails = pgTable('guardrails', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  condition: text('condition'),
+  classificationTrigger: text('classification_trigger'),
+  effects: jsonb('effects').notNull().default([]).$type<Effect[]>(),
+  examples: jsonb('examples').$type<string[]>(),
+  tags: jsonb('tags').notNull().default([]).$type<string[]>(),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+]);
+
 // Issue table
 export const issues = pgTable('issues', {
   id: serial('id').notNull(),
@@ -430,6 +449,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   tools: many(tools),
   knowledgeCategories: many(knowledgeCategories),
   globalActions: many(globalActions),
+  guardrails: many(guardrails),
   issues: many(issues),
   apiKeys: many(apiKeys),
 }));
@@ -477,6 +497,13 @@ export const toolsRelations = relations(tools, ({ one }) => ({
 export const globalActionsRelations = relations(globalActions, ({ one }) => ({
   project: one(projects, {
     fields: [globalActions.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const guardrailsRelations = relations(guardrails, ({ one }) => ({
+  project: one(projects, {
+    fields: [guardrails.projectId],
     references: [projects.id],
   }),
 }));

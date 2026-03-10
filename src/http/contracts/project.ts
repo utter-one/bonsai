@@ -94,6 +94,7 @@ export const createProjectSchema = z.object({
   timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
   autoCreateUsers: z.boolean().optional().default(false).describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().default([]).describe('Descriptors defining the data schema for user profile variables in this project'),
+  defaultGuardrailClassifierId: z.string().nullable().optional().describe('ID of the classifier used to evaluate guardrails for all conversations in this project. When set, all project guardrails are evaluated against this classifier on every user input turn.'),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
@@ -116,6 +117,7 @@ export const updateProjectSchema = z.object({
   timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
   autoCreateUsers: z.boolean().optional().describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().describe('Updated descriptors defining the data schema for user profile variables in this project'),
+  defaultGuardrailClassifierId: z.string().nullable().optional().describe('Updated ID of the classifier used to evaluate guardrails. Set to null to disable guardrail classification.'),
   version: z.number().describe('The current version number for optimistic locking'),
 });
 
@@ -138,6 +140,7 @@ export const projectResponseSchema = z.object({
   timezone: z.string().nullable().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Null means UTC.'),
   autoCreateUsers: z.boolean().describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).describe('Descriptors defining the data schema for user profile variables in this project'),
+  defaultGuardrailClassifierId: z.string().nullable().describe('ID of the classifier used to evaluate guardrails for all conversations in this project'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),
   updatedAt: z.coerce.date().describe('The timestamp when the project was last updated'),

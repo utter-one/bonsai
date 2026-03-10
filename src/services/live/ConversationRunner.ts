@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, GlobalAction, Project, Stage, Tool } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, Stage, Tool } from "../../types/models";
 import { StageAction, LIFECYCLE_ACTION_NAMES } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
@@ -80,6 +80,10 @@ export type StageRuntimeData = {
   classifiers: ClassifierRuntimeData[];
   transformers: TransformerRuntimeData[];
   globalActions: GlobalAction[];
+  /** All project guardrails, always loaded regardless of stage config */
+  guardrails: Guardrail[];
+  /** LLM provider for the project-level guardrail classifier, if configured */
+  guardrailClassifier?: ClassifierRuntimeData;
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   shouldEndConversation: boolean;
@@ -176,6 +180,8 @@ export class ConversationRunner {
       classifiers: [],
       transformers: [],
       globalActions: [],
+      guardrails: [],
+      guardrailClassifier: undefined,
       asrProvider: undefined,
       ttsProvider: undefined,
       shouldEndConversation: false,
@@ -276,6 +282,31 @@ export class ConversationRunner {
           )
         });
         stageData.globalActions = metaActions;
+      }
+    }
+
+    // Load all project guardrails — they fire on every stage regardless of stage configuration
+    {
+      const { guardrails: guardrailsTable } = await import('../../db/schema');
+      const { eq } = await import('drizzle-orm');
+      stageData.guardrails = await db.query.guardrails.findMany({
+        where: (guardrails, { eq }) => eq(guardrails.projectId, project.id),
+      });
+    }
+
+    // Load guardrail classifier if configured on the project
+    if (project.defaultGuardrailClassifierId) {
+      const guardrailClassifierEntity = await db.query.classifiers.findFirst({
+        where: (classifiers, { and, eq }) => and(eq(classifiers.projectId, conversation.projectId), eq(classifiers.id, project.defaultGuardrailClassifierId)),
+      });
+      if (guardrailClassifierEntity) {
+        const guardrailLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, guardrailClassifierEntity.llmProviderId) });
+        stageData.guardrailClassifier = {
+          classifier: guardrailClassifierEntity,
+          llmProvider: this.llmProviderFactory.createProvider(guardrailLlmProviderEntity, guardrailClassifierEntity.llmSettings),
+        };
+      } else {
+        logger.warn({ projectId: project.id, classifierId: project.defaultGuardrailClassifierId }, 'Guardrail classifier not found, guardrails will be skipped');
       }
     }
 
@@ -810,6 +841,9 @@ export class ConversationRunner {
       await cleanupProvider(this.stageData.fillerLlmProvider, 'filler LLM provider');
       for (const classifierData of this.stageData.classifiers) {
         await cleanupProvider(classifierData.llmProvider, `classifier LLM provider (${classifierData.classifier.id})`);
+      }
+      if (this.stageData.guardrailClassifier) {
+        await cleanupProvider(this.stageData.guardrailClassifier.llmProvider, `guardrail classifier LLM provider (${this.stageData.guardrailClassifier.classifier.id})`);
       }
       for (const transformerData of this.stageData.transformers) {
         await cleanupProvider(transformerData.llmProvider, `transformer LLM provider (${transformerData.transformer.id})`);

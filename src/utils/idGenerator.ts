@@ -16,6 +16,7 @@ export const ID_PREFIXES = {
   KNOWLEDGE_CATEGORY: 'kcat',
   KNOWLEDGE_ITEM: 'kitm',
   GLOBAL_ACTION: 'gact',
+  GUARDRAIL: 'gurl',
   PROVIDER: 'prov',
   ENVIRONMENT: 'env',
   API_KEY: 'akey',

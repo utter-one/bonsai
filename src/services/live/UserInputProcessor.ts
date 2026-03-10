@@ -9,7 +9,7 @@ import { KnowledgeService } from "../KnowledgeService";
 import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
-import { Conversation, GlobalAction } from "../../types/models";
+import { Conversation, GlobalAction, Guardrail } from "../../types/models";
 import { extractTextFromContent } from "../../utils/llm";
 import { StageAction } from "../../types/actions";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
@@ -45,6 +45,8 @@ export class UserInputProcessor {
       const stage = session.runner.getRuntimeData().stage;
       const conversation = session.runner.getRuntimeData().conversation;
       const globalActions = session.runner.getRuntimeData().globalActions;
+      const guardrails = session.runner.getRuntimeData().guardrails;
+      const guardrailClassifier = session.runner.getRuntimeData().guardrailClassifier;
 
       // Fetch knowledge categories for the default classifier when knowledge is enabled
       let knowledgeCategories: KnowledgeCategoryResponse[] = [];
@@ -71,13 +73,22 @@ export class UserInputProcessor {
         return this.classifyTextInput(session, classifier, classifierContext);
       });
 
-      // Run all classifiers and all context transformers in parallel
-      const [classificationResultsWithClassifiers, transformerTriggeredActions] = await Promise.all([
+      // Build guardrail classification promise if a guardrail classifier is configured and there are active guardrails
+      const guardrailPromise = guardrailClassifier && guardrails.length > 0
+        ? (async () => {
+            const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput);
+            return this.classifyTextInput(session, guardrailClassifier, guardrailContext);
+          })()
+        : Promise.resolve(null);
+
+      // Run all classifiers, guardrail classifier, and context transformers in parallel
+      const [classificationResultsWithClassifiers, guardrailResult, transformerTriggeredActions] = await Promise.all([
         Promise.all(actionPromises),
+        guardrailPromise,
         this.transformerExecutor.executeTransformers(session, userInput, originalUserInput),
       ]);
-      
-      // Register classification events for each classifier
+
+      // Register classification events for stage classifiers
       for (const result of classificationResultsWithClassifiers) {
         const classifier = classifiers.find(c => c.classifier.id === result.classifierId);
         const eventData: ClassificationEventData = {
@@ -97,11 +108,32 @@ export class UserInputProcessor {
         this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
       }
 
+      // Register classification event for guardrail classifier
+      if (guardrailResult) {
+        const eventData: ClassificationEventData = {
+          classifierId: guardrailResult.classifierId,
+          input: userInput || '',
+          actions: [guardrailResult],
+          metadata: {
+            classifierName: guardrailResult.classifierName,
+            actionCount: guardrailResult.actions.length,
+            systemPrompt: guardrailResult.renderedPrompt,
+            llmSettings: guardrailClassifier?.classifier.llmSettings,
+            currentVariables: conversation?.stageVars[stage.id] || {},
+            durationMs: guardrailResult.durationMs,
+          },
+        };
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
+        this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
+      }
+
       const allActions = [
         ...classificationResultsWithClassifiers.map(x => x.actions).flat(),
+        ...(guardrailResult?.actions ?? []),
         ...transformerTriggeredActions,
       ];
       const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.id, ga]));
+      const guardrailsMap = new Map(session.runner.getRuntimeData().guardrails.map(g => [g.id, g]));
 
       const knowledgeCategoryIds = new Set(knowledgeCategories.map(c => `__knowledge_${c.id}`));
 
@@ -111,13 +143,18 @@ export class UserInputProcessor {
           return true;
         }
 
+        // Check guardrails map first (guardrail actions use their ID as the action name)
+        if (guardrailsMap.has(action.name)) {
+          return true;
+        }
+
         let actionDef : GlobalAction | StageAction = globalActionsMap.get(action.name);
         if (!actionDef) {
           actionDef = stage.actions[action.name];
         } 
 
         if (!actionDef) {
-          logger.warn({ conversationId: session.id, actionName: action.name }, `Received action ${action.name} from classifier which does not exist in global actions or stage actions. Ignoring.`);
+          logger.warn({ conversationId: session.id, actionName: action.name }, `Received action ${action.name} from classifier which does not exist in global actions, guardrails, or stage actions. Ignoring.`);
           return false;
         }
 
