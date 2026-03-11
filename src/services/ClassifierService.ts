@@ -43,7 +43,7 @@ export class ClassifierService extends BaseService {
 
       const createdClassifier = classifier[0];
 
-      await this.auditService.logCreate('classifier', createdClassifier.id, { id: createdClassifier.id, projectId: createdClassifier.projectId, name: createdClassifier.name, description: createdClassifier.description, prompt: createdClassifier.prompt, llmProviderId: createdClassifier.llmProviderId, llmSettings: createdClassifier.llmSettings, tags: createdClassifier.tags, metadata: createdClassifier.metadata }, context?.operatorId);
+      await this.auditService.logCreate('classifier', createdClassifier.id, createdClassifier, context?.operatorId);
 
       logger.info({ classifierId: createdClassifier.id }, 'Classifier created successfully');
 
@@ -193,7 +193,7 @@ export class ClassifierService extends BaseService {
 
       const classifier = updatedClassifier[0];
 
-      await this.auditService.logUpdate('classifier', classifier.id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, { id: classifier.id, name: classifier.name, description: classifier.description, prompt: classifier.prompt, llmProviderId: classifier.llmProviderId, llmSettings: classifier.llmSettings, tags: classifier.tags, metadata: classifier.metadata }, context?.operatorId, projectId);
+      await this.auditService.logUpdate('classifier', classifier.id, existingClassifier, classifier, context?.operatorId);
 
       logger.info({ classifierId: classifier.id, newVersion: classifier.version }, 'Classifier updated successfully');
 
@@ -234,7 +234,7 @@ export class ClassifierService extends BaseService {
         throw new OptimisticLockError(`Failed to delete classifier due to version conflict`);
       }
 
-      await this.auditService.logDelete('classifier', id, { id: existingClassifier.id, name: existingClassifier.name, description: existingClassifier.description, prompt: existingClassifier.prompt, llmProviderId: existingClassifier.llmProviderId, llmSettings: existingClassifier.llmSettings, tags: existingClassifier.tags, metadata: existingClassifier.metadata }, context?.operatorId, projectId);
+      await this.auditService.logDelete('classifier', id, existingClassifier, context?.operatorId, projectId);
 
       logger.info({ classifierId: id }, 'Classifier deleted successfully');
     } catch (error) {

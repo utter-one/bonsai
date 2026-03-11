@@ -43,7 +43,8 @@ export class EnvironmentService extends BaseService {
 
       const createdEnvironment = environment[0];
 
-      await this.auditService.logCreate('environment', createdEnvironment.id, { id: createdEnvironment.id, description: createdEnvironment.description, url: createdEnvironment.url, login: createdEnvironment.login }, context?.operatorId);
+      const { password: _pw, ...safeCreatedEnvironment } = createdEnvironment;
+      await this.auditService.logCreate('environment', createdEnvironment.id, safeCreatedEnvironment, context?.operatorId);
 
       logger.info({ environmentId: createdEnvironment.id }, 'Environment created successfully');
 
@@ -182,7 +183,9 @@ export class EnvironmentService extends BaseService {
 
       const environment = updatedEnvironment[0];
 
-      await this.auditService.logUpdate('environment', environment.id, { id: existingEnvironment.id, description: existingEnvironment.description, url: existingEnvironment.url, login: existingEnvironment.login }, { id: environment.id, description: environment.description, url: environment.url, login: environment.login }, context?.operatorId);
+      const { password: _oldPw, ...safeExistingEnvironment } = existingEnvironment;
+      const { password: _newPw, ...safeEnvironment } = environment;
+      await this.auditService.logUpdate('environment', environment.id, safeExistingEnvironment, safeEnvironment, context?.operatorId);
 
       logger.info({ environmentId: environment.id, newVersion: environment.version }, 'Environment updated successfully');
 
@@ -222,7 +225,8 @@ export class EnvironmentService extends BaseService {
         throw new OptimisticLockError(`Failed to delete environment due to version conflict`);
       }
 
-      await this.auditService.logDelete('environment', id, { id: existingEnvironment.id, description: existingEnvironment.description, url: existingEnvironment.url, login: existingEnvironment.login }, context?.operatorId);
+      const { password: _pw, ...safeExistingEnvironment } = existingEnvironment;
+      await this.auditService.logDelete('environment', id, safeExistingEnvironment, context?.operatorId);
 
       logger.info({ environmentId: id }, 'Environment deleted successfully');
     } catch (error) {

@@ -66,7 +66,8 @@ export class ApiKeyService extends BaseService {
 
       const createdApiKey = apiKey[0];
 
-      await this.auditService.logCreate('api_key', createdApiKey.id, { id: createdApiKey.id, projectId: createdApiKey.projectId, name: createdApiKey.name, keyPreview: this.getKeyPreview(key), isActive: createdApiKey.isActive, metadata: createdApiKey.metadata }, context.operatorId);
+      const { key: _key, ...safeCreatedApiKey } = createdApiKey;
+      await this.auditService.logCreate('api_key', createdApiKey.id, safeCreatedApiKey, context.operatorId);
 
       logger.info({ apiKeyId: createdApiKey.id, projectId }, 'API key created successfully');
 
@@ -226,7 +227,9 @@ export class ApiKeyService extends BaseService {
 
       const updated = updatedApiKey[0];
 
-      await this.auditService.logUpdate('api_key', updated.id, { id: existingApiKey.id, projectId: existingApiKey.projectId, name: existingApiKey.name, isActive: existingApiKey.isActive, keyPreview: this.getKeyPreview(existingApiKey.key), metadata: existingApiKey.metadata, version: existingApiKey.version }, { id: updated.id, projectId: updated.projectId, name: updated.name, isActive: updated.isActive, keyPreview: this.getKeyPreview(updated.key), metadata: updated.metadata, version: updated.version }, context.operatorId);
+      const { key: _oldKey, ...safeExistingApiKey } = existingApiKey;
+      const { key: _newKey, ...safeUpdated } = updated;
+      await this.auditService.logUpdate('api_key', updated.id, safeExistingApiKey, safeUpdated, context.operatorId);
 
       logger.info({ apiKeyId: updated.id }, 'API key updated successfully');
 
@@ -263,7 +266,8 @@ export class ApiKeyService extends BaseService {
 
       await db.delete(apiKeys).where(and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id)));
 
-      await this.auditService.logDelete('api_key', id, { id: existingApiKey.id, projectId: existingApiKey.projectId, name: existingApiKey.name, isActive: existingApiKey.isActive, keyPreview: this.getKeyPreview(existingApiKey.key), metadata: existingApiKey.metadata }, context.operatorId);
+      const { key: _key, ...safeExistingApiKey } = existingApiKey;
+      await this.auditService.logDelete('api_key', id, safeExistingApiKey, context.operatorId);
 
       logger.info({ apiKeyId: id }, 'API key deleted successfully');
     } catch (error) {

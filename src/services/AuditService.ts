@@ -45,7 +45,6 @@ export class AuditService {
           projectId: input.projectId,
           oldEntity: input.oldEntity,
           newEntity: input.newEntity,
-          version: 1,
         })
         .returning();
 
@@ -78,20 +77,21 @@ export class AuditService {
    * @param projectId - Optional project ID the entity belongs to (preferred over projectId extracted from entity snapshot)
    * @returns The created audit log entry
    */
-  async logCreate(
+  async logCreate<T extends object>(
     entityType: string,
     entityId: string,
-    newEntity: Record<string, any>,
+    newEntity: T,
     userId?: string,
     projectId?: string
   ): Promise<AuditLog> {
+    const entity = newEntity as Record<string, any>;
     return this.logChange({
       userId,
       action: 'CREATE',
       entityType,
       entityId,
-      newEntity,
-      projectId: projectId ?? newEntity?.projectId,
+      newEntity: entity,
+      projectId: projectId ?? entity?.projectId,
     });
   }
 
@@ -105,22 +105,24 @@ export class AuditService {
    * @param projectId - Optional project ID the entity belongs to (preferred over projectId extracted from entity snapshots)
    * @returns The created audit log entry
    */
-  async logUpdate(
+  async logUpdate<T extends object>(
     entityType: string,
     entityId: string,
-    oldEntity: Record<string, any>,
-    newEntity: Record<string, any>,
+    oldEntity: T,
+    newEntity: T,
     userId?: string,
     projectId?: string
   ): Promise<AuditLog> {
+    const oldRec = oldEntity as Record<string, any>;
+    const newRec = newEntity as Record<string, any>;
     return this.logChange({
       userId,
       action: 'UPDATE',
       entityType,
       entityId,
-      oldEntity,
-      newEntity,
-      projectId: projectId ?? newEntity?.projectId ?? oldEntity?.projectId,
+      oldEntity: oldRec,
+      newEntity: newRec,
+      projectId: projectId ?? newRec?.projectId ?? oldRec?.projectId,
     });
   }
 
@@ -133,20 +135,21 @@ export class AuditService {
    * @param projectId - Optional project ID the entity belongs to (preferred over projectId extracted from entity snapshot)
    * @returns The created audit log entry
    */
-  async logDelete(
+  async logDelete<T extends object>(
     entityType: string,
     entityId: string,
-    oldEntity: Record<string, any>,
+    oldEntity: T,
     userId?: string,
     projectId?: string
   ): Promise<AuditLog> {
+    const oldRec = oldEntity as Record<string, any>;
     return this.logChange({
       userId,
       action: 'DELETE',
       entityType,
       entityId,
-      oldEntity,
-      projectId: projectId ?? oldEntity?.projectId,
+      oldEntity: oldRec,
+      projectId: projectId ?? oldRec?.projectId,
     });
   }
 
@@ -229,7 +232,6 @@ export class AuditService {
         entityId: auditLogs.entityId,
         entityType: auditLogs.entityType,
         projectId: auditLogs.projectId,
-        version: auditLogs.version,
         createdAt: auditLogs.createdAt,
       };
 

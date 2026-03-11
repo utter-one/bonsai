@@ -42,7 +42,7 @@ export class UserService extends BaseService {
 
       const createdUser = user[0];
 
-      await this.auditService.logCreate('user', createdUser.id, { id: createdUser.id, projectId: createdUser.projectId, profile: createdUser.profile }, context?.operatorId);
+      await this.auditService.logCreate('user', createdUser.id, createdUser, context?.operatorId);
 
       logger.info({ userId: createdUser.id, projectId }, 'User created successfully');
 
@@ -172,7 +172,7 @@ export class UserService extends BaseService {
 
       const user = updatedUser[0];
 
-      await this.auditService.logUpdate('user', user.id, { id: existingUser.id, projectId: existingUser.projectId, profile: existingUser.profile }, { id: user.id, projectId: user.projectId, profile: user.profile }, context?.operatorId);
+      await this.auditService.logUpdate('user', user.id, existingUser, user, context?.operatorId);
 
       logger.info({ userId: user.id, projectId }, 'User updated successfully');
 
@@ -207,7 +207,7 @@ export class UserService extends BaseService {
         throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
-      await this.auditService.logDelete('user', id, { id: existingUser.id, profile: existingUser.profile }, context?.operatorId);
+      await this.auditService.logDelete('user', id, existingUser, context?.operatorId);
 
       logger.info({ userId: id }, 'User deleted successfully');
     } catch (error) {

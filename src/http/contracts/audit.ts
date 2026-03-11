@@ -20,7 +20,6 @@ export const auditLogResponseSchema = z.object({
   projectId: z.string().nullable().describe('ID of the project associated with the entity'),
   oldEntity: z.record(z.string(), z.unknown()).nullable().describe('Entity state before the change'),
   newEntity: z.record(z.string(), z.unknown()).nullable().describe('Entity state after the change'),
-  version: z.number().int().describe('Version number for the audit log'),
   createdAt: z.coerce.date().describe('Timestamp when the audit log was created'),
 });
 
