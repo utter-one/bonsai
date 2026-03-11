@@ -95,6 +95,7 @@ export const createProjectSchema = z.object({
   autoCreateUsers: z.boolean().optional().default(false).describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().default([]).describe('Descriptors defining the data schema for user profile variables in this project'),
   defaultGuardrailClassifierId: z.string().nullable().optional().describe('ID of the classifier used to evaluate guardrails for all conversations in this project. When set, all project guardrails are evaluated against this classifier on every user input turn.'),
+  conversationTimeoutSeconds: z.number().int().min(0).optional().describe('Timeout in seconds for active conversations with no activity. Set to 0 or omit to disable. Conversations that have been inactive for longer than this value will be automatically aborted.'),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
@@ -118,6 +119,7 @@ export const updateProjectSchema = z.object({
   autoCreateUsers: z.boolean().optional().describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().describe('Updated descriptors defining the data schema for user profile variables in this project'),
   defaultGuardrailClassifierId: z.string().nullable().optional().describe('Updated ID of the classifier used to evaluate guardrails. Set to null to disable guardrail classification.'),
+  conversationTimeoutSeconds: z.number().int().min(0).nullable().optional().describe('Timeout in seconds for active conversations with no activity. Set to 0 or null to disable. Conversations that have been inactive for longer than this value will be automatically aborted.'),
   version: z.number().describe('The current version number for optimistic locking'),
 });
 
@@ -141,6 +143,7 @@ export const projectResponseSchema = z.object({
   autoCreateUsers: z.boolean().describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).describe('Descriptors defining the data schema for user profile variables in this project'),
   defaultGuardrailClassifierId: z.string().nullable().describe('ID of the classifier used to evaluate guardrails for all conversations in this project'),
+  conversationTimeoutSeconds: z.number().int().nullable().describe('Timeout in seconds for active conversations with no activity. Null or 0 means no timeout.'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),
   updatedAt: z.coerce.date().describe('The timestamp when the project was last updated'),
