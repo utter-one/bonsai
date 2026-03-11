@@ -30,6 +30,8 @@ type TransformerExecutionResult = {
   parsedValues: Record<string, any>;
   /** The rendered LLM prompt, or null on error */
   renderedPrompt: string | null;
+  /** The raw response from the LLM */
+  rawResponse: string;
   /** Error message if the transformer failed, undefined otherwise */
   error?: string;
   /** Total duration of the transformer execution in milliseconds, including LLM call */
@@ -119,6 +121,7 @@ export class ContextTransformerExecutor {
         metadata: {
           transformerName: result.transformerName,
           systemPrompt: result.renderedPrompt,
+          rawResponse: result.rawResponse,
           llmSettings: transformerData?.transformer.llmSettings,
           updatedVariables: stageVars,
           durationMs: result.durationMs,
@@ -244,10 +247,10 @@ export class ContextTransformerExecutor {
         }
       }
 
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, durationMs: Date.now() - startMs };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse: textContent, durationMs: Date.now() - startMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id, transformerId: transformer.id }, 'Error executing context transformer');
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt: null, error: String(error), durationMs: Date.now() - startMs };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt: null, rawResponse: null, error: String(error), durationMs: Date.now() - startMs };
     }
   }
 }
