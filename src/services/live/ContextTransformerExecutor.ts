@@ -233,7 +233,8 @@ export class ContextTransformerExecutor {
       ];
 
       const result = await llmProvider.generate(messages);
-      const textContent = rawResponse = extractTextFromContent(result.content);
+      const textContent = extractTextFromContent(result.content);
+      rawResponse = JSON.stringify(result, null, 2);
 
       logger.info({ sessionId: session.id, transformerId: transformer.id }, `Received transformation result from LLM: ${textContent}`);
 
