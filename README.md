@@ -79,4 +79,4 @@ Database migrations run automatically on container startup before the applicatio
 
 ## License
 
-[Apache-2.0](LICENSE)
+Licensed under the [Apache License 2.0](LICENSE)
