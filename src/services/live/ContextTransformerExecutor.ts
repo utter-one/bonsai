@@ -4,10 +4,12 @@ import { conversations, db } from '../../db';
 import { parseJsonFromMarkdown } from '../../utils/jsonParser';
 import logger from '../../utils/logger';
 import { extractTextFromContent } from '../../utils/llm';
+import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
 import { Connection, ConnectionManager } from '../../websocket/ConnectionManager';
 import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
+import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TransformerRuntimeData } from './ConversationRunner';
 import { TemplatingEngine } from './TemplatingEngine';
 import type { ActionClassificationResult } from '../../types/classification';
@@ -50,6 +52,7 @@ export class ContextTransformerExecutor {
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private readonly conversationService: ConversationService,
     @inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
+    @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
   ) {}
 
   /**
@@ -133,8 +136,11 @@ export class ContextTransformerExecutor {
       this.connectionManager.sendConversationEvent(conversation.id, 'transformation', eventData);
     }
 
+    // Build a raw context with the updated stage vars for condition evaluation
+    const conditionContext = this.contextBuilder.buildRawContext(conversation, stage, {}, {});
+
     // Find and return stage actions triggered by variable changes
-    const triggeredActions = this.findTriggeredActions(session, variableChangeEvents, stage.actions || {});
+    const triggeredActions = await this.findTriggeredActions(session, variableChangeEvents, stage.actions || {}, conditionContext);
     logger.info({ sessionId: session.id, conversationId: conversation.id, triggeredActions }, 'Context transformer execution completed with variable changes triggering stage actions');
     return triggeredActions;
   }
@@ -170,15 +176,17 @@ export class ContextTransformerExecutor {
 
   /**
    * Determines which stage actions should be triggered based on variable change events.
-   * An action is triggered when `triggerOnTransformation` is true and at least one of its
-   * `watchedVariables` entries matches the corresponding change event type.
+   * An action is triggered when `triggerOnTransformation` is true, at least one of its
+   * `watchedVariables` entries matches the corresponding change event type, and its
+   * optional `condition` expression evaluates to truthy.
    *
    * @param session - The active connection/session (used for logging)
    * @param changeEvents - Map of variable name to change event type
    * @param stageActions - Map of action ID to action definition
+   * @param conditionContext - Conversation context used to evaluate action conditions (has updated stage vars)
    * @returns Array of triggered action classification results
    */
-  private findTriggeredActions(session: Connection, changeEvents: VariableChangeEvents, stageActions: Record<string, StageAction>): ActionClassificationResult[] {
+  private async findTriggeredActions(session: Connection, changeEvents: VariableChangeEvents, stageActions: Record<string, StageAction>, conditionContext: ConversationContext): Promise<ActionClassificationResult[]> {
     logger.info({ changeEvents }, 'Finding triggered actions based on variable change events');
     if (Object.keys(changeEvents).length === 0) {
       return [];
@@ -194,10 +202,16 @@ export class ContextTransformerExecutor {
         ([varName, expectedEvent]) => changeEvents[varName] === expectedEvent || expectedEvent === 'any',
       );
 
-      if (isTriggered) {
-        logger.debug({ sessionId: session.id, actionId, changeEvents }, 'Action triggered by context transformer variable change');
-        triggered.push({ name: actionId, parameters: {} });
+      if (!isTriggered) continue;
+
+      const conditionMet = await isActionActive(action, conditionContext, this.scriptExecutor);
+      if (!conditionMet) {
+        logger.debug({ sessionId: session.id, actionId }, 'Transformer-triggered action skipped: condition evaluated to false');
+        continue;
       }
+
+      logger.debug({ sessionId: session.id, actionId, changeEvents }, 'Action triggered by context transformer variable change');
+      triggered.push({ name: actionId, parameters: {} });
     }
 
     return triggered;
