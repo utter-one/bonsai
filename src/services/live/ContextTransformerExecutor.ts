@@ -134,6 +134,7 @@ export class ContextTransformerExecutor {
 
     // Find and return stage actions triggered by variable changes
     const triggeredActions = this.findTriggeredActions(session, variableChangeEvents, stage.actions || {});
+    logger.info({ sessionId: session.id, conversationId: conversation.id, triggeredActions }, 'Context transformer execution completed with variable changes triggering stage actions');
     return triggeredActions;
   }
 
@@ -213,10 +214,13 @@ export class ContextTransformerExecutor {
     const { transformer, llmProvider } = transformerData;
     const startMs = Date.now();
 
+    let renderedPrompt: string = null;
+    let rawResponse: string = null;
+
     try {
       logger.debug({ sessionId: session.id, transformerId: transformer.id }, 'Executing context transformer');
 
-      const renderedPrompt = await this.templatingEngine.render(transformer.prompt, context);
+      renderedPrompt = await this.templatingEngine.render(transformer.prompt, context);
       const text = context.userInput || '';
 
       logger.info({ sessionId: session.id, transformerId: transformer.id }, `Rendering prompt for transformer:\n${renderedPrompt}\nWith input:\n${text}`);
@@ -227,7 +231,7 @@ export class ContextTransformerExecutor {
       ];
 
       const result = await llmProvider.generate(messages);
-      const textContent = extractTextFromContent(result.content);
+      const textContent = rawResponse = extractTextFromContent(result.content);
 
       logger.info({ sessionId: session.id, transformerId: transformer.id }, `Received transformation result from LLM: ${textContent}`);
 
@@ -247,10 +251,10 @@ export class ContextTransformerExecutor {
         }
       }
 
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse: textContent, durationMs: Date.now() - startMs };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, durationMs: Date.now() - startMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id, transformerId: transformer.id }, 'Error executing context transformer');
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt: null, rawResponse: null, error: String(error), durationMs: Date.now() - startMs };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt, rawResponse, error: String(error), durationMs: Date.now() - startMs };
     }
   }
 }
