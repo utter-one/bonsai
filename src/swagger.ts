@@ -17,6 +17,7 @@ import { createContextTransformerSchema, updateContextTransformerBodySchema, del
 import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
+import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, moderationProvidersResponseSchema, moderationProviderInfoSchema, moderationModelInfoSchema, moderationCategoryInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
@@ -240,6 +241,12 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteEnvironmentRequest', deleteEnvironmentBodySchema);
   registry.register('EnvironmentResponse', environmentResponseSchema);
   registry.register('EnvironmentListResponse', environmentListResponseSchema);
+  registry.register('CreateGuardrailRequest', createGuardrailSchema);
+  registry.register('UpdateGuardrailRequest', updateGuardrailBodySchema);
+  registry.register('DeleteGuardrailRequest', deleteGuardrailBodySchema);
+  registry.register('CloneGuardrailRequest', cloneGuardrailSchema);
+  registry.register('GuardrailResponse', guardrailResponseSchema);
+  registry.register('GuardrailListResponse', guardrailListResponseSchema);
   registry.register('CreateProviderRequest', createProviderSchema);
   registry.register('UpdateProviderRequest', updateProviderBodySchema);
   registry.register('DeleteProviderRequest', deleteProviderBodySchema);
