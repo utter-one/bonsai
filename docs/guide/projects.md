@@ -17,6 +17,7 @@ Each project includes:
 | `storageConfig` | Storage provider for conversation artifacts |
 | `constants` | Key-value store for templating across all stages |
 | `metadata` | Arbitrary JSON for custom data |
+| `conversationTimeoutSeconds` | Inactivity timeout for active conversations (0 or null = disabled) |
 | `userProfileVariableDescriptors` | Typed schema describing the fields expected on a user's profile |
 | `version` | Optimistic locking version number |
 
@@ -60,6 +61,30 @@ Project-level constants are available in all Handlebars prompts and scripts via 
   "maxRetries": 3
 }
 ```
+
+## Conversation Timeout
+
+The `conversationTimeoutSeconds` setting controls how long a conversation can remain inactive before it is automatically aborted.
+
+- **`0` or `null` (default)** — Timeout is disabled; conversations remain active indefinitely.
+- **Positive integer** — Conversations that have had no activity for this many seconds are automatically aborted with the reason `"Conversation timed out due to inactivity"`.
+- **Negative values** — Rejected with a validation error.
+
+A background job checks all active conversations every minute. Inactivity is measured from the timestamp of the **last conversation event** (falling back to `updatedAt` if no events have been recorded yet).
+
+When a conversation is timed out:
+1. Its status is set to `aborted`.
+2. A `conversation_aborted` event is saved.
+3. Any connected WebSocket clients receive a `conversation_aborted` event message.
+4. The session is detached from the conversation.
+
+```json
+{
+  "conversationTimeoutSeconds": 300
+}
+```
+
+This example aborts any conversation that has been inactive for 5 minutes.
 
 ## User Profile Variable Descriptors
 

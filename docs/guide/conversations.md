@@ -142,7 +142,18 @@ When navigating between stages, each stage's variables are preserved separately,
 5. **End** — Conversation ends via:
    - `end_conversation` effect (graceful)
    - `abort_conversation` effect (immediate)
+   - Inactivity timeout (see below)
    - Client disconnect
    - Error (failed state)
 
 See [WebSocket Protocol](./websocket) for the complete message flow.
+
+## Inactivity Timeout
+
+If the project has `conversationTimeoutSeconds` configured, conversations that remain in an active state without any new events for longer than the configured period are automatically aborted.
+
+A background job runs every minute and checks all active conversations (`initialized`, `awaiting_user_input`, `receiving_user_voice`, `processing_user_input`, `generating_response`). Any conversation whose last event timestamp (or `updatedAt` if no events exist) is older than the configured threshold is aborted.
+
+The connected client receives a `conversation_aborted` WebSocket event with the reason `"Conversation timed out due to inactivity"`.
+
+See [Projects — Conversation Timeout](./projects#conversation-timeout) for configuration details.

@@ -29,6 +29,7 @@ Content-Type: application/json
 | `metadata` | `object` | No | Additional metadata |
 | `timezone` | `string` | No | IANA timezone identifier for conversations (e.g. `Europe/Warsaw`). Used as fallback when no per-user or per-conversation timezone is set. Defaults to UTC. |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No (default: `[]`) | Descriptors defining the data schema for user profile variables in this project |
+| `conversationTimeoutSeconds` | `integer` (min: 0) | No | Inactivity timeout in seconds. Active conversations with no new events for this duration are automatically aborted. Set to `0` or omit to disable. Negative values are rejected. |
 
 **Response** `201 Created` — [Project Response](#project-response)
 
@@ -89,6 +90,8 @@ All fields from the create body are optional. `version` is required for optimist
 | `metadata` | `object` | No | Updated metadata |
 | `timezone` | `string` | No | Updated IANA timezone identifier |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Updated descriptors for user profile variable schema |
+| `conversationTimeoutSeconds` | `integer` (min: 0) or `null` | No | Updated inactivity timeout in seconds. Set to `0` or `null` to disable. |
+
 **Response** `200 OK` — [Project Response](#project-response)
 
 **Errors:** `400` Invalid body | `404` Not found | `409` Version conflict
@@ -127,6 +130,7 @@ Content-Type: application/json
 | `metadata` | `object` | Yes | Additional metadata |
 | `timezone` | `string` | Yes | IANA timezone identifier (null means UTC) |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Descriptors defining the data schema for user profile variables |
+| `conversationTimeoutSeconds` | `integer` | Yes | Inactivity timeout in seconds. `null` or `0` means no timeout. |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
