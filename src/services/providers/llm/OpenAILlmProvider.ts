@@ -273,8 +273,6 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       throw new Error(response.error?.message || 'Response generation failed');
     }
 
-    logger.info({ response }, 'Received response from OpenAI for text-based generation');
-
     // Extract text from output items
     let content = '';
     for (const item of response.output || []) {
