@@ -114,6 +114,36 @@ Returns audit log entries for the specified global action. See [Audit Logs](./au
 
 ---
 
+## Conversation Lifecycle Hooks
+
+Global actions with the following reserved IDs act as conversation-level lifecycle hooks. They fire automatically at the corresponding event and are **excluded** from stage-level action classification.
+
+| Reserved ID | Fires when | Restricted effects |
+|---|---|---|
+| `__conversation_start` | Conversation and first stage are initialised | `end_conversation`, `abort_conversation` |
+| `__conversation_resume` | A previously-interrupted conversation is resumed | `end_conversation`, `abort_conversation` |
+| `__conversation_end` | Conversation is gracefully ended | `go_to_stage`, `generate_response`, `abort_conversation` |
+| `__conversation_abort` | Conversation is aborted (immediate stop) | `go_to_stage`, `generate_response`, `end_conversation` |
+| `__conversation_failed` | Conversation encounters a fatal error | `go_to_stage`, `generate_response`, `end_conversation`, `abort_conversation` |
+
+Create or update a global action using the standard [Create](#create-global-action) / [Update](#update-global-action) endpoints with one of these exact IDs. Only one hook per type is supported per project.
+
+See [Global Actions — Conversation Lifecycle Hooks](../guide/global-actions#conversation-lifecycle-hooks) in the guide for use cases and examples.
+
+---
+
+## Content Moderation Hook
+
+A global action with the reserved ID `__moderation_blocked` fires when user input is flagged by the project's content moderation policy. It is automatically available in every stage (global actions whose name starts with `__` are always loaded).
+
+| Reserved ID | Fires when | Effect restrictions |
+|---|---|---|
+| `__moderation_blocked` | User input blocked by content moderation | None |
+
+Create it using the standard [Create](#create-global-action) endpoint with `id: "__moderation_blocked"`. See [Global Actions — Content Moderation Hook](../guide/global-actions#content-moderation-hook) in the guide for behaviour details and use cases.
+
+---
+
 ## Global Action Response
 
 | Field | Type | Nullable | Description |

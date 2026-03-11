@@ -21,7 +21,7 @@ Each action in the `actions` map has a key (the action ID) and a value with thes
 | `watchedVariables` | Map of variable paths to trigger conditions (`new`, `changed`, `removed`) |
 | `metadata` | Arbitrary JSON |
 
-## Lifecycle Actions
+## Stage Lifecycle Actions
 
 Stages support three reserved lifecycle actions with special names (prefixed with `__`):
 
@@ -40,6 +40,26 @@ Restricted effects: cannot use `go_to_stage` or `generate_response`. Calling `go
 ### `__on_fallback`
 
 Runs when the classifier found no matching user-triggered action. Acts as the default behavior for unrecognized input. Has no effect restrictions.
+
+## Conversation Lifecycle Actions
+
+In addition to stage-level lifecycle hooks, **global actions** with reserved IDs fire at conversation-level lifecycle events, independent of which stage is active. See [Global Actions — Conversation Lifecycle Hooks](./global-actions#conversation-lifecycle-hooks) for the full reference, restrictions, and use cases.
+
+| Reserved Global Action ID | When it fires |
+|---|---|
+| `__conversation_start` | Once, after the conversation and first stage are initialised |
+| `__conversation_resume` | When a previously-interrupted conversation is resumed |
+| `__conversation_end` | When the conversation is gracefully ended |
+| `__conversation_abort` | When the conversation is aborted (immediate stop) |
+| `__conversation_failed` | When the conversation encounters a fatal error |
+
+There is also a moderation hook:
+
+| Reserved Global Action ID | When it fires |
+|---|---|
+| `__moderation_blocked` | User input is blocked by content moderation |
+
+See [Global Actions — Content Moderation Hook](./global-actions#content-moderation-hook) for details.
 
 ## Trigger Modes
 

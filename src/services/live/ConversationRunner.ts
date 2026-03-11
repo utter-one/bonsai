@@ -2,7 +2,8 @@ import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, Stage, Tool } from "../../types/models";
-import { StageAction, LIFECYCLE_ACTION_NAMES } from "../../types/actions";
+import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS } from "../../types/actions";
+import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
 import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
@@ -21,7 +22,7 @@ import { UserInputProcessor } from "./UserInputProcessor";
 import { TtsSettings } from "../providers/tts/TtsProviderFactory";
 import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
-import { and, eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
 import { ToolExecutor } from "./ToolExecutor";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
@@ -112,6 +113,8 @@ export class ConversationRunner {
   private navigationDepth = 0;
   /** Guards against multiple AI responses being generated within the same turn (e.g. when chained stage jumps each try to generate a response) */
   private responseGeneratedInTurn = false;
+  /** Conversation-level lifecycle global actions keyed by reserved ID, loaded once in prepareConversation */
+  private conversationLifecycleActions: Map<string, GlobalAction> = new Map();
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null };
@@ -155,6 +158,19 @@ export class ConversationRunner {
     }
 
     this.stageData = await this.buildStageData(this.conversation);
+
+    // Load conversation lifecycle global actions (by reserved ID) once — they are project-level and
+    // must not appear in stage-level global action processing.
+    const lifecycleActionsList = await db.query.globalActions.findMany({
+      where: (globalActions, { and, eq, inArray }) => and(
+        eq(globalActions.projectId, session.projectId),
+        inArray(globalActions.id, Object.values(CONVERSATION_LIFECYCLE_ACTION_IDS))
+      )
+    });
+    for (const action of lifecycleActionsList) {
+      this.conversationLifecycleActions.set(action.id, action);
+    }
+
     await this.wireUpProviders();
   }
 
@@ -248,20 +264,27 @@ export class ConversationRunner {
 
     // Load global actions for the stage.
     // Meta actions (name starts with '__') are always loaded regardless of useGlobalActions.
+    // Conversation lifecycle actions (__conversation_*) are excluded — they are loaded separately
+    // in prepareConversation and must not participate in stage-level classification/triggering.
     // When useGlobalActions is enabled, the stage's configured actions are loaded on top.
     {
+      const conversationLifecycleIds = Object.values(CONVERSATION_LIFECYCLE_ACTION_IDS);
       if (stage.useGlobalActions) {
         if (stage.globalActions.length === 0) {
-          // All global actions for the project (includes meta actions)
+          // All global actions for the project (includes meta actions), except conversation lifecycle actions
           const allGlobalActions = await db.query.globalActions.findMany({
-            where: (globalActions, { eq }) => eq(globalActions.projectId, project.id)
+            where: (globalActions, { eq }) => and(
+              eq(globalActions.projectId, project.id),
+              notInArray(globalActions.id, conversationLifecycleIds)
+            )
           });
           stageData.globalActions = allGlobalActions;
         } else {
-          // Selected actions + always include meta actions
+          // Selected actions + always include meta actions, excluding conversation lifecycle actions
           const selectedGlobalActions = await db.query.globalActions.findMany({
             where: (globalActions, { and, eq, or, inArray, like }) => and(
               eq(globalActions.projectId, project.id),
+              notInArray(globalActions.id, conversationLifecycleIds),
               or(
                 inArray(globalActions.id, stage.globalActions),
                 like(globalActions.name, '__%')
@@ -271,10 +294,11 @@ export class ConversationRunner {
           stageData.globalActions = selectedGlobalActions;
         }
       } else {
-        // Global actions disabled — load only meta actions
+        // Global actions disabled — load only meta actions, excluding conversation lifecycle actions
         const metaActions = await db.query.globalActions.findMany({
           where: (globalActions, { and, eq, like }) => and(
             eq(globalActions.projectId, project.id),
+            notInArray(globalActions.id, conversationLifecycleIds),
             like(globalActions.name, '__%')
           )
         });
@@ -660,8 +684,20 @@ export class ConversationRunner {
     await this.saveAndSendEvent('conversation_start', eventData);
     logger.info({ conversationId: this.conversation.id, stageId: this.stageData.id }, 'Conversation started');
 
-    // Execute __on_enter lifecycle action if defined
     const context = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+
+    // Execute __conversation_start global lifecycle action if defined
+    const onConversationStartAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_START);
+    if (onConversationStartAction) {
+      logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_start lifecycle action');
+      const startOutcome = await this.actionsExecutor.executeActions([onConversationStartAction], context, 'conversation_start');
+      await this.applyActionOutcome(context, startOutcome);
+      await this.saveAndSendOutcomeEvents(startOutcome);
+      const actionEventData: ActionEventData = { actionName: onConversationStartAction.name || '', stageId: this.stageData.id, effects: onConversationStartAction.effects };
+      await this.saveAndSendEvent('action', actionEventData);
+    }
+
+    // Execute __on_enter lifecycle action if defined
     let enterOutcome: ActionsExecutionOutcome | null = null;
     const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
     if (onEnterAction) {
@@ -718,8 +754,37 @@ export class ConversationRunner {
     await this.saveAndSendEvent('conversation_resume', eventData);
     logger.info({ conversationId: this.conversation.id, previousStatus, stageId: this.stageData.id }, 'Conversation resumed');
 
+    // Execute __conversation_resume global lifecycle action if defined
+    const onConversationResumeAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_RESUME);
+    if (onConversationResumeAction) {
+      logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_resume lifecycle action');
+      const resumeContext = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+      const resumeOutcome = await this.actionsExecutor.executeActions([onConversationResumeAction], resumeContext, 'conversation_resume');
+      await this.applyActionOutcome(resumeContext, resumeOutcome);
+      await this.saveAndSendOutcomeEvents(resumeOutcome);
+      const actionEventData: ActionEventData = { actionName: onConversationResumeAction.name || '', stageId: this.stageData.id, effects: onConversationResumeAction.effects };
+      await this.saveAndSendEvent('action', actionEventData);
+    }
+
     // Resume to awaiting user input state to allow the user to continue
     await this.changeState('awaiting_user_input');
+  }
+
+  /**
+   * Executes the __conversation_end lifecycle global action (if configured) when the conversation
+   * is ended via an explicit client command. Returns the stageId so the caller can include it in
+   * the conversation_end event.
+   */
+  async executeEndLifecycleAction(): Promise<void> {
+    const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
+    if (!onConversationEndAction) return;
+    logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action (client command)');
+    const endContext = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+    const endOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], endContext, 'conversation_end');
+    await this.applyActionOutcome(endContext, endOutcome);
+    await this.saveAndSendOutcomeEvents(endOutcome);
+    const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
+    await this.saveAndSendEvent('action', actionEventData);
   }
 
   async receiveUserTextInput(userInput: string): Promise<string> {
@@ -1277,6 +1342,22 @@ export class ConversationRunner {
     await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, 'failed', reason);
     logger.error({ conversationId: this.stageData.conversation.id, reason }, `Conversation ${this.stageData.conversation.id} marked as failed: ${reason}`);
 
+    // Execute __conversation_failed global lifecycle action if defined
+    // Errors are swallowed to avoid masking the original failure
+    const onConversationFailedAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_FAILED);
+    if (onConversationFailedAction) {
+      try {
+        logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_failed lifecycle action');
+        const failedContext = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+        const failedOutcome = await this.actionsExecutor.executeActions([onConversationFailedAction], failedContext, 'conversation_failed');
+        await this.saveAndSendOutcomeEvents(failedOutcome);
+        const actionEventData: ActionEventData = { actionName: onConversationFailedAction.name || '', stageId: this.stageData.id, effects: onConversationFailedAction.effects };
+        await this.saveAndSendEvent('action', actionEventData);
+      } catch (lifecycleError) {
+        logger.error({ conversationId: this.conversation.id, error: lifecycleError instanceof Error ? lifecycleError.message : String(lifecycleError) }, 'Failed to execute __conversation_failed lifecycle action');
+      }
+    }
+
     // Save event and send WebSocket message
     const eventData = { reason, stageId: this.stageData.id };
     await this.saveAndSendEvent('conversation_failed', eventData);
@@ -1542,6 +1623,16 @@ export class ConversationRunner {
           await this.stageData.ttsProvider.end();
         }
       }
+      // Execute __conversation_end global lifecycle action if defined
+      const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
+      if (onConversationEndAction) {
+        logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action');
+        const endLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], context, 'conversation_end');
+        await this.applyActionOutcome(context, endLifecycleOutcome);
+        await this.saveAndSendOutcomeEvents(endLifecycleOutcome);
+        const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
+        await this.saveAndSendEvent('action', actionEventData);
+      }
       // TODO: this should generate response and end conversation afterwards
       const eventData: ConversationEndEventData = {
         stageId: this.stageData.id,
@@ -1556,6 +1647,16 @@ export class ConversationRunner {
         if (this.stageData.ttsProvider) {
           await this.stageData.ttsProvider.end();
         }
+      }
+      // Execute __conversation_abort global lifecycle action if defined
+      const onConversationAbortAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_ABORT);
+      if (onConversationAbortAction) {
+        logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_abort lifecycle action');
+        const abortLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationAbortAction], context, 'conversation_abort');
+        await this.applyActionOutcome(context, abortLifecycleOutcome);
+        await this.saveAndSendOutcomeEvents(abortLifecycleOutcome);
+        const actionEventData: ActionEventData = { actionName: onConversationAbortAction.name || '', stageId: this.stageData.id, effects: onConversationAbortAction.effects };
+        await this.saveAndSendEvent('action', actionEventData);
       }
       // Abort conversation without generating response
       const eventData: ConversationAbortedEventData = {
