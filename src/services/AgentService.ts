@@ -42,7 +42,7 @@ export class AgentService extends BaseService {
 
       const createdAgent = agent[0];
 
-      await this.auditService.logCreate('agent', createdAgent.id, { id: createdAgent.id, projectId: createdAgent.projectId, name: createdAgent.name, description: createdAgent.description, prompt: createdAgent.prompt, ttsProviderId: createdAgent.ttsProviderId, ttsSettings: createdAgent.ttsSettings, tags: createdAgent.tags, metadata: createdAgent.metadata, fillerSettings: createdAgent.fillerSettings }, context?.operatorId);
+      await this.auditService.logCreate('agent', createdAgent.id, createdAgent, context?.operatorId);
 
       logger.info({ agentId: createdAgent.id }, 'Agent created successfully');
 
@@ -192,7 +192,7 @@ export class AgentService extends BaseService {
 
       const agent = updatedAgent[0];
 
-      await this.auditService.logUpdate('agent', agent.id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, { id: agent.id, name: agent.name, description: agent.description, prompt: agent.prompt, ttsProviderId: agent.ttsProviderId, ttsSettings: agent.ttsSettings, tags: agent.tags, metadata: agent.metadata, fillerSettings: agent.fillerSettings }, context?.operatorId, projectId);
+      await this.auditService.logUpdate('agent', agent.id, existingAgent, agent, context?.operatorId, projectId);
 
       logger.info({ agentId: agent.id, newVersion: agent.version }, 'Agent updated successfully');
 
@@ -233,7 +233,7 @@ export class AgentService extends BaseService {
         throw new OptimisticLockError(`Failed to delete agent due to version conflict`);
       }
 
-      await this.auditService.logDelete('agent', id, { id: existingAgent.id, name: existingAgent.name, description: existingAgent.description, prompt: existingAgent.prompt, ttsProviderId: existingAgent.ttsProviderId, ttsSettings: existingAgent.ttsSettings, tags: existingAgent.tags, metadata: existingAgent.metadata, fillerSettings: existingAgent.fillerSettings }, context?.operatorId, projectId);
+      await this.auditService.logDelete('agent', id, existingAgent, context?.operatorId, projectId);
 
       logger.info({ agentId: id }, 'Agent deleted successfully');
     } catch (error) {

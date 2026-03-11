@@ -97,7 +97,7 @@ export class StageService extends BaseService {
 
       const createdStage = stage[0];
 
-      await this.auditService.logCreate('stage', createdStage.id, { id: createdStage.id, projectId: createdStage.projectId, name: createdStage.name, description: createdStage.description, prompt: createdStage.prompt, llmProviderId: createdStage.llmProviderId, llmSettings: createdStage.llmSettings, agentId: createdStage.agentId, enterBehavior: createdStage.enterBehavior, useKnowledge: createdStage.useKnowledge, knowledgeTags: createdStage.knowledgeTags, useGlobalActions: createdStage.useGlobalActions, globalActions: createdStage.globalActions, variableDescriptors: createdStage.variableDescriptors, actions: createdStage.actions, defaultClassifierId: createdStage.defaultClassifierId, transformerIds: createdStage.transformerIds, tags: createdStage.tags, metadata: createdStage.metadata }, context?.operatorId);
+      await this.auditService.logCreate('stage', createdStage.id, createdStage, context?.operatorId);
       logger.info({ id: createdStage.id }, 'Stage created successfully');
 
       return stageResponseSchema.parse(createdStage);
@@ -267,7 +267,7 @@ export class StageService extends BaseService {
 
       const stage = updatedStage[0];
 
-      await this.auditService.logUpdate('stage', stage.id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, agentId: existingStage.agentId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, { id: stage.id, name: stage.name, description: stage.description, prompt: stage.prompt, llmProviderId: stage.llmProviderId, llmSettings: stage.llmSettings, agentId: stage.agentId, enterBehavior: stage.enterBehavior, useKnowledge: stage.useKnowledge, knowledgeTags: stage.knowledgeTags, useGlobalActions: stage.useGlobalActions, globalActions: stage.globalActions, variableDescriptors: stage.variableDescriptors, actions: stage.actions, defaultClassifierId: stage.defaultClassifierId, transformerIds: stage.transformerIds, tags: stage.tags, metadata: stage.metadata }, context?.operatorId, projectId);
+      await this.auditService.logUpdate('stage', stage.id, existingStage, stage, context?.operatorId, projectId);
 
       logger.info({ id: stage.id, newVersion: stage.version }, 'Stage updated successfully');
 
@@ -308,7 +308,7 @@ export class StageService extends BaseService {
         throw new OptimisticLockError(`Failed to delete stage due to version conflict`);
       }
 
-      await this.auditService.logDelete('stage', id, { id: existingStage.id, name: existingStage.name, description: existingStage.description, prompt: existingStage.prompt, llmProviderId: existingStage.llmProviderId, llmSettings: existingStage.llmSettings, agentId: existingStage.agentId, enterBehavior: existingStage.enterBehavior, useKnowledge: existingStage.useKnowledge, knowledgeTags: existingStage.knowledgeTags, useGlobalActions: existingStage.useGlobalActions, globalActions: existingStage.globalActions, variableDescriptors: existingStage.variableDescriptors, actions: existingStage.actions, defaultClassifierId: existingStage.defaultClassifierId, transformerIds: existingStage.transformerIds, tags: existingStage.tags, metadata: existingStage.metadata }, context?.operatorId, projectId);
+      await this.auditService.logDelete('stage', id, existingStage, context?.operatorId, projectId);
 
       logger.info({ id }, 'Stage deleted successfully');
     } catch (error) {

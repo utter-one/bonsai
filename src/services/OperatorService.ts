@@ -54,7 +54,8 @@ export class OperatorService extends BaseService {
 
       const createdOperator = operator[0];
 
-      await this.auditService.logCreate('operator', createdOperator.id, { id: createdOperator.id, name: createdOperator.name, roles: createdOperator.roles, metadata: createdOperator.metadata }, context?.operatorId);
+      const { password: _pw, ...safeCreatedOperator } = createdOperator;
+      await this.auditService.logCreate('operator', createdOperator.id, safeCreatedOperator, context?.operatorId);
 
       logger.info({ operatorId: createdOperator.id }, 'Operator created successfully');
 
@@ -213,7 +214,9 @@ export class OperatorService extends BaseService {
 
       const operator = updatedOperator[0];
 
-      await this.auditService.logUpdate('operator', operator.id, { id: existingOperator.id, name: existingOperator.name, roles: existingOperator.roles, metadata: existingOperator.metadata }, { id: operator.id, name: operator.name, roles: operator.roles, metadata: operator.metadata }, context?.operatorId);
+      const { password: _oldPw, ...safeExistingOperator } = existingOperator;
+      const { password: _newPw, ...safeOperator } = operator;
+      await this.auditService.logUpdate('operator', operator.id, safeExistingOperator, safeOperator, context?.operatorId);
 
       logger.info({ operatorId: operator.id, newVersion: operator.version }, 'Operator updated successfully');
 
@@ -252,7 +255,8 @@ export class OperatorService extends BaseService {
         throw new OptimisticLockError(`Failed to delete operator due to version conflict`);
       }
 
-      await this.auditService.logDelete('operator', id, { id: existingOperator.id, name: existingOperator.name, roles: existingOperator.roles, metadata: existingOperator.metadata }, context?.operatorId);
+      const { password: _pw, ...safeExistingOperator } = existingOperator;
+      await this.auditService.logDelete('operator', id, safeExistingOperator, context?.operatorId);
 
       logger.info({ operatorId: id }, 'Operator deleted successfully');
     } catch (error) {
@@ -369,15 +373,12 @@ export class OperatorService extends BaseService {
       const operator = updatedOperator[0];
 
       // Log the update for audit purposes
-      const oldData: any = { id: existingOperator.id, name: existingOperator.name };
-      const newData: any = { id: operator.id, name: operator.name };
+      const { password: _oldPw, ...safeExistingOperator } = existingOperator;
+      const { password: _newPw, ...safeOperator } = operator;
+      const oldEntity = input.newPassword ? { ...safeExistingOperator, passwordChanged: false } : safeExistingOperator;
+      const newEntity = input.newPassword ? { ...safeOperator, passwordChanged: true } : safeOperator;
 
-      if (input.newPassword) {
-        oldData.passwordChanged = false;
-        newData.passwordChanged = true;
-      }
-
-      await this.auditService.logUpdate('operator', operator.id, oldData, newData, context.operatorId);
+      await this.auditService.logUpdate('operator', operator.id, oldEntity, newEntity, context.operatorId);
 
       logger.info({ operatorId: operator.id, newVersion: operator.version }, 'Profile updated successfully');
 

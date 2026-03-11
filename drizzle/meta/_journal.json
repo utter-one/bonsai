@@ -211,6 +211,13 @@
       "when": 1773233559570,
       "tag": "0029_typical_omega_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1773246876969,
+      "tag": "0030_windy_colleen_wing",
+      "breakpoints": true
     }
   ]
 }

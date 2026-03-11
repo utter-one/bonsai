@@ -43,7 +43,7 @@ export class ToolService extends BaseService {
 
       const createdTool = tool[0];
 
-      await this.auditService.logCreate('tool', createdTool.id, { id: createdTool.id, projectId: createdTool.projectId, name: createdTool.name, description: createdTool.description, prompt: createdTool.prompt, llmProviderId: createdTool.llmProviderId, llmSettings: createdTool.llmSettings, inputType: createdTool.inputType, outputType: createdTool.outputType, parameters: createdTool.parameters, tags: createdTool.tags, metadata: createdTool.metadata }, context?.operatorId);
+      await this.auditService.logCreate('tool', createdTool.id, createdTool, context?.operatorId);
 
       logger.info({ toolId: createdTool.id }, 'Tool created successfully');
 
@@ -198,7 +198,7 @@ export class ToolService extends BaseService {
 
       const tool = updatedTool[0];
 
-      await this.auditService.logUpdate('tool', tool.id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, { id: tool.id, name: tool.name, description: tool.description, prompt: tool.prompt, llmProviderId: tool.llmProviderId, llmSettings: tool.llmSettings, inputType: tool.inputType, outputType: tool.outputType, parameters: tool.parameters, tags: tool.tags, metadata: tool.metadata }, context?.operatorId, projectId);
+      await this.auditService.logUpdate('tool', tool.id, existingTool, tool, context?.operatorId, projectId);
 
       logger.info({ toolId: tool.id, newVersion: tool.version }, 'Tool updated successfully');
 
@@ -239,7 +239,7 @@ export class ToolService extends BaseService {
         throw new OptimisticLockError(`Failed to delete tool due to version conflict`);
       }
 
-      await this.auditService.logDelete('tool', id, { id: existingTool.id, name: existingTool.name, description: existingTool.description, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings, inputType: existingTool.inputType, outputType: existingTool.outputType, parameters: existingTool.parameters, tags: existingTool.tags, metadata: existingTool.metadata }, context?.operatorId, projectId);
+      await this.auditService.logDelete('tool', id, existingTool, context?.operatorId, projectId);
 
       logger.info({ toolId: id }, 'Tool deleted successfully');
     } catch (error) {

@@ -380,7 +380,6 @@ export const auditLogs = pgTable('audit_logs', {
   projectId: text('project_id'),
   oldEntity: jsonb('old_entity').$type<Record<string, any>>(),
   newEntity: jsonb('new_entity').$type<Record<string, any>>(),
-  version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (table) => [
   index('idx_audit_logs_project_id').on(table.projectId),

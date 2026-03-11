@@ -72,7 +72,7 @@ export class ConversationService extends BaseService {
       const createdConversation = result[0];
 
       if (context?.operatorId) {
-        await this.auditService.logCreate('conversation', createdConversation.id, { id: createdConversation.id, projectId: createdConversation.projectId, userId: createdConversation.userId, clientId: createdConversation.clientId, stageId: createdConversation.stageId, status: createdConversation.status }, context.operatorId);
+        await this.auditService.logCreate('conversation', createdConversation.id, createdConversation, context.operatorId);
       }
 
       logger.info({ conversationId: createdConversation.id }, 'Conversation created successfully');
@@ -409,7 +409,7 @@ export class ConversationService extends BaseService {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
 
-      await this.auditService.logDelete('conversation', id, { id: existingConversation.id, projectId: existingConversation.projectId, userId: existingConversation.userId, clientId: existingConversation.clientId, stageId: existingConversation.stageId, status: existingConversation.status }, context?.operatorId);
+      await this.auditService.logDelete('conversation', id, existingConversation, context?.operatorId);
 
       logger.info({ conversationId: id }, 'Conversation deleted successfully');
     } catch (error) {

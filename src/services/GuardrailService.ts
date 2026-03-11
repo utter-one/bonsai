@@ -45,7 +45,7 @@ export class GuardrailService extends BaseService {
 
       const created = guardrail[0];
 
-      await this.auditService.logCreate('guardrail', created.id, { id: created.id, projectId: created.projectId, name: created.name, condition: created.condition, classificationTrigger: created.classificationTrigger, effects: created.effects, examples: created.examples, tags: created.tags, metadata: created.metadata }, context?.operatorId);
+      await this.auditService.logCreate('guardrail', created.id, created, context?.operatorId);
 
       logger.info({ guardrailId: created.id }, 'Guardrail created successfully');
 
@@ -192,7 +192,7 @@ export class GuardrailService extends BaseService {
 
       const guardrail = updated[0];
 
-      await this.auditService.logUpdate('guardrail', guardrail.id, { id: existing.id, name: existing.name, condition: existing.condition, classificationTrigger: existing.classificationTrigger, effects: existing.effects, examples: existing.examples, tags: existing.tags, metadata: existing.metadata }, { id: guardrail.id, name: guardrail.name, condition: guardrail.condition, classificationTrigger: guardrail.classificationTrigger, effects: guardrail.effects, examples: guardrail.examples, tags: guardrail.tags, metadata: guardrail.metadata }, context?.operatorId, projectId);
+      await this.auditService.logUpdate('guardrail', guardrail.id, existing, guardrail, context?.operatorId, projectId);
 
       logger.info({ guardrailId: guardrail.id, newVersion: guardrail.version }, 'Guardrail updated successfully');
 
@@ -234,7 +234,7 @@ export class GuardrailService extends BaseService {
         throw new OptimisticLockError(`Failed to delete guardrail due to version conflict`);
       }
 
-      await this.auditService.logDelete('guardrail', id, { id: existing.id, name: existing.name, condition: existing.condition, classificationTrigger: existing.classificationTrigger, effects: existing.effects, examples: existing.examples, tags: existing.tags, metadata: existing.metadata }, context?.operatorId, projectId);
+      await this.auditService.logDelete('guardrail', id, existing, context?.operatorId, projectId);
 
       logger.info({ guardrailId: id }, 'Guardrail deleted successfully');
     } catch (error) {

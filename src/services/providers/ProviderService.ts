@@ -46,7 +46,8 @@ export class ProviderService extends BaseService {
 
       const createdProvider = provider[0];
 
-      await this.auditService.logCreate('provider', createdProvider.id, { id: createdProvider.id, name: createdProvider.name, providerType: createdProvider.providerType, apiType: createdProvider.apiType, config: createdProvider.config, tags: createdProvider.tags }, context?.operatorId);
+      const { config: _config, ...safeCreatedProvider } = createdProvider;
+      await this.auditService.logCreate('provider', createdProvider.id, safeCreatedProvider, context?.operatorId);
 
       logger.info({ providerId: createdProvider.id }, 'Provider created successfully');
 
@@ -204,7 +205,9 @@ export class ProviderService extends BaseService {
 
       const provider = updatedProvider[0];
 
-      await this.auditService.logUpdate('provider', provider.id, { id: existingProvider.id, name: existingProvider.name, providerType: existingProvider.providerType, apiType: existingProvider.apiType, config: existingProvider.config, tags: existingProvider.tags }, { id: provider.id, name: provider.name, providerType: provider.providerType, apiType: provider.apiType, config: provider.config, tags: provider.tags }, context?.operatorId);
+      const { config: _oldConfig, ...safeExistingProvider } = existingProvider;
+      const { config: _newConfig, ...safeProvider } = provider;
+      await this.auditService.logUpdate('provider', provider.id, safeExistingProvider, safeProvider, context?.operatorId);
 
       logger.info({ providerId: provider.id, newVersion: provider.version }, 'Provider updated successfully');
 
@@ -244,7 +247,8 @@ export class ProviderService extends BaseService {
         throw new OptimisticLockError(`Failed to delete provider due to version conflict`);
       }
 
-      await this.auditService.logDelete('provider', id, { id: existingProvider.id, name: existingProvider.name, providerType: existingProvider.providerType, apiType: existingProvider.apiType, config: existingProvider.config, tags: existingProvider.tags }, context?.operatorId);
+      const { config: _config, ...safeExistingProvider } = existingProvider;
+      await this.auditService.logDelete('provider', id, safeExistingProvider, context?.operatorId);
 
       logger.info({ providerId: id }, 'Provider deleted successfully');
     } catch (error) {
