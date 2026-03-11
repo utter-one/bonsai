@@ -24,6 +24,7 @@ import { EnvironmentController } from './http/controllers/EnvironmentController'
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
+import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { MigrationController } from './http/controllers/MigrationController';
@@ -125,6 +126,9 @@ export function createApp(): express.Application {
 
   const auditController = container.resolve(AuditController);
   auditController.registerRoutes(app);
+
+  const analyticsController = container.resolve(AnalyticsController);
+  analyticsController.registerRoutes(app);
 
   const classifierController = container.resolve(ClassifierController);
   classifierController.registerRoutes(app);

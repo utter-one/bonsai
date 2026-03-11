@@ -21,6 +21,7 @@ import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySc
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, moderationProvidersResponseSchema, moderationProviderInfoSchema, moderationModelInfoSchema, moderationCategoryInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
+import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema } from './http/contracts/analytics';
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { asrConfigSchema } from './http/contracts/project';
@@ -73,6 +74,7 @@ import { EnvironmentController } from './http/controllers/EnvironmentController'
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
+import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
@@ -305,6 +307,15 @@ export function getOpenAPISpec(): any {
   // Register Audit routes from AuditController
   const auditPaths = AuditController.getOpenAPIPaths();
   for (const path of auditPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Analytics routes from AnalyticsController
+  registry.register('LatencyMetric', latencyMetricSchema);
+  registry.register('PercentileSet', percentileSetSchema);
+  registry.register('LatencyTrendPoint', latencyTrendPointSchema);
+  const analyticsPaths = AnalyticsController.getOpenAPIPaths();
+  for (const path of analyticsPaths) {
     registry.registerPath(path);
   }
 

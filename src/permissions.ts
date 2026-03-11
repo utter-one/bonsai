@@ -92,6 +92,7 @@ export const PERMISSIONS = {
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',
+  ANALYTICS_READ: 'analytics:read',
 } as const;
 
 /** Type for permission values */
@@ -136,6 +137,7 @@ export const ROLES = {
       PERMISSIONS.API_KEY_WRITE,
       PERMISSIONS.API_KEY_DELETE,
       PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.ANALYTICS_READ,
     ],
   },
   support: {
@@ -171,6 +173,7 @@ export const ROLES = {
       PERMISSIONS.API_KEY_READ,
       PERMISSIONS.SYSTEM_CONFIG,
       PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.ANALYTICS_READ,
     ],
   },
   viewer: {
@@ -192,6 +195,7 @@ export const ROLES = {
       PERMISSIONS.PROVIDER_READ,
       PERMISSIONS.API_KEY_READ,
       PERMISSIONS.AUDIT_READ,
+      PERMISSIONS.ANALYTICS_READ,
     ],
   },
 } as const;

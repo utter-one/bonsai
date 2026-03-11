@@ -57,6 +57,7 @@ export const conversationEvents = pgTable('conversation_events', {
   primaryKey({ columns: [table.projectId, table.id] }),
   foreignKey({ columns: [table.projectId, table.conversationId], foreignColumns: [conversations.projectId, conversations.id] }).onDelete('cascade'),
   index('idx_conversation_events_project_conversation').on(table.projectId, table.conversationId),
+  index('idx_conversation_events_project_type_timestamp').on(table.projectId, table.eventType, table.timestamp),
 ]);
 
 // Operator table
