@@ -124,14 +124,12 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
     const transcriberConfig: StreamingTranscriberParams = {
       sampleRate: this.settings.sampleRate,
       encoding: 'pcm_s16le' as const,
+      speechModel: this.settings.speechModel,
     };
 
     // Add optional parameters
     if (this.settings.formatTurns !== undefined) {
       transcriberConfig.formatTurns = this.settings.formatTurns;
-    }
-    if (this.settings.speechModel) {
-      transcriberConfig.speechModel = this.settings.speechModel;
     }
     if (this.settings.keytermsPrompt && this.settings.keytermsPrompt.length > 0) {
       transcriberConfig.keytermsPrompt = this.settings.keytermsPrompt;
