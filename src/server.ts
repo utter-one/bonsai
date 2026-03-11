@@ -27,6 +27,7 @@ import { AuditController } from './http/controllers/AuditController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { MigrationController } from './http/controllers/MigrationController';
+import { ConversationTimeoutService } from './services/ConversationTimeoutService';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -172,6 +173,8 @@ export function createApp(): express.Application {
 
   const migrationController = container.resolve(MigrationController);
   migrationController.registerRoutes(app);
+
+  container.resolve(ConversationTimeoutService).start();
 
   app.use(errorHandler);
 

@@ -7,20 +7,20 @@ import { ConversationEventData, ConversationEventType } from "../types/conversat
 
 /** Session data associated with each WebSocket connection. */
 export type Connection =
-{ 
-  /** Unique identifier for the session. */
-  id: string,
-  /** ID of the project this session is authenticated for. */
-  projectId: string;
-  /** ID of the conversation currently active in this session, empty string if none. */
-  conversationId: string
-  /** Conversation runner instance for managing the conversation. */
-  runner: ConversationRunner;
-  /** WebSocket connection associated with this session. */
-  ws: WebSocket;
-  /** Session settings configured during authentication. */
-  sessionSettings: SessionSettings;
-};
+  {
+    /** Unique identifier for the session. */
+    id: string,
+    /** ID of the project this session is authenticated for. */
+    projectId: string;
+    /** ID of the conversation currently active in this session, empty string if none. */
+    conversationId: string
+    /** Conversation runner instance for managing the conversation. */
+    runner: ConversationRunner;
+    /** WebSocket connection associated with this session. */
+    ws: WebSocket;
+    /** Session settings configured during authentication. */
+    sessionSettings: SessionSettings;
+  };
 
 /**
  * Manages WebSocket sessions and their associated conversations.
@@ -41,11 +41,11 @@ export class ConnectionManager {
    */
   createSession(ws: WebSocket, projectId: string, sessionSettings?: SessionSettings): string {
     const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
-    this.socketMap.set(ws, { 
-      id: sessionId, 
-      projectId, 
-      conversationId: null, 
-      runner: null, 
+    this.socketMap.set(ws, {
+      id: sessionId,
+      projectId,
+      conversationId: null,
+      runner: null,
       ws,
       sessionSettings: sessionSettings ?? { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true }
     });
@@ -109,6 +109,21 @@ export class ConnectionManager {
       session.conversationId = null;
       session.runner = null;
       this.socketMap.set(socket, session);
+    }
+  }
+
+  /**
+   * Detaches the given conversation from all sessions that are currently associated with it.
+   * Used by background jobs (e.g. timeout) that abort a conversation without going through a single session.
+   * @param conversationId - The conversation ID to detach from all sessions.
+   */
+  detachConversationFromAllSessions(conversationId: string): void {
+    for (const [ws, session] of this.socketMap.entries()) {
+      if (session.conversationId === conversationId) {
+        session.conversationId = null;
+        session.runner = null;
+        this.socketMap.set(ws, session);
+      }
     }
   }
 

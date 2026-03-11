@@ -46,6 +46,7 @@
     "isolated-vm": "^5.0.4",
     "jsonwebtoken": "^9.0.3",
     "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
+    "node-cron": "^4.2.1",
     "openai": "^6.15.0",
     "pg": "^8.16.3",
     "pino": "^10.1.0",
@@ -60,6 +61,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.16.0",
     "@types/qs": "^6.14.0",
     "drizzle-kit": "^0.31.8"

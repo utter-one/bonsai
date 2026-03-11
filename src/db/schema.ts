@@ -35,6 +35,7 @@ export const conversations = pgTable('conversations', {
   status: text('status').notNull().$type<ConversationState>().default('initialized'),
   statusDetails: text('status_reason').default(null),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
+  lastActivityAt: timestamp('last_activity_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
@@ -98,6 +99,7 @@ export const projects = pgTable('projects', {
   autoCreateUsers: boolean('auto_create_users').notNull().default(false),
   userProfileVariableDescriptors: jsonb('user_profile_variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
   defaultGuardrailClassifierId: text('default_guardrail_classifier_id'),
+  conversationTimeoutSeconds: integer('conversation_timeout_seconds'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

@@ -154,6 +154,7 @@ export class ConversationService extends BaseService {
       conversationEventResponseSchema.parse(eventRecord);
 
       await db.insert(conversationEvents).values(eventRecord);
+      await db.update(conversations).set({ lastActivityAt: eventRecord.timestamp }).where(and(eq(conversations.projectId, projectId), eq(conversations.id, conversationId)));
 
       logger.debug({ conversationId, eventId, eventType }, 'Conversation event saved successfully');
       return eventId;
@@ -344,6 +345,42 @@ export class ConversationService extends BaseService {
       logger.info({ conversationId: id }, 'Conversation marked as failed successfully');
     } catch (error) {
       logger.error({ error, conversationId: id, reason }, 'Failed to mark conversation as failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Marks a conversation as aborted with a reason (used by internal jobs, no permission check)
+   * @param projectId - The project the conversation belongs to
+   * @param id - The unique identifier of the conversation
+   * @param reason - Human-readable description of why the conversation was aborted
+   */
+  async abortConversation(projectId: string, id: string, reason: string): Promise<void> {
+    logger.info({ conversationId: id, reason }, `Aborting conversation: ${reason}`);
+
+    try {
+      const existingConversation = await db.query.conversations.findFirst({ where: and(eq(conversations.projectId, projectId), eq(conversations.id, id)) });
+
+      if (!existingConversation) {
+        throw new NotFoundError(`Conversation with id ${id} not found`);
+      }
+
+      if (existingConversation.status === 'finished' || existingConversation.status === 'failed' || existingConversation.status === 'aborted') {
+        logger.info({ conversationId: id }, 'Conversation is already ended, skipping abort');
+        return;
+      }
+
+      await db.update(conversations)
+        .set({
+          status: 'aborted',
+          statusDetails: reason,
+          updatedAt: new Date()
+        })
+        .where(and(eq(conversations.projectId, projectId), eq(conversations.id, id)));
+
+      logger.info({ conversationId: id }, 'Conversation aborted successfully');
+    } catch (error) {
+      logger.error({ error, conversationId: id, reason }, 'Failed to abort conversation');
       throw error;
     }
   }

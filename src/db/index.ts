@@ -17,7 +17,15 @@ export const db = drizzle(pool, { schema });
 // Export schema for use in other modules
 export * from './schema';
 
-// Optional: Test connection
+// Enforce UTC on every connection so that:
+// - PostgreSQL's NOW() / defaultNow() stores UTC time (not the server's local timezone)
+// - JS Date values sent by node-postgres are stored as UTC digits
+// Without this, timestamp WITHOUT timezone columns can differ by the server's UTC offset
+// when comparing defaultNow()-set columns against new Date()-set columns.
+pool.on('connect', (client) => {
+  client.query("SET TIME ZONE 'UTC'").catch((err) => logger.error({ err }, 'Failed to set session timezone to UTC'));
+});
+
 pool.on('connect', () => {
   logger.info('✅ Database connected successfully');
 });

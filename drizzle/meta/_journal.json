@@ -204,6 +204,13 @@
       "when": 1773159078053,
       "tag": "0028_closed_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1773233559570,
+      "tag": "0029_typical_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }
