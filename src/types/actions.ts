@@ -176,7 +176,7 @@ export const toolParameterSchema = z.object({
   required: z.boolean().describe('Whether this parameter must be provided when invoking the tool'),
 }).openapi('ToolParameter');
 
-export const fieldWatchTriggerSchema = z.enum(['new', 'changed', 'removed']).describe('Condition for triggering an action based on variable changes: new (variable is created), changed (variable value changes), removed (variable is deleted)');
+export const fieldWatchTriggerSchema = z.enum(['new', 'changed', 'removed', 'any']).describe('Condition for triggering an action based on variable changes: new (variable is created), changed (variable value changes), removed (variable is deleted)');
 
 /**
  * Schema for a single stage action

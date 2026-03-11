@@ -250,9 +250,6 @@ export class ConversationRunner {
     // Meta actions (name starts with '__') are always loaded regardless of useGlobalActions.
     // When useGlobalActions is enabled, the stage's configured actions are loaded on top.
     {
-      const { globalActions: globalActionsTable } = await import('../../db/schema');
-      const { inArray, like, and, eq, or } = await import('drizzle-orm');
-
       if (stage.useGlobalActions) {
         if (stage.globalActions.length === 0) {
           // All global actions for the project (includes meta actions)
@@ -287,8 +284,6 @@ export class ConversationRunner {
 
     // Load all project guardrails — they fire on every stage regardless of stage configuration
     {
-      const { guardrails: guardrailsTable } = await import('../../db/schema');
-      const { eq } = await import('drizzle-orm');
       stageData.guardrails = await db.query.guardrails.findMany({
         where: (guardrails, { eq }) => eq(guardrails.projectId, project.id),
       });
@@ -1011,8 +1006,6 @@ export class ConversationRunner {
     this.conversation.stageVars[stageId][variableName] = variableValue;
 
     // Update conversation in database
-    const { conversations } = await import('../../db/schema');
-    const { and, eq } = await import('drizzle-orm');
     await db.update(conversations)
       .set({ stageVars: this.conversation.stageVars, updatedAt: new Date() })
       .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
@@ -1068,9 +1061,6 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, fieldName }, `Setting user profile field ${fieldName}`);
 
     // Load current user from database
-    const { users } = await import('../../db/schema');
-    const { eq, and } = await import('drizzle-orm');
-
     const currentUser = await db.query.users.findFirst({
       where: and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)),
     });
@@ -1102,9 +1092,6 @@ export class ConversationRunner {
    */
   async getUserProfileField(fieldName: string): Promise<any> {
     logger.info({ conversationId: this.conversation.id, fieldName }, `Getting user profile field ${fieldName}`);
-
-    const { users } = await import('../../db/schema');
-    const { eq, and } = await import('drizzle-orm');
 
     const user = await db.query.users.findFirst({
       where: and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)),
