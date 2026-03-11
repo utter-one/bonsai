@@ -216,9 +216,27 @@ export const LIFECYCLE_ACTION_NAMES = {
 } as const;
 
 /**
+ * Reserved global action IDs for conversation-level lifecycle hooks.
+ * A global action with one of these IDs fires at the corresponding conversation lifecycle event.
+ * These IDs are validated and excluded from stage-level global action processing.
+ */
+export const CONVERSATION_LIFECYCLE_ACTION_IDS = {
+  /** Executed once after the conversation and first stage are initialised */
+  ON_START: '__conversation_start',
+  /** Executed when a previously-interrupted conversation is resumed */
+  ON_RESUME: '__conversation_resume',
+  /** Executed when the conversation is gracefully ended */
+  ON_END: '__conversation_end',
+  /** Executed when the conversation is aborted (immediate stop) */
+  ON_ABORT: '__conversation_abort',
+  /** Executed when the conversation encounters a fatal error */
+  ON_FAILED: '__conversation_failed',
+} as const;
+
+/**
  * Type for lifecycle action context - indicates which lifecycle hook is being executed
  */
-export type LifecycleContext = 'on_enter' | 'on_leave' | 'on_fallback' | null;
+export type LifecycleContext = 'on_enter' | 'on_leave' | 'on_fallback' | 'conversation_start' | 'conversation_resume' | 'conversation_end' | 'conversation_abort' | 'conversation_failed' | null;
 
 /**
  * Mapping of lifecycle contexts to effects that should be ignored
@@ -230,16 +248,42 @@ export const LIFECYCLE_EFFECT_RESTRICTIONS: Record<string, Set<Effect['type']>> 
    * These would interfere with the stage initialization flow
    */
   on_enter: new Set<Effect['type']>(['end_conversation', 'abort_conversation', 'go_to_stage']),
-  
+
   /**
    * __on_leave: Cannot change stage or generate response during exit
    * go_to_stage would create infinite loops, generate_response is handled by destination stage
    */
   on_leave: new Set<Effect['type']>(['go_to_stage', 'generate_response']),
-  
+
   /**
    * __on_fallback: No restrictions - fallback can do anything
    * This is the last chance to handle unmatched input
    */
   on_fallback: new Set<Effect['type']>(),
+
+  /**
+   * __conversation_start: Cannot immediately end or abort the freshly started conversation
+   * Use go_to_stage to redirect, run_script/call_webhook to initialise context
+   */
+  conversation_start: new Set<Effect['type']>(['end_conversation', 'abort_conversation']),
+
+  /**
+   * __conversation_resume: Same restrictions as conversation_start
+   */
+  conversation_resume: new Set<Effect['type']>(['end_conversation', 'abort_conversation']),
+
+  /**
+   * __conversation_end: Conversation is already ending — no stage navigation, response generation, or abort
+   */
+  conversation_end: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'abort_conversation']),
+
+  /**
+   * __conversation_abort: Conversation is already aborting — no stage navigation, response generation, or end
+   */
+  conversation_abort: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'end_conversation']),
+
+  /**
+   * __conversation_failed: Conversation is in an error state — no navigation, response, or termination effects
+   */
+  conversation_failed: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'end_conversation', 'abort_conversation']),
 };
