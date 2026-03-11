@@ -68,6 +68,12 @@ export type TurnData = {
   fillerDurationMs: number | null;
   /** Duration of the moderation API call in milliseconds; null when moderation was not performed */
   moderationDurationMs: number | null;
+  /** Unix timestamp (ms) when ASR recognition started */
+  asrStartMs: number | null;
+  /** Unix timestamp (ms) when the TTS provider started synthesising the first chunk */
+  ttsStartMs: number | null;
+  /** Sequential 1-based turn number within the conversation */
+  turnIndex: number;
 };
 
 export type StageRuntimeData = {
@@ -117,7 +123,7 @@ export class ConversationRunner {
   private conversationLifecycleActions: Map<string, GlobalAction> = new Map();
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null };
+  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsStartMs: null, turnIndex: 0 };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -381,6 +387,7 @@ export class ConversationRunner {
         asrProvider.setOnRecognitionStarted(async () => {
           isRecognizing = true;
           chunkOrdinal = 0;
+          this.turnData.asrStartMs = Date.now();
         });
 
         asrProvider.setOnRecognizing(async (chunkId, text) => {
@@ -426,6 +433,7 @@ export class ConversationRunner {
         });
 
         asrProvider.setOnRecognitionStopped(async () => {
+          const asrEndMs = Date.now();
           logger.info({ conversationId }, `ASR recognition stopped for conversation ${conversationId}`);
 
           isRecognizing = false;
@@ -437,10 +445,10 @@ export class ConversationRunner {
             logger.debug({ conversationId, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}`);
             const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [/** TODO */], fullText, fullText);
             context.userInputSource = 'voice';
-            await this.processUserInput(fullText, 'voice');
+            await this.processUserInput(fullText, 'voice', asrEndMs);
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
-            await this.processUserInput(this.stageData.project.asrConfig.unintelligiblePlaceholder ?? '**inaudible**', 'voice');
+            await this.processUserInput(this.stageData.project.asrConfig.unintelligiblePlaceholder ?? '**inaudible**', 'voice', asrEndMs);
           }
         });
 
@@ -471,6 +479,9 @@ export class ConversationRunner {
           logger.info({ conversationId }, `TTS generation started for conversation ${conversationId}`);
           isGenerating = true;
           firstTtsChunkGenerated = false;
+          if (this.turnData.ttsStartMs === null) {
+            this.turnData.ttsStartMs = Date.now();
+          }
         });
 
         ttsProvider.setOnGenerationEnded(async () => {
@@ -479,12 +490,19 @@ export class ConversationRunner {
           isGenerating = false;
 
           // Snapshot turn data before any awaits to avoid reading mutated values
-          const { startMs, assistantMessageEventId, outputTurnId } = this.turnData;
+          const { startMs, assistantMessageEventId, outputTurnId, ttsStartMs } = this.turnData;
+          const ttsEndMs = Date.now();
 
-          // Record total turn duration now that all audio has been sent
-          const totalTurnDurationMs = startMs !== null ? Date.now() - startMs : undefined;
-          if (totalTurnDurationMs !== undefined && assistantMessageEventId) {
-            await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, { totalTurnDurationMs });
+          // Record total turn duration and TTS duration now that all audio has been sent
+          const totalTurnDurationMs = startMs !== null ? ttsEndMs - startMs : undefined;
+          const ttsDurationMs = ttsStartMs !== null ? ttsEndMs - ttsStartMs : undefined;
+          if (assistantMessageEventId) {
+            const backfill: Record<string, any> = {};
+            if (totalTurnDurationMs !== undefined) backfill.totalTurnDurationMs = totalTurnDurationMs;
+            if (ttsDurationMs !== undefined) backfill.ttsDurationMs = ttsDurationMs;
+            if (Object.keys(backfill).length > 0) {
+              await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
+            }
           }
 
           // Send AI response end notification to client through WebSocket
@@ -603,6 +621,8 @@ export class ConversationRunner {
             llmUsage: result.usage || {},
             systemPrompt: this.stageData.lastCompletionPrompt,
             llmSettings: this.stageData.stage.llmSettings,
+            outputTurnId: this.turnData.outputTurnId,
+            turnIndex: this.turnData.turnIndex,
             llmDurationMs,
             timeToFirstTokenMs,
             timeToFirstTokenFromTurnStartMs,
@@ -1373,9 +1393,13 @@ export class ConversationRunner {
   /**
    * Processes user input (text or voice) and advances the conversation state
    * @param userInput The user input text to process
+   * @param userInputSource Whether the input is text or voice
+   * @param asrEndMs Unix timestamp (ms) when ASR recognition completed, if applicable
    */
-  private async processUserInput(userInput: string, userInputSource: 'text' | 'voice') {
+  private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
     this.responseGeneratedInTurn = false;
+    const nextTurnIndex = this.turnData.turnIndex + 1;
+    const asrDurationMs = asrEndMs && this.turnData.asrStartMs !== null ? asrEndMs - this.turnData.asrStartMs : null;
     // Reset per-turn data, preserving inputTurnId which was assigned before processUserInput was called
     this.turnData = {
       inputTurnId: this.turnData.inputTurnId,
@@ -1387,7 +1411,11 @@ export class ConversationRunner {
       assistantMessageEventId: null,
       fillerDurationMs: null,
       moderationDurationMs: null,
+      asrStartMs: null,
+      ttsStartMs: null,
+      turnIndex: nextTurnIndex,
     };
+    const asrDurationMsValue = asrDurationMs && asrDurationMs > 0 ? asrDurationMs : undefined;
     await this.changeState('processing_user_input');
 
     // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
@@ -1460,8 +1488,10 @@ export class ConversationRunner {
     }
 
     const processingStartMs = Date.now();
-    const classificationResults = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
+    const processingResult = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
     const processingDurationMs = Date.now() - processingStartMs;
+    const classificationResults = processingResult.actions;
+    const knowledgeRetrievalDurationMs = processingResult.knowledgeRetrievalDurationMs;
 
     // Detect and handle knowledge actions - these are synthetic actions from the knowledge base
     const knowledgeResults = classificationResults.filter(r => r.name.startsWith('__knowledge_'));
@@ -1566,8 +1596,12 @@ export class ConversationRunner {
       originalText: context.originalUserInput || context.userInput || '',
       metadata: {
         source: context.userInputSource,
+        inputTurnId: this.turnData.inputTurnId,
+        turnIndex: this.turnData.turnIndex,
+        asrDurationMs: asrDurationMsValue,
         moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
         processingDurationMs,
+        knowledgeRetrievalDurationMs,
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,
       }

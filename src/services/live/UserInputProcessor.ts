@@ -15,6 +15,13 @@ import { StageAction } from "../../types/actions";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
 
+/** Result of processing user input, including actions and timing metadata */
+export type ProcessTextInputResult = {
+  actions: ActionClassificationResult[];
+  /** Duration of the knowledge category retrieval in milliseconds; undefined when knowledge is not used */
+  knowledgeRetrievalDurationMs?: number;
+};
+
 /**
  * Service responsible for processing user input during live sessions.
  */
@@ -32,9 +39,9 @@ export class UserInputProcessor {
   /** Processes text input from the user within a session.
    * @param session - The session in which the input was received.
    * @param text - The text input from the user.
-   * @returns A promise that resolves to an array of stage actions resulting from processing the input.
+   * @returns A promise that resolves to the processing result with actions and timing metadata.
    */
-  async processTextInput(session: Connection, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
+  async processTextInput(session: Connection, userInput: string, originalUserInput: string): Promise<ProcessTextInputResult> {
     // How to process:
     // - Get all classifiers for the current stage.
     // - For each classifier, run the text through it to determine actions with filtered actions based on overrideClassifierId. Do this in parallel.
@@ -50,11 +57,14 @@ export class UserInputProcessor {
 
       // Fetch knowledge categories for the default classifier when knowledge is enabled
       let knowledgeCategories: KnowledgeCategoryResponse[] = [];
+      let knowledgeRetrievalDurationMs: number | undefined;
       if (stage.useKnowledge && stage.defaultClassifierId) {
+        const knowledgeStartMs = Date.now();
         knowledgeCategories = stage.knowledgeTags.length > 0
           ? await this.knowledgeService.getCategoriesByTags(conversation.projectId, stage.knowledgeTags)
           : (await this.knowledgeService.listKnowledgeCategories(conversation.projectId, { offset: 0, limit: 100 })).items;
-        logger.debug({ conversationId: conversation.id, categoryCount: knowledgeCategories.length, classifierId: stage.defaultClassifierId }, 'Fetched knowledge categories for default classifier');
+        knowledgeRetrievalDurationMs = Date.now() - knowledgeStartMs;
+        logger.debug({ conversationId: conversation.id, categoryCount: knowledgeCategories.length, classifierId: stage.defaultClassifierId, knowledgeRetrievalDurationMs }, 'Fetched knowledge categories for default classifier');
       }
       
       const actionPromises = classifiers.map(async (classifier) => {
@@ -168,7 +178,7 @@ export class UserInputProcessor {
         return true;
       });
 
-      return filteredActions;
+      return { actions: filteredActions, knowledgeRetrievalDurationMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id }, 'Error processing text input using classifiers');
       throw error;
