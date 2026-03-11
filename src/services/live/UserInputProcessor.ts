@@ -44,7 +44,7 @@ export class UserInputProcessor {
       const classifiers = session.runner.getRuntimeData().classifiers;
       const stage = session.runner.getRuntimeData().stage;
       const conversation = session.runner.getRuntimeData().conversation;
-      const globalActions = session.runner.getRuntimeData().globalActions;
+      const globalActions = session.runner.getRuntimeData().globalActions.filter(ga => !ga.id.startsWith('__'));
       const guardrails = session.runner.getRuntimeData().guardrails;
       const guardrailClassifier = session.runner.getRuntimeData().guardrailClassifier;
 
