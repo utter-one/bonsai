@@ -11,6 +11,7 @@ import { ConversationContextBuilder, ConversationContext } from './ConversationC
 import { TransformerRuntimeData } from './ConversationRunner';
 import { TemplatingEngine } from './TemplatingEngine';
 import type { ActionClassificationResult } from '../../types/classification';
+import { StageAction } from '../../types/actions';
 
 /**
  * Map of variable names to their change event type after a transformer run.
@@ -177,7 +178,8 @@ export class ContextTransformerExecutor {
    * @param stageActions - Map of action ID to action definition
    * @returns Array of triggered action classification results
    */
-  private findTriggeredActions(session: Connection, changeEvents: VariableChangeEvents, stageActions: Record<string, import('../../types/actions').StageAction>): ActionClassificationResult[] {
+  private findTriggeredActions(session: Connection, changeEvents: VariableChangeEvents, stageActions: Record<string, StageAction>): ActionClassificationResult[] {
+    logger.info({ changeEvents }, 'Finding triggered actions based on variable change events');
     if (Object.keys(changeEvents).length === 0) {
       return [];
     }
@@ -189,7 +191,7 @@ export class ContextTransformerExecutor {
       if (!action.watchedVariables || Object.keys(action.watchedVariables).length === 0) continue;
 
       const isTriggered = Object.entries(action.watchedVariables).some(
-        ([varName, expectedEvent]) => changeEvents[varName] === expectedEvent,
+        ([varName, expectedEvent]) => changeEvents[varName] === expectedEvent || expectedEvent === 'any',
       );
 
       if (isTriggered) {
@@ -231,7 +233,8 @@ export class ContextTransformerExecutor {
       ];
 
       const result = await llmProvider.generate(messages);
-      const textContent = rawResponse = extractTextFromContent(result.content);
+      const textContent = extractTextFromContent(result.content);
+      rawResponse = JSON.stringify(result, null, 2);
 
       logger.info({ sessionId: session.id, transformerId: transformer.id }, `Received transformation result from LLM: ${textContent}`);
 
