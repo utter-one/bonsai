@@ -1511,7 +1511,7 @@ export class ConversationRunner {
         .filter(([name]) => !lifecycleActionNames.includes(name))
     );
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
-
+    const guardrailActionsMap = new Map(this.stageData.guardrails.map(ga => [ga.name, ga]));
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.stageData.faq);
 
     // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
@@ -1544,9 +1544,18 @@ export class ConversationRunner {
         return globalAction;
       }
 
+      const guardrailAction = guardrailActionsMap.get(r.name);
+      if (guardrailAction) {
+        // inject action with parameters into context
+        context.actions[guardrailAction.name] = {
+          parameters: r.parameters,
+        };
+        return guardrailAction;
+      }
+
       logger.warn({ conversationId: this.conversation.id, actionName: r.name }, `No matching action found for classification result ${r.name}`);
       return null;
-    }).filter(a => a !== null) as (StageAction | GlobalAction)[];
+    }).filter(a => a !== null) as (StageAction | GlobalAction | Guardrail)[];
 
     // If no actions matched and __on_fallback is defined, execute it
     let executionOutcome: ActionsExecutionOutcome;
