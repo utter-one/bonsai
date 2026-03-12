@@ -142,8 +142,8 @@ export class UserInputProcessor {
         ...(guardrailResult?.actions ?? []),
         ...transformerTriggeredActions,
       ];
-      const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.id, ga]));
-      const guardrailsMap = new Map(session.runner.getRuntimeData().guardrails.map(g => [g.id, g]));
+      const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.name, ga]));
+      const guardrailsMap = new Map(session.runner.getRuntimeData().guardrails.map(g => [g.name, g]));
 
       const knowledgeCategoryIds = new Set(knowledgeCategories.map(c => `__knowledge_${c.id}`));
 
