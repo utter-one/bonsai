@@ -210,8 +210,8 @@ export class ContextTransformerExecutor {
         continue;
       }
 
-      logger.debug({ sessionId: session.id, actionId, changeEvents }, 'Action triggered by context transformer variable change');
-      triggered.push({ name: actionId, parameters: {} });
+      logger.debug({ sessionId: session.id, actionId: action.name, changeEvents }, 'Action triggered by context transformer variable change');
+      triggered.push({ name: action.name, parameters: {} });
     }
 
     return triggered;

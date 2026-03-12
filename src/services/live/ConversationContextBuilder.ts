@@ -165,7 +165,6 @@ export type ConversationContext = {
     name: string;
     /** List of actions available in this stage that can be triggered by user input */
     availableActions: Array<{
-      id: string;
       name: string;
       trigger: string;
       examples?: string[];
@@ -331,8 +330,7 @@ export class ConversationContextBuilder {
   private async buildStageContext(stage: Stage, rawContext: ConversationContext): Promise<ConversationContext['stage']> {
     const availableActions = Object.entries(stage.actions || {})
       .filter(async ([_, action]) => action.triggerOnUserInput && await isActionActive(action, rawContext, this.scriptExecutor))
-      .map(([id, action]) => ({
-        id,
+      .map(([_, action]) => ({
         name: action.name,
         trigger: action.classificationTrigger,
         examples: action.examples || undefined,
@@ -373,7 +371,6 @@ export class ConversationContextBuilder {
       if (!isActive) return null;
       
       return {
-        id,
         name: action.name,
         trigger: action.classificationTrigger,
         examples: action.examples || undefined,
@@ -394,7 +391,6 @@ export class ConversationContextBuilder {
         if (!isActive) return null;
         
         return {
-          id: action.id,
           name: action.name,
           trigger: action.classificationTrigger,
           examples: action.examples || undefined,
@@ -419,7 +415,6 @@ export class ConversationContextBuilder {
 
     // Build synthetic knowledge actions from knowledge categories (injected only for the default classifier)
     const knowledgeActions = (knowledgeCategories ?? []).map(category => ({
-      id: `__knowledge_${category.id}`,
       name: `__knowledge_${category.id}`,
       trigger: category.promptTrigger,
     }));
@@ -965,8 +960,7 @@ export class ConversationContextBuilder {
       stage: {
           id: conversation.stageId,
           name: stage.name,
-          availableActions: stage.actions ? Object.entries(stage.actions).map(([id, action]) => ({
-            id,
+          availableActions: stage.actions ? Object.entries(stage.actions).map(([_, action]) => ({
             name: action.name,
             trigger: action.classificationTrigger,
             examples: action.examples || undefined,

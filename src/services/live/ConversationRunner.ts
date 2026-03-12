@@ -1513,6 +1513,7 @@ export class ConversationRunner {
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
     const guardrailActionsMap = new Map(this.stageData.guardrails.map(ga => [ga.name, ga]));
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.stageData.faq);
+    const stageActionMap = new Map(Object.values(stageActions).map(sa => [sa.name, sa]));
 
     // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
     const seenActionNames = new Set<string>();
@@ -1525,7 +1526,7 @@ export class ConversationRunner {
       seenActionNames.add(r.name);
 
       // First check stage actions
-      const stageAction = stageActions[r.name];
+      const stageAction = stageActionMap.get(r.name);
       if (stageAction) {
         // inject action with parameters into context
         context.actions[stageAction.name] = {
