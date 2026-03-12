@@ -116,7 +116,7 @@ export const variableDescriptorsSchema = z.array(fieldDescriptorSchema).describe
  * Lifecycle actions are optional and provide hooks for stage-specific behavior.
  * Regular actions (without __ prefix) are matched via classification from user input.
  */
-export const actionsSchema = z.record(z.string(), stageActionSchema).describe('Action definitions for this stage (map of action ID to action definition)');
+export const actionsSchema = z.record(z.string(), stageActionSchema).describe('Action definitions for this stage (map of action name to action definition)');
 
 /**
  * Schema for creating a new stage
