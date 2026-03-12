@@ -6,6 +6,7 @@ import { ConversationService } from '../../services/ConversationService';
 import { NotFoundError, InvalidOperationError, ArchivedProjectError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import type { ConversationFailedEventData } from '../../types/conversationEvents';
 
 /**
  * Handles resume conversation requests.
@@ -53,6 +54,20 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
     context.send(context.connection.ws, response);
 
     // Resume the conversation
-    await context.connection.runner.resumeConversation();
+    try {
+      await context.connection.runner.resumeConversation();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to resume conversation';
+      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to resume conversation');
+      const failedEventData: ConversationFailedEventData = { reason: errorMessage, stageId: conversation.stageId };
+      try {
+        await this.conversationService.failConversation(context.connection!.projectId, message.conversationId, errorMessage);
+        await this.conversationService.saveConversationEvent(context.connection!.projectId, message.conversationId, 'conversation_failed', failedEventData);
+        this.connectionManager.sendConversationEvent(message.conversationId, 'conversation_failed', failedEventData);
+      } catch (cleanupError) {
+        logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId: message.conversationId }, 'Failed to save conversation_failed event during cleanup');
+      }
+      this.connectionManager.detachConversationInSession(message.sessionId);
+    }
   }
 }

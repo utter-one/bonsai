@@ -9,6 +9,7 @@ import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
 import { UserService } from '../../services/UserService';
+import type { ConversationFailedEventData } from '../../types/conversationEvents';
 
 /**
  * Handles start conversation requests.
@@ -19,25 +20,28 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
-  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager, 
-    @inject(ConversationService) private conversationService: ConversationService, 
+  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager,
+    @inject(ConversationService) private conversationService: ConversationService,
     @inject(UserService) private userService: UserService,
     @inject(StageService) private stageService: StageService,
-    @inject(ProjectService) private projectService: ProjectService) {}
+    @inject(ProjectService) private projectService: ProjectService) { }
 
   /**
    * Handles start conversation requests.
    */
   async handle(context: WebSocketHandlerContext, message: StartConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, agentId: message.agentId, requestId: message.requestId }, 'Start conversation request received');
-    
+
     if (!context.connection) {
       throw new NotFoundError('Session not found');
     }
-    
+
     if (context.connection.conversationId) {
       throw new InvalidOperationError('A conversation is already active in this session');
     }
+
+    let conversationId: string | undefined;
+    let conversationAttached = false;
 
     try {
       // Get project first to check autoCreateUsers flag and resolve timezone later
@@ -54,7 +58,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
           throw userError;
         }
       }
-      
+
       // Get stage to extract projectId
       const stage = await this.stageService.getStageById(context.connection.projectId, message.stageId);
 
@@ -68,9 +72,10 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       const resolvedTimezone = message.timezone ?? profileTimezone ?? project.timezone ?? null;
 
       const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, clientId: context.connection.id, status: 'initialized', metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null });
-      const conversationId = conversation.id;
+      conversationId = conversation.id;
 
       await this.connectionManager.attachConversationToSession(message.sessionId, conversationId);
+      conversationAttached = true;
 
       logger.info({ sessionId: message.sessionId, conversationId }, 'Conversation created and attached to session');
 
@@ -80,10 +85,23 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: true, conversationId, requestId: message.requestId };
       context.send(context.connection.ws, response);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create conversation';
-      logger.error({ error: errorMessage, sessionId: message.sessionId }, 'Failed to create conversation');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start conversation';
+      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId }, 'Failed to start conversation');
+
+      if (conversationAttached && conversationId) {
+        const failedEventData: ConversationFailedEventData = { reason: errorMessage, stageId: message.stageId };
+        try {
+          await this.conversationService.failConversation(context.connection!.projectId, conversationId, errorMessage);
+          await this.conversationService.saveConversationEvent(context.connection!.projectId, conversationId, 'conversation_failed', failedEventData);
+          this.connectionManager.sendConversationEvent(conversationId, 'conversation_failed', failedEventData);
+        } catch (cleanupError) {
+          logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId }, 'Failed to save conversation_failed event during cleanup');
+        }
+        this.connectionManager.detachConversationInSession(message.sessionId);
+      }
+
       const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.connection.ws, response);
+      context.send(context.connection!.ws, response);
     }
   }
 }
