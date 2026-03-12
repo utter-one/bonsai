@@ -87,18 +87,13 @@ export type StageRuntimeData = {
   classifiers: ClassifierRuntimeData[];
   transformers: TransformerRuntimeData[];
   globalActions: GlobalAction[];
-  /** All project guardrails, always loaded regardless of stage config */
   guardrails: Guardrail[];
-  /** LLM provider for the project-level guardrail classifier, if configured */
   guardrailClassifier?: ClassifierRuntimeData;
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   shouldEndConversation: boolean;
-  /** Loaded agent, includes fillerSettings and TTS configuration */
   agent: AgentResponse;
-  /** LLM provider used to generate filler sentences, preloaded from agent.fillerSettings */
   fillerLlmProvider?: ILlmProvider;
-  /** FAQ items gathered from knowledge base, persisted between turns until new knowledge actions are detected */
   faq: FaqItem[];
 }
 
@@ -1348,7 +1343,8 @@ export class ConversationRunner {
 
     if (outcome.shouldEndConversation) {
       logger.info({ conversationId }, `Conversation marked for ending by action execution`);
-      return true; // Let caller handle ending the conversation
+      this.stageData.shouldEndConversation = true; // Flag to indicate conversation should end after current processing completes
+      return true;
     }
 
     logger.debug({ conversationId, hasModifiedVars: outcome.hasModifiedVars, hasModifiedUserInput: outcome.hasModifiedUserInput, hasModifiedUserProfile: outcome.hasModifiedUserProfile, shouldEndConversation: outcome.shouldEndConversation, shouldAbortConversation: outcome.shouldAbortConversation }, `Action outcome applied successfully`);
@@ -1624,7 +1620,7 @@ export class ConversationRunner {
   }
 
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
-    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldEndConversation && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
+    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
     if (shouldGenerateResponse) {
       if (this.responseGeneratedInTurn) {
         logger.warn({ conversationId: this.conversation.id }, 'Response already generated/scheduled for this turn — skipping duplicate response generation');
@@ -1663,31 +1659,26 @@ export class ConversationRunner {
       }
       this.lastFillerSentence = null;
       this.lastFillerPrompt = null;
-    } else if (executionOutcome.shouldEndConversation) {
-      // Close the filler turn if it was opened but no response follows
-      if (this.responseOutputTurnStarted) {
-        this.responseOutputTurnStarted = false;
-        if (this.stageData.ttsProvider) {
-          await this.stageData.ttsProvider.end();
+
+      if (executionOutcome.shouldEndConversation) {
+        // Execute __conversation_end global lifecycle action if defined
+        const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
+        if (onConversationEndAction) {
+          logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action');
+          const endLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], context, 'conversation_end');
+          await this.applyActionOutcome(context, endLifecycleOutcome);
+          await this.saveAndSendOutcomeEvents(endLifecycleOutcome);
+          const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
+          await this.saveAndSendEvent('action', actionEventData);
         }
+
+        const eventData: ConversationEndEventData = {
+          stageId: this.stageData.id,
+          reason: executionOutcome.endReason || 'Action execution completed conversation',
+        };
+        await this.saveAndSendEvent('conversation_end', eventData);
+        await this.changeState('finished');
       }
-      // Execute __conversation_end global lifecycle action if defined
-      const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
-      if (onConversationEndAction) {
-        logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action');
-        const endLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], context, 'conversation_end');
-        await this.applyActionOutcome(context, endLifecycleOutcome);
-        await this.saveAndSendOutcomeEvents(endLifecycleOutcome);
-        const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
-        await this.saveAndSendEvent('action', actionEventData);
-      }
-      // TODO: this should generate response and end conversation afterwards
-      const eventData: ConversationEndEventData = {
-        stageId: this.stageData.id,
-        reason: executionOutcome.endReason || 'Action execution completed conversation',
-      };
-      await this.saveAndSendEvent('conversation_end', eventData);
-      await this.changeState('finished');
     } else if (executionOutcome.shouldAbortConversation) {
       // Close the filler turn if it was opened but no response follows
       if (this.responseOutputTurnStarted) {
