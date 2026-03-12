@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, ilike, or, inArray, and, SQL, desc, sql, notInArray } from 'drizzle-orm';
 import { parseTextSearch } from '../utils/textSearch';
 import { db } from '../db/index';
-import { issues, projects, archivedProjects } from '../db/schema';
+import { issues, projects, activeProjects, archivedProjects } from '../db/schema';
 import type { CreateIssueRequest, UpdateIssueRequest, IssueResponse, IssueListResponse } from '../http/contracts/issue';
 import type { ListParams } from '../http/contracts/common';
 import { issueResponseSchema, issueListResponseSchema } from '../http/contracts/issue';
@@ -77,6 +77,7 @@ export class IssueService extends BaseService {
   /**
    * Lists issues with flexible filtering, sorting, and pagination
    * @param params - List parameters including filters, sorting, pagination, and text search. Use filters.projectId to filter by project.
+   *   Special filter: `filters.projectStatus` accepts `"active"` or `"archived"` to restrict issues to projects of that status.
    * @returns Paginated array of issues matching the criteria
    */
   async listIssues(params?: ListParams): Promise<IssueListResponse> {
@@ -107,6 +108,16 @@ export class IssueService extends BaseService {
       // Apply filters
       if (params?.filters) {
         for (const [field, filter] of Object.entries(params.filters)) {
+          if (field === 'projectStatus') {
+            // Special virtual filter: restrict issues to projects of a given status
+            const status = typeof filter === 'string' ? filter : null;
+            if (status === 'active') {
+              conditions.push(inArray(issues.projectId, db.select({ id: activeProjects.id }).from(activeProjects)));
+            } else if (status === 'archived') {
+              conditions.push(inArray(issues.projectId, db.select({ id: archivedProjects.id }).from(archivedProjects)));
+            }
+            continue;
+          }
           const condition = buildFilterCondition(field, filter, columnMap, logger);
           if (condition) {
             conditions.push(condition);
