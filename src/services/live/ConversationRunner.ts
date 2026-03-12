@@ -115,6 +115,8 @@ export class ConversationRunner {
   private responseOutputTurnStarted: boolean = false;
   /** Filler sentence generated for the current turn, passed as assistant prefix to the LLM so it continues naturally */
   private lastFillerSentence: string | null = null;
+  /** Rendered filler prompt used to generate the filler sentence for the current turn; stored for debugging */
+  private lastFillerPrompt: string | null = null;
   /** Tracks the call depth of goToStage to distinguish top-level calls from recursive ones triggered by on_enter/on_leave actions */
   private navigationDepth = 0;
   /** Guards against multiple AI responses being generated within the same turn (e.g. when chained stage jumps each try to generate a response) */
@@ -629,6 +631,7 @@ export class ConversationRunner {
             timeToFirstAudioMs,
             totalTurnDurationMs,
             moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
+            fillerPrompt: this.lastFillerPrompt ?? undefined,
           },
         };
         this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
@@ -1451,6 +1454,7 @@ export class ConversationRunner {
     // Start filler sentence immediately — opens the response turn early by sending
     // start_ai_generation_output and feeding the sentence into TTS before classification begins.
     this.lastFillerSentence = null;
+    this.lastFillerPrompt = null;
     const fillerStartMs = Date.now();
     const fillerSentence = await this.generateFillerSentence(userInput);
     if (fillerSentence) {
@@ -1649,6 +1653,7 @@ export class ConversationRunner {
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
       }
       this.lastFillerSentence = null;
+      this.lastFillerPrompt = null;
     } else if (executionOutcome.shouldEndConversation) {
       // Close the filler turn if it was opened but no response follows
       if (this.responseOutputTurnStarted) {
@@ -1730,7 +1735,11 @@ export class ConversationRunner {
         { role: 'system', content: renderedPrompt },
         { role: 'user', content: userInput }]);
       const text = extractTextFromContent(result.content).trim();
-      return text.length > 0 ? text : null;
+      if (text.length > 0) {
+        this.lastFillerPrompt = renderedPrompt;
+        return text;
+      }
+      return null;
     } catch (error) {
       logger.warn({ conversationId: this.conversation.id, message: error?.message }, 'Failed to generate filler sentence, skipping');
       return null;
