@@ -34,7 +34,7 @@ export class UserInputProcessor {
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
     @inject(ContextTransformerExecutor) private transformerExecutor: ContextTransformerExecutor,
-  ) {}
+  ) { }
 
   /** Processes text input from the user within a session.
    * @param session - The session in which the input was received.
@@ -66,7 +66,7 @@ export class UserInputProcessor {
         knowledgeRetrievalDurationMs = Date.now() - knowledgeStartMs;
         logger.debug({ conversationId: conversation.id, categoryCount: knowledgeCategories.length, classifierId: stage.defaultClassifierId, knowledgeRetrievalDurationMs }, 'Fetched knowledge categories for default classifier');
       }
-      
+
       const actionPromises = classifiers.map(async (classifier) => {
         // Inject knowledge categories only for the default classifier
         const classifierKnowledgeCategories = classifier.classifier.id === stage.defaultClassifierId ? knowledgeCategories : [];
@@ -86,9 +86,9 @@ export class UserInputProcessor {
       // Build guardrail classification promise if a guardrail classifier is configured and there are active guardrails
       const guardrailPromise = guardrailClassifier && guardrails.length > 0
         ? (async () => {
-            const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput);
-            return this.classifyTextInput(session, guardrailClassifier, guardrailContext);
-          })()
+          const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput);
+          return this.classifyTextInput(session, guardrailClassifier, guardrailContext);
+        })()
         : Promise.resolve(null);
 
       // Run all classifiers, guardrail classifier, and context transformers in parallel
@@ -144,35 +144,30 @@ export class UserInputProcessor {
       ];
       const globalActionsMap = new Map(session.runner.getRuntimeData().globalActions.map(ga => [ga.name, ga]));
       const guardrailsMap = new Map(session.runner.getRuntimeData().guardrails.map(g => [g.name, g]));
-
       const knowledgeCategoryIds = new Set(knowledgeCategories.map(c => `__knowledge_${c.id}`));
-
+      const stageActionsMap = new Map(Object.values(stage.actions).map(a => [a.name, a]));
       const filteredActions = allActions.filter(action => {
         // Allow synthetic knowledge actions to pass through without looking them up in stage or global actions
         if (knowledgeCategoryIds.has(action.name)) {
           return true;
         }
 
-        // Check guardrails map first (guardrail actions use their ID as the action name)
-        if (guardrailsMap.has(action.name)) {
-          return true;
-        }
-
-        let actionDef : GlobalAction | StageAction = globalActionsMap.get(action.name);
-        if (!actionDef) {
-          actionDef = stage.actions[action.name];
-        } 
+        let actionDef = guardrailsMap.get(action.name)
+          ?? globalActionsMap.get(action.name)
+          ?? stageActionsMap.get(action.name);
 
         if (!actionDef) {
-          logger.warn({ conversationId: session.id, actionName: action.name }, `Received action ${action.name} from classifier which does not exist in global actions, guardrails, or stage actions. Ignoring.`);
+          logger.warn({ actions: stage.actions, conversationId: session.id, actionName: action.name }, `Received action ${action.name} from classifier which does not exist in global actions, guardrails, or stage actions. Ignoring.`);
           return false;
         }
 
         // Check if we have all required parameters for the action
-        const missingRequiredParams = (actionDef.parameters || []).filter(p => p.required && action.parameters[p.name] == null).map(p => p.name);
-        if (missingRequiredParams.length > 0) {
-          logger.warn({ conversationId: session.id, actionName: action.name, missingParameters: missingRequiredParams }, `Received incomplete action ${action.name} from classifier. Missing required parameters: ${missingRequiredParams.join(', ')}. Ignoring.`);
-          return false;
+        if ('parameters' in actionDef) {
+          const missingRequiredParams = (actionDef.parameters || []).filter(p => p.required && action.parameters[p.name] == null).map(p => p.name);
+          if (missingRequiredParams.length > 0) {
+            logger.warn({ conversationId: session.id, actionName: action.name, missingParameters: missingRequiredParams }, `Received incomplete action ${action.name} from classifier. Missing required parameters: ${missingRequiredParams.join(', ')}. Ignoring.`);
+            return false;
+          }
         }
 
         return true;
@@ -182,7 +177,7 @@ export class UserInputProcessor {
     } catch (error) {
       logger.error({ error, sessionId: session.id }, 'Error processing text input using classifiers');
       throw error;
-    } 
+    }
   }
 
   private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number }> {
@@ -207,16 +202,16 @@ export class UserInputProcessor {
 
       const result = await llmProvider.generate(messages);
       const textContent = extractTextFromContent(result.content);
-      
+
       logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received classification result from LLM provider: ${textContent}`);
       const classificationResult = classificationResultSchema.parse(parseJsonFromMarkdown(textContent));
-      
+
       // Convert actions object to array format
       const actions: ActionClassificationResult[] = Object.entries(classificationResult.actions).map(([name, parameters]) => ({
         name,
         parameters,
       }));
-      
+
       return {
         classifierId: classifier.id,
         classifierName: classifier.name,
