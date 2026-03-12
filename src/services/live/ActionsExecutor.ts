@@ -8,7 +8,7 @@ import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
 import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
-import type { GlobalAction } from '../../types/models';
+import type { GlobalAction, Guardrail } from '../../types/models';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 import { NotFoundError } from '../../errors';
 import { ParameterValue } from '../../types/parameters';
@@ -96,9 +96,9 @@ export class ActionsExecutor {
   ) { }
 
   /**
-   * Helper method to extract action name from StageAction or GlobalAction
+   * Helper method to extract action name from StageAction, GlobalAction, or Guardrail
    */
-  private getActionName(action: StageAction | GlobalAction): string {
+  private getActionName(action: StageAction | GlobalAction | Guardrail): string {
     if ('id' in action && 'version' in action) {
       // It's a GlobalAction
       return (action as GlobalAction).name;
@@ -233,7 +233,7 @@ export class ActionsExecutor {
    * @returns Array of execution results for each action
    */
   async executeActions(
-    actions: (StageAction | GlobalAction)[],
+    actions: (StageAction | GlobalAction | Guardrail)[],
     context: ConversationContext,
     lifecycleContext: LifecycleContext = null
   ): Promise<ActionsExecutionOutcome> {
