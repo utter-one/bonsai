@@ -18,7 +18,7 @@ services:
 
   bonsai-backend:
     build:
-      context: https://github.com/utter-one/bonsai.git
+      context: https://github.com/utter-one/bonsai.git#main
     environment:
       DB_CONNECTION_STRING: postgresql://bonsai:${POSTGRES_PASSWORD:-bonsai}@postgres:5432/bonsai
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (min 32 characters)}
@@ -43,7 +43,7 @@ services:
 
   bonsai-console:
     build:
-      context: https://github.com/utter-one/bonsai-console.git
+      context: https://github.com/utter-one/bonsai-console.git#main
     ports:
       - "${ADMIN_PORT:-80}:80"
     depends_on:
@@ -53,7 +53,7 @@ services:
 
   bonsai-docs:
     build:
-      context: https://github.com/utter-one/bonsai.git#:docs
+      context: https://github.com/utter-one/bonsai.git#main:docs
     ports:
       - "${DOCS_PORT:-8080}:80"
     restart: unless-stopped
