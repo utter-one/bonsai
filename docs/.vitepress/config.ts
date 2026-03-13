@@ -33,6 +33,8 @@ export default defineConfig({
             { text: 'Global Actions', link: '/guide/global-actions' },
             { text: 'Guardrails', link: '/guide/guardrails' },
             { text: 'Providers', link: '/guide/providers' },
+            { text: 'Users', link: '/guide/users' },
+            { text: 'Environments', link: '/guide/environments' },
           ],
         },
         {
@@ -40,9 +42,17 @@ export default defineConfig({
           items: [
             { text: 'Conversations', link: '/guide/conversations' },
             { text: 'Actions & Effects', link: '/guide/actions-and-effects' },
+            { text: 'Content Moderation', link: '/guide/moderation' },
             { text: 'WebSocket Protocol', link: '/guide/websocket' },
             { text: 'Templating', link: '/guide/templating' },
             { text: 'Scripting', link: '/guide/scripting' },
+          ],
+        },
+        {
+          text: 'Operations',
+          items: [
+            { text: 'Issues', link: '/guide/issues' },
+            { text: 'Audit Logs', link: '/guide/audit-logs' },
           ],
         },
         {
@@ -65,7 +75,7 @@ export default defineConfig({
           items: [
             { text: 'Setup', link: '/api/setup' },
             { text: 'Authentication', link: '/api/authentication' },
-            { text: 'Admins', link: '/api/admins' },
+            { text: 'Operators', link: '/api/operators' },
             { text: 'Version', link: '/api/version' },
           ],
         },
@@ -100,6 +110,7 @@ export default defineConfig({
             { text: 'Environments', link: '/api/environments' },
             { text: 'Migration', link: '/api/migration' },
             { text: 'Audit Logs', link: '/api/audit-logs' },
+            { text: 'Analytics', link: '/api/analytics' },
           ],
         },
         {

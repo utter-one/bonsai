@@ -82,6 +82,7 @@ Permissions follow the `entity:action` pattern:
 | Migration | `migration:export` | `migration:import` | — |
 | System | `system:config` | — | — |
 | Audit | `audit:read` | — | — |
+| Analytics | `analytics:read` | — | — |
 
 ### Defense in Depth
 

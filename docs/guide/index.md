@@ -48,11 +48,16 @@ This guide covers:
 | [Global Actions](./global-actions) | Reusable cross-stage action definitions |
 | [Guardrails](./guardrails) | Content safety classifiers and moderation |
 | [Providers](./providers) | LLM, TTS, ASR, and Storage provider integrations |
+| [Users](./users) | End-user profiles and lifecycle |
+| [Environments](./environments) | Remote instance connections for migration |
 | [Conversations](./conversations) | Conversation lifecycle, states, and events |
+| [Content Moderation](./moderation) | Input screening and safety policies |
 | [WebSocket Protocol](./websocket) | Real-time communication protocol reference |
 | [Authentication](./authentication) | Operator auth, API keys, and RBAC |
 | [Templating](./templating) | Handlebars templates in prompts |
 | [Scripting](./scripting) | Sandboxed JavaScript execution in effects |
+| [Issues](./issues) | Bug tracking linked to conversations |
+| [Audit Logs](./audit-logs) | Change tracking and compliance |
 
 ## Quick Start
 
