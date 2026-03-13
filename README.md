@@ -1,4 +1,4 @@
-## What Is Bonsai?
+# What Is Bonsai?
 
 Bonsai is a platform for building customer-facing AI agents that sound like your brand, follow your rules, and improve over time. It helps teams create voice and chat experiences with structured conversation journeys, approved knowledge, and built-in guardrails, so assistants can answer questions, collect information, and take action in real time without drifting off-brand.
 
