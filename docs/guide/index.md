@@ -37,6 +37,7 @@ This guide covers:
 | [Installation](./installation) | Setting up and running the server |
 | [Configuration](./configuration) | Environment variables and server settings |
 | [Core Concepts](./concepts) | Architecture overview and entity relationships |
+| [APIs](./apis) | REST API, WebSocket API, and schema endpoints |
 | [Projects](./projects) | Top-level container for conversational experiences |
 | [Stages](./stages) | Conversation phases and flow control |
 | [Agents](./agents) | AI personality and voice configuration |
