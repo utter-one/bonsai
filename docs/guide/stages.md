@@ -24,6 +24,8 @@ A **Stage** represents a distinct phase in a conversation. Stages are the centra
 | `variableDescriptors` | Schema of typed variables for this stage |
 | `actions` | Map of action definitions |
 | `metadata` | Arbitrary JSON |
+| `tags` | Searchable labels for organization |
+| `archived` | Whether the stage is archived |
 | `version` | Optimistic locking version |
 
 ## Enter Behavior

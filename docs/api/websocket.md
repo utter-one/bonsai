@@ -170,6 +170,7 @@ Voice input uses a three-step flow:
 
 ```json
 {
+  "requestId": "req-6",
   "type": "start_user_voice_input",
   "sessionId": "session-abc",
   "conversationId": "conv-123"
@@ -182,6 +183,7 @@ Response includes `inputTurnId`.
 
 ```json
 {
+  "requestId": "req-7",
   "type": "send_user_voice_chunk",
   "sessionId": "session-abc",
   "conversationId": "conv-123",
@@ -201,6 +203,7 @@ Response includes `inputTurnId`.
 
 ```json
 {
+  "requestId": "req-8",
   "type": "end_user_voice_input",
   "sessionId": "session-abc",
   "conversationId": "conv-123",

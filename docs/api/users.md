@@ -2,14 +2,14 @@
 
 Users represent end-users who participate in conversations. Users have flexible profile data stored as key-value pairs.
 
-**Tag:** `Users`
+**Tag:** `Users` | **Scoped to:** Project
 
 For more information, see [Core Concepts](../guide/concepts).
 
 ## Create User
 
 ```http
-POST /api/users
+POST /api/projects/:projectId/users
 Content-Type: application/json
 ```
 
@@ -40,7 +40,7 @@ Content-Type: application/json
 ## Get User
 
 ```http
-GET /api/users/:id
+GET /api/projects/:projectId/users/:id
 ```
 
 **Required permission:** `user:read`
@@ -52,7 +52,7 @@ GET /api/users/:id
 ## List Users
 
 ```http
-GET /api/users
+GET /api/projects/:projectId/users
 ```
 
 **Required permission:** `user:read`
@@ -64,7 +64,7 @@ Supports [pagination & filtering](./pagination).
 ## Update User
 
 ```http
-PUT /api/users/:id
+PUT /api/projects/:projectId/users/:id
 Content-Type: application/json
 ```
 
@@ -81,7 +81,7 @@ Content-Type: application/json
 ## Delete User
 
 ```http
-DELETE /api/users/:id
+DELETE /api/projects/:projectId/users/:id
 ```
 
 **Required permission:** `user:delete`
@@ -93,7 +93,7 @@ DELETE /api/users/:id
 ## Get Audit Logs
 
 ```http
-GET /api/users/:id/audit-logs
+GET /api/projects/:projectId/users/:id/audit-logs
 ```
 
 **Required permission:** `audit:read`
@@ -110,3 +110,4 @@ Returns audit log entries for the specified user. See [Audit Logs](./audit-logs)
 | `profile` | `object` | No | User profile data |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |

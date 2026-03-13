@@ -25,11 +25,14 @@ Content-Type: application/json
 | `acceptVoice` | `boolean` | No (default: `true`) | Whether conversations accept voice input |
 | `generateVoice` | `boolean` | No (default: `true`) | Whether conversations generate voice responses |
 | `storageConfig` | [`StorageConfig`](#storage-config) | No | Storage configuration for conversation artifacts |
+| `moderationConfig` | [`ModerationConfig`](#moderation-config) | No | Content moderation configuration |
 | `constants` | `Record<string, ParameterValue>` | No | Constants for templating and conversation logic |
 | `metadata` | `object` | No | Additional metadata |
 | `timezone` | `string` | No | IANA timezone identifier for conversations (e.g. `Europe/Warsaw`). Used as fallback when no per-user or per-conversation timezone is set. Defaults to UTC. |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No (default: `[]`) | Descriptors defining the data schema for user profile variables in this project |
 | `conversationTimeoutSeconds` | `integer` (min: 0) | No | Inactivity timeout in seconds. Active conversations with no new events for this duration are automatically aborted. Set to `0` or omit to disable. Negative values are rejected. |
+| `autoCreateUsers` | `boolean` | No (default: `false`) | When enabled, users are automatically created on first WebSocket connection if they do not exist |
+| `defaultGuardrailClassifierId` | `string` | No | ID of the classifier used to evaluate guardrails for all conversations in this project |
 
 **Response** `201 Created` — [Project Response](#project-response)
 
@@ -86,11 +89,14 @@ All fields from the create body are optional. `version` is required for optimist
 | `acceptVoice` | `boolean` | No | Updated voice acceptance |
 | `generateVoice` | `boolean` | No | Updated voice generation |
 | `storageConfig` | [`StorageConfig`](#storage-config) | No | Updated storage config |
+| `moderationConfig` | [`ModerationConfig`](#moderation-config) | No | Updated moderation config |
 | `constants` | `Record<string, ParameterValue>` | No | Updated constants |
 | `metadata` | `object` | No | Updated metadata |
 | `timezone` | `string` | No | Updated IANA timezone identifier |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Updated descriptors for user profile variable schema |
 | `conversationTimeoutSeconds` | `integer` (min: 0) or `null` | No | Updated inactivity timeout in seconds. Set to `0` or `null` to disable. |
+| `autoCreateUsers` | `boolean` | No | Updated auto-create users setting |
+| `defaultGuardrailClassifierId` | `string` or `null` | No | Updated guardrail classifier ID. Set to `null` to disable. |
 
 **Response** `200 OK` — [Project Response](#project-response)
 
@@ -100,18 +106,13 @@ All fields from the create body are optional. `version` is required for optimist
 
 ```http
 DELETE /api/projects/:id
-Content-Type: application/json
 ```
 
 **Required permission:** `project:delete`
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `version` | `integer` | Yes | Current version for optimistic locking |
-
 **Response** `204 No Content`
 
-**Errors:** `400` Invalid body | `404` Not found | `409` Version conflict
+**Errors:** `404` Not found
 
 ---
 
@@ -126,14 +127,19 @@ Content-Type: application/json
 | `acceptVoice` | `boolean` | No | Whether voice input is accepted |
 | `generateVoice` | `boolean` | No | Whether voice is generated |
 | `storageConfig` | `StorageConfig` | Yes | Storage configuration |
+| `moderationConfig` | `ModerationConfig` | Yes | Content moderation configuration |
 | `constants` | `Record<string, ParameterValue>` | Yes | Project constants |
 | `metadata` | `object` | Yes | Additional metadata |
 | `timezone` | `string` | Yes | IANA timezone identifier (null means UTC) |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Descriptors defining the data schema for user profile variables |
 | `conversationTimeoutSeconds` | `integer` | Yes | Inactivity timeout in seconds. `null` or `0` means no timeout. |
+| `autoCreateUsers` | `boolean` | No | Whether users are auto-created on first WebSocket connection |
+| `defaultGuardrailClassifierId` | `string` | Yes | Classifier ID for evaluating guardrails |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archivedAt` | `string` | Yes | ISO 8601 timestamp when the project was archived |
+| `archivedBy` | `string` | Yes | ID of the operator who archived the project |
 
 ## ASR Config
 
@@ -161,3 +167,45 @@ Describes a single field in a typed schema. Used in `userProfileVariableDescript
 | `type` | `string` | Yes | One of: `string`, `number`, `boolean`, `object`, `string[]`, `number[]`, `boolean[]`, `object[]`, `image`, `image[]`, `audio`, `audio[]` |
 | `isArray` | `boolean` | Yes | Whether the field holds an array of values |
 | `objectSchema` | `FieldDescriptor[]` | No | Nested field descriptors when `type` is `object` or `object[]` |
+
+## Moderation Config
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `enabled` | `boolean` | Yes | Whether content moderation is enabled for this project |
+| `llmProviderId` | `string` | Yes | ID of the LLM provider used for moderation (must support moderation API, e.g. OpenAI or Mistral) |
+| `blockedCategories` | `string[]` | No | List of category names that should cause the input to be blocked. If omitted or empty, any flagged category will block the input. Category names are provider-specific. |
+
+## Archive Project
+
+```http
+POST /api/projects/:id/archive
+Content-Type: application/json
+```
+
+**Required permission:** `project:write`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | `integer` | Yes | Current version for optimistic locking |
+
+**Response** `200 OK` — [Project Response](#project-response)
+
+**Errors:** `404` Not found | `409` Version conflict or already archived
+
+## Unarchive Project
+
+```http
+POST /api/projects/:id/unarchive
+Content-Type: application/json
+```
+
+**Required permission:** `project:write`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | `integer` | Yes | Current version for optimistic locking |
+
+**Response** `200 OK` — [Project Response](#project-response)
+
+**Errors:** `400` Project is not archived | `404` Not found | `409` Version conflict

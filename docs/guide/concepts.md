@@ -37,6 +37,7 @@ Project
 ├── Tools (LLM-callable operations)
 ├── Knowledge Categories → Items (FAQ)
 ├── Global Actions (reusable action definitions)
+├── Guardrails (content safety classifiers)
 ├── API Keys (WebSocket authentication)
 │
 ├── Conversations → Events → Artifacts
@@ -47,6 +48,9 @@ Providers (shared, not project-scoped)
 ├── TTS (ElevenLabs, OpenAI, Deepgram, Cartesia, Azure)
 ├── ASR (Azure, ElevenLabs, Deepgram)
 └── Storage (S3, Azure Blob, GCS, Local)
+
+Environments (shared, not project-scoped)
+└── Key-value variable overrides per deployment context
 ```
 
 ## Conversation Flow

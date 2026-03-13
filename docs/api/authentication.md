@@ -33,7 +33,7 @@ Content-Type: application/json
 {
   "accessToken": "eyJ...",
   "refreshToken": "eyJ...",
-  "expiresIn": 900,
+  "expiresIn": 64800,
   "operatorId": "operator@example.com",
   "displayName": "Operator User",
   "roles": ["super_admin"]

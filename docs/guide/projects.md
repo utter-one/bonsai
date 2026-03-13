@@ -15,9 +15,13 @@ Each project includes:
 | `generateVoice` | Whether the project generates voice output (TTS) |
 | `asrConfig` | ASR (speech-to-text) provider configuration |
 | `storageConfig` | Storage provider for conversation artifacts |
+| `moderationConfig` | Content moderation configuration (provider, blocked categories) |
 | `constants` | Key-value store for templating across all stages |
 | `metadata` | Arbitrary JSON for custom data |
 | `conversationTimeoutSeconds` | Inactivity timeout for active conversations (0 or null = disabled) |
+| `autoCreateUsers` | Whether to automatically create user records on first conversation (default: `false`) |
+| `defaultGuardrailClassifierId` | Optional default guardrail classifier applied project-wide |
+| `timezone` | Default IANA timezone for the project (e.g. `America/New_York`) |
 | `userProfileVariableDescriptors` | Typed schema describing the fields expected on a user's profile |
 | `version` | Optimistic locking version number |
 
@@ -118,6 +122,7 @@ A project contains the following child entities, all scoped by `projectId`:
 - [Tools](./tools) — Callable LLM-powered tools
 - [Knowledge Categories & Items](./knowledge) — FAQ data
 - [Global Actions](./global-actions) — Reusable action definitions
+- [Guardrails](../api/guardrails) — Content safety classifiers
 - [API Keys](./authentication#api-keys) — WebSocket authentication tokens
 - Conversations — Recorded conversation sessions
 - Users — End-user profiles

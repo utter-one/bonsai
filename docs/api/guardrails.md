@@ -145,6 +145,7 @@ Returns audit log entries for the specified guardrail. See [Audit Logs](./audit-
 | `version` | `integer` | No | Version number for optimistic locking |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |
 
 ## Guardrail List Response
 

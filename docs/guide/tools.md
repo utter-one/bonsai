@@ -17,6 +17,8 @@ A **Tool** is an LLM-powered callable operation within a project. Tools are invo
 | `outputType` | Output modality: `text`, `image`, or `multi-modal` |
 | `parameters` | Array of tool parameter definitions |
 | `metadata` | Arbitrary JSON |
+| `tags` | Searchable labels for organization |
+| `archived` | Whether the tool is archived |
 | `version` | Optimistic locking version |
 
 ## Tool Parameters

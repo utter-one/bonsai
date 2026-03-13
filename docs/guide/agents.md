@@ -15,6 +15,8 @@ An **Agent** defines the AI's personality and voice for a conversation stage. Ag
 | `ttsSettings` | Voice-specific settings (depends on TTS provider) |
 | `fillerSettings` | Optional LLM-generated filler sentence spoken at the start of each turn |
 | `metadata` | Arbitrary JSON |
+| `tags` | Searchable labels for organization |
+| `archived` | Whether the agent is archived |
 | `version` | Optimistic locking version |
 
 ## Personality Prompt

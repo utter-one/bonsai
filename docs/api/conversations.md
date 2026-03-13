@@ -97,6 +97,7 @@ Returns audit log entries for the specified conversation. See [Audit Logs](./aud
 | `metadata` | `object` | Yes | Additional metadata |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |
 
 ## Event Response
 

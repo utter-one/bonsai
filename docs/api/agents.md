@@ -128,6 +128,7 @@ Returns audit log entries for the specified agent. See [Audit Logs](./audit-logs
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |
 
 ## Filler Settings
 

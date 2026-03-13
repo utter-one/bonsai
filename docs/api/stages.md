@@ -23,7 +23,7 @@ Content-Type: application/json
 | `name` | `string` (min 1) | Yes | Display name |
 | `description` | `string` | No | Detailed description |
 | `prompt` | `string` (min 1) | Yes | System prompt defining stage behavior |
-| `llmProviderId` | `string` | No | LLM provider ID |
+| `llmProviderId` | `string` | Yes | LLM provider ID |
 | `llmSettings` | [`LlmSettings`](#llm-settings) | Yes | LLM provider-specific settings |
 | `agentId` | `string` (min 1) | Yes | Associated agent ID |
 | `enterBehavior` | `string` | No | `"generate_response"` (default) or `"await_user_input"` |
@@ -75,7 +75,7 @@ Content-Type: application/json
 
 **Required permission:** `stage:write`
 
-All create fields are optional plus `version` (required for optimistic locking), **except `llmSettings` which must always be provided**.
+All create fields are optional plus `version` (required for optimistic locking).
 
 **Response** `200 OK` — [Stage Response](#stage-response)
 
@@ -150,6 +150,7 @@ Returns audit log entries for the specified stage. See [Audit Logs](./audit-logs
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |
 
 ## Actions
 

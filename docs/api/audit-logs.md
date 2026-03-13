@@ -17,10 +17,10 @@ GET /api/projects/:projectId/context-transformers/:id/audit-logs
 GET /api/projects/:projectId/tools/:id/audit-logs
 GET /api/projects/:projectId/global-actions/:id/audit-logs
 GET /api/projects/:projectId/conversations/:id/audit-logs
-GET /api/projects/:projectId/issues/:id/audit-logs
+GET /api/issues/:id/audit-logs
 GET /api/providers/:id/audit-logs
 GET /api/environments/:id/audit-logs
-GET /api/users/:id/audit-logs
+GET /api/projects/:projectId/users/:id/audit-logs
 ```
 
 ## List Audit Logs
@@ -56,7 +56,6 @@ Supports [pagination & filtering](./pagination).
       "entityType": "agent",
       "oldEntity": { "name": "Old Name" },
       "newEntity": { "name": "New Name" },
-      "version": 1,
       "createdAt": "2025-01-15T10:00:00.000Z"
     }
   ],
@@ -77,5 +76,5 @@ Supports [pagination & filtering](./pagination).
 | `entityType` | `string` | No | Type of entity (e.g., `operator`, `agent`, `stage`) |
 | `oldEntity` | `object` | Yes | Entity state before the change (`null` for CREATE) |
 | `newEntity` | `object` | Yes | Entity state after the change (`null` for DELETE) |
-| `version` | `integer` | No | Audit log version |
+| `projectId` | `string` | Yes | Project ID the entity belongs to |
 | `createdAt` | `string` | No | ISO 8601 timestamp |

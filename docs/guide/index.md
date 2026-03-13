@@ -46,6 +46,7 @@ This guide covers:
 | [Tools](./tools) | LLM-powered callable tools |
 | [Knowledge Base](./knowledge) | FAQ categories and items |
 | [Global Actions](./global-actions) | Reusable cross-stage action definitions |
+| [Guardrails](./guardrails) | Content safety classifiers and moderation |
 | [Providers](./providers) | LLM, TTS, ASR, and Storage provider integrations |
 | [Conversations](./conversations) | Conversation lifecycle, states, and events |
 | [WebSocket Protocol](./websocket) | Real-time communication protocol reference |
