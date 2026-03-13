@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: bonsai
+      POSTGRES_USER: bonsai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bonsai}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bonsai -d bonsai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Uncomment to expose PostgreSQL to the host for direct access:
+    # ports:
+    #   - "5432:5432"
+
+  bonsai-backend:
+    build:
+      context: https://github.com/utter-one/bonsai.git
+    environment:
+      DB_CONNECTION_STRING: postgresql://bonsai:${POSTGRES_PASSWORD:-bonsai}@postgres:5432/bonsai
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (min 32 characters)}
+      PORT: "3000"
+      NODE_ENV: ${NODE_ENV:-production}
+      DB_SSL: "false"
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+
+  bonsai-console:
+    build:
+      context: https://github.com/utter-one/bonsai-console.git
+    ports:
+      - "${ADMIN_PORT:-80}:80"
+    depends_on:
+      bonsai-backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  bonsai-docs:
+    build:
+      context: https://github.com/utter-one/bonsai.git#:docs
+    ports:
+      - "${DOCS_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
