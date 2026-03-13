@@ -118,7 +118,7 @@ A project contains the following child entities, all scoped by `projectId`:
 - [Stages](./stages) — Conversation phases
 - [Agents](./agents) — AI personality definitions
 - [Classifiers](./classifiers) — Intent classification
-- [Context Transformers](./context-transformers) — Data extraction
+- [Context Transformers](./context-transformers) — Variable population: data extraction, prompt fragments, flow control
 - [Tools](./tools) — Callable LLM-powered tools
 - [Knowledge Categories & Items](./knowledge) — FAQ data
 - [Global Actions](./global-actions) — Reusable action definitions

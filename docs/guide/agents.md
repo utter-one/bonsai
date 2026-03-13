@@ -128,20 +128,20 @@ The `prompt` supports [Handlebars templates](./templating). The following variab
 
 | Variable | Description |
 |----------|-------------|
-| `{{ userInput }}` | The raw text of the current user turn |
-| `{{ vars }}` | Stage-scoped conversation variables |
-| `{{ stageVars }}` | All stage variables keyed by stage ID |
-| `{{ userProfile }}` | User profile object |
-| `{{ consts }}` | Project-level constants |
-| `{{ history }}` | Conversation message history |
-| `{{ time }}` | Current time context |
-| `{{ stage }}` | Current stage context |
+| <code v-pre>{{userInput}}</code> | The raw text of the current user turn |
+| <code v-pre>{{vars}}</code> | Stage-scoped conversation variables |
+| <code v-pre>{{stageVars}}</code> | All stage variables keyed by stage ID |
+| <code v-pre>{{userProfile}}</code> | User profile object |
+| <code v-pre>{{consts}}</code> | Project-level constants |
+| <code v-pre>{{history}}</code> | Conversation message history |
+| <code v-pre>{{time}}</code> | Current time context |
+| <code v-pre>{{stage}}</code> | Current stage context |
 
 ### Tips
 
 - Keep the filler prompt strict: instruct the LLM to produce **one sentence only**, with no extra commentary or punctuation.
 - Use a fast, cheap LLM (e.g. `gpt-4o-mini`) since latency here directly affects when the user first hears audio.
-- You can reference `{{ userInput }}` in the prompt to make fillers slightly context-aware (e.g. different fillers for questions vs statements).
+- You can reference <code v-pre>{{userInput}}</code> in the prompt to make fillers slightly context-aware (e.g. different fillers for questions vs statements).
 
 ## Usage in Stages
 

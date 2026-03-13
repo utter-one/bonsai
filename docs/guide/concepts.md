@@ -22,7 +22,7 @@ Project
 │   ├── → Agent (AI personality + voice)
 │   ├── → LLM Provider (for response generation)
 │   ├── → Default Classifier (intent detection)
-│   ├── → Context Transformers[] (data extraction)
+│   ├── → Context Transformers[] (variable population, prompt fragments, flow control)
 │   ├── → Global Actions[] (reusable behaviors)
 │   ├── → Knowledge tags (FAQ injection)
 │   ├── Variable Descriptors (stage data schema)
@@ -33,7 +33,7 @@ Project
 │   └── TTS Settings (voice configuration)
 │
 ├── Classifiers (LLM intent classifiers)
-├── Context Transformers (LLM data extractors)
+├── Context Transformers (LLM-powered variable population)
 ├── Tools (LLM-callable operations)
 ├── Knowledge Categories → Items (FAQ)
 ├── Global Actions (reusable action definitions)

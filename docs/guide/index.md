@@ -21,7 +21,7 @@ When an end user connects via WebSocket and starts a conversation, the system:
 
 1. Transcribes the user's voice input (ASR) or accepts text
 2. Classifies user intent using LLM-powered classifiers
-3. Extracts structured data via context transformers
+3. Populates stage variables via context transformers (data extraction, prompt fragments, flow-control flags)
 4. Executes matching actions and their effects (scripts, webhooks, tools, stage navigation)
 5. Generates an AI response using the stage prompt and conversation history
 6. Synthesizes the response as audio (TTS) and streams it back to the client
@@ -43,7 +43,7 @@ This guide covers:
 | [Agents](./agents) | AI personality and voice configuration |
 | [Actions & Effects](./actions-and-effects) | Behaviors triggered by user input |
 | [Classifiers](./classifiers) | LLM-powered intent classification |
-| [Context Transformers](./context-transformers) | Structured data extraction from conversations |
+| [Context Transformers](./context-transformers) | LLM-powered variable population: data extraction, prompt fragments, flow control |
 | [Tools](./tools) | LLM-powered callable tools |
 | [Knowledge Base](./knowledge) | FAQ categories and items |
 | [Global Actions](./global-actions) | Reusable cross-stage action definitions |

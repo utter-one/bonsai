@@ -122,7 +122,7 @@ This is useful for building operator UIs that dynamically render provider config
 | Agent | TTS (voice synthesis) |
 | Stage | LLM (response generation) |
 | Classifier | LLM (intent classification) |
-| Context Transformer | LLM (data extraction) |
+| Context Transformer | LLM (variable population) |
 | Tool | LLM (tool execution) |
 
 ## Provider Inheritance
