@@ -18,7 +18,7 @@ Each action in the `actions` map has a key (the action ID) and a value with thes
 | `parameters` | Parameters extracted by the classifier when triggering |
 | `effects` | Ordered array of effects to execute |
 | `examples` | Example user phrases (included in classifier prompt) |
-| `watchedVariables` | Map of variable paths to trigger conditions (`new`, `changed`, `removed`) |
+| `watchedVariables` | Map of variable paths to trigger conditions (`new`, `changed`, `removed`, `any`) |
 | `metadata` | Arbitrary JSON |
 
 ## Stage Lifecycle Actions
@@ -135,7 +135,7 @@ Executes JavaScript in a secure isolated sandbox. See [Scripting](./scripting) f
 ```json
 {
   "type": "run_script",
-  "script": "vars.retryCount = (vars.retryCount || 0) + 1; if (vars.retryCount >= 3) { vars.escalate = true; }"
+  "code": "vars.retryCount = (vars.retryCount || 0) + 1; if (vars.retryCount >= 3) { vars.escalate = true; }"
 }
 ```
 
@@ -157,11 +157,11 @@ Performs operations on stage variables:
 ```json
 {
   "type": "modify_variables",
-  "operations": [
-    { "op": "set", "path": "status", "value": "verified" },
-    { "op": "reset", "path": "retryCount" },
-    { "op": "add", "path": "history", "value": "step completed" },
-    { "op": "remove", "path": "pendingItems", "value": "item-1" }
+  "modifications": [
+    { "variableName": "status", "operation": "set", "value": "verified" },
+    { "variableName": "retryCount", "operation": "reset" },
+    { "variableName": "history", "operation": "add", "value": "step completed" },
+    { "variableName": "pendingItems", "operation": "remove", "value": "item-1" }
   ]
 }
 ```
@@ -179,8 +179,8 @@ Same operations as `modify_variables`, but applied to the user's profile instead
 ```json
 {
   "type": "modify_user_profile",
-  "operations": [
-    { "op": "set", "path": "preferredLanguage", "value": "es" }
+  "modifications": [
+    { "fieldName": "preferredLanguage", "operation": "set", "value": "es" }
   ]
 }
 ```
@@ -220,16 +220,16 @@ Explicitly triggers AI response generation. Two modes:
 
 **Generated** (LLM produces the response):
 ```json
-{ "type": "generate_response", "mode": "generated" }
+{ "type": "generate_response", "responseMode": "generated" }
 ```
 
 **Prescripted** (predefined text, no LLM call):
 ```json
 {
   "type": "generate_response",
-  "mode": "prescripted",
-  "responses": ["Welcome! How can I help?", "Hi there! What can I do for you?"],
-  "selectionStrategy": "random"
+  "responseMode": "prescripted",
+  "prescriptedResponses": ["Welcome! How can I help?", "Hi there! What can I do for you?"],
+  "prescriptedSelectionStrategy": "random"
 }
 ```
 

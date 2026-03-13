@@ -22,7 +22,7 @@ Project
 │   ├── → Agent (AI personality + voice)
 │   ├── → LLM Provider (for response generation)
 │   ├── → Default Classifier (intent detection)
-│   ├── → Context Transformers[] (data extraction)
+│   ├── → Context Transformers[] (variable population, prompt fragments, flow control)
 │   ├── → Global Actions[] (reusable behaviors)
 │   ├── → Knowledge tags (FAQ injection)
 │   ├── Variable Descriptors (stage data schema)
@@ -33,10 +33,11 @@ Project
 │   └── TTS Settings (voice configuration)
 │
 ├── Classifiers (LLM intent classifiers)
-├── Context Transformers (LLM data extractors)
+├── Context Transformers (LLM-powered variable population)
 ├── Tools (LLM-callable operations)
 ├── Knowledge Categories → Items (FAQ)
 ├── Global Actions (reusable action definitions)
+├── Guardrails (content safety classifiers)
 ├── API Keys (WebSocket authentication)
 │
 ├── Conversations → Events → Artifacts
@@ -47,6 +48,9 @@ Providers (shared, not project-scoped)
 ├── TTS (ElevenLabs, OpenAI, Deepgram, Cartesia, Azure)
 ├── ASR (Azure, ElevenLabs, Deepgram)
 └── Storage (S3, Azure Blob, GCS, Local)
+
+Environments (shared, not project-scoped)
+└── Key-value variable overrides per deployment context
 ```
 
 ## Conversation Flow
@@ -57,33 +61,33 @@ A typical conversation turn follows this pipeline:
 User Input (voice or text)
     │
     ▼
-┌─────────────────┐
+┌─────────────────────┐
 │  ASR Transcription  │  (voice → text, if voice input)
-└────────┬────────┘
+└────────┬────────────┘
          │
          ▼
-┌─────────────────────────────────┐
+┌───────────────────────────────────┐
 │  Classification (parallel)        │  Classifiers identify actions
 │  Transformation (parallel)        │  Transformers extract data
-└────────┬────────────────────────┘
+└────────┬──────────────────────────┘
          │
          ▼
-┌─────────────────────────────────┐
+┌───────────────────────────────────┐
 │  Action Execution                 │  Effects run sequentially:
 │  • Scripts, webhooks, tools       │  modify vars, navigate stages,
 │  • Variable/profile modifications │  call external services
-└────────┬────────────────────────┘
+└────────┬──────────────────────────┘
          │
          ▼
-┌─────────────────────────────────┐
+┌───────────────────────────────────┐
 │  Response Generation              │  LLM generates text using
 │  (streamed)                       │  Handlebars-rendered prompt
-└────────┬────────────────────────┘
+└────────┬──────────────────────────┘
          │
          ▼
-┌─────────────────────────────────┐
+┌───────────────────────────────────┐
 │  TTS Synthesis (streamed)         │  Text → audio chunks
-└────────┬────────────────────────┘
+└────────┬──────────────────────────┘
          │
          ▼
    Client receives text + audio
@@ -122,12 +126,6 @@ Knowledge categories contain FAQ-style question-answer pairs. When a stage has `
 
 All mutable entities use a `version` field for optimistic concurrency control. Update and delete operations must include the current version number, ensuring no silent overwrites when multiple operators edit simultaneously.
 
-## Two APIs
+## APIs
 
-Bonsai Backend exposes two APIs:
-
-1. **REST API** — For administration: create and manage projects, stages, agents, providers, and all other entities. Protected by JWT authentication with role-based permissions.
-
-2. **WebSocket API** — For end-user conversations: real-time bidirectional communication for voice and text sessions. Protected by project-scoped API keys.
-
-These two APIs serve different audiences. The REST API is used by operators and content managers, while the WebSocket API is used by client applications (web apps, mobile apps, kiosks, etc.) that host the conversational experience.
+Bonsai Backend exposes a REST API for administration and a WebSocket API for live conversations, along with unauthenticated schema endpoints for tooling and client generation. See the [APIs](./apis) page for the full overview.

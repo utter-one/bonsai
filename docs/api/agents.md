@@ -128,6 +128,7 @@ Returns audit log entries for the specified agent. See [Audit Logs](./audit-logs
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |
 
 ## Filler Settings
 
@@ -143,14 +144,14 @@ The `prompt` field supports the same [template variables](../guide/templating) a
 
 | Variable | Description |
 |----------|-------------|
-| `{{ userInput }}` | The raw text of the current user turn |
-| `{{ vars }}` | Stage-scoped conversation variables |
-| `{{ stageVars }}` | All stage variables keyed by stage ID |
-| `{{ userProfile }}` | User profile object |
-| `{{ consts }}` | Project-level constants |
-| `{{ history }}` | Conversation message history |
-| `{{ time }}` | Current time context |
-| `{{ stage }}` | Current stage context |
+| <code v-pre>{{userInput}}</code> | The raw text of the current user turn |
+| <code v-pre>{{vars}}</code> | Stage-scoped conversation variables |
+| <code v-pre>{{stageVars}}</code> | All stage variables keyed by stage ID |
+| <code v-pre>{{userProfile}}</code> | User profile object |
+| <code v-pre>{{consts}}</code> | Project-level constants |
+| <code v-pre>{{history}}</code> | Conversation message history |
+| <code v-pre>{{time}}</code> | Current time context |
+| <code v-pre>{{stage}}</code> | Current stage context |
 
 > **Note:** `actions`, `results`, and FAQ context are **not** available in the filler prompt because classification has not run yet at filler generation time.
 

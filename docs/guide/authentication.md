@@ -72,6 +72,7 @@ Permissions follow the `entity:action` pattern:
 | Context Transformer | `context_transformer:read` | `context_transformer:write` | `context_transformer:delete` |
 | Tool | `tool:read` | `tool:write` | `tool:delete` |
 | Global Action | `global_action:read` | `global_action:write` | `global_action:delete` |
+| Guardrail | `guardrail:read` | `guardrail:write` | `guardrail:delete` |
 | Knowledge | `knowledge:read` | `knowledge:write` | `knowledge:delete` |
 | Conversation | `conversation:read` | `conversation:write` | `conversation:delete` |
 | Issue | `issue:read` | `issue:write` | `issue:delete` |
@@ -81,6 +82,7 @@ Permissions follow the `entity:action` pattern:
 | Migration | `migration:export` | `migration:import` | — |
 | System | `system:config` | — | — |
 | Audit | `audit:read` | — | — |
+| Analytics | `analytics:read` | — | — |
 
 ### Defense in Depth
 

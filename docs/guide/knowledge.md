@@ -13,6 +13,7 @@ The **Knowledge Base** provides a structured FAQ system for projects. It organiz
 | `name` | Category name (e.g., "Billing FAQ", "Product Features") |
 | `promptTrigger` | Phrase that activates this category during classification |
 | `tags` | Array of tags for filtering |
+| `archived` | Whether the category is archived |
 | `order` | Sort order for display |
 | `version` | Optimistic locking version |
 

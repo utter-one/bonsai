@@ -2,7 +2,7 @@
 
 Track bugs, feature requests, and performance issues related to conversations.
 
-**Tag:** `Issues` | **Scoped to:** Project
+**Tag:** `Issues`
 
 ::: info
 Issues use auto-incrementing integer IDs, not string UUIDs.
@@ -11,7 +11,7 @@ Issues use auto-incrementing integer IDs, not string UUIDs.
 ## Create Issue
 
 ```http
-POST /api/projects/:projectId/issues
+POST /api/issues
 Content-Type: application/json
 ```
 
@@ -21,9 +21,10 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `projectId` | `string` (min 1) | Yes | ID of the project this issue belongs to |
 | `environment` | `string` (min 1) | Yes | Environment where issue occurred |
 | `buildVersion` | `string` (min 1) | Yes | Application build version |
-| `beat` | `string` | No | Beat/sprint identifier |
+| `stage` | `string` | No | Stage identifier for tracking purposes |
 | `sessionId` | `string` | No | Related conversation session ID |
 | `eventIndex` | `integer` | No | Index of event in session |
 | `userId` | `string` | No | User ID who reported the issue |
@@ -41,7 +42,7 @@ Content-Type: application/json
 ## Get Issue
 
 ```http
-GET /api/projects/:projectId/issues/:id
+GET /api/issues/:id
 ```
 
 **Required permission:** `issue:read`
@@ -53,7 +54,7 @@ GET /api/projects/:projectId/issues/:id
 ## List Issues
 
 ```http
-GET /api/projects/:projectId/issues
+GET /api/issues
 ```
 
 **Required permission:** `issue:read`
@@ -63,7 +64,7 @@ Supports [pagination & filtering](./pagination).
 ## Update Issue
 
 ```http
-PUT /api/projects/:projectId/issues/:id
+PUT /api/issues/:id
 Content-Type: application/json
 ```
 
@@ -78,7 +79,7 @@ All create fields are optional (no version-based optimistic locking for issues).
 ## Delete Issue
 
 ```http
-DELETE /api/projects/:projectId/issues/:id
+DELETE /api/issues/:id
 ```
 
 **Required permission:** `issue:delete`
@@ -90,7 +91,7 @@ DELETE /api/projects/:projectId/issues/:id
 ## Get Audit Logs
 
 ```http
-GET /api/projects/:projectId/issues/:id/audit-logs
+GET /api/issues/:id/audit-logs
 ```
 
 **Required permission:** `audit:read`
@@ -107,7 +108,7 @@ Returns audit log entries for the specified issue. See [Audit Logs](./audit-logs
 | `projectId` | `string` | No | Parent project ID |
 | `environment` | `string` | No | Environment |
 | `buildVersion` | `string` | No | Build version |
-| `beat` | `string` | Yes | Beat/sprint identifier |
+| `stage` | `string` | Yes | Stage identifier |
 | `sessionId` | `string` | Yes | Related session ID |
 | `eventIndex` | `integer` | Yes | Event index in session |
 | `userId` | `string` | Yes | Reporter user ID |

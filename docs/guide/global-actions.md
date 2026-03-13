@@ -18,6 +18,8 @@
 | `effects` | Ordered array of effects to execute |
 | `examples` | Example user phrases for classifier context |
 | `metadata` | Arbitrary JSON |
+| `tags` | Searchable labels for organization |
+| `archived` | Whether the global action is archived |
 | `version` | Optimistic locking version |
 
 ## Referencing in Stages

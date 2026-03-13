@@ -22,7 +22,8 @@ Returns the complete catalog of all provider types.
   "asr": { "providers": [...] },
   "tts": { "providers": [...] },
   "llm": { "providers": [...] },
-  "storage": { "providers": [...] }
+  "storage": { "providers": [...] },
+  "moderation": { "providers": [...] }
 }
 ```
 
@@ -33,6 +34,7 @@ GET /api/provider-catalog/asr
 GET /api/provider-catalog/tts
 GET /api/provider-catalog/llm
 GET /api/provider-catalog/storage
+GET /api/provider-catalog/moderation
 ```
 
 Returns providers for a specific category.
@@ -63,7 +65,7 @@ GET /api/provider-catalog/:type/:apiType
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `type` | `string` | Provider type: `asr`, `tts`, `llm`, or `storage` |
+| `type` | `string` | Provider type: `asr`, `tts`, `llm`, `storage`, or `moderation` |
 | `apiType` | `string` | Provider API type (e.g., `openai`, `azure`, `elevenlabs`) |
 
 **Response** `200 OK` — Single provider info object

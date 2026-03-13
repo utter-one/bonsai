@@ -50,6 +50,18 @@ GET /api/projects/:projectId/api-keys
 
 Supports [pagination & filtering](./pagination).
 
+## List All API Keys (Global)
+
+```http
+GET /api/api-keys
+```
+
+**Required permission:** `api_key:read`
+
+Retrieves API keys across all projects with optional filtering, sorting, and pagination.
+
+Supports [pagination & filtering](./pagination).
+
 ## Update API Key
 
 ```http

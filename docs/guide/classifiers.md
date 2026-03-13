@@ -14,6 +14,8 @@ A **Classifier** is an LLM-powered intent detection component. It analyzes user 
 | `llmProviderId` | LLM provider for classification |
 | `llmSettings` | LLM-specific settings |
 | `metadata` | Arbitrary JSON |
+| `tags` | Searchable labels for organization |
+| `archived` | Whether the classifier is archived |
 | `version` | Optimistic locking version |
 
 ## How Classification Works

@@ -24,6 +24,8 @@ A **Stage** represents a distinct phase in a conversation. Stages are the centra
 | `variableDescriptors` | Schema of typed variables for this stage |
 | `actions` | Map of action definitions |
 | `metadata` | Arbitrary JSON |
+| `tags` | Searchable labels for organization |
+| `archived` | Whether the stage is archived |
 | `version` | Optimistic locking version |
 
 ## Enter Behavior
@@ -105,7 +107,7 @@ A stage references several other entities:
 - **Agent** (`agentId`) — Defines the AI's personality prompt and TTS voice settings. See [Agents](./agents).
 - **LLM Provider** (`llmProviderId` / `llmSettings`) — The model used for generating responses. See [Providers](./providers).
 - **Classifier** (`defaultClassifierId`) — Classifies user input into action triggers. See [Classifiers](./classifiers).
-- **Context Transformers** (`transformerIds`) — Extract structured data from each turn. See [Context Transformers](./context-transformers).
+- **Context Transformers** (`transformerIds`) — Populate stage variables on each turn: extract structured data, generate prompt fragments, or write flow-control flags. See [Context Transformers](./context-transformers).
 - **Global Actions** (`globalActions`) — Reusable actions available in this stage. See [Global Actions](./global-actions).
 - **Knowledge** (`knowledgeTags`) — FAQ categories included in classification. See [Knowledge](./knowledge).
 

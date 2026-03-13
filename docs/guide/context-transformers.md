@@ -1,6 +1,8 @@
 # Context Transformers
 
-A **Context Transformer** is an LLM-powered component that extracts structured data from a conversation turn and writes it into stage variables. Transformers run in parallel with classifiers on each user input.
+A **Context Transformer** is an LLM-powered component that writes values into stage variables on each user input turn. Transformers run in parallel with classifiers.
+
+While the most common use case is structured data extraction, transformers are general-purpose: the LLM can produce any variable values that suit your design — including pre-rendered text fragments for injection into the main stage prompt, whisper instructions to steer the LLM's next response, or boolean/numeric flags used by action conditions to control conversation flow programmatically.
 
 ## Structure
 
@@ -105,6 +107,7 @@ Watch trigger conditions:
 - **`new`** — The variable was not set before and now has a value
 - **`changed`** — The variable's value has changed
 - **`removed`** — The variable was removed (set to null)
+- **`any`** — Triggers on any of the above: creation, change, or removal
 
 ## Use Cases
 
@@ -112,6 +115,9 @@ Watch trigger conditions:
 - **Entity extraction** — Pull product names, dates, locations from user messages
 - **Sentiment tracking** — Continuously evaluate user sentiment across turns
 - **Topic detection** — Identify conversation topic shifts for routing
+- **Prompt fragment generation** — Pre-render context-aware text that gets injected into the stage system prompt via a variable reference (e.g. a dynamic product description block)
+- **Whisper injection** — Write a short instruction string into a variable, then reference it in the user response to quietly steer the LLM's next response without requiring a full prompt change
+- **Flow control variables** — Produce boolean or categorical values (e.g. `isEscalationNeeded: true`) that action conditions read to trigger navigation, scripts, or webhooks
 
 ## Cloning
 

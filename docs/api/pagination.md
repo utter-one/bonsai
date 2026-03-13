@@ -7,7 +7,7 @@ All list endpoints accept a common set of query parameters for pagination, sorti
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `offset` | `integer` (min 0) | `0` | Starting index for pagination |
-| `limit` | `integer` (positive, max 100) | `100` | Maximum number of items to return. Omitted or `null` values fall back to the default |
+| `limit` | `integer` (positive, max 1000) | `100` | Maximum number of items to return. Omitted or `null` values fall back to the default |
 | `textSearch` | `string` | `null` | Full-text search query string |
 | `orderBy` | `string \| string[]` | `null` | Field(s) to sort by. Prefix with `-` for descending |
 | `groupBy` | `string \| string[]` | `null` | Field(s) to group results by |

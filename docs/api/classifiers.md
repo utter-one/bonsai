@@ -23,7 +23,7 @@ Content-Type: application/json
 | `name` | `string` (min 1) | Yes | Display name |
 | `description` | `string` | No | Detailed description |
 | `prompt` | `string` (min 1) | Yes | Prompt defining classification logic |
-| `llmProviderId` | `string` | No | LLM provider ID |
+| `llmProviderId` | `string` | Yes | LLM provider ID |
 | `llmSettings` | `LlmSettings` | Yes | LLM provider-specific settings |
 | `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
@@ -61,7 +61,7 @@ Content-Type: application/json
 
 **Required permission:** `classifier:write`
 
-All create fields are optional plus `version` (required), **except `llmSettings` which must always be provided**.
+All create fields are optional plus `version` (required).
 
 **Response** `200 OK` — [Classifier Response](#classifier-response)
 
@@ -126,3 +126,4 @@ Returns audit log entries for the specified classifier. See [Audit Logs](./audit
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |
