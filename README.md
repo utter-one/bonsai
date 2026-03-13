@@ -1,6 +1,12 @@
+## What Is Bonsai?
+
+Bonsai is a platform for building customer-facing AI agents that sound like your brand, follow your rules, and improve over time. It helps teams create voice and chat experiences with structured conversation journeys, approved knowledge, and built-in guardrails, so assistants can answer questions, collect information, and take action in real time without drifting off-brand.
+
 # Bonsai Backend
 
-Backend for building and running AI-powered voice and text conversation pipelines. Provides a REST API and a real-time WebSocket API for designing, deploying, and managing multi-turn AI conversations with support for multiple LLM, TTS, and ASR providers.
+Bonsai Backend is the runtime and API layer that powers those experiences. It manages projects, stages, agents, actions, tools, providers, and conversation state, while exposing REST and WebSocket APIs for integrating Bonsai into your own apps, channels, and operational tooling.
+
+**Bonsai Console** - a web admin interface is available in the [bonsai-admin repository](https://github.com/utter-one/bonsai-admin)
 
 ## Features
 
