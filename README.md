@@ -1,88 +1,265 @@
-# What Is Bonsai?
+<p align="center">
+  <img src="./docs/assets/bonsai-logo-h.svg" alt="Bonsai" width="420">
+</p>
 
-Bonsai is a platform for building customer-facing AI agents that sound like your brand, follow your rules, and improve over time. It helps teams create voice and chat experiences with structured conversation journeys, approved knowledge, and built-in guardrails, so assistants can answer questions, collect information, and take action in real time without drifting off-brand.
+Bonsai is a platform for building and operating customer-facing AI agents that must sound like your brand, follow your rules, and stay operable in production.
 
-# Bonsai Backend
+As a system, Bonsai has two core parts:
 
-Bonsai Backend is the runtime and API layer that powers those experiences. It manages projects, stages, agents, actions, tools, providers, and conversation state, while exposing REST and WebSocket APIs for integrating Bonsai into your own apps, channels, and operational tooling.
+- **Bonsai Backend**: the runtime, APIs, orchestration layer, provider integrations, conversation state, guardrails, auditability, and real-time voice/text session engine
+- **[Bonsai Console](https://github.com/utter-one/bonsai-console)**: the visual admin panel for designing experiences, monitoring conversations and users, and administering projects, providers, and access
 
-**Bonsai Console** - a web admin interface is available in the [bonsai-admin repository](https://github.com/utter-one/bonsai-admin)
+Together they give teams one operating system for conversational AI: design flows and agents, manage knowledge and providers, enforce guardrails and permissions, run live sessions, and monitor what happened in production.
 
-## Features
+Most AI agent stacks optimize for raw model access. Bonsai optimizes for the full governed system around customer-facing AI: structured stages, explicit actions, approved knowledge, project-wide guardrails, real-time voice and text, and the operational controls brands and enterprises need after launch.
 
-- **REST API** — full resource management: projects, stages, agents, classifiers, context transformers, tools, knowledge base, providers, conversations, and more
-- **Real-time WebSocket API** — streaming conversation pipeline: ASR → classification → context transformation → LLM generation → TTS synthesis
-- **Multi-provider AI integrations** — OpenAI, Anthropic, Google Gemini for LLM; Azure, Speechmatics, AssemblyAI for ASR/TTS; S3/Azure/GCS for storage
-- **RBAC + JWT & API key authentication** — role-based access control enforced at both controller and service layers
-- **Scripting sandbox** — safely execute custom JavaScript logic inside conversations via `isolated-vm`
-- **Handlebars templating** — dynamic prompt and message composition with full variable context
-- **OpenAPI / Swagger UI** — self-documenting API available at `/api-docs`
-- **Docker-ready** — single-stage image with automatic database migrations on startup
+This repository contains the backend half of that system
 
-## Prerequisites
+The companion UI for the full Bonsai platform lives in [Bonsai Console](https://github.com/utter-one/bonsai-console).
 
-- Node.js 20+
-- PostgreSQL 14+
+## Quick Look
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="./docs/assets/1-bonsai-stage.png">
+        <img src="./docs/assets/1-bonsai-stage.png" alt="Bonsai Stage view" width="360">
+      </a>
+      <br>
+      <strong>Stage Edit</strong>
+    </td>
+    <td align="center">
+      <a href="./docs/assets/2-bonsai-guardrails.png">
+        <img src="./docs/assets/2-bonsai-guardrails.png" alt="Bonsai Guardrails view" width="360">
+      </a>
+      <br>
+      <strong>Guardrails</strong>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="./docs/assets/3-bonsai-playground.png">
+        <img src="./docs/assets/3-bonsai-playground.png" alt="Bonsai Playground view" width="360">
+      </a>
+      <br>
+      <strong>Playground</strong>
+    </td>
+    <td align="center">
+      <a href="./docs/assets/4-bonsai-audit.png">
+        <img src="./docs/assets/4-bonsai-audit.png" alt="Bonsai Audit view" width="360">
+      </a>
+      <br>
+      <strong>Audit</strong>
+    </td>
+  </tr>
+</table>
+
 
 ## Quick Start
 
+The fastest way to get Bonsai running locally is through the compose stack
+
 ```bash
-git clone https://github.com/your-org/bonsai-backend.git
-cd bonsai-backend
+git clone https://github.com/utter-one/bonsai.git
+cd bonsai/compose
 
-cp .env.example .env
-# Edit .env — set DB_CONNECTION_STRING and JWT_SECRET at minimum
+cp env.example .env
+# Set JWT_SECRET to a random value of at least 32 characters
+# Change POSTGRES_PASSWORD before using this outside local development
 
-npm install
-npm run dev
+docker compose up -d
 ```
 
-The server starts on `http://localhost:3000` by default.
+Once the stack is up:
 
-## Environment Variables
+- Console admin panel: `http://localhost`
+- Backend API: `http://localhost:3000`
+- Swagger UI: `http://localhost:3000/api-docs`
+- VitePress docs: `http://localhost:8080`
 
-| Variable | Required | Description | Default |
-|---|---|---|---|
-| `DB_CONNECTION_STRING` | Yes | PostgreSQL connection string | `postgresql://postgres:...@localhost:5432/bonsai` |
-| `JWT_SECRET` | Yes | Secret for signing JWTs (minimum 32 characters) | — |
-| `PORT` | No | HTTP server port | `3000` |
-| `NODE_ENV` | No | Runtime environment (`development` / `production`) | `development` |
-| `DB_POOL_SIZE` | No | Database connection pool size | `10` |
-| `DB_SSL` | No | Enable SSL for the database connection | `true` |
-| `CORS_ORIGIN` | No | Allowed CORS origin | `*` |
+For the full setup details, configuration options,  see [`compose/README.md`](./compose/README.md).
 
-## Scripts
+## Who is Bonsai for?
 
-| Script | Description |
+### For brands
+
+Brands do not need a chatbot that "usually behaves". They need an agent that protects tone of voice, respects boundaries, and stays aligned with approved messaging. Bonsai helps with that through:
+
+- structured multi-stage conversations instead of one giant prompt
+- reusable agents for personality and voice
+- approved FAQ-style knowledge injection
+- project-wide guardrails that fire on every stage
+- content moderation before the main AI pipeline
+- prescripted or generated responses depending on the risk level
+
+### For enterprises
+
+Enterprises need more than generation quality. They need governance, traceability, security, and operational visibility. Bonsai includes:
+
+- JWT-based operator auth plus project-scoped API keys
+- RBAC permissions across operators, content, infrastructure, audit, and analytics
+- immutable audit logs with before/after snapshots
+- issue tracking linked to exact conversations, sessions, stages, and events
+- latency analytics and per-conversation timing timelines
+- environment records and migration workflows for moving configuration between instances
+- optimistic locking on mutable entities to prevent silent overwrites
+
+### For product and engineering teams
+
+Bonsai is headless. You can bring your own frontend, channel, or client application while keeping one backend model for configuration, orchestration, and runtime:
+
+- REST API for administration
+- WebSocket API for live voice and text sessions
+- generated OpenAPI and JSON Schema contracts
+- sandboxed scripts, webhooks, and LLM-powered tools
+- provider portability across LLM, ASR, TTS, moderation, and storage
+
+## The Model
+
+Bonsai is built around a project model for conversational applications:
+
+```text
+Project  
+│  
+├── Agents                  ← who speaks (persona, ToV, behavior)  
+├── Stages                  ← conversation/runtime states  
+│   └── Stage  
+│       ├── General         ← basic stage configuration  
+│       ├── Prompt          ← stage instructions / prompt template  
+│       ├── Features        ← enabled capabilities for this stage  
+│       ├── Memory          ← stage-level memory settings  
+│       ├── Actions         ← actions available in this stage  
+│       ├── Lifecycle       ← transitions, enter/exit behavior  
+├── Classifiers             ← input / intent / routing / safety classification  
+├── Global Actions          ← actions available across the project  
+├── Guardrails & Moderation ← moderation and enforced policies  
+├── Context Transformers    ← context shaping / enrichment before inference  
+├── Global Memory  
+│   ├── User Profile        ← persistent user profile schema  
+│   └── Constants           ← project-wide constants  
+├── Knowledge               ← approved knowledge, grounding, glossary  
+└── Tools                   ← registered callable capabilities (tools for the frontend)
+
+Shared infrastructure
+├── Providers
+│   ├── LLM
+│   ├── TTS
+│   ├── ASR
+│   └──Storage
+└── Environments
+```
+
+In practice, that means you can model a conversational experience as explicit stages, attach the right personality and voice to each stage, classify user intent, extract structured context, run effects, call tools or webhooks, and stream the result back over WebSocket.
+
+## How a Turn Works
+
+```text
+Voice or text input
+  -> ASR (if voice)
+  -> Moderation
+  -> Classifiers + Guardrails + Context Transformers (in parallel)
+  -> Actions and Effects
+     - scripts
+     - webhooks
+     - tools
+     - variable updates
+     - user profile updates
+     - stage navigation
+  -> LLM response generation
+  -> TTS synthesis (if voice output is enabled)
+  -> streamed text and audio back to the client
+```
+
+Each conversation stores state, variables, events, artifacts, and timing data, so teams can inspect what happened after the fact instead of treating production as a black box.
+
+## Core Capabilities
+
+- **Structured conversation design**: Build flows with projects, stages, agents, classifiers, transformers, actions, and lifecycle hooks.
+- **Real-time voice and text runtime**: Run live sessions over WebSocket with streaming transcription, streamed AI output, and streamed voice.
+- **Explicit behavior orchestration**: Use effects such as `go_to_stage`, `run_script`, `call_webhook`, `call_tool`, `modify_variables`, `modify_user_profile`, `generate_response`, `end_conversation`, and `abort_conversation`.
+- **Reusable cross-stage behaviors**: Define global actions once and attach them across stages, including lifecycle hooks like `conversation_start` and `conversation_end`.
+- **Always-on guardrails**: Enforce project-level safety or policy rules on every stage through a shared guardrail classifier.
+- **Content moderation**: Screen user input before the main pipeline and route blocked content through a dedicated moderation hook.
+- **Knowledge grounding**: Attach FAQ-style knowledge categories and items to stages using tags, so the model answers from approved material.
+- **Context extraction and flow control**: Run LLM-powered context transformers in parallel with classifiers to write typed values into stage state.
+- **Voice configuration**: Configure agent-level TTS settings and optional filler responses to reduce perceived latency.
+- **Observability and operations**: Track conversations, events, artifacts, issues, audit logs, and latency analytics.
+- **Environment promotion**: Preview and pull configuration from remote Bonsai instances into the current one.
+- **Schema-first integration**: Generate and expose OpenAPI and WebSocket JSON Schema contracts for tooling and client generation.
+
+## Currently Supported Providers
+
+| Type | Providers |
 |---|---|
-| `npm run dev` | Generate schemas, run migrations, start development server |
+| `LLM` | OpenAI, OpenAI legacy chat completions, Anthropic, Gemini, Groq, Mistral, DeepSeek, OpenRouter, Together AI, Fireworks AI, Perplexity, Cohere, and xAI |
+| `TTS` | ElevenLabs, OpenAI, Azure, Deepgram, Cartesia, and Amazon Polly |
+| `ASR` | Azure, ElevenLabs, Deepgram, AssemblyAI, and Speechmatics |
+| `Storage` | S3, Azure Blob Storage, Google Cloud Storage, and local filesystem storage |
+
+## API Surfaces
+
+### REST API
+
+The REST API is used for administration and configuration:
+
+- base path: `/api`
+- authentication: JWT bearer tokens
+- interactive docs: `/api-docs`
+- machine-readable schema: `/openapi.json`
+
+Use it to manage projects, stages, agents, classifiers, context transformers, tools, global actions, guardrails, knowledge, providers, users, conversations, issues, environments, migration, audit logs, analytics, and more.
+
+### WebSocket API
+
+The WebSocket API is used for live sessions:
+
+- endpoint: `/ws`
+- authentication: project-scoped API key sent in the `auth` message
+- schema: `/websocket-contracts.json`
+
+Use it to authenticate sessions, start or resume conversations, stream user voice input, send text input, receive AI text and audio output, inspect conversation events, run actions, call tools, and control stage navigation.
+
+## Documentation
+
+- [Compose quick start](./compose/README.md)
+- [Guide](./docs/guide/index.md)
+- [API reference](./docs/api/index.md)
+- [Contributing](./CONTRIBUTING.md)
+- [Security policy](./SECURITY.md)
+
+## Repository Layout
+
+| Path | Purpose |
+|---|---|
+| `src/` | Application runtime, controllers, services, providers, WebSocket host, and utilities |
+| `docs/` | VitePress documentation source for the guide and API reference |
+| `compose/` | Fast local stack for backend, console, docs, and PostgreSQL |
+| `drizzle/` | Database migrations and schema snapshots |
+| `schemas/` | Generated WebSocket JSON Schema contracts |
+
+## Development Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Generate WebSocket schema, run migrations, and start the server |
 | `npm start` | Run migrations and start the server |
-| `npm run build` | Regenerate WebSocket JSON Schema and compile TypeScript |
-| `npm run db:generate` | Generate a new Drizzle migration from schema changes |
-| `npm run db:migrate` | Apply pending migrations to the database |
-| `npm run db:studio` | Open Drizzle Studio to browse the database |
+| `npm run build` | Generate WebSocket schema and compile TypeScript |
+| `npm run db:generate` | Generate a new Drizzle migration |
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:push` | Push schema changes directly with Drizzle |
+| `npm run db:studio` | Open Drizzle Studio |
 | `npm run schemas:generate` | Regenerate `schemas/websocket-contracts.json` |
 
-## Docker
+## Tech Stack
 
-```bash
-docker build -t bonsai-backend .
-
-docker run -p 3000:3000 \
-  -e DB_CONNECTION_STRING="postgresql://user:pass@host:5432/bonsai" \
-  -e JWT_SECRET="your-secret-key-min-32-chars" \
-  bonsai-backend
-```
-
-Database migrations run automatically on container startup before the application starts. The container exposes a health check endpoint at `GET /health`.
-
-## API & Documentation
-
-- **Full documentation** — see the [docs/](docs/) directory (built with VitePress)
-- **Swagger UI** — available at `/api-docs` when the server is running
-- **OpenAPI spec** — available at `/openapi.json`
-- **WebSocket contracts** — JSON Schema available at `/websocket-contracts.json`
+- Node.js and TypeScript
+- Express for the REST API
+- `ws` for real-time WebSocket communication
+- PostgreSQL with Drizzle ORM
+- Zod for contracts and OpenAPI generation
+- `tsyringe` for dependency injection
+- `isolated-vm` for sandboxed scripts
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE)
+Licensed under the [Apache License 2.0](./LICENSE).
