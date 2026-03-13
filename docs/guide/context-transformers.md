@@ -107,6 +107,7 @@ Watch trigger conditions:
 - **`new`** — The variable was not set before and now has a value
 - **`changed`** — The variable's value has changed
 - **`removed`** — The variable was removed (set to null)
+- **`any`** — Triggers on any of the above: creation, change, or removal
 
 ## Use Cases
 
