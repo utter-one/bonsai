@@ -359,7 +359,7 @@ export class ProjectExchangeService extends BaseService {
       const p = v1.project;
       await tx.insert(projects).values({
         id: newProjectId,
-        name: p.name,
+        name: p.name + ` (imported ${new Date().toLocaleString()})`,
         description: p.description ?? null,
         asrConfig: p.asrConfig ? {
           asrProviderId: resolveHint(p.asrConfig.asrHint) ?? undefined,
