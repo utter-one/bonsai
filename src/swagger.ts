@@ -80,6 +80,8 @@ import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
 import { MigrationController } from './http/controllers/MigrationController';
 import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
+import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
+import { providerHintSchema, providerHintResolutionTargetSchema, providerHintResolutionSchema, asrConfigExchangeV1Schema, storageConfigExchangeV1Schema, moderationConfigExchangeV1Schema, fillerSettingsExchangeV1Schema, projectExchangeV1Schema, agentExchangeV1Schema, stageExchangeV1Schema, classifierExchangeV1Schema, contextTransformerExchangeV1Schema, toolExchangeV1Schema, globalActionExchangeV1Schema, guardrailExchangeV1Schema, knowledgeCategoryExchangeV1Schema, knowledgeItemExchangeV1Schema, projectExchangeBundleV1Schema, projectExchangeImportResultSchema } from './http/contracts/projectExchange';
 
 extendZodWithOpenApi(z);
 
@@ -425,6 +427,31 @@ export function getOpenAPISpec(): any {
   registry.register('ExportBundle', exportBundleSchema);
   const migrationPaths = MigrationController.getOpenAPIPaths();
   for (const path of migrationPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Project Exchange schemas and routes
+  registry.register('ProviderHint', providerHintSchema);
+  registry.register('ProviderHintResolutionTarget', providerHintResolutionTargetSchema);
+  registry.register('ProviderHintResolution', providerHintResolutionSchema);
+  registry.register('AsrConfigExchangeV1', asrConfigExchangeV1Schema);
+  registry.register('StorageConfigExchangeV1', storageConfigExchangeV1Schema);
+  registry.register('ModerationConfigExchangeV1', moderationConfigExchangeV1Schema);
+  registry.register('FillerSettingsExchangeV1', fillerSettingsExchangeV1Schema);
+  registry.register('ProjectExchangeV1', projectExchangeV1Schema);
+  registry.register('AgentExchangeV1', agentExchangeV1Schema);
+  registry.register('StageExchangeV1', stageExchangeV1Schema);
+  registry.register('ClassifierExchangeV1', classifierExchangeV1Schema);
+  registry.register('ContextTransformerExchangeV1', contextTransformerExchangeV1Schema);
+  registry.register('ToolExchangeV1', toolExchangeV1Schema);
+  registry.register('GlobalActionExchangeV1', globalActionExchangeV1Schema);
+  registry.register('GuardrailExchangeV1', guardrailExchangeV1Schema);
+  registry.register('KnowledgeCategoryExchangeV1', knowledgeCategoryExchangeV1Schema);
+  registry.register('KnowledgeItemExchangeV1', knowledgeItemExchangeV1Schema);
+  registry.register('ProjectExchangeBundleV1', projectExchangeBundleV1Schema);
+  registry.register('ProjectExchangeImportResult', projectExchangeImportResultSchema);
+  const projectExchangePaths = ProjectExchangeController.getOpenAPIPaths();
+  for (const path of projectExchangePaths) {
     registry.registerPath(path);
   }
 
