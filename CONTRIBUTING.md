@@ -18,7 +18,7 @@ By contributing, you agree that your contributions will be licensed under the **
 ## Branches & Versions
 - We create PRs to `dev` branch
 - `main` branch is where the production code lives
-- For each public release there'a a version tag: `vX.Y.Z`
+- For each public release there's a version tag: `vX.Y.Z`
 
 ## Code of conduct
 Be respectful. Assume good intent. We want a welcoming community.
