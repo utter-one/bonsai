@@ -102,6 +102,14 @@ export function createApp(): express.Application {
     res.send(JSON.stringify(swaggerSpec, null, 2));
   });
 
+  // LLMs.txt — AI-friendly API reference
+  app.get('/llms.txt', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    const llmsUrl = new URL('../llms.txt', import.meta.url);
+    const llmsPath = fileURLToPath(llmsUrl);
+    res.sendFile(llmsPath);
+  });
+
   // WebSocket Contracts JSON Schema endpoint
   app.get('/websocket-contracts.json', (req, res) => {
     res.setHeader('Content-Type', 'application/json');

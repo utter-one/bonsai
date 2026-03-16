@@ -1,0 +1,392 @@
+# Bonsai - Conversational AI Platform
+
+> Bonsai is a self-hosted platform for designing, deploying, and managing conversational AI agents. It supports multiple LLM providers, knowledge-grounded responses, guardrails, and real-time WebSocket conversations.
+
+Full API documentation: /api-docs (Swagger UI) | /openapi.json (OpenAPI 3.0 spec)
+
+## Architecture
+
+Bonsai uses a resource chain to build conversational agents:
+
+```
+Provider → Project → Agent → Stage → [Knowledge, Guardrails] → API Key
+```
+
+- **Provider**: An LLM connection (Gemini, OpenAI, Anthropic, etc.)
+- **Project**: A container for agents, stages, knowledge, and guardrails
+- **Agent**: A persona with a name and base prompt
+- **Stage**: The core conversation unit — links an agent to an LLM provider with a system prompt, knowledge, and actions
+- **Knowledge**: FAQ-style question/answer pairs organized in categories
+- **Guardrail**: Safety rules with effects (warn, block, redirect, etc.)
+- **API Key**: Project-scoped key for WebSocket client authentication
+
+## Authentication
+
+### Operator (REST API)
+```
+POST /api/auth/login
+Body: { "id": "email@example.com", "password": "..." }
+Returns: { "accessToken": "...", "refreshToken": "...", "expiresIn": 64800 }
+```
+Use: `Authorization: Bearer <accessToken>` on all API calls.
+
+### Client (WebSocket)
+Connect to `/ws`, then send: `{ "type": "auth", "apiKey": "akey_live_..." }`
+
+## Initial Setup
+
+The first operator is created via a one-time endpoint (auto-locks after first use):
+
+```
+POST /api/setup/initial-operator
+Body: { "id": "email@example.com", "name": "Admin", "password": "min-8-chars" }
+```
+
+## Quick Start: Create Your First Agent
+
+### 1. Create a Provider
+
+```
+POST /api/providers
+{
+  "name": "My LLM",
+  "providerType": "llm",          // required: "asr" | "tts" | "llm" | "embeddings" | "storage"
+  "apiType": "gemini",             // required: provider implementation name
+  "config": { "apiKey": "..." }    // required: provider-specific config object (see below)
+}
+```
+
+### 2. Create a Project
+
+```
+POST /api/projects
+{
+  "name": "my-project",            // required
+  "description": "...",            // optional
+  "acceptVoice": false,            // optional, default: true
+  "generateVoice": false,          // optional, default: true
+  "autoCreateUsers": true          // optional, default: false — auto-creates users on first WebSocket connect
+}
+```
+
+### 3. Create an Agent
+
+```
+POST /api/projects/{projectId}/agents
+{
+  "name": "My Agent",              // required
+  "prompt": "You are a helpful assistant."  // required
+}
+```
+
+### 4. Create a Stage
+
+The stage is where the LLM provider, agent, system prompt, and knowledge come together.
+
+```
+POST /api/projects/{projectId}/stages
+{
+  "name": "Main Chat",             // required
+  "prompt": "System prompt here",  // required — the main system prompt for this stage
+  "llmProviderId": "prov_...",     // required — ID from step 1
+  "agentId": "agnt_...",           // required — ID from step 3
+  "llmSettings": {                 // required — provider-specific settings
+    "model": "gemini-2.0-flash",
+    "defaultTemperature": 0.7,
+    "defaultMaxTokens": 1024
+  },
+  "useKnowledge": true,            // optional, default: false
+  "enterBehavior": "generate_response"  // optional: "generate_response" | "await_user_input"
+}
+```
+
+### 5. Add Knowledge (Optional)
+
+Categories need a `promptTrigger` — the phrase that tells the LLM when to use this category:
+
+```
+POST /api/projects/{projectId}/knowledge/categories
+{
+  "name": "FAQ",                           // required
+  "promptTrigger": "When the user asks about features or pricing"  // required
+}
+```
+
+```
+POST /api/projects/{projectId}/knowledge/items
+{
+  "categoryId": "kcat_...",        // required
+  "question": "What does it cost?", // required
+  "answer": "It's free during beta." // required
+}
+```
+
+### 6. Create an API Key
+
+```
+POST /api/projects/{projectId}/api-keys
+{
+  "name": "Widget Key",            // required
+  "metadata": {}                   // required (even if empty)
+}
+```
+
+The `key` field (e.g., `akey_live_...`) is only returned once at creation. Save it immediately.
+
+## Provider Config Schemas
+
+Each provider type requires a specific `config` object:
+
+### Gemini (apiType: "gemini")
+```json
+{ "config": { "apiKey": "AIza..." } }
+```
+LLM settings: `model`, `defaultTemperature` (0-2), `defaultMaxTokens`, `defaultTopP` (0-1), `defaultTopK`, `thinkingLevel` ("minimal"|"low"|"medium"|"high"), `thinkingBudget` (-1 dynamic, 0 disable, 128-32768), `timeout`
+
+### OpenAI (apiType: "openai")
+```json
+{ "config": { "apiKey": "sk-...", "organizationId": "optional", "baseUrl": "optional" } }
+```
+LLM settings: `model`, `defaultTemperature` (0-2), `defaultMaxTokens`, `defaultTopP` (0-1), `reasoningEffort` ("none"|"minimal"|"low"|"medium"|"high"|"xhigh"), `reasoningSummary` ("auto"|"concise"|"detailed"), `timeout`
+
+### Anthropic (apiType: "anthropic")
+```json
+{ "config": { "apiKey": "sk-ant-...", "baseUrl": "optional" } }
+```
+LLM settings: `model`, `defaultTemperature` (0-1), `defaultMaxTokens`, `defaultTopP` (0-1), `thinkingMode` ("enabled"|"adaptive"), `thinkingBudgetTokens` (min 1024), `timeout`
+
+## Guardrails
+
+Guardrails are project-level safety rules evaluated by a **guardrail classifier** on every user input turn. They work alongside the system prompt but provide enforced protection — the LLM can't ignore them.
+
+**Setup requires two pieces:**
+1. A classifier assigned as the project's `defaultGuardrailClassifierId`
+2. Guardrails with `classificationTrigger` labels matching the classifier's output
+
+```
+POST /api/projects/{projectId}/guardrails
+{
+  "name": "No PHI",                            // required
+  "classificationTrigger": "phi_detected",     // matches classifier output label
+  "effects": [{                                // what happens when triggered
+    "type": "modify_user_input",
+    "template": "Please do not share patient information. I can only help with questions about the platform."
+  }],
+  "examples": [                                // training examples for the classifier
+    "my patient John Smith has depression",
+    "SSN 123-45-6789"
+  ]
+}
+```
+
+**Effect types and their required fields:**
+- `modify_user_input` — `{ "type": "modify_user_input", "template": "replacement text" }` (uses `template`, NOT `script` or `config`)
+- `end_conversation` — `{ "type": "end_conversation" }`
+- `abort_conversation` — `{ "type": "abort_conversation" }`
+- `go_to_stage` — `{ "type": "go_to_stage", "stageId": "stag_..." }`
+- `run_script` — `{ "type": "run_script", "script": "...", "resultKey": "..." }`
+- `call_webhook` — `{ "type": "call_webhook", "url": "...", "method": "POST", "headers": {...}, "body": {...}, "resultKey": "..." }`
+- `modify_variables` — `{ "type": "modify_variables", "operations": [...] }`
+- `modify_user_profile` — `{ "type": "modify_user_profile", "operations": [...] }`
+- `call_tool` — `{ "type": "call_tool", "toolId": "..." }`
+- `generate_response` — `{ "type": "generate_response" }`
+
+**Guardrails vs Moderation:**
+- **Moderation** = pre-pipeline safety net using provider APIs (OpenAI/Mistral moderation endpoints). Configured at project level via `moderationConfig`. Screens for harmful content categories (hate, violence, self-harm, etc.).
+- **Guardrails** = custom business rules evaluated by your classifier. For things like PHI detection, no clinical advice, no competitor disparagement — rules specific to your domain.
+
+**Classifier for both guardrails and actions:**
+A single classifier can serve double duty — assign it as both the project's `defaultGuardrailClassifierId` (for guardrails) and a stage's `defaultClassifierId` (for actions). The classifier prompt should output labels matching both guardrail triggers and action triggers.
+
+## Common Gotchas
+
+1. **Provider `config` is a nested object**, not flat fields. `{ "config": { "apiKey": "..." } }` not `{ "apiKey": "..." }`
+2. **Knowledge categories require `promptTrigger`** — a string describing when the category applies
+3. **API key creation requires `metadata: {}`** — even if empty, it must be present
+4. **Initial operator uses `id` not `email`** — the `id` field is the unique identifier (typically email)
+5. **Update/delete operations require `version`** for optimistic locking
+6. **Stage `llmSettings` varies by provider** — use the correct schema for your provider's apiType
+7. **All IDs are auto-generated** with prefixes: `prov_`, `proj_`, `agnt_`, `stag_`, `kcat_`, `kitm_`, `akey_`, `grl_`
+8. **The `/api/setup/initial-operator` endpoint auto-locks** after the first operator is created
+9. **Guardrail effects use `template`** not `script` or `config` for `modify_user_input`
+10. **Guardrails need a guardrail classifier** — create a classifier and set it as `defaultGuardrailClassifierId` on the project, or guardrails won't fire
+11. **Classifier output must be JSON** — format: `{"actions": {"action_name": {"param": "value"}}}`. Plain text labels like `lead_signup` won't work. The action name in the JSON must match the `name` field of the global action or guardrail (not the `classificationTrigger`)
+12. **Classifier `defaultMaxTokens` must be large enough** for JSON output — 50 tokens is too small, use 256+. Gemini wraps output in markdown code blocks which eats tokens
+13. **Global action `name` must match classifier output** — Bonsai matches actions by `name`, not `classificationTrigger`. If your classifier outputs `{"actions": {"lead_signup": {}}}`, the global action must be named `lead_signup`
+14. **Global actions must be listed on the stage** — set `globalActions: ["gact_..."]` on the stage, not just `useGlobalActions: true`. An empty array means no global actions are active
+15. **Webhook body Handlebars path** — action parameters are at `{{actions.<action_name>.parameters.<param>}}`, not `{{parameters.<param>}}` or `{{action.parameters.<param>}}`
+16. **Console `VITE_API_BASE_URL`** — must be set in `.env.production` (not `.env` which is dockerignored, and not `--build-arg` which the Dockerfile doesn't accept)
+17. **CORS `credentials: true` blocks wildcard** — `CORS_ORIGIN=*` doesn't work when the backend sets `credentials: true`. Use a specific origin URL
+18. **Actions need `generate_response` effect** — if a global action or guardrail has effects like `call_webhook`, the conversation will hang unless you also add a `generate_response` effect. Without it, Bonsai runs the effects but never tells the LLM to respond
+19. **Webhook `call_webhook` is synchronous** — Bonsai waits for the webhook to respond before proceeding. If your webhook endpoint is slow (cold starts, external API calls), it blocks the entire turn. Make your webhook respond immediately (`res.json({success: true})`) and process async
+20. **Multi-turn parameter capture** — the classifier only fires actions when its trigger conditions are met (e.g., email detected). Parameters collected across multiple messages (e.g., name+email in one turn, EHR in the next) won't all land in one action execution. Capture what you can in the triggering message; the rest is in conversation history
+21. **Same classifier for guardrails and actions causes conflicts** — use separate classifiers for the project `defaultGuardrailClassifierId` and the stage `defaultClassifierId`. A shared classifier can cause guardrails to interfere with action execution (e.g., email addresses triggering PHI detection)
+
+## WebSocket Protocol
+
+Connect: `wss://your-host/ws`
+
+The conversation flow requires three phases: authenticate → start conversation → exchange messages.
+
+```
+// 1. Authenticate with project API key
+→ { "type": "auth", "apiKey": "akey_live_..." }
+← { "type": "auth", "success": true, "sessionId": "session_abc123", "projectSettings": {...} }
+
+// 2. Start a conversation (requires sessionId, userId, stageId)
+→ { "type": "start_conversation", "sessionId": "session_abc123", "userId": "user-1", "stageId": "stag_..." }
+← { "type": "conversation_event", "eventType": "conversation_start", ... }
+← { "type": "start_ai_generation_output", ... }         // AI starts generating
+← { "type": "ai_transcribed_chunk", "chunkText": "Hi" } // Streaming text chunks
+← { "type": "ai_transcribed_chunk", "chunkText": "!" }
+← { "type": "end_ai_generation_output", "fullText": "Hi!" }  // Complete response
+← { "type": "start_conversation", "success": true, "conversationId": "conv_..." }  // NOTE: arrives AFTER greeting
+
+// 3. Send user text (requires sessionId + conversationId)
+→ { "type": "send_user_text_input", "sessionId": "session_abc123", "conversationId": "conv_...", "text": "Hello" }
+← { "type": "start_ai_generation_output", ... }
+← { "type": "ai_transcribed_chunk", "chunkText": "..." }  // One or more chunks
+← { "type": "end_ai_generation_output", "fullText": "..." }
+```
+
+**Key gotchas:**
+1. `start_conversation` response arrives AFTER the greeting messages (if `enterBehavior` is `generate_response`)
+2. Streaming uses `ai_transcribed_chunk` (NOT `output_text`) with `chunkText` field
+3. Use `end_ai_generation_output` with `fullText` for the complete response
+4. `conversationId` comes from the `start_conversation` response, not the `conversation_event`
+
+See `/websocket-contracts.json` for the full WebSocket message schema.
+
+## Classifiers and Actions
+
+To trigger automated actions (like lead capture webhooks), you need:
+
+1. **A classifier** — an LLM-based intent detector assigned to a stage via `defaultClassifierId`
+2. **A global action** — with a `classificationTrigger` matching the classifier's output label
+3. **Effects** — what happens when the action triggers (e.g., `call_webhook`)
+4. **Parameters** — data extracted from user input and passed to effects via `{{parameters.name}}`
+
+```
+POST /api/projects/{projectId}/classifiers
+{
+  "name": "Intent Classifier",
+  "llmProviderId": "prov_...",           // required
+  "llmSettings": { "model": "..." },    // required
+  "prompt": "Classify the user message. If it contains an email, output: lead_signup\nOtherwise: none"
+}
+```
+
+```
+POST /api/projects/{projectId}/global-actions
+{
+  "name": "Capture Lead",
+  "classificationTrigger": "lead_signup",
+  "parameters": [
+    { "name": "email", "type": "string", "description": "Email address", "required": true }
+  ],
+  "effects": [{
+    "type": "call_webhook",
+    "url": "https://your-webhook-url.com",
+    "method": "POST",
+    "headers": { "Content-Type": "application/json" },
+    "body": { "email": "{{parameters.email}}" },
+    "resultKey": "webhook_result"
+  }],
+  "examples": ["my email is jane@example.com", "you can reach me at test@test.com"]
+}
+```
+
+Then link the classifier to your stage:
+```
+PUT /api/projects/{projectId}/stages/{stageId}
+{ "version": N, "defaultClassifierId": "clas_..." }
+```
+
+## Testing Your Agent
+
+### Quick Test: Python CLI Chat
+
+Save this as `chat.py` and run with `python3 chat.py`:
+
+```python
+import asyncio, json, sys
+import websockets  # pip install websockets
+
+WS_URL = "wss://your-host/ws"
+API_KEY = "akey_live_..."
+STAGE_ID = "stag_..."
+
+async def chat():
+    async with websockets.connect(WS_URL) as ws:
+        # Auth
+        await ws.send(json.dumps({"type": "auth", "apiKey": API_KEY}))
+        resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+        sid = resp["sessionId"]
+
+        # Start conversation
+        await ws.send(json.dumps({
+            "type": "start_conversation", "sessionId": sid,
+            "userId": "tester", "stageId": STAGE_ID
+        }))
+
+        # Collect greeting + conversation ID
+        conv_id = None
+        while True:
+            data = json.loads(await asyncio.wait_for(ws.recv(), timeout=20))
+            if data.get("type") == "start_conversation":
+                conv_id = data.get("conversationId")
+            if data.get("type") == "end_ai_generation_output":
+                print(f"Agent: {data['fullText']}")
+                break
+
+        # Wait for start_conversation if not yet received
+        if not conv_id:
+            data = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
+            conv_id = data.get("conversationId")
+
+        # Chat loop
+        while True:
+            text = input("You: ")
+            await ws.send(json.dumps({
+                "type": "send_user_text_input", "sessionId": sid,
+                "conversationId": conv_id, "text": text
+            }))
+            while True:
+                data = json.loads(await asyncio.wait_for(ws.recv(), timeout=20))
+                if data.get("type") == "end_ai_generation_output":
+                    print(f"Agent: {data['fullText']}")
+                    break
+
+asyncio.run(chat())
+```
+
+### Quick Test: Embeddable HTML Widget
+
+Create a test page to preview the chat widget:
+
+```html
+<!DOCTYPE html>
+<html>
+<head><title>Chat Widget Test</title></head>
+<body>
+  <h1>Chat Widget Test</h1>
+  <script
+    src="./pablo-chat.js"
+    data-ws-url="wss://your-host/ws"
+    data-api-key="akey_live_..."
+    data-stage-id="stag_...">
+  </script>
+</body>
+</html>
+```
+
+The widget creates a floating chat bubble (bottom-right by default). Add `data-position="bottom-left"` to change sides.
+
+## Resources
+
+- OpenAPI spec: `GET /openapi.json`
+- Swagger UI: `GET /api-docs`
+- WebSocket contracts: `GET /websocket-contracts.json`
+- LLM-friendly reference: `GET /llms.txt`
+- Health check: `GET /health`
+- Version: `GET /version`
