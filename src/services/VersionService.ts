@@ -75,11 +75,11 @@ export class VersionService {
     const environment = process.env.NODE_ENV ?? 'dev';
     let suffix = '';
     if (environment !== 'production') { 
-      suffix = environment ? 'dev' : '';
+      suffix = environment ? `${environment}-` : '';
       if (!commitHash) {
-        suffix += `-${Date.now()}+local`;
+        suffix += `${Date.now()}+local`;
       } else {
-        suffix += `-${commitHash.slice(0, 7)}`;
+        suffix += `${commitHash.slice(0, 7)}`;
       }
     }
 
