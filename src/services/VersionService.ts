@@ -55,7 +55,7 @@ export class VersionService {
       version: this.readPackageVersion() + this.getVersionSuffix(),
       restSchemaHash: this.hashRestSchema(),
       wsSchemaHash: this.hashWsSchema(),
-      gitCommit: process.env.GIT_COMMIT ?? null,
+      gitCommit: process.env.GIT_COMMIT ?? process.env.SOURCE_COMMIT,
     };
   }
 
