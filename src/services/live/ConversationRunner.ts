@@ -691,6 +691,7 @@ export class ConversationRunner {
 
   async startConversation() {
     this.responseGeneratedInTurn = false;
+    this.resetTurnData();
     if (this.conversation.status !== 'initialized') {
       throw new Error(`Cannot start conversation in current state: ${this.conversation.status}`);
     }
@@ -945,6 +946,11 @@ export class ConversationRunner {
     this.navigationDepth++;
     if (isTopLevel) {
       this.responseGeneratedInTurn = false;
+      // Only reset turn timing for top-level (client-initiated) navigation; internal goToStage
+      // calls triggered mid-turn by applyActionOutcome must preserve the ongoing turn's data.
+      if (!isProcessingUserInput) {
+        this.resetTurnData();
+      }
     }
 
     try {
@@ -1204,9 +1210,10 @@ export class ConversationRunner {
       throw new Error(`Cannot run action in current state: ${this.conversation.status}`);
     }
 
-    // Reset the per-turn response guard so a client-initiated action can generate a response,
+    // Reset per-turn data so timing fields are clean for this client-initiated action turn,
     // just like processUserInput does at the start of each user turn.
     this.responseGeneratedInTurn = false;
+    this.resetTurnData();
 
     // Load the action from the database
     const globalAction = await db.query.globalActions.findFirst({
@@ -1395,11 +1402,11 @@ export class ConversationRunner {
    * @param userInputSource Whether the input is text or voice
    * @param asrEndMs Unix timestamp (ms) when ASR recognition completed, if applicable
    */
-  private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
-    this.responseGeneratedInTurn = false;
-    const nextTurnIndex = this.turnData.turnIndex + 1;
-    const asrDurationMs = asrEndMs && this.turnData.asrStartMs !== null ? asrEndMs - this.turnData.asrStartMs : null;
-    // Reset per-turn data, preserving inputTurnId which was assigned before processUserInput was called
+  /**
+   * Resets the response-timing fields of turnData for a new turn, preserving correlation IDs.
+   * Called at the start of every entry point that may lead to generateResponse.
+   */
+  private resetTurnData(): void {
     this.turnData = {
       inputTurnId: this.turnData.inputTurnId,
       outputTurnId: undefined,
@@ -1412,8 +1419,15 @@ export class ConversationRunner {
       moderationDurationMs: null,
       asrStartMs: null,
       ttsStartMs: null,
-      turnIndex: nextTurnIndex,
+      turnIndex: this.turnData.turnIndex + 1,
     };
+  }
+
+  private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
+    this.responseGeneratedInTurn = false;
+    // Capture asrStartMs before resetting turnData so we can compute asrDurationMs
+    const asrDurationMs = asrEndMs && this.turnData.asrStartMs !== null ? asrEndMs - this.turnData.asrStartMs : null;
+    this.resetTurnData();
     const asrDurationMsValue = asrDurationMs && asrDurationMs > 0 ? asrDurationMs : undefined;
     await this.changeState('processing_user_input');
 
