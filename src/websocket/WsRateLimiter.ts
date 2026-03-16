@@ -1,4 +1,5 @@
 import { singleton } from 'tsyringe';
+import { parseEnvInt } from '../utils/env';
 
 type WindowEntry = {
   count: number;
@@ -8,6 +9,7 @@ type WindowEntry = {
 /**
  * In-memory rate limiter for WebSocket authentication attempts.
  * Uses a fixed-window counter keyed by client IP address.
+ * Expired entries are periodically pruned to prevent unbounded memory growth.
  * Configurable via environment variables:
  * - RATE_LIMIT_WS_AUTH_WINDOW_MS: window duration in ms (default: 900000 = 15 minutes)
  * - RATE_LIMIT_WS_AUTH_MAX: max attempts per window per IP (default: 10)
@@ -17,10 +19,14 @@ export class WsRateLimiter {
   private readonly windowMs: number;
   private readonly max: number;
   private readonly entries: Map<string, WindowEntry> = new Map();
+  private pruneTimer: ReturnType<typeof setInterval>;
 
   constructor() {
-    this.windowMs = parseInt(process.env.RATE_LIMIT_WS_AUTH_WINDOW_MS ?? '900000', 10);
-    this.max = parseInt(process.env.RATE_LIMIT_WS_AUTH_MAX ?? '10', 10);
+    this.windowMs = parseEnvInt('RATE_LIMIT_WS_AUTH_WINDOW_MS', 900_000);
+    this.max = parseEnvInt('RATE_LIMIT_WS_AUTH_MAX', 10);
+    // Prune expired entries once per window to prevent unbounded map growth
+    this.pruneTimer = setInterval(() => this.pruneExpired(), this.windowMs);
+    this.pruneTimer.unref();
   }
 
   /**
@@ -53,4 +59,15 @@ export class WsRateLimiter {
     if (!entry) return 0;
     return Math.max(0, Math.ceil((entry.resetAt - Date.now()) / 1000));
   }
+
+  /** Removes entries whose windows have already expired. */
+  private pruneExpired(): void {
+    const now = Date.now();
+    for (const [ip, entry] of this.entries) {
+      if (now >= entry.resetAt) {
+        this.entries.delete(ip);
+      }
+    }
+  }
 }
+

@@ -53,7 +53,9 @@ export class ConversationServer {
     this.wss = new WebSocketServer({ server, path: '/ws', maxPayload });
 
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-      const clientIp = req.socket.remoteAddress ?? '';
+      // Prefer X-Forwarded-For when present (set by reverse proxies), fall back to socket address
+      const forwarded = req.headers['x-forwarded-for'];
+      const clientIp = (Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0]?.trim()) ?? req.socket.remoteAddress ?? '';
       this.connectionManager.trackSocketIp(ws, clientIp);
       logger.info({ ip: clientIp }, 'New WebSocket connection established');
 

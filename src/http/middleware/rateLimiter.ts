@@ -1,6 +1,7 @@
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import type { Request } from 'express';
 import { TooManyRequestsError } from '../../errors';
+import { parseEnvInt } from '../../utils/env';
 
 /**
  * Creates a rate limiter for authentication endpoints (login, refresh).
@@ -10,8 +11,8 @@ import { TooManyRequestsError } from '../../errors';
  */
 export function createAuthRateLimiter() {
   return rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS ?? '900000', 10),
-    max: parseInt(process.env.RATE_LIMIT_AUTH_MAX ?? '10', 10),
+    windowMs: parseEnvInt('RATE_LIMIT_AUTH_WINDOW_MS', 900_000),
+    max: parseEnvInt('RATE_LIMIT_AUTH_MAX', 10),
     keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ''),
     standardHeaders: 'draft-7',
     legacyHeaders: false,
@@ -30,8 +31,9 @@ export function createAuthRateLimiter() {
  */
 export function createApiRateLimiter() {
   return rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_API_WINDOW_MS ?? '60000', 10),
-    max: parseInt(process.env.RATE_LIMIT_API_MAX ?? '300', 10),
+    windowMs: parseEnvInt('RATE_LIMIT_API_WINDOW_MS', 60_000),
+    max: parseEnvInt('RATE_LIMIT_API_MAX', 300),
+    skip: (req: Request) => req.path === '/api/auth/login' || req.path === '/api/auth/refresh',
     keyGenerator: (req: Request) => req.user?.operatorId ?? ipKeyGenerator(req.ip ?? ''),
     standardHeaders: 'draft-7',
     legacyHeaders: false,

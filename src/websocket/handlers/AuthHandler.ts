@@ -32,6 +32,14 @@ export class AuthHandler implements WebSocketHandler<AuthRequest> {
   async handle(context: WebSocketHandlerContext, message: AuthRequest): Promise<void> {
     const ip = this.connectionManager.getSocketIp(context.ws);
 
+    // Reject re-authentication on an already-authenticated connection
+    if (context.connection) {
+      logger.warn({ requestId: message.requestId, sessionId: context.connection.id }, 'Auth message received on already-authenticated connection');
+      const response: AuthResponse = { type: 'auth', success: false, error: 'Already authenticated', requestId: message.requestId };
+      context.send(context.ws, response);
+      return;
+    }
+
     if (!this.wsRateLimiter.tryConsume(ip)) {
       const retryAfter = this.wsRateLimiter.getRetryAfterSeconds(ip);
       logger.warn({ requestId: message.requestId, ip, retryAfter }, 'WebSocket auth rate limit exceeded');
