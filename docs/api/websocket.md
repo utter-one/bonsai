@@ -84,6 +84,21 @@ All fields default to `true` if omitted.
 | `projectSettings` | `object` | Project settings (projectId, acceptVoice, generateVoice, asrConfig) |
 | `error` | `string` | Error message (on failure) |
 
+### Rate Limiting
+
+Authentication attempts are rate-limited per IP address to prevent API key brute-forcing. If the limit is exceeded, the server sends an error response and immediately closes the connection:
+
+```json
+{
+  "type": "auth",
+  "requestId": "req-1",
+  "success": false,
+  "error": "Too many authentication attempts, please try again later"
+}
+```
+
+The default limit is **10 attempts per 15 minutes** per IP. Configurable via `RATE_LIMIT_WS_AUTH_WINDOW_MS` and `RATE_LIMIT_WS_AUTH_MAX`.
+
 ---
 
 ## Session Lifecycle

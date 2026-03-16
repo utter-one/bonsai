@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError, ArchivedProjectError } from '../../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError, ArchivedProjectError, TooManyRequestsError } from '../../errors';
 import logger from '../../utils/logger';
 
 /**
@@ -10,6 +10,14 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
   if (err instanceof z.ZodError) {
     logger.error({ validationProblems: JSON.parse(err.message) }, 'Validation error');
     res.status(400).json({ error: 'Validation failed', details: err.issues });
+    return;
+  }
+
+  if (err instanceof TooManyRequestsError) {
+    if (!res.getHeader('Retry-After')) {
+      res.setHeader('Retry-After', '60');
+    }
+    res.status(429).json({ error: err.message });
     return;
   }
 

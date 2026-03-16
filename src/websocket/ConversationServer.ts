@@ -1,6 +1,8 @@
+import 'reflect-metadata';
 import { inject, singleton, container } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
+import type { IncomingMessage } from 'http';
 import { ConnectionManager } from './ConnectionManager';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common'
@@ -50,8 +52,12 @@ export class ConversationServer {
     const maxPayload = parseInt(process.env.WS_MAX_PAYLOAD_BYTES ?? String(10 * 1024 * 1024), 10);
     this.wss = new WebSocketServer({ server, path: '/ws', maxPayload });
 
-    this.wss.on('connection', (ws: WebSocket) => {
-      logger.info('New WebSocket connection established');
+    this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      // Prefer X-Forwarded-For when present (set by reverse proxies), fall back to socket address
+      const forwarded = req.headers['x-forwarded-for'];
+      const clientIp = (Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0]?.trim()) ?? req.socket.remoteAddress ?? '';
+      this.connectionManager.trackSocketIp(ws, clientIp);
+      logger.info({ ip: clientIp }, 'New WebSocket connection established');
 
       ws.on('message', (data: Buffer) => {
         this.handleMessage(ws, data);

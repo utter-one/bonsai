@@ -33,6 +33,7 @@ import { ConversationTimeoutService } from './services/ConversationTimeoutServic
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
+import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
 import { ConversationServer } from './websocket/ConversationServer';
@@ -49,6 +50,13 @@ setSpecProvider(getOpenAPISpec);
  */
 export function createApp(): express.Application {
   const app = express();
+
+  // Trust proxy headers when running behind a reverse proxy (nginx, load balancer, etc.)
+  // This ensures req.ip reflects the real client IP from X-Forwarded-For.
+  // Set TRUST_PROXY=false to disable (default: enabled).
+  if (process.env.TRUST_PROXY !== 'false') {
+    app.set('trust proxy', 1);
+  }
 
   // Configure query parser to use qs for nested query parameters
   app.set('query parser', (str: string) => qs.parse(str, { allowDots: true, depth: 10 }));
@@ -111,6 +119,9 @@ export function createApp(): express.Application {
 
   // Request context middleware (creates req.context from req.user)
   app.use(requestContextMiddleware);
+
+  // General API rate limiter — keyed by authenticated operator ID, falls back to IP
+  app.use(createApiRateLimiter());
 
   // Register routes for all controllers
   const authController = container.resolve(AuthController);
