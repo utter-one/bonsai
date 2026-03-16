@@ -1,6 +1,8 @@
+import 'reflect-metadata';
 import { inject, singleton, container } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
+import type { IncomingMessage } from 'http';
 import { ConnectionManager } from './ConnectionManager';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common'
@@ -50,8 +52,10 @@ export class ConversationServer {
     const maxPayload = parseInt(process.env.WS_MAX_PAYLOAD_BYTES ?? String(10 * 1024 * 1024), 10);
     this.wss = new WebSocketServer({ server, path: '/ws', maxPayload });
 
-    this.wss.on('connection', (ws: WebSocket) => {
-      logger.info('New WebSocket connection established');
+    this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      const clientIp = req.socket.remoteAddress ?? '';
+      this.connectionManager.trackSocketIp(ws, clientIp);
+      logger.info({ ip: clientIp }, 'New WebSocket connection established');
 
       ws.on('message', (data: Buffer) => {
         this.handleMessage(ws, data);
