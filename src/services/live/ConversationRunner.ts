@@ -568,7 +568,7 @@ export class ConversationRunner {
       completionLlmProvider.setOnChunk(async (chunk: LlmChunk) => {
         logger.debug({ conversationId, chunkLength: chunk.content.length }, `LLM completion chunk for conversation ${conversationId}: ${chunk.content.length} characters`);
         // Record the timestamp of the first token if not already captured
-        if (this.turnData.firstTokenMs === null) {
+        if (this.turnData.firstTokenMs === null && this.turnData.llmStartMs !== null) {
           this.turnData.firstTokenMs = Date.now();
         }
         if (ttsProvider) {
@@ -1655,6 +1655,7 @@ export class ConversationRunner {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
         this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        this.turnData.firstTokenMs = null;
         this.turnData.llmStartMs = Date.now();
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
       }
