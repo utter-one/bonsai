@@ -13,6 +13,34 @@ The REST API is used for **administration**: creating and managing projects, sta
 
 See the [Authentication](./authentication) guide for details on obtaining tokens and managing permissions.
 
+## Rate Limiting
+
+The API enforces two tiers of rate limiting:
+
+### Authentication Endpoints
+
+`POST /api/auth/login` and `POST /api/auth/refresh` are protected by a **per-IP** rate limiter to prevent brute-force attacks.
+
+- **Default limit:** 10 requests per 15 minutes per IP address
+- **Configurable via:** `RATE_LIMIT_AUTH_WINDOW_MS` and `RATE_LIMIT_AUTH_MAX`
+
+### General API
+
+All other API endpoints are protected by a **per-operator** rate limiter. For unauthenticated requests the IP address is used as the key.
+
+- **Default limit:** 300 requests per minute per operator
+- **Configurable via:** `RATE_LIMIT_API_WINDOW_MS` and `RATE_LIMIT_API_MAX`
+
+### Rate Limit Response
+
+When a limit is exceeded the server returns `429 Too Many Requests` with a `Retry-After` header (in seconds) and a JSON error body:
+
+```json
+{
+  "error": "Too many requests, please slow down"
+}
+```
+
 ## WebSocket API
 
 The WebSocket API is used for **live conversations**: real-time bidirectional communication for voice and text sessions. It is protected by project-scoped API keys.

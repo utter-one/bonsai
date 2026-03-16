@@ -4,6 +4,7 @@ import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { AuthService } from '../../services/AuthService';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from '../contracts/auth';
 import { asyncHandler } from '../../utils/asyncHandler';
+import { createAuthRateLimiter } from '../middleware/rateLimiter';
 import logger from '../../utils/logger';
 
 /**
@@ -43,6 +44,7 @@ export class AuthController {
             },
           },
           401: { description: 'Invalid credentials' },
+          429: { description: 'Too many login attempts, please try again later' },
         },
       },
       {
@@ -70,6 +72,7 @@ export class AuthController {
             },
           },
           401: { description: 'Invalid or expired refresh token' },
+          429: { description: 'Too many requests, please slow down' },
         },
       },
     ];
@@ -79,8 +82,9 @@ export class AuthController {
    * Register all routes for this controller
    */
   registerRoutes(router: Router): void {
-    router.post('/api/auth/login', asyncHandler(this.login.bind(this)));
-    router.post('/api/auth/refresh', asyncHandler(this.refresh.bind(this)));
+    const authRateLimiter = createAuthRateLimiter();
+    router.post('/api/auth/login', authRateLimiter, asyncHandler(this.login.bind(this)));
+    router.post('/api/auth/refresh', authRateLimiter, asyncHandler(this.refresh.bind(this)));
   }
 
   /**
