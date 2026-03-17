@@ -130,7 +130,7 @@ Navigates to a different stage. Triggers `__on_leave` on the current stage and `
 
 ### `run_script`
 
-Executes JavaScript in a secure isolated sandbox. See [Scripting](./scripting) for details.
+Executes an ad-hoc JavaScript code in a secure isolated sandbox. See [Scripting](./scripting) for details.
 
 ```json
 {
@@ -187,7 +187,7 @@ Same operations as `modify_variables`, but applied to the user's profile instead
 
 ### `call_tool`
 
-Invokes an LLM-powered tool. See [Tools](./tools).
+Invokes a tool. The tool's `type` determines both its execution behaviour and when it runs relative to other effects (see [Effect Execution Priority](#effect-execution-priority)). See [Tools](./tools).
 
 ```json
 {
@@ -197,9 +197,13 @@ Invokes an LLM-powered tool. See [Tools](./tools).
 }
 ```
 
+Results are stored differently depending on the tool type:
+- **`smart_function`** and **`script`** tools — stored under `context.results.tools.<toolId>`
+- **`webhook`** tools — stored under `context.results.webhooks.<toolId>` (same namespace as `call_webhook`)
+
 ### `call_webhook`
 
-Makes an HTTP request to an external service:
+Makes an ad-hoc HTTP request to an external service:
 
 ```json
 {
@@ -241,16 +245,18 @@ Effects from **all** triggered actions are gathered into a single global list, s
 
 | Priority | Effect type |
 |---|---|
-| 1 | `call_webhook` |
-| 2 | `call_tool` |
+| 1 | `call_webhook` · `call_tool` _(webhook tools)_ |
+| 2 | `call_tool` _(smart_function tools)_ |
 | 3 | `modify_variables` |
 | 4 | `modify_user_profile` |
 | 5 | `modify_user_input` |
-| 6 | `run_script` |
+| 6 | `run_script` · `call_tool` _(script tools)_ |
 | 7 | `generate_response` |
 | 8 | `end_conversation` |
 | 9 | `abort_conversation` |
 | 10 | `go_to_stage` |
+
+`call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1 (alongside `call_webhook`), `script` tools at priority 6 (alongside `run_script`), and `smart_function` tools at priority 2.
 
 ### Conflict Resolution
 
