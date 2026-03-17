@@ -1,8 +1,9 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, SQL, desc, sql } from 'drizzle-orm';
+import { eq, and, SQL, desc, sql, inArray } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { tools } from '../db/schema';
+import type { ToolType } from '../db/schema';
 import type { CreateToolRequest, UpdateToolRequest, ToolResponse, ToolListResponse, CloneToolRequest } from '../http/contracts/tool';
 import type { ListParams } from '../http/contracts/common';
 import { toolResponseSchema, toolListResponseSchema } from '../http/contracts/tool';
@@ -39,7 +40,22 @@ export class ToolService extends BaseService {
     logger.info({ toolId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating tool');
 
     try {
-      const tool = await db.insert(tools).values({ id: toolId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, inputType: input.inputType, outputType: input.outputType, parameters: input.parameters ?? [], tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const toolValues: any = { id: toolId, projectId, name: input.name, description: input.description ?? null, type: input.type, parameters: input.parameters ?? [], tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 };
+      if (input.type === 'smart_function') {
+        toolValues.prompt = input.prompt;
+        toolValues.llmProviderId = input.llmProviderId ?? null;
+        toolValues.llmSettings = input.llmSettings ?? null;
+        toolValues.inputType = input.inputType;
+        toolValues.outputType = input.outputType;
+      } else if (input.type === 'webhook') {
+        toolValues.url = input.url;
+        toolValues.webhookMethod = input.webhookMethod ?? 'GET';
+        toolValues.webhookHeaders = input.webhookHeaders ?? null;
+        toolValues.webhookBody = input.webhookBody ?? null;
+      } else if (input.type === 'script') {
+        toolValues.code = input.code;
+      }
+      const tool = await db.insert(tools).values(toolValues).returning();
 
       const createdTool = tool[0];
 
@@ -96,6 +112,7 @@ export class ToolService extends BaseService {
         id: tools.id,
         projectId: tools.projectId,
         name: tools.name,
+        type: tools.type,
         inputType: tools.inputType,
         outputType: tools.outputType,
         llmProviderId: tools.llmProviderId,
@@ -186,6 +203,11 @@ export class ToolService extends BaseService {
       if (updateData.llmSettings !== undefined) updatePayload.llmSettings = updateData.llmSettings;
       if (updateData.inputType !== undefined) updatePayload.inputType = updateData.inputType;
       if (updateData.outputType !== undefined) updatePayload.outputType = updateData.outputType;
+      if (updateData.url !== undefined) updatePayload.url = updateData.url;
+      if (updateData.webhookMethod !== undefined) updatePayload.webhookMethod = updateData.webhookMethod;
+      if (updateData.webhookHeaders !== undefined) updatePayload.webhookHeaders = updateData.webhookHeaders;
+      if (updateData.webhookBody !== undefined) updatePayload.webhookBody = updateData.webhookBody;
+      if (updateData.code !== undefined) updatePayload.code = updateData.code;
       if (updateData.parameters !== undefined) updatePayload.parameters = updateData.parameters;
       if (updateData.tags !== undefined) updatePayload.tags = updateData.tags;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
@@ -268,11 +290,32 @@ export class ToolService extends BaseService {
         throw new NotFoundError(`Tool with id ${id} not found`);
       }
 
-      return await this.createTool(projectId, { id: input.id, name: input.name ?? `${existingTool.name} (Clone)`, description: existingTool.description ?? undefined, prompt: existingTool.prompt, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings as any, inputType: existingTool.inputType as 'text' | 'image' | 'multi-modal', outputType: existingTool.outputType as 'text' | 'image' | 'multi-modal', parameters: existingTool.parameters as any, tags: existingTool.tags as string[], metadata: existingTool.metadata ?? undefined }, context);
+      const cloneBase = { id: input.id, name: input.name ?? `${existingTool.name} (Clone)`, description: existingTool.description ?? undefined, parameters: existingTool.parameters as any, tags: existingTool.tags as string[], metadata: existingTool.metadata ?? undefined };
+      let cloneInput: CreateToolRequest;
+      if (existingTool.type === 'webhook') {
+        cloneInput = { ...cloneBase, type: 'webhook', url: existingTool.url!, webhookMethod: existingTool.webhookMethod as any, webhookHeaders: existingTool.webhookHeaders as any, webhookBody: existingTool.webhookBody ?? undefined };
+      } else if (existingTool.type === 'script') {
+        cloneInput = { ...cloneBase, type: 'script', code: existingTool.code! };
+      } else {
+        cloneInput = { ...cloneBase, type: 'smart_function', prompt: existingTool.prompt!, llmProviderId: existingTool.llmProviderId, llmSettings: existingTool.llmSettings as any, inputType: existingTool.inputType as 'text' | 'image' | 'multi-modal', outputType: existingTool.outputType as 'text' | 'image' | 'multi-modal' };
+      }
+      return await this.createTool(projectId, cloneInput, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone tool');
       throw error;
     }
+  }
+
+  /**
+   * Batch-fetches tool types by IDs, used to determine execution priority before sorting effects
+   * @param projectId - The project ID to scope the query
+   * @param ids - Array of tool IDs to look up
+   * @returns Map of toolId → ToolType for all found tools
+   */
+  async getToolTypesByIds(projectId: string, ids: string[]): Promise<Map<string, ToolType>> {
+    if (ids.length === 0) return new Map();
+    const rows = await db.select({ id: tools.id, type: tools.type }).from(tools).where(and(eq(tools.projectId, projectId), inArray(tools.id, ids)));
+    return new Map(rows.map(r => [r.id, r.type]));
   }
 
   /**

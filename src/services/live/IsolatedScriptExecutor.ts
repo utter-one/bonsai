@@ -105,9 +105,10 @@ export class IsolatedScriptExecutor {
    * 
    * @param code - The JavaScript code to execute
    * @param context - Execution context containing conversation and stage information
+   * @param toolParameters - Optional parameters injected as `params` when executing as a tool script
    * @throws Error if script execution fails or times out
    */
-  async executeScript(code: string, context: ConversationContext): Promise<ScriptExecutionResult> {
+  async executeScript(code: string, context: ConversationContext, toolParameters?: Record<string, unknown>): Promise<ScriptExecutionResult> {
     logger.info({ conversationId: context.conversationId, stageId: context.stage.id, codeLength: code.length }, `Running script in isolated VM`);
 
     // Snapshot mutable state for change detection
@@ -173,6 +174,11 @@ export class IsolatedScriptExecutor {
       // Utility functions
       await jail.set('uuid', new ivm.Callback(() => crypto.randomUUID()));
       await jail.set('formatDate', new ivm.Callback((iso: string, locale?: string, options?: Record<string, string>) => new Intl.DateTimeFormat(locale ?? undefined, options ?? undefined).format(new Date(iso))));
+
+      // If called as a tool script, inject tool parameters as read-only `params`
+      if (toolParameters !== undefined) {
+        await jail.set('params', new ivm.ExternalCopy(toolParameters).copyInto());
+      }
 
       // Flow control functions — signals are captured into flowControl and returned with ScriptExecutionResult
       await jail.set('goToStage', new ivm.Callback((stageId: string) => { flowControl.goToStageId = stageId; }));

@@ -14,7 +14,7 @@ import { conversationResponseSchema, conversationListResponseSchema, conversatio
 import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './http/contracts/stage';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './http/contracts/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
-import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
+import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
@@ -230,6 +230,10 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteContextTransformerRequest', deleteContextTransformerBodySchema);
   registry.register('ContextTransformerResponse', contextTransformerResponseSchema);
   registry.register('ContextTransformerListResponse', contextTransformerListResponseSchema);
+  registry.register('CreateSmartFunctionTool', createSmartFunctionToolSchema);
+  registry.register('CreateWebhookTool', createWebhookToolSchema);
+  registry.register('CreateScriptTool', createScriptToolSchema);
+  registry.register('ToolType', toolTypeSchema);
   registry.register('CreateToolRequest', createToolSchema);
   registry.register('UpdateToolRequest', updateToolBodySchema);
   registry.register('DeleteToolRequest', deleteToolBodySchema);

@@ -11,13 +11,19 @@ export { listParamsSchema, type ListParams };
 export { toolParameterSchema, type ToolParameter };
 
 /**
- * Schema for tool input types
+ * Schema for the tool type discriminator
+ * Determines the execution behaviour: LLM call, HTTP webhook, or isolated JavaScript script
+ */
+export const toolTypeSchema = z.enum(['smart_function', 'webhook', 'script']).describe('Tool execution type: smart_function (LLM-based), webhook (HTTP call), script (JavaScript)');
+
+/**
+ * Schema for tool input types (smart_function tools only)
  * Defines the format of data the tool accepts
  */
 export const toolInputTypeSchema = z.enum(['text', 'image', 'multi-modal']).describe('Type of input the tool accepts: text (plain text), image (image data), multi-modal (combination of text and images)');
 
 /**
- * Schema for tool output types
+ * Schema for tool output types (smart_function tools only)
  * Defines the format of data the tool produces
  */
 export const toolOutputTypeSchema = z.enum(['text', 'image', 'multi-modal']).describe('Type of output the tool produces: text (plain text), image (image data), multi-modal (combination of text and images)');
@@ -32,37 +38,81 @@ export const toolRouteParamsSchema = z.object({
 
 export type ToolRouteParams = z.infer<typeof toolRouteParamsSchema>;
 
-/**
- * Schema for creating a new tool
- * Required fields: id, name, prompt, inputType, outputType
- * Optional fields: description, llmProviderId, metadata
- */
-export const createToolSchema = z.object({
+/** Shared create fields present on every tool type */
+const createToolBaseSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the tool (auto-generated if not provided)'),
   name: z.string().min(1).describe('Display name of the tool'),
   description: z.string().nullable().optional().describe('Detailed description of the tool\'s purpose and behavior'),
-  prompt: z.string().min(1).describe('Handlebars template for tool invocation'),
-  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this tool'),
-  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this tool'),
-  inputType: toolInputTypeSchema.describe('Expected input format for the tool'),
-  outputType: toolOutputTypeSchema.describe('Expected output format from the tool'),
   parameters: z.array(toolParameterSchema).optional().default([]).describe('Parameters that this tool expects to receive'),
   tags: z.array(z.string()).optional().default([]).describe('Tags for categorizing and filtering this tool'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Additional tool-specific metadata'),
 });
 
 /**
+ * Schema for creating a smart_function tool
+ * Executes an LLM call using the rendered prompt and returns the model output
+ */
+export const createSmartFunctionToolSchema = createToolBaseSchema.extend({
+  type: z.literal('smart_function').describe('Tool executes an LLM call'),
+  prompt: z.string().min(1).describe('Handlebars template rendered before being sent to the LLM'),
+  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this tool'),
+  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this tool'),
+  inputType: toolInputTypeSchema.describe('Expected input format for the tool'),
+  outputType: toolOutputTypeSchema.describe('Expected output format from the tool'),
+}).openapi('CreateSmartFunctionTool');
+
+/**
+ * Schema for creating a webhook tool
+ * Makes an HTTP request and stores the response in context.results.webhooks
+ */
+export const createWebhookToolSchema = createToolBaseSchema.extend({
+  type: z.literal('webhook').describe('Tool makes an HTTP request'),
+  url: z.string().url().describe('Target URL — supports Handlebars templating'),
+  webhookMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().default('GET').describe('HTTP method to use'),
+  webhookHeaders: z.record(z.string(), z.string()).optional().describe('HTTP headers to send; values support Handlebars templating'),
+  webhookBody: z.string().optional().describe('Request body template (Handlebars); used for POST/PUT/PATCH'),
+}).openapi('CreateWebhookTool');
+
+/**
+ * Schema for creating a script tool
+ * Executes isolated JavaScript code with full flow-control capabilities
+ */
+export const createScriptToolSchema = createToolBaseSchema.extend({
+  type: z.literal('script').describe('Tool executes isolated JavaScript code'),
+  code: z.string().min(1).describe('JavaScript code to execute in an isolated VM context'),
+}).openapi('CreateScriptTool');
+
+/**
+ * Discriminated union schema for creating any tool type
+ * The 'type' field determines which variant is validated
+ */
+export const createToolSchema = z.discriminatedUnion('type', [
+  createSmartFunctionToolSchema,
+  createWebhookToolSchema,
+  createScriptToolSchema,
+]);
+
+/**
  * Schema for updating a tool
- * All fields are optional except version for optimistic locking
+ * All fields are optional except version; type-specific fields are accepted for all variants
  */
 export const updateToolBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
   description: z.string().nullable().optional().describe('Updated description'),
-  prompt: z.string().min(1).optional().describe('Updated tool prompt template'),
-  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID'),
-  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
-  inputType: toolInputTypeSchema.optional().describe('Updated input format'),
-  outputType: toolOutputTypeSchema.optional().describe('Updated output format'),
+  // smart_function fields
+  prompt: z.string().min(1).optional().describe('Updated Handlebars prompt template (smart_function)'),
+  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID (smart_function)'),
+  llmSettings: llmSettingsSchema.optional().describe('Updated LLM provider-specific settings (smart_function)'),
+  inputType: toolInputTypeSchema.optional().describe('Updated input format (smart_function)'),
+  outputType: toolOutputTypeSchema.optional().describe('Updated output format (smart_function)'),
+  // webhook fields
+  url: z.string().url().optional().describe('Updated target URL (webhook)'),
+  webhookMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().describe('Updated HTTP method (webhook)'),
+  webhookHeaders: z.record(z.string(), z.string()).nullable().optional().describe('Updated HTTP headers (webhook)'),
+  webhookBody: z.string().nullable().optional().describe('Updated request body template (webhook)'),
+  // script fields
+  code: z.string().min(1).optional().describe('Updated JavaScript code (script)'),
+  // shared fields
   parameters: z.array(toolParameterSchema).optional().describe('Updated parameters for the tool'),
   tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
@@ -78,19 +128,29 @@ export const deleteToolBodySchema = z.object({
 });
 
 /**
- * Schema for tool response
- * Includes all fields from the database schema
+ * Wide response schema for all tool types
+ * Type-specific fields are nullable when not applicable to a given tool type
  */
 export const toolResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the tool'),
   projectId: z.string().describe('ID of the project this tool belongs to'),
   name: z.string().describe('Display name of the tool'),
   description: z.string().nullable().describe('Detailed description of the tool'),
-  prompt: z.string().describe('Handlebars template for tool invocation'),
-  llmProviderId: z.string().nullable().describe('ID of the LLM provider'),
-  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings'),
-  inputType: toolInputTypeSchema.describe('Expected input format'),
-  outputType: toolOutputTypeSchema.describe('Expected output format'),
+  type: toolTypeSchema.describe('Tool execution type'),
+  // smart_function fields
+  prompt: z.string().nullable().describe('Handlebars prompt template (smart_function only)'),
+  llmProviderId: z.string().nullable().describe('ID of the LLM provider (smart_function only)'),
+  llmSettings: llmSettingsSchema.nullable().describe('LLM provider-specific settings (smart_function only)'),
+  inputType: toolInputTypeSchema.nullable().describe('Expected input format (smart_function only)'),
+  outputType: toolOutputTypeSchema.nullable().describe('Expected output format (smart_function only)'),
+  // webhook fields
+  url: z.string().nullable().describe('Target URL (webhook only)'),
+  webhookMethod: z.string().nullable().describe('HTTP method (webhook only)'),
+  webhookHeaders: z.record(z.string(), z.string()).nullable().describe('HTTP headers (webhook only)'),
+  webhookBody: z.string().nullable().describe('Request body template (webhook only)'),
+  // script fields
+  code: z.string().nullable().describe('JavaScript code (script only)'),
+  // shared fields
   parameters: z.array(toolParameterSchema).describe('Parameters that this tool expects to receive'),
   tags: z.array(z.string()).describe('Tags for categorizing and filtering this tool'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
@@ -113,6 +173,15 @@ export const toolListResponseSchema = z.object({
 
 /** Request body for creating a new tool */
 export type CreateToolRequest = z.infer<typeof createToolSchema>;
+
+/** Request body for creating a smart_function tool */
+export type CreateSmartFunctionToolRequest = z.infer<typeof createSmartFunctionToolSchema>;
+
+/** Request body for creating a webhook tool */
+export type CreateWebhookToolRequest = z.infer<typeof createWebhookToolSchema>;
+
+/** Request body for creating a script tool */
+export type CreateScriptToolRequest = z.infer<typeof createScriptToolSchema>;
 
 /** Request body for updating a tool */
 export type UpdateToolRequest = z.infer<typeof updateToolBodySchema>;

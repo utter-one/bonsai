@@ -9,6 +9,7 @@ import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecut
 import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
+import type { ToolType } from '../../db/schema';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 import { NotFoundError } from '../../errors';
 import { ParameterValue } from '../../types/parameters';
@@ -108,17 +109,25 @@ export class ActionsExecutor {
   }
 
   /**
-   * Gets the execution priority for an effect type
-   * Lower numbers execute first
+   * Gets the execution priority for an effect type.
+   * Lower numbers execute first.
+   * For call_tool effects, priority is determined by the referenced tool's type so that
+   * webhook tools run at the same priority as call_webhook (1), script tools at the same
+   * priority as run_script (6), and smart_function tools at priority 2.
    * @param effect - The effect to get priority for
-   * @returns Priority number (1-7)
+   * @param toolTypes - Optional map of toolId → ToolType for call_tool priority resolution
+   * @returns Priority number
    */
-  private getEffectPriority(effect: Effect): number {
+  private getEffectPriority(effect: Effect, toolTypes?: Map<string, ToolType>): number {
     switch (effect.type) {
       case 'call_webhook':
         return 1;
-      case 'call_tool':
-        return 2;
+      case 'call_tool': {
+        const toolType = toolTypes?.get((effect as CallToolEffect).toolId);
+        if (toolType === 'webhook') return 1;
+        if (toolType === 'script') return 6;
+        return 2; // smart_function or unknown
+      }
       case 'modify_variables':
         return 3;
       case 'modify_user_profile':
@@ -288,9 +297,15 @@ export class ActionsExecutor {
       }
     }
 
+    // Pre-fetch tool types for all call_tool effects so priority can be resolved per tool type
+    const toolIds = [...new Set(
+      filteredEffects.filter(e => e.effect.type === 'call_tool').map(e => (e.effect as CallToolEffect).toolId)
+    )];
+    const toolTypeMap = await this.toolService.getToolTypesByIds(context.projectId, toolIds);
+
     // Sort all effects by priority (lower numbers execute first)
     let sortedEffects = filteredEffects.sort(
-      (a, b) => this.getEffectPriority(a.effect) - this.getEffectPriority(b.effect)
+      (a, b) => this.getEffectPriority(a.effect, toolTypeMap) - this.getEffectPriority(b.effect, toolTypeMap)
     );
 
     // Resolve conflicts between effects
@@ -694,24 +709,7 @@ export class ActionsExecutor {
 
       logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, hasResult: !!executionResult.result }, `Tool executed successfully`);
 
-      // 4. Validate output against tool.outputType
-      // Check that the result format matches what we expect
-      if (executionResult.result !== undefined && executionResult.result !== null) {
-
-        if (tool.outputType === 'text') {
-          // For text output, result should be a string or easily convertible
-          if (!executionResult.result.every(x => x.contentType === 'text')) {
-            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool output type is '${tool.outputType}' but result contains non-text content, will convert to string`);
-          }
-        } else if (tool.outputType === 'image') {
-          if (!executionResult.result.every(x => x.contentType === 'image')) {
-            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool output type is '${tool.outputType}' but result contains non-image content`);
-          }
-        }
-        // For 'multi-modal', we accept any format
-      }
-
-      // 5. Store the result in context.results.tools
+      // 4. Store the result in context.results.tools
       if (!context.results) {
         context.results = { webhooks: {}, tools: {} };
       }
@@ -719,22 +717,37 @@ export class ActionsExecutor {
         context.results.tools = {};
       }
 
-      context.results.tools[tool.id] = {
-        toolId: tool.id,
-        toolName: tool.name,
-        inputType: tool.inputType,
-        outputType: tool.outputType,
-        parameters: resolvedParameters,
-        result: executionResult.result,
-        executedAt: new Date().toISOString(),
-      };
+      // Store result in the context bucket appropriate for the tool type:
+      // - webhook tools mirror the call_webhook effect and store under context.results.webhooks
+      // - smart_function and script tools store under context.results.tools
+      if (tool.type === 'webhook') {
+        if (!context.results.webhooks) context.results.webhooks = {};
+        context.results.webhooks[tool.id] = executionResult.result;
+      } else {
+        context.results.tools[tool.id] = {
+          toolId: tool.id,
+          toolName: tool.name,
+          parameters: resolvedParameters,
+          result: executionResult.result,
+          executedAt: new Date().toISOString(),
+        };
+      }
 
-      logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name }, `Tool called successfully and result stored: ${tool.name}`);
+      logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, toolType: tool.type }, `Tool called successfully and result stored: ${tool.name}`);
 
-      // Return tool call event data so caller can save/send it
+      // For script tools, propagate flow control and mutable-state change flags onto the outcome
+      const flowControl = executionResult.flowControl ?? {};
       return {
-        shouldEndConversation: false,
-        shouldAbortConversation: false,
+        shouldEndConversation: flowControl.shouldEndConversation ?? false,
+        endReason: flowControl.endReason,
+        shouldAbortConversation: flowControl.shouldAbortConversation ?? false,
+        abortReason: flowControl.abortReason,
+        newStageId: flowControl.goToStageId,
+        shouldGenerateResponse: flowControl.shouldGenerateResponse,
+        prescriptedResponse: flowControl.prescriptedResponse,
+        hasModifiedVars: executionResult.hasModifiedVars ?? false,
+        hasModifiedUserInput: executionResult.hasModifiedUserInput ?? false,
+        hasModifiedUserProfile: executionResult.hasModifiedUserProfile ?? false,
         toolCallEvent: {
           toolId: tool.id,
           toolName: tool.name,
