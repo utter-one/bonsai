@@ -6,9 +6,9 @@ A **Tool** is a callable operation within a project. Tools are invoked via the `
 
 | Type | Execution | Priority |
 |---|---|---|
-| `smart_function` | LLM-powered: sends a prompt to an LLM and returns a structured result | Same as `call_tool` (2) |
-| `webhook` | HTTP call: makes an outbound HTTP request and stores the response | Same as `call_webhook` (1) |
-| `script` | JavaScript: runs code in a secure isolated sandbox | Same as `run_script` (6) |
+| `smart_function` | LLM-powered: sends a prompt to an LLM and returns a structured result | 2 |
+| `webhook` | HTTP call: makes an outbound HTTP request and stores the response | 1 (runs before smart_function tools) |
+| `script` | JavaScript: runs code in a secure isolated sandbox | 6 (runs after variable modifications) |
 
 The `type` field is a discriminator that determines which additional fields are required.
 
@@ -62,7 +62,7 @@ The result is stored under `context.results.tools.<toolId>` and is available to 
 
 ## Webhook Tools
 
-A `webhook` tool makes an HTTP request to an external service, just like the `call_webhook` effect but reusable across stages. All URL, header, and body fields support Handlebars templating.
+A `webhook` tool makes an HTTP request to an external service. All URL, header, and body fields support Handlebars templating.
 
 **Type-specific fields:**
 
@@ -88,7 +88,7 @@ A `webhook` tool makes an HTTP request to an external service, just like the `ca
 }
 ```
 
-The HTTP response object is stored under `context.results.webhooks.<toolId>` (same namespace as `call_webhook` effects) and has the shape:
+The HTTP response object is stored under `context.results.webhooks.<toolId>` and has the shape:
 
 ```json
 {
@@ -105,7 +105,7 @@ Inside the Handlebars templates, the tool's resolved parameters are available as
 {"query": "{{tool.parameters.searchTerm}}", "limit": {{tool.parameters.maxResults}}}
 ```
 
-Webhook tools run at **priority 1**, interleaved with `call_webhook` effects.
+Webhook tools run at **priority 1**, before smart_function and script tools.
 
 ## Script Tools
 
@@ -140,7 +140,7 @@ vars.orderTotal = total;
 
 The result (assigned to `result`) is stored under `context.results.tools.<toolId>`.
 
-Script tools support the same flow control functions available to `run_script` effects (`goToStage()`, `endConversation()`, etc.) and run at **priority 6**, interleaved with `run_script` effects. See [Scripting](./scripting) for the full scripting API.
+Script tools support the same flow control functions available to `script` tools (`goToStage()`, `endConversation()`, etc.) and run at **priority 6**, after variable modifications. See [Scripting](./scripting) for the full scripting API.
 
 ## Tool Parameters
 

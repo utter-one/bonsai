@@ -29,13 +29,13 @@ Stages support three reserved lifecycle actions with special names (prefixed wit
 
 Runs when the conversation enters this stage — either at the start of a conversation or via a `go_to_stage` effect. Executes **before** the `enterBehavior` (generate response or await input).
 
-Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
+Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`. Calling `goToStage()` inside a `script` tool is also silently ignored.
 
 ### `__on_leave`
 
 Runs when the conversation is about to leave this stage (before loading the new stage). Useful for cleanup or persisting state.
 
-Restricted effects: cannot use `go_to_stage` or `generate_response`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
+Restricted effects: cannot use `go_to_stage` or `generate_response`. Calling `goToStage()` inside a `script` tool is also silently ignored.
 
 ### `__on_fallback`
 
@@ -128,17 +128,6 @@ Navigates to a different stage. Triggers `__on_leave` on the current stage and `
 { "type": "go_to_stage", "stageId": "troubleshooting" }
 ```
 
-### `run_script`
-
-Executes an ad-hoc JavaScript code in a secure isolated sandbox. See [Scripting](./scripting) for details.
-
-```json
-{
-  "type": "run_script",
-  "code": "vars.retryCount = (vars.retryCount || 0) + 1; if (vars.retryCount >= 3) { vars.escalate = true; }"
-}
-```
-
 ### `modify_user_input`
 
 Replaces the user's input text using a Handlebars template. This modifies what the LLM sees as the user's message.
@@ -199,24 +188,7 @@ Invokes a tool. The tool's `type` determines both its execution behaviour and wh
 
 Results are stored differently depending on the tool type:
 - **`smart_function`** and **`script`** tools — stored under `context.results.tools.<toolId>`
-- **`webhook`** tools — stored under `context.results.webhooks.<toolId>` (same namespace as `call_webhook`)
-
-### `call_webhook`
-
-Makes an ad-hoc HTTP request to an external service:
-
-```json
-{
-  "type": "call_webhook",
-  "method": "POST",
-  "url": "https://api.example.com/orders/{{vars.orderId}}",
-  "headers": { "Authorization": "Bearer {{consts.apiToken}}" },
-  "body": { "action": "check_status" },
-  "resultKey": "orderStatus"
-}
-```
-
-The response is stored under `context.results.webhooks.<resultKey>` and accessible in subsequent effects and prompts.
+- **`webhook`** tools — stored under `context.results.webhooks.<toolId>`
 
 ### `generate_response`
 
@@ -245,18 +217,18 @@ Effects from **all** triggered actions are gathered into a single global list, s
 
 | Priority | Effect type |
 |---|---|
-| 1 | `call_webhook` · `call_tool` _(webhook tools)_ |
-| 2 | `call_tool` _(smart_function tools)_ |
+| 1 | `call_tool` _(webhook tools)_ |
+| 2 | `call_tool` _(smart\_function tools)_ |
 | 3 | `modify_variables` |
 | 4 | `modify_user_profile` |
 | 5 | `modify_user_input` |
-| 6 | `run_script` · `call_tool` _(script tools)_ |
+| 6 | `call_tool` _(script tools)_ |
 | 7 | `generate_response` |
 | 8 | `end_conversation` |
 | 9 | `abort_conversation` |
 | 10 | `go_to_stage` |
 
-`call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1 (alongside `call_webhook`), `script` tools at priority 6 (alongside `run_script`), and `smart_function` tools at priority 2.
+`call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1, `script` tools at priority 6, and `smart_function` tools at priority 2.
 
 ### Conflict Resolution
 

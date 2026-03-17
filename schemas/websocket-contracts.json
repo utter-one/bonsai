@@ -1422,9 +1422,6 @@
           "$ref": "#/definitions/GoToStageEffect"
         },
         {
-          "$ref": "#/definitions/RunScriptEffect"
-        },
-        {
           "$ref": "#/definitions/ModifyUserInputEffect"
         },
         {
@@ -1437,9 +1434,6 @@
           "$ref": "#/definitions/CallToolEffect"
         },
         {
-          "$ref": "#/definitions/CallWebhookEffect"
-        },
-        {
           "$ref": "#/definitions/GenerateResponseEffect"
         }
       ],
@@ -1449,12 +1443,10 @@
           "end_conversation": "#/definitions/EndConversationEffect",
           "abort_conversation": "#/definitions/AbortConversationEffect",
           "go_to_stage": "#/definitions/GoToStageEffect",
-          "run_script": "#/definitions/RunScriptEffect",
           "modify_user_input": "#/definitions/ModifyUserInputEffect",
           "modify_variables": "#/definitions/ModifyVariablesEffect",
           "modify_user_profile": "#/definitions/ModifyUserProfileEffect",
           "call_tool": "#/definitions/CallToolEffect",
-          "call_webhook": "#/definitions/CallWebhookEffect",
           "generate_response": "#/definitions/GenerateResponseEffect"
         }
       }
@@ -1516,27 +1508,6 @@
       "required": [
         "type",
         "stageId"
-      ]
-    },
-    "RunScriptEffect": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": [
-            "run_script"
-          ],
-          "description": "Effect type"
-        },
-        "code": {
-          "type": "string",
-          "minLength": 1,
-          "description": "JavaScript code to execute in isolated context"
-        }
-      },
-      "required": [
-        "type",
-        "code"
       ]
     },
     "ModifyUserInputEffect": {
@@ -1691,56 +1662,6 @@
         "type",
         "toolId",
         "parameters"
-      ]
-    },
-    "CallWebhookEffect": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": [
-            "call_webhook"
-          ],
-          "description": "Effect type"
-        },
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "description": "HTTP(S) URL to call"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "GET",
-            "POST",
-            "PUT",
-            "PATCH",
-            "DELETE"
-          ],
-          "default": "GET",
-          "description": "HTTP method to use"
-        },
-        "headers": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "HTTP headers to send with the request"
-        },
-        "body": {
-          "nullable": true,
-          "description": "Request body for POST/PUT/PATCH requests"
-        },
-        "resultKey": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Key name to store the webhook result under in context.results.webhooks"
-        }
-      },
-      "required": [
-        "type",
-        "url",
-        "resultKey"
       ]
     },
     "GenerateResponseEffect": {

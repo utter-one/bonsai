@@ -1,12 +1,11 @@
 import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
-import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
 import { ToolExecutor } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
-import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
+import type { AbortConversationEffect, CallToolEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
 import type { ToolType } from '../../db/schema';
@@ -82,12 +81,11 @@ type EffectWithSource = {
 
 /**
  * Service responsible for executing effects defined in stage actions and global actions
- * Handles all effect types: end_conversation, abort_conversation, go_to_stage, run_script, modify_user_input, call_tool
+ * Handles all effect types: end_conversation, abort_conversation, go_to_stage, modify_user_input, call_tool
  */
 @injectable()
 export class ActionsExecutor {
   constructor(
-    @inject(IsolatedScriptExecutor) private readonly scriptRunner: IsolatedScriptExecutor,
     @inject(ToolService) private readonly toolService: ToolService,
     @inject(ToolExecutor) private readonly toolExecutor: ToolExecutor,
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
@@ -111,17 +109,14 @@ export class ActionsExecutor {
   /**
    * Gets the execution priority for an effect type.
    * Lower numbers execute first.
-   * For call_tool effects, priority is determined by the referenced tool's type so that
-   * webhook tools run at the same priority as call_webhook (1), script tools at the same
-   * priority as run_script (6), and smart_function tools at priority 2.
+   * For call_tool effects, priority is determined by the referenced tool's type:
+   * webhook tools run at priority 1, script tools at priority 6, smart_function tools at priority 2.
    * @param effect - The effect to get priority for
    * @param toolTypes - Optional map of toolId → ToolType for call_tool priority resolution
    * @returns Priority number
    */
   private getEffectPriority(effect: Effect, toolTypes?: Map<string, ToolType>): number {
     switch (effect.type) {
-      case 'call_webhook':
-        return 1;
       case 'call_tool': {
         const toolType = toolTypes?.get((effect as CallToolEffect).toolId);
         if (toolType === 'webhook') return 1;
@@ -134,8 +129,6 @@ export class ActionsExecutor {
         return 4;
       case 'modify_user_input':
         return 5;
-      case 'run_script':
-        return 6;
       case 'generate_response':
         return 7;
       case 'end_conversation':
@@ -422,9 +415,6 @@ export class ActionsExecutor {
       case 'go_to_stage':
         return await this.executeGoToStage(effect, context);
 
-      case 'run_script':
-        return await this.executeRunScript(effect, context);
-
       case 'modify_user_input':
         return await this.executeModifyUserInput(effect, context);
 
@@ -436,9 +426,6 @@ export class ActionsExecutor {
 
       case 'call_tool':
         return await this.executeCallTool(effect, context);
-
-      case 'call_webhook':
-        return await this.executeCallWebhook(effect, context);
 
       case 'generate_response':
         return await this.executeGenerateResponse(effect, context, actionName);
@@ -496,33 +483,6 @@ export class ActionsExecutor {
       shouldEndConversation: false,
       shouldAbortConversation: false,
       newStageId: effect.stageId,
-    };
-  }
-
-  /**
-   * Executes run_script effect
-   * Delegates to IsolatedScriptExecutor for secure script execution in isolated VM.
-   * Flow control signals (goToStage, endConversation, etc.) emitted by the script are mapped
-   * directly onto EffectOutcome fields.
-   */
-  private async executeRunScript(
-    effect: RunScriptEffect,
-    context: ConversationContext,
-  ): Promise<EffectOutcome> {
-    logger.info({ effect }, `Executing run_script effect`);
-    const result = await this.scriptRunner.executeScript(effect.code, context);
-
-    return {
-      shouldEndConversation: result.flowControl.shouldEndConversation ?? false,
-      endReason: result.flowControl.endReason,
-      shouldAbortConversation: result.flowControl.shouldAbortConversation ?? false,
-      abortReason: result.flowControl.abortReason,
-      newStageId: result.flowControl.goToStageId,
-      shouldGenerateResponse: result.flowControl.shouldGenerateResponse,
-      prescriptedResponse: result.flowControl.prescriptedResponse,
-      hasModifiedVars: result.hasModifiedVars,
-      hasModifiedUserInput: result.hasModifiedUserInput,
-      hasModifiedUserProfile: result.hasModifiedUserProfile,
     };
   }
 
@@ -717,8 +677,8 @@ export class ActionsExecutor {
         context.results.tools = {};
       }
 
-      // Store result in the context bucket appropriate for the tool type:
-      // - webhook tools mirror the call_webhook effect and store under context.results.webhooks
+      // Store result in the appropriate context bucket:
+      // - webhook tools store under context.results.webhooks
       // - smart_function and script tools store under context.results.tools
       if (tool.type === 'webhook') {
         if (!context.results.webhooks) context.results.webhooks = {};
@@ -764,89 +724,6 @@ export class ActionsExecutor {
       logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
       throw error;
     }
-  }
-
-  /**
-   * Executes call_webhook effect
-   * Calls an HTTP(S) endpoint and stores the result in conversation context
-   */
-  private async executeCallWebhook(
-    effect: CallWebhookEffect,
-    context: ConversationContext,
-  ): Promise<EffectOutcome> {
-    logger.info({ conversationId: context.conversationId, url: effect.url, method: effect.method || 'GET', resultKey: effect.resultKey }, `Calling webhook: ${effect.url}`);
-
-    try {
-      // Render URL through templating engine
-      const renderedUrl = await this.templatingEngine.render(effect.url, context);
-
-      // Render headers through templating engine
-      const renderedHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (effect.headers) {
-        for (const [key, value] of Object.entries(effect.headers)) {
-          renderedHeaders[key] = await this.templatingEngine.render(value, context);
-        }
-      }
-
-      // Prepare fetch options
-      const fetchOptions: RequestInit = {
-        method: effect.method || 'GET',
-        headers: renderedHeaders,
-      };
-
-      // Add body for POST/PUT/PATCH requests
-      if (effect.body && ['POST', 'PUT', 'PATCH'].includes(effect.method || 'GET')) {
-        // Render body through templating engine
-        const bodyString = typeof effect.body === 'string' ? effect.body : JSON.stringify(effect.body);
-        const renderedBody = await this.templatingEngine.render(bodyString, context);
-        fetchOptions.body = renderedBody;
-      }
-
-      // Make the HTTP request
-      const response = await fetch(renderedUrl, fetchOptions);
-
-      // Parse response
-      let result: any;
-      const contentType = response.headers.get('content-type');
-      if (contentType?.includes('application/json')) {
-        result = await response.json();
-      } else {
-        result = await response.text();
-      }
-
-      // Store result in context
-      if (!context.results) {
-        context.results = { webhooks: {}, tools: {} };
-      }
-      if (!context.results.webhooks) {
-        context.results.webhooks = {};
-      }
-
-      // Convert headers to plain object
-      const headersObj: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        headersObj[key] = value;
-      });
-
-      context.results.webhooks[effect.resultKey] = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: headersObj,
-        data: result,
-      };
-
-      logger.info({ conversationId: context.conversationId, url: effect.url, status: response.status, resultKey: effect.resultKey }, `Webhook called successfully and result stored`);
-    } catch (error) {
-      logger.error({ conversationId: context.conversationId, url: effect.url, error: error instanceof Error ? error.message : String(error) }, `Failed to call webhook`);
-      throw error;
-    }
-
-    return {
-      shouldEndConversation: false,
-      shouldAbortConversation: false,
-    };
   }
 
   /**

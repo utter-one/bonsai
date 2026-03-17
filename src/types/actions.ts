@@ -34,15 +34,6 @@ export const goToStageEffectSchema = z.object({
 }).openapi('GoToStageEffect');
 
 /**
- * Effect type: Run Script
- * Runs an isolated JavaScript code that can modify stage state and variables
- */
-export const runScriptEffectSchema = z.object({
-  type: z.literal('run_script').describe('Effect type'),
-  code: z.string().min(1).describe('JavaScript code to execute in isolated context'),
-}).openapi('RunScriptEffect');
-
-/**
  * Effect type: Modify User Input
  * Changes the contents of user input using a template (can replace, redact, or inject whisper)
  */
@@ -98,19 +89,6 @@ export const callToolEffectSchema = z.object({
 }).openapi('CallToolEffect');
 
 /**
- * Effect type: Call Webhook
- * Calls an HTTP(S) endpoint and stores the result in conversation context
- */
-export const callWebhookEffectSchema = z.object({
-  type: z.literal('call_webhook').describe('Effect type'),
-  url: z.string().url().describe('HTTP(S) URL to call'),
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().default('GET').describe('HTTP method to use'),
-  headers: z.record(z.string(), z.string()).optional().describe('HTTP headers to send with the request'),
-  body: z.unknown().optional().describe('Request body for POST/PUT/PATCH requests'),
-  resultKey: z.string().min(1).describe('Key name to store the webhook result under in context.results.webhooks'),
-}).openapi('CallWebhookEffect');
-
-/**
  * Effect type: Generate Response
  * Triggers AI response generation (must be explicitly added to actions)
  */
@@ -129,12 +107,10 @@ export const effectSchema = z.discriminatedUnion('type', [
   endConversationEffectSchema,
   abortConversationEffectSchema,
   goToStageEffectSchema,
-  runScriptEffectSchema,
   modifyUserInputEffectSchema,
   modifyVariablesEffectSchema,
   modifyUserProfileEffectSchema,
   callToolEffectSchema,
-  callWebhookEffectSchema,
   generateResponseEffectSchema,
 ]).openapi('Effect');
 
@@ -142,14 +118,12 @@ export const effectSchema = z.discriminatedUnion('type', [
 export type EndConversationEffect = z.infer<typeof endConversationEffectSchema>;
 export type AbortConversationEffect = z.infer<typeof abortConversationEffectSchema>;
 export type GoToStageEffect = z.infer<typeof goToStageEffectSchema>;
-export type RunScriptEffect = z.infer<typeof runScriptEffectSchema>;
 export type ModifyUserInputEffect = z.infer<typeof modifyUserInputEffectSchema>;
 export type VariableOperation = z.infer<typeof variableOperationSchema>;
 export type UserProfileOperation = z.infer<typeof userProfileOperationSchema>;
 export type ModifyVariablesEffect = z.infer<typeof modifyVariablesEffectSchema>;
 export type ModifyUserProfileEffect = z.infer<typeof modifyUserProfileEffectSchema>;
 export type CallToolEffect = z.infer<typeof callToolEffectSchema>;
-export type CallWebhookEffect = z.infer<typeof callWebhookEffectSchema>;
 export type GenerateResponseEffect = z.infer<typeof generateResponseEffectSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 
@@ -263,7 +237,7 @@ export const LIFECYCLE_EFFECT_RESTRICTIONS: Record<string, Set<Effect['type']>> 
 
   /**
    * __conversation_start: Cannot immediately end or abort the freshly started conversation
-   * Use go_to_stage to redirect, run_script/call_webhook to initialise context
+   * Use go_to_stage to redirect, call_tool to initialise context
    */
   conversation_start: new Set<Effect['type']>(['end_conversation', 'abort_conversation']),
 
