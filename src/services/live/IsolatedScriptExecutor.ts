@@ -6,7 +6,7 @@ import { ConversationContext } from './ConversationContextBuilder';
 
 /**
  * Flow control signals emitted by a script via goToStage(), endConversation(), etc.
- * Only meaningful in run_script effect context; silently ignored in condition and expression evaluation.
+ * Only meaningful when executing a script-type tool or an inline script; silently ignored in condition and expression evaluation.
  */
 export type ScriptFlowControl = {
   /** Stage ID to transition to after the script finishes */
@@ -88,7 +88,7 @@ export type ScriptExecutionResult = {
  * - `historyContains(substr, role?)` - Case-insensitive substring search across messages
  * - `stageMessages(role?)` - Messages exchanged in the current stage only, optionally filtered by role
  *
- * Flow control (run_script only; ignored in conditions and inline expressions):
+ * Flow control (script tools only; ignored in conditions and inline expressions):
  * - `goToStage(stageId)` - Transition to a different stage after the script
  * - `endConversation(reason?)` - End the conversation gracefully
  * - `abortConversation(reason?)` - Abort the conversation
