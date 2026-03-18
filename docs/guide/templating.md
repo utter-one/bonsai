@@ -136,7 +136,7 @@ Context: The user has order {{vars.orderId}} with status {{vars.orderStatus}}.
 User's question: {{userInput}}
 ```
 
-The `call_webhook` effect supports Handlebars in URLs and body:
+The `call_tool` effect (for webhook tools) supports Handlebars in URLs, headers, and body:
 
 ```handlebars
 https://api.example.com/orders/{{vars.orderId}}/status

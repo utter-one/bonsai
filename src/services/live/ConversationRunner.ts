@@ -1285,6 +1285,7 @@ export class ConversationRunner {
     const eventData: ToolCallEventData = {
       toolId: tool.id,
       toolName: tool.name,
+      toolType: tool.type,
       parameters,
       success: executeResult.success,
       result: executeResult.result,
@@ -1297,7 +1298,7 @@ export class ConversationRunner {
     };
     await this.saveAndSendEvent('tool_call', eventData);
 
-    logger.info({ conversationId: this.conversation.id, toolId, success: executeResult.success }, `Tool ${tool.name} executed`);
+    logger.info({ conversationId: this.conversation.id, toolId, success: executeResult.success, result: executeResult.result }, `Tool ${tool.name} executed`);
 
     return executeResult;
   }
@@ -1865,6 +1866,7 @@ export class ConversationRunner {
         const eventData = {
           toolId: toolCallEvent.toolId,
           toolName: toolCallEvent.toolName,
+          toolType: toolCallEvent.toolType,
           parameters: toolCallEvent.parameters,
           success: toolCallEvent.success,
           result: toolCallEvent.result,

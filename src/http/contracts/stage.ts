@@ -9,14 +9,12 @@ import {
   endConversationEffectSchema,
   abortConversationEffectSchema,
   goToStageEffectSchema,
-  runScriptEffectSchema,
   modifyUserInputEffectSchema,
   modifyVariablesEffectSchema,
   modifyUserProfileEffectSchema,
   variableOperationSchema,
   userProfileOperationSchema,
   callToolEffectSchema,
-  callWebhookEffectSchema,
   stageActionSchema,
 } from '../../types/actions';
 import type {
@@ -24,14 +22,12 @@ import type {
   EndConversationEffect,
   AbortConversationEffect,
   GoToStageEffect,
-  RunScriptEffect,
   ModifyUserInputEffect,
   ModifyVariablesEffect,
   ModifyUserProfileEffect,
   VariableOperation,
   UserProfileOperation,
   CallToolEffect,
-  CallWebhookEffect,
   StageAction,
 } from '../../types/actions';
 
@@ -45,14 +41,12 @@ export {
   endConversationEffectSchema,
   abortConversationEffectSchema,
   goToStageEffectSchema,
-  runScriptEffectSchema,
   modifyUserInputEffectSchema,
   modifyVariablesEffectSchema,
   modifyUserProfileEffectSchema,
   variableOperationSchema,
   userProfileOperationSchema,
   callToolEffectSchema,
-  callWebhookEffectSchema,
   stageActionSchema,
 };
 
@@ -61,14 +55,12 @@ export type {
   EndConversationEffect,
   AbortConversationEffect,
   GoToStageEffect,
-  RunScriptEffect,
   ModifyUserInputEffect,
   ModifyVariablesEffect,
   ModifyUserProfileEffect,
   VariableOperation,
   UserProfileOperation,
   CallToolEffect,
-  CallWebhookEffect,
   StageAction,
 };
 

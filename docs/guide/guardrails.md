@@ -67,9 +67,8 @@ Guardrails support all the same effects as stage actions and global actions:
 
 - `end_conversation`, `abort_conversation`
 - `go_to_stage`
-- `run_script`
 - `modify_user_input`, `modify_variables`, `modify_user_profile`
-- `call_tool`, `call_webhook`
+- `call_tool`
 - `generate_response`
 
 See [Actions & Effects](./actions-and-effects) for details on each effect type.

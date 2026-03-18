@@ -14,7 +14,7 @@ import { conversationResponseSchema, conversationListResponseSchema, conversatio
 import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './http/contracts/stage';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './http/contracts/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
-import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
+import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
@@ -25,7 +25,7 @@ import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema } fro
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { asrConfigSchema } from './http/contracts/project';
-import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, runScriptEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, callWebhookEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema } from './types/actions';
+import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema } from './types/actions';
 import { fieldDescriptorSchema } from './types/parameters';
 import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
@@ -155,14 +155,12 @@ export function getOpenAPISpec(): any {
   registry.register('EndConversationEffect', endConversationEffectSchema);
   registry.register('AbortConversationEffect', abortConversationEffectSchema);
   registry.register('GoToStageEffect', goToStageEffectSchema);
-  registry.register('RunScriptEffect', runScriptEffectSchema);
   registry.register('ModifyUserInputEffect', modifyUserInputEffectSchema);
   registry.register('ModifyVariablesEffect', modifyVariablesEffectSchema);
   registry.register('ModifyUserProfileEffect', modifyUserProfileEffectSchema);
   registry.register('VariableOperation', variableOperationSchema);
   registry.register('UserProfileOperation', userProfileOperationSchema);
   registry.register('CallToolEffect', callToolEffectSchema);
-  registry.register('CallWebhookEffect', callWebhookEffectSchema);
   registry.register('GenerateResponseEffect', generateResponseEffectSchema);
   registry.register('Effect', effectSchema);
   registry.register('StageActionParameter', stageActionParameterSchema);
@@ -230,6 +228,10 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteContextTransformerRequest', deleteContextTransformerBodySchema);
   registry.register('ContextTransformerResponse', contextTransformerResponseSchema);
   registry.register('ContextTransformerListResponse', contextTransformerListResponseSchema);
+  registry.register('CreateSmartFunctionTool', createSmartFunctionToolSchema);
+  registry.register('CreateWebhookTool', createWebhookToolSchema);
+  registry.register('CreateScriptTool', createScriptToolSchema);
+  registry.register('ToolType', toolTypeSchema);
   registry.register('CreateToolRequest', createToolSchema);
   registry.register('UpdateToolRequest', updateToolBodySchema);
   registry.register('DeleteToolRequest', deleteToolBodySchema);

@@ -9,37 +9,61 @@ import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
 import { ImageParameterValue, ParameterValue, parameterValueSchema } from "../../types/parameters";
+import { IsolatedScriptExecutor, ScriptFlowControl } from "./IsolatedScriptExecutor";
 
 export const toolExecutionResultSchema = z.object({
   success: z.boolean(),
   failureReason: z.string().optional(),
   toolId: z.string(),
   parameters: z.record(z.string(), parameterValueSchema).describe('Parameters that were passed to the tool during execution'),
-  result: z.array(llmContentSchema).optional().describe('Optional field for tool output'),
+  result: z.unknown().optional().describe('Optional field for tool output'),
   renderedPrompt: z.string().optional(),
   llmSettings: z.any().optional(),
-  /** Total duration of the tool execution in milliseconds, including LLM call */
+  /** Total duration of the tool execution in milliseconds */
   durationMs: z.number().optional(),
+  /** Flow control signals emitted by script tools */
+  flowControl: z.custom<ScriptFlowControl>().optional(),
+  /** Whether the script tool modified stage variables */
+  hasModifiedVars: z.boolean().optional(),
+  /** Whether the script tool modified user input */
+  hasModifiedUserInput: z.boolean().optional(),
+  /** Whether the script tool modified user profile */
+  hasModifiedUserProfile: z.boolean().optional(),
 });
 
 export type ToolExecutionResult = z.infer<typeof toolExecutionResultSchema>;
 
 @singleton()
 export class ToolExecutor {
-  constructor(@inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
+  constructor(
+    @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
-    @inject(ConversationContextBuilder) private readonly conversationContextBuilder: ConversationContextBuilder) { }
+    @inject(ConversationContextBuilder) private readonly conversationContextBuilder: ConversationContextBuilder,
+    @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
+  ) { }
 
   /**
-   * Executes a tool by invoking its associated LLM provider with the rendered prompt and provided parameters.
-   * @param tool The tool to execute, which includes the prompt template and LLM provider configuration.
-   * @param context The conversation context to use for rendering the prompt.
-   * @param parameters The parameters to pass to the tool, which will be included in the context for prompt rendering.
-   * @returns A promise that resolves to the result of the tool execution, including success status, output, and any error information.
-   * @throws NotFoundError if the associated LLM provider is not found.
-   * @throws Error for any issues during tool execution, which will be captured in the failureReason of the result.
+   * Executes a tool by dispatching to the appropriate executor based on tool type.
+   * @param tool The tool to execute.
+   * @param context The conversation context used for templating and script execution.
+   * @param parameters The resolved parameters to pass to the tool.
+   * @returns A promise that resolves to the result of the tool execution.
    */
   async executeTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
+    if (tool.type === 'webhook') {
+      return this.executeWebhookTool(tool, context, parameters);
+    }
+    if (tool.type === 'script') {
+      return this.executeScriptTool(tool, context, parameters);
+    }
+    return this.executeSmartFunctionTool(tool, context, parameters);
+  }
+
+  /**
+   * Executes a smart_function tool by invoking its LLM provider with the rendered prompt.
+   * @throws NotFoundError if the associated LLM provider is not found.
+   */
+  private async executeSmartFunctionTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
     if (!tool.llmProviderId) {
       throw new Error(`Tool "${tool.name}" does not have an associated LLM provider`);
     }
@@ -56,22 +80,10 @@ export class ToolExecutor {
       const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);
       logger.debug({ toolId: tool.id, renderedPrompt }, `Rendered prompt for tool "${tool.name}"`);
 
-      const messages: LlmMessage[] = [
-        {
-          role: 'system' as const,
-          content: renderedPrompt
-        }
-      ];
-
-      // Extract and add image parameters as user messages
+      const messages: LlmMessage[] = [{ role: 'system' as const, content: renderedPrompt }];
       const imageMessages = this.extractImageMessages(parameters);
       messages.push(...imageMessages);
-
-      // Add final user instruction message
-      messages.push({
-        role: 'user' as const,
-        content: 'Please complete the requested task based on the system instructions.'
-      });
+      messages.push({ role: 'user' as const, content: 'Please complete the requested task based on the system instructions.' });
 
       const result = await llmProvider.generate(messages, { outputFormat: this.getOutputFormat(tool) });
       const durationMs = Date.now() - toolStartMs;
@@ -82,19 +94,93 @@ export class ToolExecutor {
     }
   }
 
-  private getOutputFormat(tool: Tool): LlmGenerationOptions['outputFormat'] {
-    // Determine output format based on tool configuration or default to text
-    if (tool.outputType === 'text') {
-      return 'text';
-    }
-    if (tool.outputType === 'image') {
-      return 'image';
-    }
-    if (tool.outputType === 'multi-modal') {
-      return 'image';
+  /**
+   * Executes a webhook tool by making an HTTP request with Handlebars-rendered URL, headers, and body.
+   * The result is shaped as `{ status, statusText, headers, data }`.
+   */
+  private async executeWebhookTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
+    if (!tool.url) {
+      throw new Error(`Webhook tool "${tool.name}" does not have a URL configured`);
     }
 
-    // Add more formats as needed
+    const toolStartMs = Date.now();
+    try {
+      const templateContext = { ...context, tool: { parameters } };
+
+      const renderedUrl = await this.templatingEngine.render(tool.url, templateContext);
+
+      const renderedHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (tool.webhookHeaders) {
+        for (const [key, value] of Object.entries(tool.webhookHeaders)) {
+          renderedHeaders[key] = await this.templatingEngine.render(value, templateContext);
+        }
+      }
+
+      const method = tool.webhookMethod ?? 'GET';
+      const fetchOptions: RequestInit = { method, headers: renderedHeaders };
+
+      if (tool.webhookBody && ['POST', 'PUT', 'PATCH'].includes(method)) {
+        fetchOptions.body = await this.templatingEngine.render(tool.webhookBody, templateContext);
+      }
+
+      logger.debug({ toolId: tool.id, url: renderedUrl, method }, `Executing webhook tool "${tool.name}"`);
+
+      const response = await fetch(renderedUrl, fetchOptions);
+
+      let data: unknown;
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+
+      const headersObj: Record<string, string> = {};
+      response.headers.forEach((value, key) => { headersObj[key] = value; });
+
+      const result = { status: response.status, statusText: response.statusText, headers: headersObj, data };
+      const durationMs = Date.now() - toolStartMs;
+      return { success: true, toolId: tool.id, parameters, result, durationMs };
+    } catch (error) {
+      logger.error({ toolId: tool.id, url: tool.url, error }, `Error executing webhook tool "${tool.name}"`);
+      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during webhook execution', durationMs: Date.now() - toolStartMs };
+    }
+  }
+
+  /**
+   * Executes a script tool in an isolated VM with full flow-control capabilities.
+   * Parameters are injected as `params` inside the script.
+   */
+  private async executeScriptTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
+    if (!tool.code) {
+      throw new Error(`Script tool "${tool.name}" does not have code configured`);
+    }
+
+    const toolStartMs = Date.now();
+    try {
+      const scriptResult = await this.scriptExecutor.executeScript(tool.code, context, parameters);
+      const durationMs = Date.now() - toolStartMs;
+      return {
+        success: true,
+        toolId: tool.id,
+        parameters,
+        result: scriptResult.value,
+        durationMs,
+        flowControl: scriptResult.flowControl,
+        hasModifiedVars: scriptResult.hasModifiedVars,
+        hasModifiedUserInput: scriptResult.hasModifiedUserInput,
+        hasModifiedUserProfile: scriptResult.hasModifiedUserProfile,
+      };
+    } catch (error) {
+      logger.error({ toolId: tool.id, error }, `Error executing script tool "${tool.name}"`);
+      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during script execution', durationMs: Date.now() - toolStartMs };
+    }
+  }
+
+  private getOutputFormat(tool: Tool): LlmGenerationOptions['outputFormat'] {
+    if (tool.outputType === 'text') return 'text';
+    if (tool.outputType === 'image') return 'image';
+    if (tool.outputType === 'multi-modal') return 'image';
     return 'text';
   }
 
@@ -109,23 +195,12 @@ export class ToolExecutor {
 
     for (const [key, value] of Object.entries(parameters)) {
       if (this.isImageParameter(value)) {
-        // Single image parameter
-        const imageContent = this.convertImageToContent(value);
-        imageMessages.push({
-          role: 'user',
-          content: [imageContent]
-        });
+        imageMessages.push({ role: 'user', content: [this.convertImageToContent(value)] });
       } else if (Array.isArray(value) && value.length > 0) {
-        // Check if all array items are image parameters
         const arrayValue = value as any[];
         const allImages = arrayValue.every(v => this.isImageParameter(v));
         if (allImages) {
-          // Image array parameter - combine all images into one message
-          const imageContents = arrayValue.map(img => this.convertImageToContent(img as ImageParameterValue));
-          imageMessages.push({
-            role: 'user',
-            content: imageContents
-          });
+          imageMessages.push({ role: 'user', content: arrayValue.map(img => this.convertImageToContent(img as ImageParameterValue)) });
         }
       }
     }
@@ -133,34 +208,11 @@ export class ToolExecutor {
     return imageMessages;
   }
 
-  /**
-   * Checks if a value is an image parameter based on its structure
-   * @param value The value to check
-   * @returns True if the value matches the image parameter structure
-   */
   private isImageParameter(value: any): value is ImageParameterValue {
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      typeof value.data === 'string' &&
-      typeof value.mimeType === 'string' &&
-      value.mimeType.startsWith('image/')
-    );
+    return typeof value === 'object' && value !== null && typeof value.data === 'string' && typeof value.mimeType === 'string' && value.mimeType.startsWith('image/');
   }
 
-  /**
-   * Converts an image parameter value to MessageContent format for LLM provider
-   * @param image The image parameter value to convert
-   * @returns MessageContent object with image data
-   */
   private convertImageToContent(image: ImageParameterValue): MessageContent {
-    return {
-      type: 'image',
-      source: {
-        type: 'base64',
-        data: image.data,
-        mimeType: image.mimeType
-      }
-    };
+    return { type: 'image', source: { type: 'base64', data: image.data, mimeType: image.mimeType } };
   }
 }

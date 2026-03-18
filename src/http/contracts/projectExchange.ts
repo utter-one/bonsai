@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { llmSettingsSchema, ttsSettingsSchema } from './common';
 import { asrSettingsSchema } from './project';
-import { effectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema } from '../../types/actions';
+import { effectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, filterDeprecatedEffects } from '../../types/actions';
 import { fieldDescriptorSchema, parameterValueSchema } from '../../types/parameters';
 
 extendZodWithOpenApi(z);
@@ -201,16 +201,28 @@ export type ContextTransformerExchangeV1 = z.infer<typeof contextTransformerExch
 /**
  * Tool entity in the exchange format.
  * The LLM provider reference is replaced by a hint.
+ * All type-specific fields are optional to accommodate all three tool types
+ * (smart_function, webhook, script) in a single flat schema.
  */
 export const toolExchangeV1Schema = z.object({
   id: z.string().describe('Local document ID; remapped to a fresh UUID on import'),
   name: z.string().describe('Display name of the tool'),
   description: z.string().nullable().optional().describe('Detailed description of the tool'),
-  prompt: z.string().describe('Handlebars template for tool invocation'),
-  llmHint: providerHintSchema.nullable().optional().describe('Provider hint identifying the LLM provider used at export time'),
-  llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this tool'),
-  inputType: z.enum(['text', 'image', 'multi-modal']).describe('Expected input format for the tool'),
-  outputType: z.enum(['text', 'image', 'multi-modal']).describe('Expected output format from the tool'),
+  type: z.enum(['smart_function', 'webhook', 'script']).optional().default('smart_function').describe('Tool execution type: smart_function (LLM-based), webhook (HTTP call), script (JavaScript)'),
+  // smart_function fields
+  prompt: z.string().nullable().optional().describe('Handlebars template for tool invocation (smart_function only)'),
+  llmHint: providerHintSchema.nullable().optional().describe('Provider hint identifying the LLM provider used at export time (smart_function only)'),
+  llmSettings: llmSettingsSchema.nullable().optional().describe('LLM provider-specific settings for this tool (smart_function only)'),
+  inputType: z.enum(['text', 'image', 'multi-modal']).nullable().optional().describe('Expected input format for the tool (smart_function only)'),
+  outputType: z.enum(['text', 'image', 'multi-modal']).nullable().optional().describe('Expected output format from the tool (smart_function only)'),
+  // webhook fields
+  url: z.string().nullable().optional().describe('Target URL — supports Handlebars templating (webhook only)'),
+  webhookMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).nullable().optional().describe('HTTP method to use (webhook only)'),
+  webhookHeaders: z.record(z.string(), z.string()).nullable().optional().describe('HTTP headers to send; values support Handlebars templating (webhook only)'),
+  webhookBody: z.string().nullable().optional().describe('Request body template (Handlebars); used for POST/PUT/PATCH (webhook only)'),
+  // script fields
+  code: z.string().nullable().optional().describe('JavaScript code to execute in an isolated VM context (script only)'),
+  // shared fields
   parameters: z.array(toolParameterSchema).optional().describe('Parameters that this tool expects to receive'),
   tags: z.array(z.string()).optional().describe('Tags for categorizing and filtering this tool'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional tool-specific metadata'),
@@ -232,7 +244,7 @@ export const globalActionExchangeV1Schema = z.object({
   classificationTrigger: z.string().nullable().optional().describe('Classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().optional().describe('Local document ID of an override classifier; remapped on import'),
   parameters: z.array(stageActionParameterSchema).optional().describe('Parameters to extract from user input'),
-  effects: z.array(effectSchema).optional().describe('Effects to execute when action is triggered'),
+  effects: z.preprocess(filterDeprecatedEffects, z.array(effectSchema)).optional().describe('Effects to execute when action is triggered'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   tags: z.array(z.string()).optional().describe('Tags for categorizing and filtering this global action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
@@ -250,7 +262,7 @@ export const guardrailExchangeV1Schema = z.object({
   name: z.string().describe('Display name of the guardrail'),
   condition: z.string().nullable().optional().describe('Condition expression for guardrail activation'),
   classificationTrigger: z.string().nullable().optional().describe('Classification label that triggers this guardrail'),
-  effects: z.array(effectSchema).optional().describe('Effects to execute when the guardrail is triggered'),
+  effects: z.preprocess(filterDeprecatedEffects, z.array(effectSchema)).optional().describe('Effects to execute when the guardrail is triggered'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this guardrail'),
   tags: z.array(z.string()).optional().describe('Tags for categorizing and filtering this guardrail'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional guardrail-specific metadata'),

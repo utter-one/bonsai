@@ -728,11 +728,21 @@ export class MigrationService extends BaseService {
         projectId: sql`excluded.project_id`,
         name: sql`excluded.name`,
         description: sql`excluded.description`,
+        type: sql`excluded.type`,
+        // smart_function fields
         prompt: sql`excluded.prompt`,
         llmProviderId: sql`excluded.llm_provider_id`,
         llmSettings: sql`excluded.llm_settings`,
         inputType: sql`excluded.input_type`,
         outputType: sql`excluded.output_type`,
+        // webhook fields
+        url: sql`excluded.url`,
+        webhookMethod: sql`excluded.webhook_method`,
+        webhookHeaders: sql`excluded.webhook_headers`,
+        webhookBody: sql`excluded.webhook_body`,
+        // script fields
+        code: sql`excluded.code`,
+        // shared fields
         parameters: sql`excluded.parameters`,
         metadata: sql`excluded.metadata`,
         version: sql`${tools.version} + 1`,

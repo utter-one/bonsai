@@ -1,6 +1,6 @@
 # Scripting
 
-Bonsai Backend supports executing custom JavaScript within conversation actions via the `run_script` effect. Scripts run in a secure, isolated sandbox with strict resource limits.
+Bonsai Backend supports executing custom JavaScript within conversation actions via `script` tools. Scripts run in a secure, isolated sandbox with strict resource limits.
 
 ## Sandbox Environment
 
@@ -192,7 +192,7 @@ vars.stageRetries = stageUserMsgs.length;
 
 ## Flow Control
 
-Flow control functions are available in `run_script` effects only. They are silently ignored in action conditions and inline `=` expressions.
+Flow control functions are available in `script` tools and `script` tool calls only. They are silently ignored in action conditions and inline `=` expressions.
 
 All signals are queued and applied after the script finishes — the script always runs to completion first.
 
@@ -200,7 +200,7 @@ All signals are queued and applied after the script finishes — the script alwa
 
 Transition to a different stage after the script.
 
-> **Note:** `goToStage()` is **silently ignored** when called inside a `run_script` effect that belongs to a lifecycle action (`__on_enter` or `__on_leave`). Use it only in regular user-triggered or command-triggered actions.
+> **Note:** `goToStage()` is **silently ignored** when called inside a `script` tool that belongs to a lifecycle action (`__on_enter` or `__on_leave`). Use it only in regular user-triggered or command-triggered actions.
 
 ```javascript
 if (vars.retryCount >= 3) {
@@ -361,7 +361,7 @@ vars.allowNavigation = vars.allFieldsFilled && vars.termsAccepted;
 
 - **No async/await** — All code must be synchronous
 - **No external modules** — Cannot import or require packages
-- **No network calls** — Use `call_webhook` effect instead
+- **No network calls** — Use a `webhook` tool instead
 - **No timers** — `setTimeout`, `setInterval` are not available
 - **16 MB memory** — Complex data structures or large strings may hit the limit
 - **5 second timeout** — Long-running computations will be terminated
@@ -370,6 +370,6 @@ vars.allowNavigation = vars.allFieldsFilled && vars.termsAccepted;
 
 - **Keep scripts short** — Use scripts for data manipulation, not complex logic
 - **Guard against undefined** — Always check if variables exist before accessing them
-- **Use effects for external calls** — Scripts handle local state; `call_webhook` and `call_tool` handle external interactions
+- **Use tools for external calls** — Scripts handle local state; `webhook` and `smart_function` tools handle external interactions
 - **Log for debugging** — Use `console.log()` to track script execution in conversation events
 - **Avoid side effects** — Only modify `vars`, `userProfile`, and `userInput`

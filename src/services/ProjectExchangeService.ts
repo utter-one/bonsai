@@ -190,11 +190,21 @@ export class ProjectExchangeService extends BaseService {
         id: t.id,
         name: t.name,
         description: t.description,
-        prompt: t.prompt,
+        type: t.type,
+        // smart_function fields
+        prompt: t.prompt ?? null,
         llmHint: hint(t.llmProviderId) ?? null,
-        llmSettings: t.llmSettings as any,
-        inputType: t.inputType,
-        outputType: t.outputType,
+        llmSettings: t.llmSettings as any ?? null,
+        inputType: t.inputType ?? null,
+        outputType: t.outputType ?? null,
+        // webhook fields
+        url: t.url ?? null,
+        webhookMethod: t.webhookMethod as any ?? null,
+        webhookHeaders: t.webhookHeaders ?? null,
+        webhookBody: t.webhookBody ?? null,
+        // script fields
+        code: t.code ?? null,
+        // shared fields
         parameters: t.parameters,
         tags: t.tags,
         metadata: t.metadata,
@@ -446,11 +456,21 @@ export class ProjectExchangeService extends BaseService {
           projectId: newProjectId,
           name: t.name,
           description: t.description ?? null,
-          prompt: t.prompt,
+          type: t.type ?? 'smart_function',
+          // smart_function fields
+          prompt: t.prompt ?? null,
           llmProviderId: resolveHint(t.llmHint) ?? null,
-          llmSettings: t.llmSettings as any,
-          inputType: t.inputType,
-          outputType: t.outputType,
+          llmSettings: t.llmSettings as any ?? null,
+          inputType: t.inputType ?? null,
+          outputType: t.outputType ?? null,
+          // webhook fields
+          url: t.url ?? null,
+          webhookMethod: t.webhookMethod as any ?? null,
+          webhookHeaders: t.webhookHeaders as any ?? null,
+          webhookBody: t.webhookBody ?? null,
+          // script fields
+          code: t.code ?? null,
+          // shared fields
           parameters: t.parameters ?? [],
           tags: t.tags ?? [],
           metadata: t.metadata ?? null,

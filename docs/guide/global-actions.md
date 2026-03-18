@@ -90,7 +90,7 @@ A global action with the reserved ID `__moderation_blocked` fires when user inpu
 ### Use Cases
 
 - Send a polite "I can't respond to that" message via a prescripted `generate_response`
-- Track policy violations with a `call_webhook` or `run_script`
+- Track policy violations with a `call_tool` (webhook or script tool)
 - Increment a strike counter and `go_to_stage` to an escalation flow after repeated violations
 - `end_conversation` immediately on severe content flags
 
@@ -110,9 +110,8 @@ Global actions support all the same effects as stage actions:
 
 - `end_conversation`, `abort_conversation`
 - `go_to_stage`
-- `run_script`
 - `modify_user_input`, `modify_variables`, `modify_user_profile`
-- `call_tool`, `call_webhook`
+- `call_tool`
 - `generate_response`
 
 See [Actions & Effects](./actions-and-effects) for detail on each effect type.

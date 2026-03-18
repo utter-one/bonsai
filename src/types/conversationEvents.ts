@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { classificationResultWithClassifierSchema } from "./classification";
 import { effectSchema } from "./actions";
-import { llmContentSchema } from '../services/providers/llm/ILlmProvider';
 import { parameterValueSchema } from './parameters';
 
 // Conversation State Schema
@@ -93,9 +92,10 @@ export type CommandEventData = z.infer<typeof commandEventDataSchema>;
 export const toolCallEventDataSchema = z.object({
   toolId: z.string(),
   toolName: z.string(),
+  toolType: z.enum(['smart_function', 'webhook', 'script']).optional(),
   parameters: z.record(z.string(), parameterValueSchema),
   success: z.boolean(),
-  result: z.array(llmContentSchema).optional(),
+  result: z.unknown().optional(),
   error: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
