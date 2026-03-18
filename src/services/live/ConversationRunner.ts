@@ -1454,7 +1454,13 @@ export class ConversationRunner {
         const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
         const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context);
         await this.applyActionOutcome(context, executionOutcome);
-        const messageEventData: MessageEventData = { text: '[Content removed by moderation]', originalText: userInput, role: 'user', metadata: { moderationDurationMs: this.turnData.moderationDurationMs } };
+        const messageEventData: MessageEventData = { 
+          text: '[Content removed by moderation]', 
+          originalText: userInput, 
+          role: 'user', 
+          visibility: this.turnMessageVisibility,
+          metadata: { moderationDurationMs: this.turnData.moderationDurationMs } 
+        };
         await this.saveAndSendEvent('message', messageEventData);
         await this.saveAndSendOutcomeEvents(executionOutcome);
         const actionEventData: ActionEventData = { actionName: moderationBlockedAction.name || '', stageId: this.stageData.id, effects: moderationBlockedAction.effects };
@@ -1807,6 +1813,7 @@ export class ConversationRunner {
       text,
       role: 'assistant',
       originalText: text,
+      visibility: this.turnMessageVisibility,
       metadata: {
         prescripted: true,
       },
