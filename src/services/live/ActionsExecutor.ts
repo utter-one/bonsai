@@ -679,21 +679,21 @@ export class ActionsExecutor {
         context.results.tools = {};
       }
 
-      // Store result in the appropriate context bucket:
-      // - webhook tools store under context.results.webhooks
-      // - smart_function and script tools store under context.results.tools
-      if (tool.type === 'webhook') {
+      // Store result in the context bucket
+      if (tool.type === 'webhook') { // for backwards compatibility, also store webhook tool results in context.results.webhooks
         if (!context.results.webhooks) context.results.webhooks = {};
         context.results.webhooks[tool.id] = executionResult.result;
-      } else {
-        context.results.tools[tool.id] = {
-          toolId: tool.id,
-          toolName: tool.name,
-          parameters: resolvedParameters,
-          result: executionResult.result,
-          executedAt: new Date().toISOString(),
-        };
-      }
+      } 
+
+      context.results.tools[tool.id] = {
+        toolId: tool.id,
+        toolName: tool.name,
+        toolType: tool.type,
+        parameters: resolvedParameters,
+        result: executionResult.result,
+        executedAt: new Date().toISOString(),
+      };
+      
 
       logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, toolType: tool.type }, `Tool called successfully and result stored: ${tool.name}`);
 
