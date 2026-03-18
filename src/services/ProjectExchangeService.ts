@@ -1,5 +1,5 @@
 import { singleton } from 'tsyringe';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/index';
 import { projects, agents, stages, classifiers, contextTransformers, tools, globalActions, guardrails, knowledgeCategories, knowledgeItems, providers } from '../db/schema';
 import { BaseService } from './BaseService';
@@ -316,8 +316,7 @@ export class ProjectExchangeService extends BaseService {
     const hintToProviderId = new Map<string, string | null>();
     for (const [key, h] of hints) {
       const [row] = await db.select({ id: providers.id }).from(providers).where(eq(providers.providerType, h.type)).limit(1);
-      // Narrow by apiType as a secondary filter using JS (Drizzle `and(eq, eq)` works too but this is simpler for now)
-      const [precise] = await db.select({ id: providers.id }).from(providers).where(eq(providers.apiType, h.apiType)).limit(1);
+      const [precise] = await db.select({ id: providers.id }).from(providers).where(and(eq(providers.apiType, h.apiType), eq(providers.providerType, h.type))).limit(1);
       hintToProviderId.set(key, precise?.id ?? row?.id ?? null);
     }
 
@@ -552,8 +551,16 @@ export class ProjectExchangeService extends BaseService {
           useGlobalActions: s.useGlobalActions ?? true,
           globalActions: (s.globalActions ?? []).map(gid => idMap.get(gid) ?? gid),
           variableDescriptors: s.variableDescriptors ?? [],
-          actions: s.actions ?? {},
           defaultClassifierId: s.defaultClassifierId ? (idMap.get(s.defaultClassifierId) ?? null) : null,
+          actions: Object.fromEntries(
+            Object.entries(s.actions ?? {}).map(([key, action]) => [
+              key,
+              {
+                ...action,
+                overrideClassifierId: action.overrideClassifierId ? (idMap.get(action.overrideClassifierId) ?? null) : action.overrideClassifierId,
+              },
+            ])
+          ),
           transformerIds: (s.transformerIds ?? []).map(tid => idMap.get(tid) ?? tid),
           tags: s.tags ?? [],
           metadata: s.metadata ?? null,
