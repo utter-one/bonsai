@@ -153,6 +153,19 @@ export const toolParameterSchema = z.object({
 export const fieldWatchTriggerSchema = z.enum(['new', 'changed', 'removed', 'any']).describe('Condition for triggering an action based on variable changes: new (variable is created), changed (variable value changes), removed (variable is deleted)');
 
 /**
+ * Effect types that existed in older versions of the API but are no longer supported.
+ * These are silently ignored when loading actions instead of causing validation errors.
+ */
+export const DEPRECATED_EFFECT_TYPES = new Set(['call_webhook', 'run_script']);
+
+/**
+ * Preprocessor that strips deprecated effect types from an effects array.
+ * Use with `z.preprocess` to silently ignore unknown legacy effect types.
+ */
+export const filterDeprecatedEffects = (val: unknown): unknown =>
+  Array.isArray(val) ? val.filter((e: unknown) => !(e && typeof e === 'object' && 'type' in e && DEPRECATED_EFFECT_TYPES.has((e as { type: unknown }).type as string))) : val;
+
+/**
  * Schema for a single stage action
  * Defines an action available within a conversation stage
  */
@@ -164,7 +177,7 @@ export const stageActionSchema = z.object({
   classificationTrigger: z.string().nullable().optional().describe('Optional classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().optional().describe('Optional classifier ID - if set, this action is only enumerated for that specific classifier'),
   parameters: z.array(stageActionParameterSchema).describe('Optional array of parameters to extract from user input'),
-  effects: z.array(effectSchema).describe('Array of effects to execute when action is triggered'),
+  effects: z.preprocess(filterDeprecatedEffects, z.array(effectSchema).describe('Array of effects to execute when action is triggered')),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   triggerOnTransformation: z.boolean().optional().default(false).describe('Whether this action should be triggered on variable transformations'),
   watchedVariables: z.record(z.string(), fieldWatchTriggerSchema).optional().describe('Optional map of variable paths to watch for changes that trigger this action'),  

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { llmSettingsSchema, ttsSettingsSchema } from './common';
 import { asrSettingsSchema } from './project';
-import { effectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema } from '../../types/actions';
+import { effectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, filterDeprecatedEffects } from '../../types/actions';
 import { fieldDescriptorSchema, parameterValueSchema } from '../../types/parameters';
 
 extendZodWithOpenApi(z);
@@ -232,7 +232,7 @@ export const globalActionExchangeV1Schema = z.object({
   classificationTrigger: z.string().nullable().optional().describe('Classification label that triggers this action'),
   overrideClassifierId: z.string().nullable().optional().describe('Local document ID of an override classifier; remapped on import'),
   parameters: z.array(stageActionParameterSchema).optional().describe('Parameters to extract from user input'),
-  effects: z.array(effectSchema).optional().describe('Effects to execute when action is triggered'),
+  effects: z.preprocess(filterDeprecatedEffects, z.array(effectSchema)).optional().describe('Effects to execute when action is triggered'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   tags: z.array(z.string()).optional().describe('Tags for categorizing and filtering this global action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
@@ -250,7 +250,7 @@ export const guardrailExchangeV1Schema = z.object({
   name: z.string().describe('Display name of the guardrail'),
   condition: z.string().nullable().optional().describe('Condition expression for guardrail activation'),
   classificationTrigger: z.string().nullable().optional().describe('Classification label that triggers this guardrail'),
-  effects: z.array(effectSchema).optional().describe('Effects to execute when the guardrail is triggered'),
+  effects: z.preprocess(filterDeprecatedEffects, z.array(effectSchema)).optional().describe('Effects to execute when the guardrail is triggered'),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this guardrail'),
   tags: z.array(z.string()).optional().describe('Tags for categorizing and filtering this guardrail'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional guardrail-specific metadata'),
