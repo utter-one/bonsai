@@ -715,7 +715,7 @@ export class ConversationContextBuilder {
       if (!isActive) return null;
       return {
         id: guardrail.id,
-        name: guardrail.id,
+        name: guardrail.name,
         trigger: guardrail.classificationTrigger,
         examples: guardrail.examples || undefined,
       };
