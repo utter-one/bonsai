@@ -808,7 +808,7 @@ export class ActionsExecutor {
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,
-      turnVisibility: { visibility: effect.visibility },
+      turnVisibility: { visibility: effect.visibility, condition: effect.condition },
     };
   }
 }

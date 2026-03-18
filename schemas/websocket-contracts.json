@@ -1766,9 +1766,14 @@
           "enum": [
             "always",
             "stage",
-            "never"
+            "never",
+            "conditional"
           ],
-          "description": "Visibility setting: always (always visible), stage (visible only in current stage), never (never visible)"
+          "description": "Visibility setting: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on a JavaScript condition expression)"
+        },
+        "condition": {
+          "type": "string",
+          "description": "JavaScript condition expression evaluated against the conversation context — required when visibility is \"conditional\""
         }
       },
       "required": [

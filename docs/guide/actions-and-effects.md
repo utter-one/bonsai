@@ -211,6 +211,28 @@ Explicitly triggers AI response generation. Two modes:
 
 Selection strategies: `random` (pick randomly) or `round_robin` (cycle through).
 
+### `change_visibility`
+
+Sets the visibility of the current turn's messages (both the user input and the AI response). This controls whether those messages are included when building the conversation history sent to the LLM, templates and scripts on future turns.
+
+```json
+{
+  "type": "change_visibility",
+  "target": "action",
+  "id": "collect-payment-info",
+  "visibility": "never"
+}
+```
+
+| Field | Description |
+|---|---|
+| `target` | `"action"` or `"stage"` — what the `id` refers to |
+| `id` | ID of the action or stage this effect belongs to |
+| `visibility` | `"always"`, `"stage"`, `"never"`, or `"conditional"` (see [Message Visibility](#message-visibility)) |
+| `condition` | JavaScript expression evaluated against the conversation context — required when `visibility` is `"conditional"` |
+
+The visibility is recorded on the message event and evaluated when building history on subsequent turns. See [Message Visibility](#message-visibility) for how each value is interpreted.
+
 ## Effect Execution Priority
 
 Effects from **all** triggered actions are gathered into a single global list, sorted by priority, and then conflict-resolved before execution. Effects within the same priority tier run in the order they appeared across all actions.
@@ -227,6 +249,7 @@ Effects from **all** triggered actions are gathered into a single global list, s
 | 8 | `end_conversation` |
 | 9 | `abort_conversation` |
 | 10 | `go_to_stage` |
+| 11 | `change_visibility` |
 
 `call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1, `script` tools at priority 6, and `smart_function` tools at priority 2.
 
@@ -235,6 +258,7 @@ Effects from **all** triggered actions are gathered into a single global list, s
 - **Multiple `go_to_stage`** — only the first one (lowest priority index) is kept; the rest are discarded
 - **`abort_conversation` + `end_conversation`** — `abort_conversation` wins; `end_conversation` is removed
 - **Multiple `modify_user_input`** — all are applied in sequence, each receiving the output of the previous
+- **Multiple `change_visibility`** — the last one applied wins (highest priority index)
 
 ## Execution Flow
 
@@ -248,3 +272,28 @@ When a user sends input, the system:
 6. Applies the combined outcome (variable changes, stage navigation, response generation)
 
 Effects within a single action run in order, and their results can be used by subsequent effects. If any effect triggers `end_conversation`, `abort_conversation`, or `go_to_stage`, it takes effect after all current effects complete.
+
+## Message Visibility
+
+Every `message` event (user input and AI response) can carry a `visibility` setting that controls whether it appears in the conversation history sent to the LLM on future turns. Visibility is set by the [`change_visibility`](#change_visibility) effect and evaluated each time history is built.
+
+| Value | Behaviour |
+|---|---|
+| `always` | Always included in history (default when no visibility is set) |
+| `never` | Never included in history |
+| `stage` | Included only when the current stage matches the stage the message was recorded in |
+| `conditional` | Included only when a JavaScript condition expression evaluates to truthy |
+
+The `conditional` value supports an arbitrary JavaScript expression evaluated against the full conversation context. It can be set via the `change_visibility` effect (using the `condition` field) or directly on the message event data:
+
+```json
+{
+  "type": "change_visibility",
+  "target": "action",
+  "id": "my-action",
+  "visibility": "conditional",
+  "condition": "vars.includeHistory === true"
+}
+```
+
+Visibility is evaluated lazily: it is recorded on the message event when the turn completes and re-evaluated on every subsequent turn when history is assembled. This means a `stage` or `conditional` message can move in and out of the visible history as the conversation progresses.
