@@ -1194,6 +1194,14 @@
                 "toolName": {
                   "type": "string"
                 },
+                "toolType": {
+                  "type": "string",
+                  "enum": [
+                    "smart_function",
+                    "webhook",
+                    "script"
+                  ]
+                },
                 "parameters": {
                   "type": "object",
                   "additionalProperties": {

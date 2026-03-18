@@ -32,6 +32,7 @@ export type ActionsExecutionOutcome = {
   toolCallEvents?: Array<{
     toolId: string;
     toolName: string;
+    toolType?: ToolType;
     parameters: Record<string, any>;
     success: boolean;
     result?: any;
@@ -59,6 +60,7 @@ export type EffectOutcome = {
   toolCallEvent?: {
     toolId: string;
     toolName: string;
+    toolType?: ToolType;
     parameters: Record<string, any>;
     success: boolean;
     result?: any;
@@ -631,7 +633,7 @@ export class ActionsExecutor {
     effect: CallToolEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
-    logger.info({ context, toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
+    logger.info({ toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
 
     try {
       // 1. Load the tool
@@ -711,6 +713,7 @@ export class ActionsExecutor {
         toolCallEvent: {
           toolId: tool.id,
           toolName: tool.name,
+          toolType: tool.type,
           parameters: resolvedParameters,
           success: executionResult.success,
           result: executionResult.result,

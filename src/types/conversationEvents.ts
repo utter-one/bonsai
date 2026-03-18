@@ -92,6 +92,7 @@ export type CommandEventData = z.infer<typeof commandEventDataSchema>;
 export const toolCallEventDataSchema = z.object({
   toolId: z.string(),
   toolName: z.string(),
+  toolType: z.enum(['smart_function', 'webhook', 'script']).optional(),
   parameters: z.record(z.string(), parameterValueSchema),
   success: z.boolean(),
   result: z.unknown().optional(),
