@@ -1748,19 +1748,6 @@
           ],
           "description": "Effect type"
         },
-        "target": {
-          "type": "string",
-          "enum": [
-            "action",
-            "stage"
-          ],
-          "description": "Whether to change visibility of an action or the entire stage"
-        },
-        "id": {
-          "type": "string",
-          "minLength": 1,
-          "description": "ID of the action or stage to change visibility for"
-        },
         "visibility": {
           "type": "string",
           "enum": [
@@ -1778,8 +1765,6 @@
       },
       "required": [
         "type",
-        "target",
-        "id",
         "visibility"
       ]
     },

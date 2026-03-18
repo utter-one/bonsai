@@ -804,7 +804,7 @@ export class ActionsExecutor {
    * Produces a visibility override that the caller (ConversationRunner) applies to current-turn message events before saving.
    */
   private executeChangeVisibility(effect: ChangeVisibilityEffect): EffectOutcome {
-    logger.info({ target: effect.target, id: effect.id, visibility: effect.visibility }, `Setting turn visibility override: ${effect.visibility}`);
+    logger.info({ visibility: effect.visibility }, `Setting turn visibility override: ${effect.visibility}`);
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,

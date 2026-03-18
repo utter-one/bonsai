@@ -105,8 +105,6 @@ export const generateResponseEffectSchema = z.object({
  */
 export const changeVisibilityEffectSchema = z.object({
   type: z.literal('change_visibility').describe('Effect type'),
-  target: z.enum(['action', 'stage']).describe('Whether to change visibility of an action or the entire stage'),
-  id: z.string().min(1).describe('ID of the action or stage to change visibility for'),
   visibility: z.enum(['always', 'stage', 'never', 'conditional']).describe('Visibility setting: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on a JavaScript condition expression)'),
   condition: z.string().optional().describe('JavaScript condition expression evaluated against the conversation context — required when visibility is "conditional"'),
 }).openapi('ChangeVisibilityEffect');
