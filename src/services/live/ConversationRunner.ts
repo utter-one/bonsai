@@ -6,7 +6,7 @@ import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS 
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
@@ -118,6 +118,8 @@ export class ConversationRunner {
   private responseGeneratedInTurn = false;
   /** Conversation-level lifecycle global actions keyed by reserved ID, loaded once in prepareConversation */
   private conversationLifecycleActions: Map<string, GlobalAction> = new Map();
+  /** Visibility override for the current turn's messages, set by change_visibility effects */
+  private turnMessageVisibility: MessageVisibility | undefined = undefined;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsStartMs: null, turnIndex: 0 };
@@ -614,6 +616,7 @@ export class ConversationRunner {
           text: textContent,
           role: 'assistant',
           originalText: textContent,
+          visibility: this.turnMessageVisibility,
           metadata: {
             llmUsage: result.usage || {},
             systemPrompt: this.stageData.lastCompletionPrompt,
@@ -1408,6 +1411,7 @@ export class ConversationRunner {
    * Called at the start of every entry point that may lead to generateResponse.
    */
   private resetTurnData(): void {
+    this.turnMessageVisibility = undefined;
     this.turnData = {
       inputTurnId: this.turnData.inputTurnId,
       outputTurnId: undefined,
@@ -1615,10 +1619,14 @@ export class ConversationRunner {
     }
 
     // Save event for user message
+    if (executionOutcome.turnVisibility) {
+      this.turnMessageVisibility = executionOutcome.turnVisibility;
+    }
     const messageEventData: MessageEventData = {
       role: 'user',
       text: context.userInput || '',
       originalText: context.originalUserInput || context.userInput || '',
+      visibility: this.turnMessageVisibility,
       metadata: {
         source: context.userInputSource,
         inputTurnId: this.turnData.inputTurnId,

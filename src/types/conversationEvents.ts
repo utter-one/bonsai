@@ -36,11 +36,19 @@ export const conversationEventTypeSchema = z.enum([
 
 export type ConversationEventType = z.infer<typeof conversationEventTypeSchema>;
 
+export const messageVisibilitySchema = z.object({
+  visibility: z.enum(['always', 'stage', 'never', 'conditional']).describe('Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)'),
+  condition: z.string().optional().describe('Condition for visibility, evaluated against conversation variables'),
+})
+
+export type MessageVisibility = z.infer<typeof messageVisibilitySchema>;
+
 // Event Data Schemas
 export const messageEventDataSchema = z.object({
   role: z.enum(['user', 'assistant']),
   text: z.string(),
   originalText: z.string(),
+  visibility: messageVisibilitySchema.optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
