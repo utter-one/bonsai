@@ -165,6 +165,20 @@ The `metadata` object of certain events carries timing measurements (all duratio
 
 #### `tool_call` event
 
+The `eventData` object for a `tool_call` event has these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `toolId` | `string` | ID of the tool that was invoked |
+| `toolName` | `string` | Display name of the tool |
+| `toolType` | `string` | Tool type: `smart_function`, `webhook`, or `script` |
+| `parameters` | `object` | Resolved parameters passed to the tool |
+| `success` | `boolean` | Whether the tool executed successfully |
+| `result` | `any` | Tool output (shape depends on tool type) |
+| `error` | `string` | Error message if `success` is `false` |
+
+The `metadata` object carries:
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `durationMs` | `number` | Time taken to execute the tool |

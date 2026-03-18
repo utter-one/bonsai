@@ -470,7 +470,7 @@ When `receiveEvents` is enabled, the server pushes conversation events:
 | `transformation` | Context transformation | `transformerId`, `input`, `appliedFields[]` |
 | `action` | Action triggered | `actionName`, `stageId`, `effects[]` |
 | `command` | Client command | `command`, `parameters` |
-| `tool_call` | Tool invocation | `toolId`, `toolName`, `parameters`, `success`, `result` |
+| `tool_call` | Tool invocation | `toolId`, `toolName`, `toolType`, `parameters`, `success`, `result` |
 | `conversation_start` | Conversation started | `stageId`, `initialVariables` |
 | `conversation_resume` | Conversation resumed | `previousStatus`, `stageId` |
 | `conversation_end` | Conversation ended | `reason`, `stageId` |

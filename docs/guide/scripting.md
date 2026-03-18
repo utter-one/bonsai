@@ -82,8 +82,13 @@ const lastMessage = history[history.length - 1];
 // Check classification results
 const matchedActions = actions;
 
-// Access webhook/tool results
+// Access smart_function / script tool results
+const analysisResult = results.tools?.sentimentAnalyzer?.result;
+
+// Access webhook tool results (also mirrored at results.webhooks for backward compat)
 const orderData = results.webhooks?.orderLookup;
+// equivalently:
+const orderData2 = results.tools?.orderLookup?.result;
 
 // Current stage metadata
 const isBookingStage = stage.name === 'Booking';
@@ -326,12 +331,20 @@ if (vars.retryCount >= 3) {
 ### Data Transformation
 
 ```javascript
-// Parse and restructure webhook response
+// Parse and restructure webhook tool response
+// Webhook results land in both results.webhooks and results.tools
 const response = results.webhooks?.customerLookup;
 if (response) {
-  vars.customerName = response.firstName + " " + response.lastName;
-  vars.accountTier = response.subscription?.tier || "free";
-  vars.isActive = response.status === "active";
+  vars.customerName = response.data.firstName + " " + response.data.lastName;
+  vars.accountTier = response.data.subscription?.tier || "free";
+  vars.isActive = response.data.status === "active";
+}
+
+// Parse a smart_function or script tool result
+const analysis = results.tools?.sentimentAnalyzer?.result;
+if (analysis) {
+  vars.sentiment = analysis.label;
+  vars.sentimentScore = analysis.score;
 }
 ```
 
