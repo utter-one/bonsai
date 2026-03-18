@@ -5,8 +5,9 @@ import { inject, singleton } from "tsyringe";
 import { Conversation, GlobalAction, Guardrail, Stage } from "../../types/models";
 import { FieldDescriptor } from "../../types/parameters";
 import { StageAction } from "../../types/actions";
-import { ConversationEventData, MessageEventData } from "../../types/conversationEvents";
+import { ConversationEventData } from "../../types/conversationEvents";
 import { IsolatedScriptExecutor } from "./IsolatedScriptExecutor";
+import { HistoryBuilder } from "./HistoryBuilder";
 import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
@@ -190,7 +191,10 @@ export type ConversationContext = {
  */
 @singleton()
 export class ConversationContextBuilder {
-  constructor(@inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor) {}
+  constructor(
+    @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
+    @inject(HistoryBuilder) private readonly historyBuilder: HistoryBuilder,
+  ) {}
 
   /**
    * Builds a rich time context object anchored to the given IANA timezone.
@@ -491,12 +495,7 @@ export class ConversationContextBuilder {
       eventData: e.eventData as ConversationEventData,
       metadata: e.metadata as Record<string, any> | undefined,
     }));
-    context.history = allEvents
-      .filter(e => e.eventType === 'message')
-      .map(e => {
-        const eventData = e.eventData as MessageEventData;
-        return { role: eventData.role, content: eventData.text };
-      });
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
   }
@@ -555,12 +554,7 @@ export class ConversationContextBuilder {
       eventData: e.eventData as ConversationEventData,
       metadata: e.metadata as Record<string, any> | undefined,
     }));
-    context.history = allEvents
-      .filter(e => e.eventType === 'message')
-      .map(e => {
-        const eventData = e.eventData as MessageEventData;
-        return { role: eventData.role, content: eventData.text };
-      });
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
   }
@@ -671,12 +665,7 @@ export class ConversationContextBuilder {
       eventData: e.eventData as ConversationEventData,
       metadata: e.metadata as Record<string, any> | undefined,
     }));
-    context.history = allEvents
-      .filter(e => e.eventType === 'message')
-      .map(e => {
-        const eventData = e.eventData as MessageEventData;
-        return { role: eventData.role, content: eventData.text };
-      });
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
   }
@@ -763,12 +752,7 @@ export class ConversationContextBuilder {
       eventData: e.eventData as ConversationEventData,
       metadata: e.metadata as Record<string, any> | undefined,
     }));
-    context.history = allEvents
-      .filter(e => e.eventType === 'message')
-      .map(e => {
-        const eventData = e.eventData as MessageEventData;
-        return { role: eventData.role, content: eventData.text };
-      });
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
   }
@@ -853,12 +837,7 @@ export class ConversationContextBuilder {
       eventData: e.eventData as ConversationEventData,
       metadata: e.metadata as Record<string, any> | undefined,
     }));
-    context.history = allEvents
-      .filter(e => e.eventType === 'message')
-      .map(e => {
-        const eventData = e.eventData as MessageEventData;
-        return { role: eventData.role, content: eventData.text };
-      });
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
   }
@@ -923,12 +902,7 @@ export class ConversationContextBuilder {
       eventData: e.eventData as ConversationEventData,
       metadata: e.metadata as Record<string, any> | undefined,
     }));
-    context.history = allEvents
-      .filter(e => e.eventType === 'message')
-      .map(e => {
-        const eventData = e.eventData as MessageEventData;
-        return { role: eventData.role, content: eventData.text };
-      });
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
   }

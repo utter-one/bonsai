@@ -1031,6 +1031,28 @@
                 "originalText": {
                   "type": "string"
                 },
+                "visibility": {
+                  "type": "object",
+                  "properties": {
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "always",
+                        "stage",
+                        "never",
+                        "conditional"
+                      ],
+                      "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Condition for visibility, evaluated against conversation variables"
+                    }
+                  },
+                  "required": [
+                    "visibility"
+                  ]
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1443,6 +1465,9 @@
         },
         {
           "$ref": "#/definitions/GenerateResponseEffect"
+        },
+        {
+          "$ref": "#/definitions/ChangeVisibilityEffect"
         }
       ],
       "discriminator": {
@@ -1455,7 +1480,8 @@
           "modify_variables": "#/definitions/ModifyVariablesEffect",
           "modify_user_profile": "#/definitions/ModifyUserProfileEffect",
           "call_tool": "#/definitions/CallToolEffect",
-          "generate_response": "#/definitions/GenerateResponseEffect"
+          "generate_response": "#/definitions/GenerateResponseEffect",
+          "change_visibility": "#/definitions/ChangeVisibilityEffect"
         }
       }
     },
@@ -1710,6 +1736,36 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChangeVisibilityEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "change_visibility"
+          ],
+          "description": "Effect type"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "always",
+            "stage",
+            "never",
+            "conditional"
+          ],
+          "description": "Visibility setting: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on a JavaScript condition expression)"
+        },
+        "condition": {
+          "type": "string",
+          "description": "JavaScript condition expression evaluated against the conversation context — required when visibility is \"conditional\""
+        }
+      },
+      "required": [
+        "type",
+        "visibility"
       ]
     },
     "start-user-voice-input-request": {

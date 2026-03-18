@@ -100,6 +100,16 @@ export const generateResponseEffectSchema = z.object({
 }).openapi('GenerateResponseEffect');
 
 /**
+ * Effect type: Change Visibility
+ * Changes visibility of messages in current turn
+ */
+export const changeVisibilityEffectSchema = z.object({
+  type: z.literal('change_visibility').describe('Effect type'),
+  visibility: z.enum(['always', 'stage', 'never', 'conditional']).describe('Visibility setting: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on a JavaScript condition expression)'),
+  condition: z.string().optional().describe('JavaScript condition expression evaluated against the conversation context — required when visibility is "conditional"'),
+}).openapi('ChangeVisibilityEffect');
+
+/**
  * Discriminated union of all effect types
  * Defines the possible effects that can be executed in stage actions or global actions
  */
@@ -112,6 +122,7 @@ export const effectSchema = z.discriminatedUnion('type', [
   modifyUserProfileEffectSchema,
   callToolEffectSchema,
   generateResponseEffectSchema,
+  changeVisibilityEffectSchema,
 ]).openapi('Effect');
 
 // Infer types from schemas
@@ -125,6 +136,7 @@ export type ModifyVariablesEffect = z.infer<typeof modifyVariablesEffectSchema>;
 export type ModifyUserProfileEffect = z.infer<typeof modifyUserProfileEffectSchema>;
 export type CallToolEffect = z.infer<typeof callToolEffectSchema>;
 export type GenerateResponseEffect = z.infer<typeof generateResponseEffectSchema>;
+export type ChangeVisibilityEffect = z.infer<typeof changeVisibilityEffectSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 
 

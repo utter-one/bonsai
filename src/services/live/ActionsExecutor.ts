@@ -5,7 +5,8 @@ import { ToolService } from '../ToolService';
 import { ToolExecutor } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
-import type { AbortConversationEffect, CallToolEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
+import type { AbortConversationEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
+import type { MessageVisibility } from '../../types/conversationEvents';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
 import type { ToolType } from '../../db/schema';
@@ -29,6 +30,8 @@ export type ActionsExecutionOutcome = {
   hasModifiedUserProfile: boolean;
   goToStageId?: string;
   error?: string;
+  /** Pending visibility override to apply to the current turn's messages, produced by change_visibility effects */
+  turnVisibility?: MessageVisibility;
   toolCallEvents?: Array<{
     toolId: string;
     toolName: string;
@@ -57,6 +60,8 @@ export type EffectOutcome = {
   hasModifiedUserInput?: boolean;
   hasModifiedUserProfile?: boolean;
   newStageId?: string;
+  /** Pending visibility override for the current turn's messages */
+  turnVisibility?: MessageVisibility;
   toolCallEvent?: {
     toolId: string;
     toolName: string;
@@ -131,14 +136,16 @@ export class ActionsExecutor {
         return 4;
       case 'modify_user_input':
         return 5;
+      case 'change_visibility':
+        return 50;
       case 'generate_response':
-        return 7;
+        return 100;
       case 'end_conversation':
-        return 8;
+        return 200;
       case 'abort_conversation':
-        return 9;
+        return 201;
       case 'go_to_stage':
-        return 10;
+        return 202;
       default:
         return 999; // Unknown effects execute last
     }
@@ -360,6 +367,11 @@ export class ActionsExecutor {
           outcome.goToStageId = effectResult.newStageId;
         }
 
+        // Propagate visibility override from change_visibility effect
+        if (effectResult.turnVisibility) {
+          outcome.turnVisibility = effectResult.turnVisibility;
+        }
+
         // Check if effect resulted in conversation termination
         if (effectResult.shouldEndConversation) {
 
@@ -431,6 +443,9 @@ export class ActionsExecutor {
 
       case 'generate_response':
         return await this.executeGenerateResponse(effect, context, actionName);
+
+      case 'change_visibility':
+        return this.executeChangeVisibility(effect);
 
       default:
         throw new Error(`Unknown effect`);
@@ -781,6 +796,19 @@ export class ActionsExecutor {
       shouldEndConversation: false,
       shouldAbortConversation: false,
       shouldGenerateResponse: true,
+    };
+  }
+
+  /**
+   * Executes change_visibility effect.
+   * Produces a visibility override that the caller (ConversationRunner) applies to current-turn message events before saving.
+   */
+  private executeChangeVisibility(effect: ChangeVisibilityEffect): EffectOutcome {
+    logger.info({ visibility: effect.visibility }, `Setting turn visibility override: ${effect.visibility}`);
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+      turnVisibility: { visibility: effect.visibility, condition: effect.condition },
     };
   }
 }

@@ -62,7 +62,7 @@ Every significant occurrence during a conversation is recorded as an event:
 | `conversation_end` | Conversation ended gracefully (reason, stageId) |
 | `conversation_aborted` | Conversation aborted (reason, stageId) |
 | `conversation_failed` | Conversation failed (reason, stageId) |
-| `message` | User or AI message (role, text, original text, LLM usage) |
+| `message` | User or AI message (role, text, original text, LLM usage, optional visibility) |
 | `classification` | Classifier result (classifierId, matched actions, parameters) |
 | `transformation` | Transformer result (transformerId, applied fields) |
 | `action` | Action executed (action name, stageId, effects) |
@@ -71,6 +71,19 @@ Every significant occurrence during a conversation is recorded as an event:
 | `jump_to_stage` | Stage navigation (fromStageId, toStageId) |
 
 Events provide a full audit trail of the conversation for debugging, analytics, and compliance.
+
+### Message Visibility
+
+`message` events carry an optional `visibility` field that controls whether the message is included in the conversation history sent to the LLM on subsequent turns. When no visibility is set, messages are always included.
+
+| Value | Behaviour |
+|---|---|
+| `always` | Always included in history (default) |
+| `never` | Never included in history |
+| `stage` | Included only while the conversation is in the same stage where the message was recorded |
+| `conditional` | Included only when a JavaScript expression evaluates to truthy |
+
+Visibility is set by the [`change_visibility`](./actions-and-effects.md#change_visibility) effect, which applies to both the user input and the AI response for the current turn. See [Message Visibility](./actions-and-effects.md#message-visibility) in the actions guide for full details and examples.
 
 ### Timing Metadata
 
