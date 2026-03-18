@@ -136,16 +136,16 @@ export class ActionsExecutor {
         return 4;
       case 'modify_user_input':
         return 5;
-      case 'generate_response':
-        return 7;
-      case 'end_conversation':
-        return 8;
-      case 'abort_conversation':
-        return 9;
-      case 'go_to_stage':
-        return 10;
       case 'change_visibility':
-        return 11;
+        return 50;
+      case 'generate_response':
+        return 100;
+      case 'end_conversation':
+        return 200;
+      case 'abort_conversation':
+        return 201;
+      case 'go_to_stage':
+        return 202;
       default:
         return 999; // Unknown effects execute last
     }

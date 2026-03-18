@@ -245,11 +245,11 @@ Effects from **all** triggered actions are gathered into a single global list, s
 | 4 | `modify_user_profile` |
 | 5 | `modify_user_input` |
 | 6 | `call_tool` _(script tools)_ |
-| 7 | `generate_response` |
-| 8 | `end_conversation` |
-| 9 | `abort_conversation` |
-| 10 | `go_to_stage` |
-| 11 | `change_visibility` |
+| 50 | `change_visibility` |
+| 100 | `generate_response` |
+| 200 | `end_conversation` |
+| 201 | `abort_conversation` |
+| 202 | `go_to_stage` |
 
 `call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1, `script` tools at priority 6, and `smart_function` tools at priority 2.
 
