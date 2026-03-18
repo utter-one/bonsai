@@ -552,8 +552,16 @@ export class ProjectExchangeService extends BaseService {
           useGlobalActions: s.useGlobalActions ?? true,
           globalActions: (s.globalActions ?? []).map(gid => idMap.get(gid) ?? gid),
           variableDescriptors: s.variableDescriptors ?? [],
-          actions: s.actions ?? {},
           defaultClassifierId: s.defaultClassifierId ? (idMap.get(s.defaultClassifierId) ?? null) : null,
+          actions: Object.fromEntries(
+            Object.entries(s.actions ?? {}).map(([key, action]) => [
+              key,
+              {
+                ...action,
+                overrideClassifierId: action.overrideClassifierId ? (idMap.get(action.overrideClassifierId) ?? null) : action.overrideClassifierId,
+              },
+            ])
+          ),
           transformerIds: (s.transformerIds ?? []).map(tid => idMap.get(tid) ?? tid),
           tags: s.tags ?? [],
           metadata: s.metadata ?? null,
