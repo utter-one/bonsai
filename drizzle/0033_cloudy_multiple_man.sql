@@ -1,0 +1,5 @@
+DROP VIEW "public"."active_projects";--> statement-breakpoint
+DROP VIEW "public"."archived_projects";--> statement-breakpoint
+ALTER TABLE "projects" ADD COLUMN "language_code" text;--> statement-breakpoint
+CREATE VIEW "public"."active_projects" AS (select "id", "name", "description", "asr_config", "accept_voice", "generate_voice", "storage_config", "moderation_config", "constants", "metadata", "timezone", "language_code", "auto_create_users", "user_profile_variable_descriptors", "default_guardrail_classifier_id", "conversation_timeout_seconds", "version", "created_at", "updated_at", "archived_at", "archived_by" from "projects" where "projects"."archived_at" is null);--> statement-breakpoint
+CREATE VIEW "public"."archived_projects" AS (select "id", "name", "description", "asr_config", "accept_voice", "generate_voice", "storage_config", "moderation_config", "constants", "metadata", "timezone", "language_code", "auto_create_users", "user_profile_variable_descriptors", "default_guardrail_classifier_id", "conversation_timeout_seconds", "version", "created_at", "updated_at", "archived_at", "archived_by" from "projects" where "projects"."archived_at" is not null);

@@ -232,6 +232,13 @@
       "when": 1773743807003,
       "tag": "0032_unknown_odin",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1773911969025,
+      "tag": "0033_cloudy_multiple_man",
+      "breakpoints": true
     }
   ]
 }

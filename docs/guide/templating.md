@@ -15,6 +15,7 @@ Templates have access to these data contexts:
 | `history` | Conversation message history (auto-injected) |
 | `context.results` | Results from tool calls, webhooks, and actions |
 | `time` | Current date/time context, timezone-aware (see [Time Context](#time-context)) |
+| `project` | Project-level settings: `timezone`, `languageCode`, and `language` (see [Project Context](#project-context)) |
 | `agent` | The agent's personality `prompt` text — **must be explicitly placed** in the template (see [Agent & Knowledge Variables](#agent--knowledge-variables)) |
 | `faq` | Array of `{ question, answer }` objects from knowledge classification — stage system prompts only, **must be explicitly placed** (see [Agent & Knowledge Variables](#agent--knowledge-variables)) |
 
@@ -184,6 +185,26 @@ Q: {{this.question}}
 A: {{this.answer}}
 {{/each}}
 {{/hasItems}}
+```
+
+---
+
+## Project Context
+
+Every prompt template has access to a `project` object with settings configured on the project:
+
+| Field | Example | Description |
+|---|---|---|
+| `project.timezone` | `"Europe/Warsaw"` | IANA timezone identifier set on the project, or `null` if not configured |
+| `project.languageCode` | `"en-US"` | ISO language code set on the project, or `null` if not configured |
+| `project.language` | `"American English"` | Human-readable English name derived from `languageCode`, or `null` if not configured |
+
+These values are static for the lifetime of the conversation and useful for language-aware prompts:
+
+```handlebars
+{{#exists project.language}}
+Respond in {{project.language}}.
+{{/exists}}
 ```
 
 ---

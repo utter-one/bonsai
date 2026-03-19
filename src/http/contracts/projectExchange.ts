@@ -104,6 +104,7 @@ export const projectExchangeV1Schema = z.object({
   constants: z.record(z.string(), parameterValueSchema).nullable().optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional metadata for the project'),
   timezone: z.string().nullable().optional().describe('IANA timezone identifier, e.g. Europe/Warsaw or America/New_York'),
+  languageCode: z.string().nullable().optional().describe('ISO language code for the project, e.g. en-US or pl-PL'),
   autoCreateUsers: z.boolean().optional().describe('When enabled, users are automatically created on first WebSocket connection'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().describe('Descriptors defining the data schema for user profile variables'),
   defaultGuardrailClassifierId: z.string().nullable().optional().describe('Local document ID of the classifier used to evaluate guardrails; remapped on import'),
