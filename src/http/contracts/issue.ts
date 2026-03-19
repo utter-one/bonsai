@@ -43,7 +43,7 @@ export const updateIssueBodySchema = z.object({
   stage: z.string().optional().describe('Stage identifier'),
   sessionId: z.string().optional().describe('Related conversation session ID'),
   eventIndex: z.number().int().optional().describe('Event index in session'),
-  userId: z.string().optional().describe('User ID who reported the issue'),
+  userId: z.string().optional().nullable().describe('User ID who reported the issue'),
   severity: z.string().min(1).optional().describe('Issue severity level'),
   category: z.string().min(1).optional().describe('Issue category or type'),
   bugDescription: z.string().min(1).optional().describe('Detailed bug description'),

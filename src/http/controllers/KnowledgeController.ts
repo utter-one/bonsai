@@ -294,6 +294,38 @@ export class KnowledgeController {
           404: { description: 'Category not found' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/knowledge/categories/{id}/audit-logs',
+        tags: ['Knowledge'],
+        summary: 'Get knowledge category audit logs',
+        description: 'Retrieves audit logs for a specific knowledge category',
+        request: {
+          params: knowledgeCategoryRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Audit logs retrieved successfully',
+          },
+          404: { description: 'Knowledge category not found' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/knowledge/items/{id}/audit-logs',
+        tags: ['Knowledge'],
+        summary: 'Get knowledge item audit logs',
+        description: 'Retrieves audit logs for a specific knowledge item',
+        request: {
+          params: knowledgeItemRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Audit logs retrieved successfully',
+          },
+          404: { description: 'Knowledge item not found' },
+        },
+      },
     ];
   }
 
@@ -317,6 +349,10 @@ export class KnowledgeController {
 
     // Category items route
     router.get('/api/projects/:projectId/knowledge/categories/:categoryId/items', asyncHandler(this.getItemsByCategory.bind(this)));
+
+    // Audit log routes
+    router.get('/api/projects/:projectId/knowledge/categories/:id/audit-logs', asyncHandler(this.getKnowledgeCategoryAuditLogs.bind(this)));
+    router.get('/api/projects/:projectId/knowledge/items/:id/audit-logs', asyncHandler(this.getKnowledgeItemAuditLogs.bind(this)));
   }
 
   // ============================================================
@@ -454,5 +490,27 @@ export class KnowledgeController {
     const params = knowledgeCategoryItemsRouteParamsSchema.parse(req.params);
     const items = await this.knowledgeService.getItemsByCategory(params.projectId, params.categoryId);
     res.status(200).json(items);
+  }
+
+  /**
+   * GET /api/projects/:projectId/knowledge/categories/:id/audit-logs
+   * Get audit logs for a knowledge category
+   */
+  private async getKnowledgeCategoryAuditLogs(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
+    const params = knowledgeCategoryRouteParamsSchema.parse(req.params);
+    const auditLogs = await this.knowledgeService.getKnowledgeCategoryAuditLogs(params.id);
+    res.status(200).json(auditLogs);
+  }
+
+  /**
+   * GET /api/projects/:projectId/knowledge/items/:id/audit-logs
+   * Get audit logs for a knowledge item
+   */
+  private async getKnowledgeItemAuditLogs(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
+    const params = knowledgeItemRouteParamsSchema.parse(req.params);
+    const auditLogs = await this.knowledgeService.getKnowledgeItemAuditLogs(params.id);
+    res.status(200).json(auditLogs);
   }
 }

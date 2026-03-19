@@ -3,7 +3,6 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema, listResponseLimitSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
 import { fieldDescriptorSchema } from '../../types/parameters';
-import type { FieldDescriptor } from '../../types/parameters';
 import {
   effectSchema,
   endConversationEffectSchema,
@@ -142,7 +141,7 @@ export const createStageSchema = z.object({
  */
 export const updateStageBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name for the stage'),
-  description: z.string().optional().describe('Updated detailed description of the stage'),
+  description: z.string().optional().nullable().describe('Updated detailed description of the stage'),
   prompt: z.string().min(1).optional().describe('Updated system prompt'),
   llmProviderId: z.string().min(1).optional().describe('Updated LLM provider ID'),
   llmSettings: llmSettingsSchema.unwrap().unwrap().optional().describe('Updated LLM provider-specific settings'),

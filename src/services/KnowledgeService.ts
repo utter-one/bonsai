@@ -460,4 +460,36 @@ export class KnowledgeService extends BaseService {
       throw error;
     }
   }
+
+  /**
+   * Retrieves all audit log entries for a specific knowledge category
+   * @param categoryId - The unique identifier of the knowledge category
+   * @returns Array of audit log entries for the knowledge category
+   */
+  async getKnowledgeCategoryAuditLogs(categoryId: string): Promise<any[]> {
+    logger.debug({ categoryId }, 'Fetching audit logs for knowledge category');
+
+    try {
+      return await this.auditService.getEntityAuditLogs('knowledge_category', categoryId);
+    } catch (error) {
+      logger.error({ error, categoryId }, 'Failed to fetch knowledge category audit logs');
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves all audit log entries for a specific knowledge item
+   * @param itemId - The unique identifier of the knowledge item
+   * @returns Array of audit log entries for the knowledge item
+   */
+  async getKnowledgeItemAuditLogs(itemId: string): Promise<any[]> {
+    logger.debug({ itemId }, 'Fetching audit logs for knowledge item');
+
+    try {
+      return await this.auditService.getEntityAuditLogs('knowledge_item', itemId);
+    } catch (error) {
+      logger.error({ error, itemId }, 'Failed to fetch knowledge item audit logs');
+      throw error;
+    }
+  }
 }

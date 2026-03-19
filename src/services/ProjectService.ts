@@ -38,6 +38,11 @@ export class ProjectService extends BaseService {
       await this.validateStorageProvider(input.storageConfig.storageProviderId);
     }
 
+    const effectiveAcceptVoice = input.acceptVoice ?? true;
+    if (effectiveAcceptVoice && !input.asrConfig) {
+      throw new InvalidOperationError('asrConfig is required when acceptVoice is enabled');
+    }
+
     try {
       const id = generateId(ID_PREFIXES.PROJECT);
       const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, languageCode: input.languageCode, autoCreateUsers: input.autoCreateUsers ?? false, userProfileVariableDescriptors: input.userProfileVariableDescriptors ?? [], defaultGuardrailClassifierId: input.defaultGuardrailClassifierId ?? null, conversationTimeoutSeconds: input.conversationTimeoutSeconds ?? null, version: 1 }).returning();
@@ -160,6 +165,12 @@ export class ProjectService extends BaseService {
       if (existingProject.version !== input.version) {
         logger.warn({ projectId: id, expectedVersion: input.version, actualVersion: existingProject.version }, 'Optimistic lock version mismatch');
         throw new OptimisticLockError('Project');
+      }
+
+      const effectiveAcceptVoice = input.acceptVoice !== undefined ? input.acceptVoice : existingProject.acceptVoice;
+      const effectiveAsrConfig = input.asrConfig !== undefined ? input.asrConfig : existingProject.asrConfig;
+      if (effectiveAcceptVoice && !effectiveAsrConfig) {
+        throw new InvalidOperationError('asrConfig is required when acceptVoice is enabled');
       }
 
       const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, languageCode: input.languageCode, autoCreateUsers: input.autoCreateUsers, userProfileVariableDescriptors: input.userProfileVariableDescriptors, defaultGuardrailClassifierId: input.defaultGuardrailClassifierId, conversationTimeoutSeconds: input.conversationTimeoutSeconds ?? null, version: existingProject.version + 1, updatedAt: new Date() };
@@ -392,6 +403,22 @@ export class ProjectService extends BaseService {
       return projectResponseSchema.parse(updatedProject[0]);
     } catch (error) {
       logger.error({ error, projectId: id }, 'Failed to unarchive project');
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieves all audit log entries for a specific project
+   * @param projectId - The unique identifier of the project
+   * @returns Array of audit log entries for the project
+   */
+  async getProjectAuditLogs(projectId: string): Promise<any[]> {
+    logger.debug({ projectId }, 'Fetching audit logs for project');
+
+    try {
+      return await this.auditService.getEntityAuditLogs('project', projectId);
+    } catch (error) {
+      logger.error({ error, projectId }, 'Failed to fetch project audit logs');
       throw error;
     }
   }
