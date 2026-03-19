@@ -164,6 +164,22 @@ export class ApiKeyController {
           409: { description: 'Version conflict - API key was modified by another request' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/api-keys/{id}/audit-logs',
+        tags: ['API Keys'],
+        summary: 'Get API key audit logs',
+        description: 'Retrieves audit logs for a specific API key',
+        request: {
+          params: apiKeyIdParamSchema,
+        },
+        responses: {
+          200: {
+            description: 'Audit logs retrieved successfully',
+          },
+          404: { description: 'API key not found' },
+        },
+      },
     ];
   }
 
@@ -177,6 +193,7 @@ export class ApiKeyController {
     router.get('/api/api-keys', asyncHandler(this.listAllApiKeys.bind(this)));
     router.put('/api/projects/:projectId/api-keys/:id', asyncHandler(this.updateApiKey.bind(this)));
     router.delete('/api/projects/:projectId/api-keys/:id', asyncHandler(this.deleteApiKey.bind(this)));
+    router.get('/api/projects/:projectId/api-keys/:id/audit-logs', asyncHandler(this.getApiKeyAuditLogs.bind(this)));
   }
 
   /**
@@ -241,5 +258,16 @@ export class ApiKeyController {
     const body = deleteApiKeyBodySchema.parse(req.body) as DeleteApiKeyRequest;
     await this.apiKeyService.deleteApiKey(params.projectId, params.id, body.version, req.context);
     res.status(204).send();
+  }
+
+  /**
+   * GET /api/projects/:projectId/api-keys/:id/audit-logs
+   * Get audit logs for an API key
+   */
+  private async getApiKeyAuditLogs(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
+    const params = apiKeyRouteParamsSchema.parse(req.params);
+    const auditLogs = await this.apiKeyService.getApiKeyAuditLogs(params.id);
+    res.status(200).json(auditLogs);
   }
 }
