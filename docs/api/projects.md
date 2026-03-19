@@ -93,8 +93,8 @@ All fields from the create body are optional. `version` is required for optimist
 | `moderationConfig` | [`ModerationConfig`](#moderation-config) | No | Updated moderation config |
 | `constants` | `Record<string, ParameterValue>` | No | Updated constants |
 | `metadata` | `object` | No | Updated metadata |
-| `timezone` | `string` | No | Updated IANA timezone identifier |
-| `languageCode` | `string` | No | Updated ISO language code |
+| `timezone` | `string` or `null` | No | Updated IANA timezone identifier. Set to `null` to clear. |
+| `languageCode` | `string` or `null` | No | Updated ISO language code. Set to `null` to clear. |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Updated descriptors for user profile variable schema |
 | `conversationTimeoutSeconds` | `integer` (min: 0) or `null` | No | Updated inactivity timeout in seconds. Set to `0` or `null` to disable. |
 | `autoCreateUsers` | `boolean` | No | Updated auto-create users setting |
