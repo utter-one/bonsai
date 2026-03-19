@@ -1188,7 +1188,15 @@
               "type": "object",
               "properties": {
                 "command": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "go_to_stage",
+                    "set_var",
+                    "get_var",
+                    "get_all_vars",
+                    "run_action",
+                    "call_tool"
+                  ]
                 },
                 "parameters": {
                   "type": "object",

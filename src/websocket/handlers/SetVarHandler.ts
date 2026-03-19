@@ -33,6 +33,7 @@ export class SetVarHandler implements WebSocketHandler<SetVarRequest> {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      await context.connection.runner.saveCommandEvent('set_var', { stageId: message.stageId, variableName: message.variableName, variableValue: message.variableValue });
       await context.connection.runner.setVariable(message.stageId, message.variableName, message.variableValue);
 
       const response: SetVarResponse = { type: 'set_var', sessionId: message.sessionId, success: true, requestId: message.requestId };

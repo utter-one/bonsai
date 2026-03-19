@@ -89,8 +89,12 @@ export const actionEventDataSchema = z.object({
 
 export type ActionEventData = z.infer<typeof actionEventDataSchema>;
 
+export const commandTypeSchema = z.enum(['go_to_stage', 'set_var', 'get_var', 'get_all_vars', 'run_action', 'call_tool']);
+
+export type CommandType = z.infer<typeof commandTypeSchema>;
+
 export const commandEventDataSchema = z.object({
-  command: z.string(),
+  command: commandTypeSchema,
   parameters: z.record(z.string(), parameterValueSchema).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });

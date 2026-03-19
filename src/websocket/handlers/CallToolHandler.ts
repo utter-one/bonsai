@@ -33,6 +33,7 @@ export class CallToolHandler implements WebSocketHandler<CallToolRequest> {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      await context.connection.runner.saveCommandEvent('call_tool', { toolId: message.toolId, parameters: message.parameters });
       const result = await context.connection.runner.callTool(message.toolId, message.parameters);
 
       const response: CallToolResponse = { type: 'call_tool', sessionId: message.sessionId, success: true, result, requestId: message.requestId };

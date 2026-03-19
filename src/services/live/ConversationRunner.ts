@@ -6,7 +6,7 @@ import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS 
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
@@ -899,6 +899,16 @@ export class ConversationRunner {
 
   async receiveCommand(command: string, data: any) {
     throw new Error("Method not implemented.");
+  }
+
+  /**
+   * Saves a command event for the current conversation.
+   * @param command - The type of command received
+   * @param parameters - Optional parameters associated with the command
+   */
+  async saveCommandEvent(command: CommandType, parameters?: Record<string, any>): Promise<void> {
+    const eventData: CommandEventData = { command, parameters };
+    await this.saveAndSendEvent('command', eventData);
   }
 
   /**
