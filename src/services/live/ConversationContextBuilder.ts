@@ -158,6 +158,16 @@ export type ConversationContext = {
    */
   time: TimeContext;
 
+  /** Project-level settings exposed in conversation context */
+  project: {
+    /** IANA timezone identifier configured on the project, e.g. "Europe/Warsaw". Null if not set. */
+    timezone: string | null;
+    /** ISO language code configured on the project, e.g. "en-US" or "pl-PL". Null if not set. */
+    languageCode: string | null;
+    /** Human-readable language name derived from languageCode, e.g. "American English". Null if languageCode is not set. */
+    language: string | null;
+  };
+
   /** Stage configuration and available actions (optional, included for classification and processing contexts) */
   stage?: {
     /** ID of the stage */
@@ -328,6 +338,24 @@ export class ConversationContextBuilder {
   }
 
   /**
+   * Builds a project context object from raw project settings.
+   * Derives `language` as the human-readable English name of the ISO language code.
+   * @param timezone - IANA timezone identifier, e.g. "Europe/Warsaw". Null if not set.
+   * @param languageCode - ISO language code, e.g. "en-US" or "pl-PL". Null if not set.
+   */
+  private buildProjectContext(timezone: string | null, languageCode: string | null): ConversationContext['project'] {
+    let language: string | null = null;
+    if (languageCode) {
+      try {
+        language = new Intl.DisplayNames(['en'], { type: 'language' }).of(languageCode) ?? null;
+      } catch {
+        language = null;
+      }
+    }
+    return { timezone, languageCode, language };
+  }
+
+  /**
    * Transforms Stage entity into simplified stage context for use in prompts.
    * Filters actions to only include those that can be triggered by user input.
    */
@@ -458,7 +486,7 @@ export class ConversationContextBuilder {
     // Load project constants
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, conversation.projectId),
-      columns: { constants: true },
+      columns: { constants: true, timezone: true, languageCode: true },
     });
 
     const context = {
@@ -480,7 +508,8 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
-      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage!, user?.profile || {}, project?.constants || {})),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage!, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null))),
     };
 
     // Get all events from database; history is a filtered view on message events
@@ -519,7 +548,7 @@ export class ConversationContextBuilder {
     // Load project constants
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, conversation.projectId),
-      columns: { constants: true },
+      columns: { constants: true, timezone: true, languageCode: true },
     });
 
     const context: ConversationContext = {
@@ -539,7 +568,8 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
-      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {})),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null))),
     };
 
     // Load conversation history so templates can reference prior messages
@@ -579,7 +609,7 @@ export class ConversationContextBuilder {
     // Load project constants
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, conversation.projectId),
-      columns: { constants: true },
+      columns: { constants: true, timezone: true, languageCode: true },
     });
 
     const context: ConversationContext = {
@@ -598,7 +628,8 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
-      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!, user?.profile || {}, project?.constants || {})),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
+      stage: await this.buildStageContext(stage!, this.buildRawContext(conversation, stage!, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null))),
     };
 
     return context;
@@ -624,11 +655,11 @@ export class ConversationContextBuilder {
     // Load project constants
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, conversation.projectId),
-      columns: { constants: true },
+      columns: { constants: true, timezone: true, languageCode: true },
     });
 
     // Build raw context for condition evaluation
-    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {});
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
     rawContext.userInput = userInput;
     rawContext.originalUserInput = originalUserInput;
 
@@ -650,6 +681,7 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
       stage: await this.buildStageContextForClassifier(stage, globalActions, classifierId, rawContext, knowledgeCategories),
     };
 
@@ -690,11 +722,11 @@ export class ConversationContextBuilder {
     // Load project constants
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, conversation.projectId),
-      columns: { constants: true },
+      columns: { constants: true, timezone: true, languageCode: true },
     });
 
     // Build raw context for condition evaluation
-    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {});
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
     rawContext.userInput = userInput;
     rawContext.originalUserInput = originalUserInput;
 
@@ -730,6 +762,7 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
       stage: {
         id: stage.id,
         name: stage.name,
@@ -778,10 +811,10 @@ export class ConversationContextBuilder {
     // Load project constants
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, conversation.projectId),
-      columns: { constants: true },
+      columns: { constants: true, timezone: true, languageCode: true },
     });
 
-    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {});
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
     rawContext.userInput = userInput;
     rawContext.originalUserInput = originalUserInput;
 
@@ -822,6 +855,7 @@ export class ConversationContextBuilder {
       schema: fieldDescriptorsToPseudoJson(outputFieldDescriptors),
       context: transformerContext,
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
       stage: await this.buildStageContext(stage, rawContext),
     };
 
@@ -862,7 +896,7 @@ export class ConversationContextBuilder {
     // Load project constants
     const project = await db.query.projects.findFirst({
       where: eq(projects.id, conversation.projectId),
-      columns: { constants: true },
+      columns: { constants: true, timezone: true, languageCode: true },
     });
 
     const context = {
@@ -887,7 +921,8 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
-      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {})),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
+      stage: await this.buildStageContext(stage, this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null))),
     };
 
     // Get all events from database; history is a filtered view on message events
@@ -915,7 +950,7 @@ export class ConversationContextBuilder {
    * @param stage - Stage entity
    * @returns ConversationContext with only raw data and no filtering for actions or stage context.
    */
-  public buildRawContext(conversation: Conversation, stage: Stage, userProfile: Record<string, any>, consts: Record<string, any> = {}): ConversationContext {
+  public buildRawContext(conversation: Conversation, stage: Stage, userProfile: Record<string, any>, consts: Record<string, any> = {}, projectContext: ConversationContext['project'] = { timezone: null, languageCode: null, language: null }): ConversationContext {
     return {
       conversationId: conversation.id,
       projectId: conversation.projectId,
@@ -931,6 +966,7 @@ export class ConversationContextBuilder {
         tools: {},
       },
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      project: projectContext,
       stage: {
           id: conversation.stageId,
           name: stage.name,

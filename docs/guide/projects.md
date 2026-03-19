@@ -22,6 +22,7 @@ Each project includes:
 | `autoCreateUsers` | Whether to automatically create user records on first conversation (default: `false`) |
 | `defaultGuardrailClassifierId` | Optional default guardrail classifier applied project-wide |
 | `timezone` | Default IANA timezone for the project (e.g. `America/New_York`) |
+| `languageCode` | Optional ISO language code for the project (e.g. `en-US`, `pl-PL`). Exposed in conversation context as `project.languageCode` and `project.language`. |
 | `userProfileVariableDescriptors` | Typed schema describing the fields expected on a user's profile |
 | `version` | Optimistic locking version number |
 

@@ -29,6 +29,7 @@ Content-Type: application/json
 | `constants` | `Record<string, ParameterValue>` | No | Constants for templating and conversation logic |
 | `metadata` | `object` | No | Additional metadata |
 | `timezone` | `string` | No | IANA timezone identifier for conversations (e.g. `Europe/Warsaw`). Used as fallback when no per-user or per-conversation timezone is set. Defaults to UTC. |
+| `languageCode` | `string` | No | ISO language code for conversations (e.g. `en-US`, `pl-PL`). Exposed in conversation context as `project.languageCode` and `project.language`. |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No (default: `[]`) | Descriptors defining the data schema for user profile variables in this project |
 | `conversationTimeoutSeconds` | `integer` (min: 0) | No | Inactivity timeout in seconds. Active conversations with no new events for this duration are automatically aborted. Set to `0` or omit to disable. Negative values are rejected. |
 | `autoCreateUsers` | `boolean` | No (default: `false`) | When enabled, users are automatically created on first WebSocket connection if they do not exist |
@@ -93,6 +94,7 @@ All fields from the create body are optional. `version` is required for optimist
 | `constants` | `Record<string, ParameterValue>` | No | Updated constants |
 | `metadata` | `object` | No | Updated metadata |
 | `timezone` | `string` | No | Updated IANA timezone identifier |
+| `languageCode` | `string` | No | Updated ISO language code |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Updated descriptors for user profile variable schema |
 | `conversationTimeoutSeconds` | `integer` (min: 0) or `null` | No | Updated inactivity timeout in seconds. Set to `0` or `null` to disable. |
 | `autoCreateUsers` | `boolean` | No | Updated auto-create users setting |
@@ -131,6 +133,7 @@ DELETE /api/projects/:id
 | `constants` | `Record<string, ParameterValue>` | Yes | Project constants |
 | `metadata` | `object` | Yes | Additional metadata |
 | `timezone` | `string` | Yes | IANA timezone identifier (null means UTC) |
+| `languageCode` | `string` | Yes | ISO language code (e.g. `en-US`, `pl-PL`), or `null` if not set |
 | `userProfileVariableDescriptors` | [`FieldDescriptor[]`](#field-descriptor) | No | Descriptors defining the data schema for user profile variables |
 | `conversationTimeoutSeconds` | `integer` | Yes | Inactivity timeout in seconds. `null` or `0` means no timeout. |
 | `autoCreateUsers` | `boolean` | No | Whether users are auto-created on first WebSocket connection |

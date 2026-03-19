@@ -30,6 +30,7 @@ Scripts have access to these global variables:
 | `originalUserInput` | Read-only | Original unmodified user input |
 | `results` | Read-only | Results from tools and webhooks |
 | `time` | Read-only | Rich time context: `iso`, `date`, `time`, `dayOfWeek`, `timezone`, `calendar`, `anchor`, etc. |
+| `project` | Read-only | Project-level settings: `timezone` (IANA identifier or `null`), `languageCode` (ISO code or `null`), `language` (human-readable name or `null`) |
 | `userInputSource` | Read-only | Input channel: `'text'` \| `'voice'` \| `null` |
 | `consts` | Read-only | Project-level constants (from project settings) |
 | `stageVars` | Read-only | Variables for all stages, keyed by stage ID |

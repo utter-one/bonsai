@@ -97,6 +97,7 @@ export const projects = pgTable('projects', {
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   timezone: text('timezone'),
+  languageCode: text('language_code'),
   autoCreateUsers: boolean('auto_create_users').notNull().default(false),
   userProfileVariableDescriptors: jsonb('user_profile_variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
   defaultGuardrailClassifierId: text('default_guardrail_classifier_id'),
