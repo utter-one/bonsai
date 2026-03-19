@@ -83,7 +83,7 @@ export type AsrSettings = z.infer<typeof asrSettingsSchema>;
  */
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(255).describe('The name of the project'),
-  description: z.string().optional().describe('A description of the project'),
+  description: z.string().nullable().optional().describe('A description of the project'),
   asrConfig: asrConfigSchema.optional().describe('Optional ASR configuration settings'),
   acceptVoice: z.boolean().optional().default(true).describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().default(true).describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
@@ -91,8 +91,8 @@ export const createProjectSchema = z.object({
   moderationConfig: moderationConfigSchema.optional().describe('Optional content moderation configuration'),
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
-  timezone: z.string().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
-  languageCode: z.string().optional().describe('ISO language code for the project, e.g. en-US or pl-PL. Used as a hint for language-aware LLM prompts.'),
+  timezone: z.string().nullable().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
+  languageCode: z.string().nullable().optional().describe('ISO language code for the project, e.g. en-US or pl-PL. Used as a hint for language-aware LLM prompts.'),
   autoCreateUsers: z.boolean().optional().default(false).describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().default([]).describe('Descriptors defining the data schema for user profile variables in this project'),
   defaultGuardrailClassifierId: z.string().nullable().optional().describe('ID of the classifier used to evaluate guardrails for all conversations in this project. When set, all project guardrails are evaluated against this classifier on every user input turn.'),
@@ -108,7 +108,7 @@ export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
  */
 export const updateProjectSchema = z.object({
   name: z.string().min(1).max(255).optional().describe('The updated name of the project'),
-  description: z.string().optional().describe('The updated description of the project'),
+  description: z.string().nullable().optional().describe('The updated description of the project'),
   asrConfig: asrConfigSchema.describe('Updated ASR configuration settings'),
   acceptVoice: z.boolean().optional().describe('Whether conversations can accept voice input (requires asrConfig fully populated)'),
   generateVoice: z.boolean().optional().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
