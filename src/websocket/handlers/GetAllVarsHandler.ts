@@ -33,6 +33,7 @@ export class GetAllVarsHandler implements WebSocketHandler<GetAllVarsRequest> {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      await context.connection.runner.saveCommandEvent('get_all_vars', { stageId: message.stageId });
       const variables = await context.connection.runner.getAllVariables(message.stageId);
 
       const response: GetAllVarsResponse = { type: 'get_all_vars', sessionId: message.sessionId, success: true, variables, requestId: message.requestId };

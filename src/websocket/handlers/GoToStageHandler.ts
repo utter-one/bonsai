@@ -33,6 +33,7 @@ export class GoToStageHandler implements WebSocketHandler<GoToStageRequest> {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      await context.connection.runner.saveCommandEvent('go_to_stage', { stageId: message.stageId });
       await context.connection.runner.goToStage(message.stageId);
 
       const response: GoToStageResponse = { type: 'go_to_stage', sessionId: message.sessionId, success: true, requestId: message.requestId };

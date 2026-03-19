@@ -33,6 +33,7 @@ export class RunActionHandler implements WebSocketHandler<RunActionRequest> {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      await context.connection.runner.saveCommandEvent('run_action', { actionName: message.actionName, parameters: message.parameters });
       const result = await context.connection.runner.runAction(message.actionName, message.parameters);
 
       const response: RunActionResponse = { type: 'run_action', sessionId: message.sessionId, success: true, result, requestId: message.requestId };
