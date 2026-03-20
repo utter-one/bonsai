@@ -4,6 +4,7 @@ import { meta } from "zod/v4/core";
 import { SessionSettings } from "./contracts/auth";
 import { logger } from "../utils/logger";
 import { ConversationEventData, ConversationEventType } from "../types/conversationEvents";
+import { WebSocketChannel } from "./WebSocketChannel";
 
 /** Session data associated with each WebSocket connection. */
 export type Connection =
@@ -109,7 +110,8 @@ export class ConnectionManager {
       session.conversationId = conversationId;
       const { ConversationRunner } = await import('../services/live/ConversationRunner.js');
       session.runner = container.resolve(ConversationRunner);
-      await session.runner.prepareConversation(conversationId, session, this.socketMap.get(socket).ws);
+      const channel = new WebSocketChannel(this.socketMap.get(socket).ws, session, this);
+      await session.runner.prepareConversation(conversationId, session, channel);
       this.socketMap.set(socket, session);
     }
   }
