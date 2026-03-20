@@ -1,16 +1,14 @@
 import 'reflect-metadata';
-import { inject, singleton, container } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
 import { ConnectionManager } from './ConnectionManager';
+import { ChannelHandlerDispatcher } from './ChannelHandlerDispatcher';
 import { logger } from '../utils/logger';
-import type { BaseInputMessage, BaseOutputMessage } from './contracts/common'
-import { ChannelHandlerRegistry } from '../channels/ChannelHandlerRegistry';
-
-// Import handlers module to trigger decorator registration
-import type { ChannelHandler, ChannelHandlerContext } from '../channels/channel';
-import "../channels/handlers";
+import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
+import type { CALInputMessage } from '../channels/messages';
+import type { ChannelHandlerContext } from '../channels/channel';
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -19,30 +17,11 @@ import "../channels/handlers";
 @singleton()
 export class WebSocketChannelHost {
   private wss: WebSocketServer | null = null;
-  private handlers = new Map<string, { instance: ChannelHandler; requiresAuth: boolean }>();
 
-  constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager) {
-    this.registerHandlers();
-  }
-
-  /**
-   * Registers all message handlers from the registry.
-   * Handlers are automatically discovered via the @MessageHandlerFor decorator.
-   */
-  private registerHandlers(): void {
-    const registryItems = ChannelHandlerRegistry.getAll();
-
-    for (const messageType of registryItems.keys()) {
-      const registryItem = registryItems.get(messageType);
-      const handler = registryItem.handlerFactory();
-      if (handler) {
-        this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth });
-        logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth }, 'Registered message handler');
-      }
-    }
-
-    logger.info({ count: this.handlers.size }, 'All message handlers registered');
-  }
+  constructor(
+    @inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
+    @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
+  ) {}
 
   /**
    * Initializes the WebSocket server and attaches it to an HTTP server.
@@ -76,54 +55,43 @@ export class WebSocketChannelHost {
   }
 
   /**
-   * Handles incoming WebSocket messages.
-   * Routes messages to appropriate handlers based on message type.
+   * Handles an incoming raw WebSocket message.
+   * Parses the payload, builds a transport-specific context, and delegates to the dispatcher.
    * @param ws - The WebSocket connection that sent the message.
-   * @param data - The raw message data.
+   * @param data - The raw message data buffer.
    */
   private async handleMessage(ws: WebSocket, data: Buffer): Promise<void> {
+    let wsMessage: BaseInputMessage;
     try {
-      const wsMessage = JSON.parse(data.toString()) as BaseInputMessage;
-
-      logger.debug({ messageType: wsMessage.type, requestId: wsMessage.requestId }, 'Received WebSocket message');
-
-      const handler = this.handlers.get(wsMessage.type);
-      if (!handler) {
-        logger.warn({ messageType: wsMessage.type }, 'Unknown message type received');
-        this.sendError(ws, 'Unknown message type', wsMessage.requestId);
-        return;
-      }
-
-      const connection = this.connectionManager.getConnectionForWebSocket(ws);
-      
-      // Check if handler requires authentication
-      if (handler.requiresAuth && (!connection || !connection.id)) {
-        this.sendError(ws, 'Authentication required', wsMessage.requestId);
-        return;
-      }
-
-      // Translate WS wire format → CAL format: map requestId to correlationId
-      const message = { ...wsMessage, correlationId: wsMessage.requestId };
-
-      const context: ChannelHandlerContext = {
-        ws,
-        connection,
-        // Translate CAL response → WS wire format: map correlationId to requestId and inject sessionId
-        send: (msg: any) => {
-          const wsMsg: Record<string, unknown> = { ...msg };
-          if (!wsMsg.requestId && wsMsg.correlationId) wsMsg.requestId = wsMsg.correlationId;
-          if (!wsMsg.sessionId && connection?.id) wsMsg.sessionId = connection.id;
-          this.send(ws, wsMsg as BaseOutputMessage);
-        },
-        sendError: (error: string, requestId?: string) => this.sendError(ws, error, requestId),
-      };
-
-      await handler.instance.handle(context, message as any);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error({ error: message }, 'Failed to handle WebSocket message');
-      this.sendError(ws, message);
+      wsMessage = JSON.parse(data.toString()) as BaseInputMessage;
+    } catch {
+      this.sendError(ws, 'Invalid JSON');
+      return;
     }
+
+    const connection = this.connectionManager.getConnectionForWebSocket(ws);
+
+    // Translate WS wire format → CAL format: map requestId → correlationId, resolve conversationId from session
+    const calMessage = {
+      ...wsMessage,
+      correlationId: wsMessage.requestId,
+      conversationId: connection?.conversationId ?? '',
+    } as CALInputMessage;
+
+    const context: ChannelHandlerContext = {
+      ws,
+      connection,
+      // Translate CAL response → WS wire format: map correlationId → requestId and inject sessionId
+      send: (msg: any) => {
+        const wsMsg: Record<string, unknown> = { ...msg };
+        if (!wsMsg.requestId && wsMsg.correlationId) wsMsg.requestId = wsMsg.correlationId;
+        if (!wsMsg.sessionId && connection?.id) wsMsg.sessionId = connection.id;
+        this.send(ws, wsMsg as BaseOutputMessage);
+      },
+      sendError: (error: string, correlationId?: string) => this.sendError(ws, error, correlationId),
+    };
+
+    await this.dispatcher.dispatch(calMessage, context);
   }
 
   /**

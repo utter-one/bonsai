@@ -38,7 +38,7 @@ export type ChannelHandlerContext = {
   /** Transport-specific socket. Only available in WebSocket handler context. */
   ws?: WebSocket;
   send: (message: any) => void;
-  sendError: (error: string, requestId?: string) => void;
+  sendError: (error: string, correlationId?: string) => void;
 };
 
 /**
