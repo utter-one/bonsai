@@ -92,7 +92,8 @@ export class ConversationService extends BaseService {
   async saveConversationState(projectId: string, conversationId: string,
     status: ConversationState,
     statusDetails?: string | null,
-    stageVars?: Record<string, Record<string, any>>
+    stageVars?: Record<string, Record<string, any>>,
+    endingStageId?: string
   ) {
     logger.debug({ conversationId }, 'Saving conversation state');
 
@@ -103,6 +104,7 @@ export class ConversationService extends BaseService {
         status: ConversationState;
         statusDetails: string | null;
         stageVars: Record<string, Record<string, any>>;
+        endingStageId: string;
         updatedAt: Date;
       }> = {
         status,
@@ -115,6 +117,10 @@ export class ConversationService extends BaseService {
 
       if (stageVars !== undefined) {
         updateData.stageVars = stageVars;
+      }
+
+      if (endingStageId !== undefined) {
+        updateData.endingStageId = endingStageId;
       }
 
       await db.update(conversations)
@@ -267,6 +273,8 @@ export class ConversationService extends BaseService {
         userId: conversations.userId,
         clientId: conversations.clientId,
         stageId: conversations.stageId,
+        startingStageId: conversations.startingStageId,
+        endingStageId: conversations.endingStageId,
         status: conversations.status,
         statusDetails: conversations.statusDetails,
         createdAt: conversations.createdAt,
