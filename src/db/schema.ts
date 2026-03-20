@@ -31,6 +31,8 @@ export const conversations = pgTable('conversations', {
   userId: text('user_id').notNull(),
   clientId: text('client_id').notNull(),
   stageId: text('stage_id').notNull(),
+  startingStageId: text('starting_stage_id'),
+  endingStageId: text('ending_stage_id'),
   stageVars: jsonb('stage_vars').$type<Record<string, Record<string, any>>>(),
   status: text('status').notNull().$type<ConversationState>().default('initialized'),
   statusDetails: text('status_reason').default(null),

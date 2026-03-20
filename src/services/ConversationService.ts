@@ -62,6 +62,7 @@ export class ConversationService extends BaseService {
         userId: input.userId,
         clientId: input.clientId,
         stageId: input.stageId,
+        startingStageId: input.stageId,
         stageVars: {},
         status: input.status ?? 'initialized',
         statusDetails: input.statusDetails ?? null,
@@ -303,10 +304,12 @@ export class ConversationService extends BaseService {
         return;
       }
 
+      const finishedAt = new Date();
       await db.update(conversations)
         .set({
           status: 'finished',
-          updatedAt: new Date()
+          endingStageId: existingConversation.stageId,
+          updatedAt: finishedAt,
         })
         .where(and(eq(conversations.projectId, projectId), eq(conversations.id, id)));
 
@@ -334,11 +337,13 @@ export class ConversationService extends BaseService {
         throw new NotFoundError(`Conversation with id ${id} not found`);
       }
 
+      const failedAt = new Date();
       await db.update(conversations)
         .set({
           status: 'failed',
           statusDetails: reason,
-          updatedAt: new Date()
+          endingStageId: existingConversation.stageId,
+          updatedAt: failedAt,
         })
         .where(and(eq(conversations.projectId, projectId), eq(conversations.id, id)));
 
@@ -370,11 +375,13 @@ export class ConversationService extends BaseService {
         return;
       }
 
+      const abortedAt = new Date();
       await db.update(conversations)
         .set({
           status: 'aborted',
           statusDetails: reason,
-          updatedAt: new Date()
+          endingStageId: existingConversation.stageId,
+          updatedAt: abortedAt,
         })
         .where(and(eq(conversations.projectId, projectId), eq(conversations.id, id)));
 
