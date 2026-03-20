@@ -26,3 +26,29 @@ export interface ICommunicationChannel {
      */
     sendMessage(response: CALOutputMessage): Promise<void>;
 }
+
+import type { Connection } from "../websocket/ConnectionManager";
+import type { CALBaseInputMessage } from './messages';
+
+/**
+ * Context provided to channel message handlers.
+ * Contains the connection metadata and dependencies needed for handling messages.
+ */
+export type ChannelHandlerContext = {
+  connection?: Connection;
+  send: (message: any) => void;
+  sendError: (error: string, requestId?: string) => void;
+};
+
+/**
+ * Base interface for channel message handlers.
+ * Each handler is responsible for processing a specific type of WebSocket message.
+ */
+export type ChannelHandler<T extends CALBaseInputMessage = CALBaseInputMessage> = {
+  /**
+   * Handles the incoming message.
+   * @param context - The handler context containing connection metadata and utilities.
+   * @param message - The parsed message to handle.
+   */
+  handle(context: ChannelHandlerContext, message: T): Promise<void> | void;
+};

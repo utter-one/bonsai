@@ -36,7 +36,7 @@ import { requestContextMiddleware } from './http/middleware/requestContext';
 import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
-import { ConversationServer } from './websocket/ConversationServer';
+import { WebSocketChannelHost } from './websocket/ConversationServer';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -208,7 +208,7 @@ export function startServer(port: number = 3000): void {
   const server = createServer(app);
 
   // Initialize WebSocket host
-  const wsHost = container.resolve(ConversationServer);
+  const wsHost = container.resolve(WebSocketChannelHost);
   wsHost.initialize(server);
 
   server.listen(port, () => {

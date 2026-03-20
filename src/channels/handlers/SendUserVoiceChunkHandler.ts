@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
+import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
 import type { SendUserVoiceChunkRequest, SendUserVoiceChunkResponse } from '../contracts/userInput';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 
 /**
  * Handles send user voice chunk requests.
  */
-@WebSocketMessageHandler('send_user_voice_chunk')
+@ChannelMessageHandler('send_user_voice_chunk')
 @injectable()
-export class SendUserVoiceChunkHandler implements WebSocketHandler<SendUserVoiceChunkRequest> {
+export class SendUserVoiceChunkHandler implements ChannelHandler<SendUserVoiceChunkRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles send user voice chunk requests.
    */
-  async handle(context: WebSocketHandlerContext, message: SendUserVoiceChunkRequest): Promise<void> {
+  async handle(context: ChannelHandlerContext, message: SendUserVoiceChunkRequest): Promise<void> {
     logger.debug({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user voice chunk request received');
 
     try {

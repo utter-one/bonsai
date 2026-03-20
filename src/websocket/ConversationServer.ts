@@ -6,10 +6,10 @@ import type { IncomingMessage } from 'http';
 import { ConnectionManager } from './ConnectionManager';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common'
-import { WebSocketHandlerRegistry } from './WebSocketHandlerRegistry';
+import { ChannelHandlerRegistry } from './ChannelHandlerRegistry';
 
 // Import handlers module to trigger decorator registration
-import { WebSocketHandler, WebSocketHandlerContext } from './WebSocketHandler';
+import { ChannelHandler, ChannelHandlerContext } from './ChannelHandler';
 import "./handlers";
 
 /**
@@ -17,9 +17,9 @@ import "./handlers";
  * Handles authentication, session management, and conversation lifecycle.
  */
 @singleton()
-export class ConversationServer {
+export class WebSocketChannelHost {
   private wss: WebSocketServer | null = null;
-  private handlers = new Map<string, { instance: WebSocketHandler; requiresAuth: boolean }>();
+  private handlers = new Map<string, { instance: ChannelHandler; requiresAuth: boolean }>();
 
   constructor(@inject(ConnectionManager) private connectionManager: ConnectionManager) {
     this.registerHandlers();
@@ -30,7 +30,7 @@ export class ConversationServer {
    * Handlers are automatically discovered via the @MessageHandlerFor decorator.
    */
   private registerHandlers(): void {
-    const registryItems = WebSocketHandlerRegistry.getAll();
+    const registryItems = ChannelHandlerRegistry.getAll();
 
     for (const messageType of registryItems.keys()) {
       const registryItem = registryItems.get(messageType);
@@ -102,7 +102,7 @@ export class ConversationServer {
         return;
       }
 
-      const context: WebSocketHandlerContext = { ws, connection, send: this.send.bind(this), sendError: this.sendError.bind(this) };
+      const context: ChannelHandlerContext = { ws, connection, send: this.send.bind(this), sendError: this.sendError.bind(this) };
 
       await handler.instance.handle(context, message);
     } catch (error) {

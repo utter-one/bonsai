@@ -1,7 +1,7 @@
 import type { WebSocket } from 'ws';
 import type { Connection } from './ConnectionManager';
-import type { ICommunicationChannel } from '../services/channels/ICommunicationChannel';
-import type { CALInputMessage, CALOutputMessage } from '../services/channels/messages';
+import type { ICommunicationChannel } from '../channels/channel';
+import type { CALInputMessage, CALOutputMessage } from '../channels/messages';
 import { logger } from '../utils/logger';
 
 /**

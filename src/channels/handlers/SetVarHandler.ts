@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
+import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
 import type { SetVarRequest, SetVarResponse } from '../contracts/command';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 
 /**
  * Handles set variable requests.
  */
-@WebSocketMessageHandler('set_var')
+@ChannelMessageHandler('set_var')
 @injectable()
-export class SetVarHandler implements WebSocketHandler<SetVarRequest> {
+export class SetVarHandler implements ChannelHandler<SetVarRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles set variable requests.
    */
-  async handle(context: WebSocketHandlerContext, message: SetVarRequest): Promise<void> {
+  async handle(context: ChannelHandlerContext, message: SetVarRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, requestId: message.requestId }, 'Set variable request received');
 
     try {

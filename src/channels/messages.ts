@@ -12,10 +12,10 @@
  *  - Output push types (server → client, unsolicited): `CAL<Description>Message`
  */
 
-import type { ParameterValue } from '../../types/parameters';
-import type { LlmContent } from '../providers/llm/ILlmProvider';
-import type { AudioFormat } from '../../types/audio';
-import type { ConversationEventType, ConversationEventData } from '../../types/conversationEvents';
+import type { ParameterValue } from '../types/parameters';
+import type { LlmContent } from '../services/providers/llm/ILlmProvider';
+import type { AudioFormat } from '../types/audio';
+import type { ConversationEventType, ConversationEventData } from '../types/conversationEvents';
 
 
 // Base message types
@@ -45,7 +45,7 @@ export type CALBaseOutputMessage = {
 /**
  * Requests that a new conversation is started for the given user and stage.
  */
-export type CALStartConversationMessage = CALBaseInputMessage & {
+export type CALStartConversationRequest = CALBaseInputMessage & {
   type: 'start_conversation';
   /** Identifier of the user initiating the conversation. */
   userId: string;
@@ -60,14 +60,14 @@ export type CALStartConversationMessage = CALBaseInputMessage & {
 /**
  * Requests that a previously paused conversation is resumed.
  */
-export type CALResumeConversationMessage = CALBaseInputMessage & {
+export type CALResumeConversationRequest = CALBaseInputMessage & {
   type: 'resume_conversation';
 };
 
 /**
  * Requests that the active conversation is ended.
  */
-export type CALEndConversationMessage = CALBaseInputMessage & {
+export type CALEndConversationRequest = CALBaseInputMessage & {
   type: 'end_conversation';
 };
 
@@ -75,14 +75,14 @@ export type CALEndConversationMessage = CALBaseInputMessage & {
  * Signals that the user has started speaking and the channel should begin buffering voice data.
  * Audio chunks are delivered separately via receiveAudioChunk.
  */
-export type CALStartUserVoiceInputMessage = CALBaseInputMessage & {
+export type CALStartUserVoiceInputRequest = CALBaseInputMessage & {
   type: 'start_user_voice_input';
 };
 
 /**
  * Signals that the user has finished speaking and the voice input turn should be finalised.
  */
-export type CALEndUserVoiceInputMessage = CALBaseInputMessage & {
+export type CALEndUserVoiceInputRequest = CALBaseInputMessage & {
   type: 'end_user_voice_input';
   /** Identifier of the input turn to close, as returned by the corresponding result message. */
   inputTurnId: string;
@@ -91,7 +91,7 @@ export type CALEndUserVoiceInputMessage = CALBaseInputMessage & {
 /**
  * Delivers a text message from the user into the conversation.
  */
-export type CALSendUserTextInputMessage = CALBaseInputMessage & {
+export type CALSendUserTextInputRequest = CALBaseInputMessage & {
   type: 'send_user_text_input';
   /** Text content submitted by the user. */
   text: string;
@@ -100,7 +100,7 @@ export type CALSendUserTextInputMessage = CALBaseInputMessage & {
 /**
  * Instructs the conversation engine to navigate to a specific stage.
  */
-export type CALGoToStageMessage = CALBaseInputMessage & {
+export type CALGoToStageRequest = CALBaseInputMessage & {
   type: 'go_to_stage';
   /** Identifier of the target stage. */
   stageId: string;
@@ -109,7 +109,7 @@ export type CALGoToStageMessage = CALBaseInputMessage & {
 /**
  * Sets a single variable on a specific stage.
  */
-export type CALSetVarMessage = CALBaseInputMessage & {
+export type CALSetVarRequest = CALBaseInputMessage & {
   type: 'set_var';
   /** Identifier of the stage that owns the variable. */
   stageId: string;
@@ -122,7 +122,7 @@ export type CALSetVarMessage = CALBaseInputMessage & {
 /**
  * Retrieves a single variable from a specific stage.
  */
-export type CALGetVarMessage = CALBaseInputMessage & {
+export type CALGetVarRequest = CALBaseInputMessage & {
   type: 'get_var';
   /** Identifier of the stage that owns the variable. */
   stageId: string;
@@ -133,7 +133,7 @@ export type CALGetVarMessage = CALBaseInputMessage & {
 /**
  * Retrieves all variables for a specific stage.
  */
-export type CALGetAllVarsMessage = CALBaseInputMessage & {
+export type CALGetAllVarsRequest = CALBaseInputMessage & {
   type: 'get_all_vars';
   /** Identifier of the stage whose variables should be retrieved. */
   stageId: string;
@@ -142,7 +142,7 @@ export type CALGetAllVarsMessage = CALBaseInputMessage & {
 /**
  * Triggers execution of a named global action with the supplied parameter values.
  */
-export type CALRunActionMessage = CALBaseInputMessage & {
+export type CALRunActionRequest = CALBaseInputMessage & {
   type: 'run_action';
   /** Name of the global action to execute. */
   actionName: string;
@@ -153,7 +153,7 @@ export type CALRunActionMessage = CALBaseInputMessage & {
 /**
  * Requests execution of a tool by its identifier with the supplied parameter values.
  */
-export type CALCallToolMessage = CALBaseInputMessage & {
+export type CALCallToolRequest = CALBaseInputMessage & {
   type: 'call_tool';
   /** Identifier of the tool to execute. */
   toolId: string;
@@ -165,26 +165,26 @@ export type CALCallToolMessage = CALBaseInputMessage & {
  * Discriminated union of all inbound message types accepted by a communication channel.
  */
 export type CALInputMessage =
-  | CALStartConversationMessage
-  | CALResumeConversationMessage
-  | CALEndConversationMessage
-  | CALStartUserVoiceInputMessage
-  | CALEndUserVoiceInputMessage
-  | CALSendUserTextInputMessage
-  | CALGoToStageMessage
-  | CALSetVarMessage
-  | CALGetVarMessage
-  | CALGetAllVarsMessage
-  | CALRunActionMessage
-  | CALCallToolMessage;
+  | CALStartConversationRequest
+  | CALResumeConversationRequest
+  | CALEndConversationRequest
+  | CALStartUserVoiceInputRequest
+  | CALEndUserVoiceInputRequest
+  | CALSendUserTextInputRequest
+  | CALGoToStageRequest
+  | CALSetVarRequest
+  | CALGetVarRequest
+  | CALGetAllVarsRequest
+  | CALRunActionRequest
+  | CALCallToolRequest;
 
 // Output result messages
 
 /**
  * Result of a start_conversation command.
  */
-export type CALStartConversationResultMessage = CALBaseOutputMessage & {
-  type: 'start_conversation_result';
+export type CALStartConversationResponse = CALBaseOutputMessage & {
+  type: 'start_conversation';
   success: boolean;
   error?: string;
 };
@@ -192,8 +192,8 @@ export type CALStartConversationResultMessage = CALBaseOutputMessage & {
 /**
  * Result of a resume_conversation command.
  */
-export type CALResumeConversationResultMessage = CALBaseOutputMessage & {
-  type: 'resume_conversation_result';
+export type CALResumeConversationResponse = CALBaseOutputMessage & {
+  type: 'resume_conversation';
   success: boolean;
   error?: string;
 };
@@ -201,8 +201,8 @@ export type CALResumeConversationResultMessage = CALBaseOutputMessage & {
 /**
  * Result of an end_conversation command.
  */
-export type CALEndConversationResultMessage = CALBaseOutputMessage & {
-  type: 'end_conversation_result';
+export type CALEndConversationResponse = CALBaseOutputMessage & {
+  type: 'end_conversation';
   success: boolean;
   error?: string;
 };
@@ -211,8 +211,8 @@ export type CALEndConversationResultMessage = CALBaseOutputMessage & {
  * Result of a start_user_voice_input command.
  * On success, inputTurnId must be supplied to subsequent voice chunks and the end_user_voice_input message.
  */
-export type CALStartUserVoiceInputResultMessage = CALBaseOutputMessage & {
-  type: 'start_user_voice_input_result';
+export type CALStartUserVoiceInputResponse = CALBaseOutputMessage & {
+  type: 'start_user_voice_input';
   success: boolean;
   /** Identifier for the new voice input turn. Present when success is true. */
   inputTurnId?: string;
@@ -222,8 +222,8 @@ export type CALStartUserVoiceInputResultMessage = CALBaseOutputMessage & {
 /**
  * Result of an end_user_voice_input command.
  */
-export type CALEndUserVoiceInputResultMessage = CALBaseOutputMessage & {
-  type: 'end_user_voice_input_result';
+export type CALEndUserVoiceInputResponse = CALBaseOutputMessage & {
+  type: 'end_user_voice_input';
   success: boolean;
   /** Identifier of the voice input turn that was closed. */
   inputTurnId: string;
@@ -235,8 +235,8 @@ export type CALEndUserVoiceInputResultMessage = CALBaseOutputMessage & {
  * inputTurnId identifies the turn created for this text input and can be used to correlate
  * the resulting conversation events.
  */
-export type CALSendUserTextInputResultMessage = CALBaseOutputMessage & {
-  type: 'send_user_text_input_result';
+export type CALSendUserTextInputResponse = CALBaseOutputMessage & {
+  type: 'send_user_text_input';
   success: boolean;
   /** Identifier of the input turn created for this text submission. */
   inputTurnId: string;
@@ -246,8 +246,8 @@ export type CALSendUserTextInputResultMessage = CALBaseOutputMessage & {
 /**
  * Result of a go_to_stage command.
  */
-export type CALGoToStageResultMessage = CALBaseOutputMessage & {
-  type: 'go_to_stage_result';
+export type CALGoToStageResponse = CALBaseOutputMessage & {
+  type: 'go_to_stage';
   success: boolean;
   error?: string;
 };
@@ -255,7 +255,7 @@ export type CALGoToStageResultMessage = CALBaseOutputMessage & {
 /**
  * Result of a set_var command.
  */
-export type CALSetVarResultMessage = CALBaseOutputMessage & {
+export type CALSetVarResponse = CALBaseOutputMessage & {
   type: 'set_var_result';
   success: boolean;
   error?: string;
@@ -264,8 +264,8 @@ export type CALSetVarResultMessage = CALBaseOutputMessage & {
 /**
  * Result of a get_var command.
  */
-export type CALGetVarResultMessage = CALBaseOutputMessage & {
-  type: 'get_var_result';
+export type CALGetVarResponse = CALBaseOutputMessage & {
+  type: 'get_var';
   success: boolean;
   /** Name of the requested variable, echoed for easy correlation. */
   variableName: string;
@@ -277,8 +277,8 @@ export type CALGetVarResultMessage = CALBaseOutputMessage & {
 /**
  * Result of a get_all_vars command.
  */
-export type CALGetAllVarsResultMessage = CALBaseOutputMessage & {
-  type: 'get_all_vars_result';
+export type CALGetAllVarsResponse = CALBaseOutputMessage & {
+  type: 'get_all_vars';
   success: boolean;
   /** All stage variables keyed by name. Empty object when none exist. */
   variables: Record<string, ParameterValue>;
@@ -288,8 +288,8 @@ export type CALGetAllVarsResultMessage = CALBaseOutputMessage & {
 /**
  * Result of a run_action command.
  */
-export type CALRunActionResultMessage = CALBaseOutputMessage & {
-  type: 'run_action_result';
+export type CALRunActionResponse = CALBaseOutputMessage & {
+  type: 'run_action';
   success: boolean;
   /** Multi-modal content blocks returned by the action. */
   result?: LlmContent[];
@@ -299,8 +299,8 @@ export type CALRunActionResultMessage = CALBaseOutputMessage & {
 /**
  * Result of a call_tool command.
  */
-export type CALCallToolResultMessage = CALBaseOutputMessage & {
-  type: 'call_tool_result';
+export type CALCallToolResponse = CALBaseOutputMessage & {
+  type: 'call_tool';
   success: boolean;
   /** Multi-modal content blocks returned by the tool. */
   result?: LlmContent[];
@@ -475,18 +475,18 @@ export type CALConversationEventUpdateMessage = CALBaseOutputMessage & {
  * Discriminated union of all outbound message types emitted by a communication channel.
  */
 export type CALOutputMessage =
-  | CALStartConversationResultMessage
-  | CALResumeConversationResultMessage
-  | CALEndConversationResultMessage
-  | CALStartUserVoiceInputResultMessage
-  | CALEndUserVoiceInputResultMessage
-  | CALSendUserTextInputResultMessage
-  | CALGoToStageResultMessage
-  | CALSetVarResultMessage
-  | CALGetVarResultMessage
-  | CALGetAllVarsResultMessage
-  | CALRunActionResultMessage
-  | CALCallToolResultMessage
+  | CALStartConversationResponse
+  | CALResumeConversationResponse
+  | CALEndConversationResponse
+  | CALStartUserVoiceInputResponse
+  | CALEndUserVoiceInputResponse
+  | CALSendUserTextInputResponse
+  | CALGoToStageResponse
+  | CALSetVarResponse
+  | CALGetVarResponse
+  | CALGetAllVarsResponse
+  | CALRunActionResponse
+  | CALCallToolResponse
   | CALStartAiGenerationOutputMessage
   | CALSendAiVoiceChunkMessage
   | CALEndAiGenerationOutputMessage

@@ -1,20 +1,20 @@
 import { inject, injectable } from 'tsyringe';
-import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
 import type { AuthRequest, AuthResponse } from '../contracts/auth';
 import { ConnectionManager } from '../ConnectionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';
 import { ProjectService } from '../../services/ProjectService';
 import { WsRateLimiter } from '../WsRateLimiter';
 import { logger } from '../../utils/logger';
-import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 
 /**
  * Handles WebSocket authentication requests.
  * Validates API key and creates a session on successful authentication.
  */
-@WebSocketMessageHandler('auth', false)
+@ChannelMessageHandler('auth', false)
 @injectable()
-export class AuthHandler implements WebSocketHandler<AuthRequest> {
+export class AuthHandler implements ChannelHandler<AuthRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -29,7 +29,7 @@ export class AuthHandler implements WebSocketHandler<AuthRequest> {
    * Handles authentication requests.
    * Validates API key against the database and creates a session on successful authentication.
    */
-  async handle(context: WebSocketHandlerContext, message: AuthRequest): Promise<void> {
+  async handle(context: ChannelHandlerContext, message: AuthRequest): Promise<void> {
     const ip = this.connectionManager.getSocketIp(context.ws);
 
     // Reject re-authentication on an already-authenticated connection

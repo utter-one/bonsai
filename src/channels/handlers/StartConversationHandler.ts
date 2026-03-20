@@ -1,5 +1,5 @@
 import { inject, injectable } from 'tsyringe';
-import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
+import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
 import type { StartConversationRequest, StartConversationResponse } from '../contracts/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
@@ -7,16 +7,16 @@ import { StageService } from '../../services/StageService';
 import { ProjectService } from '../../services/ProjectService';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 import { UserService } from '../../services/UserService';
 import type { ConversationFailedEventData } from '../../types/conversationEvents';
 
 /**
  * Handles start conversation requests.
  */
-@WebSocketMessageHandler('start_conversation')
+@ChannelMessageHandler('start_conversation')
 @injectable()
-export class StartConversationHandler implements WebSocketHandler<StartConversationRequest> {
+export class StartConversationHandler implements ChannelHandler<StartConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -29,7 +29,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
   /**
    * Handles start conversation requests.
    */
-  async handle(context: WebSocketHandlerContext, message: StartConversationRequest): Promise<void> {
+  async handle(context: ChannelHandlerContext, message: StartConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, agentId: message.agentId, requestId: message.requestId }, 'Start conversation request received');
 
     if (!context.connection) {

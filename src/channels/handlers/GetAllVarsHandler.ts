@@ -1,23 +1,23 @@
 import { injectable } from 'tsyringe';
-import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
+import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
 import type { GetAllVarsRequest, GetAllVarsResponse } from '../contracts/command';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 
 /**
  * Handles get all variables requests.
  */
-@WebSocketMessageHandler('get_all_vars')
+@ChannelMessageHandler('get_all_vars')
 @injectable()
-export class GetAllVarsHandler implements WebSocketHandler<GetAllVarsRequest> {
+export class GetAllVarsHandler implements ChannelHandler<GetAllVarsRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles get all variables requests.
    */
-  async handle(context: WebSocketHandlerContext, message: GetAllVarsRequest): Promise<void> {
+  async handle(context: ChannelHandlerContext, message: GetAllVarsRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, requestId: message.requestId }, 'Get all variables request received');
 
     try {

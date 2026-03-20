@@ -1,17 +1,17 @@
 import { inject, injectable } from 'tsyringe';
-import type { WebSocketHandler, WebSocketHandlerContext } from '../WebSocketHandler';
+import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
 import type { EndConversationRequest, EndConversationResponse } from '../contracts/session';
 import { ConnectionManager } from '../ConnectionManager';
 import { logger } from '../../utils/logger';
-import { WebSocketMessageHandler } from '../WebSocketHandlerRegistry';
+import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 import { ConversationService } from '../../services/ConversationService';
 
 /**
  * Handles end conversation requests.
  */
-@WebSocketMessageHandler('end_conversation')
+@ChannelMessageHandler('end_conversation')
 @injectable()
-export class EndConversationHandler implements WebSocketHandler<EndConversationRequest> {
+export class EndConversationHandler implements ChannelHandler<EndConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -21,7 +21,7 @@ export class EndConversationHandler implements WebSocketHandler<EndConversationR
   /**
    * Handles end conversation requests.
    */
-  async handle(context: WebSocketHandlerContext, message: EndConversationRequest): Promise<void> {
+  async handle(context: ChannelHandlerContext, message: EndConversationRequest): Promise<void> {
     logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End conversation request received');
 
     try {

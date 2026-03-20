@@ -1,6 +1,6 @@
 import { singleton, container } from "tsyringe";
 import type { ConversationRunner } from "../services/live/ConversationRunner";
-import type { ICommunicationChannel } from "../services/channels/ICommunicationChannel";
+import type { ICommunicationChannel } from "../channels/channel";
 import { SessionSettings } from "./contracts/auth";
 import { logger } from "../utils/logger";
 import { WebSocketChannel } from "./WebSocketChannel";
