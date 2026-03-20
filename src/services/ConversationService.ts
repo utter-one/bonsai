@@ -199,7 +199,7 @@ export class ConversationService extends BaseService {
    * @param newMetadata - Additional metadata to merge into the event's existing metadata
    * @param newMessageVisibility - The visibility of the message
    */
-  async updateMessageEvent(projectId: string, eventId: string, newUserInput: string, newMetadata: Record<string, any>, newMessageVisibility: MessageVisibility): Promise<void> {
+  async updateMessageEvent(projectId: string, eventId: string, newUserInput: string, newMetadata: Record<string, any>, newMessageVisibility: MessageVisibility): Promise<ConversationEventResponse | null> {
     try {
       const existing = await db.query.conversationEvents.findFirst({ where: and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId)) });
       if (!existing) {
@@ -213,8 +213,9 @@ export class ConversationService extends BaseService {
 
       const existingData = existing.eventData as MessageEventData;
       const updatedEventData = { ...existingData, userInput: newUserInput, visibility: newMessageVisibility, metadata: { ...(existingData.metadata || {}), ...newMetadata } } as ConversationEventData;
-      await db.update(conversationEvents).set({ eventData: updatedEventData }).where(and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId)));
-      logger.debug({ projectId, eventId }, 'Conversation event message ID updated successfully');
+      const result = await db.update(conversationEvents).set({ eventData: updatedEventData }).where(and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId))).returning();
+      logger.debug({ projectId, eventId }, 'Conversation event message updated successfully');
+      return result.length > 0 ? conversationEventResponseSchema.parse(result[0]) : null;
     } catch (error) {
       logger.error({ error, projectId, eventId }, 'Failed to update conversation event message ID');
     }

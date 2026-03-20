@@ -1653,7 +1653,7 @@ export class ConversationRunner {
     }
 
     // Update message event with moderation and processing results, which may be needed for response generation and should be sent to client for UI updates
-    await this.conversationService.updateMessageEvent(this.conversation.projectId, userMessageEventId, context.userInput, {
+    const updated = await this.conversationService.updateMessageEvent(this.conversation.projectId, userMessageEventId, context.userInput, {
         source: context.userInputSource,
         inputTurnId: this.turnData.inputTurnId,
         turnIndex: this.turnData.turnIndex,
@@ -1664,6 +1664,7 @@ export class ConversationRunner {
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,
     }, this.turnMessageVisibility);
+    this.connectionManager.sendConversationEventUpdate(this.conversation.id, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
 
     await this.generateResponse(context, executionOutcome);
   }
