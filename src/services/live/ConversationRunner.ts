@@ -1006,17 +1006,20 @@ export class ConversationRunner {
         }
       }
 
-      // Load new stage data
-      const newStageData = await this.buildStageData({ ...this.conversation, stageId });
-
-      // Update stage data and conversation
-      this.stageData = newStageData;
+      // Update stageId on this.conversation before building new stage data.
+      // This keeps stageData.conversation as the same object reference as this.conversation,
+      // so any subsequent applyActionOutcome writes to this.conversation.stageVars are
+      // immediately visible via getRuntimeData().conversation on the next turn.
       this.conversation.stageId = stageId;
 
       // Update conversation in database
       await db.update(conversations)
         .set({ stageId, updatedAt: new Date() })
         .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+
+      // Load new stage data, passing this.conversation directly (not a spread copy)
+      const newStageData = await this.buildStageData(this.conversation);
+      this.stageData = newStageData;
 
       // Re-wire providers for the new stage
       await this.wireUpProviders();
