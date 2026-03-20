@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws';
-import type { Connection, ConnectionManager } from './ConnectionManager';
+import type { Connection } from './ConnectionManager';
 import type { ICommunicationChannel } from '../services/channels/ICommunicationChannel';
 import type { CALInputMessage, CALOutputMessage } from '../services/channels/messages';
 import { logger } from '../utils/logger';
@@ -8,8 +8,7 @@ import { logger } from '../utils/logger';
  * WebSocket-backed implementation of {@link ICommunicationChannel}.
  *
  * Translates CAL output messages to their WebSocket wire-format counterparts and
- * dispatches conversation-event messages via {@link ConnectionManager} so that all
- * sessions subscribed to a conversation receive them.
+ * sends them directly to the associated WebSocket client.
  *
  * `open()` and `close()` are no-ops because the WebSocket lifecycle is managed
  * externally by {@link ConnectionManager}. `receiveMessage()` is also a no-op because
@@ -19,7 +18,6 @@ export class WebSocketChannel implements ICommunicationChannel {
   constructor(
     private readonly ws: WebSocket,
     private readonly connection: Connection,
-    private readonly connectionManager: ConnectionManager,
   ) {}
 
   /** No-op: WebSocket lifecycle is managed by {@link ConnectionManager}. */
@@ -33,8 +31,7 @@ export class WebSocketChannel implements ICommunicationChannel {
 
   /**
    * Translates a CAL output message to its WebSocket wire-format equivalent and
-   * sends it to the client, or broadcasts it via {@link ConnectionManager} for
-   * conversation-event messages.
+   * sends it directly to the client.
    * @param msg - The CAL output message to transmit.
    */
   async sendMessage(msg: CALOutputMessage): Promise<void> {
@@ -144,12 +141,30 @@ export class WebSocketChannel implements ICommunicationChannel {
       }
 
       case 'conversation_event': {
-        this.connectionManager.sendConversationEvent(msg.conversationId, msg.eventType, msg.eventData, msg.inputTurnId, msg.outputTurnId);
+        if (!sessionSettings.receiveEvents) return;
+        this.send({
+          type: 'conversation_event',
+          sessionId,
+          conversationId,
+          eventType: msg.eventType,
+          eventData: msg.eventData,
+          inputTurnId: msg.inputTurnId,
+          outputTurnId: msg.outputTurnId,
+        });
         break;
       }
 
       case 'conversation_event_update': {
-        this.connectionManager.sendConversationEventUpdate(msg.conversationId, msg.eventType, msg.eventData, msg.inputTurnId, msg.outputTurnId);
+        if (!sessionSettings.receiveEvents) return;
+        this.send({
+          type: 'conversation_event_update',
+          sessionId,
+          conversationId,
+          eventType: msg.eventType,
+          eventData: msg.eventData,
+          inputTurnId: msg.inputTurnId,
+          outputTurnId: msg.outputTurnId,
+        });
         break;
       }
 

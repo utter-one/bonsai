@@ -83,7 +83,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       await context.connection.runner.startConversation();
 
       const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: true, conversationId, requestId: message.requestId };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start conversation';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId }, 'Failed to start conversation');
@@ -93,7 +93,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
         try {
           await this.conversationService.failConversation(context.connection!.projectId, conversationId, errorMessage);
           await this.conversationService.saveConversationEvent(context.connection!.projectId, conversationId, 'conversation_failed', failedEventData);
-          this.connectionManager.sendConversationEvent(conversationId, 'conversation_failed', failedEventData);
+          await context.connection!.channel?.sendMessage({ type: 'conversation_event', conversationId, eventType: 'conversation_failed', eventData: failedEventData });
         } catch (cleanupError) {
           logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId }, 'Failed to save conversation_failed event during cleanup');
         }
@@ -101,7 +101,7 @@ export class StartConversationHandler implements WebSocketHandler<StartConversat
       }
 
       const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

@@ -84,7 +84,9 @@ export class ConversationTimeoutService {
       const eventData: ConversationAbortedEventData = { stageId, reason: TIMEOUT_REASON };
       await this.conversationService.saveConversationEvent(projectId, id, 'conversation_aborted', eventData);
 
-      this.connectionManager.sendConversationEvent(id, 'conversation_aborted', eventData);
+      for (const connection of this.connectionManager.getConnectionsForConversation(id)) {
+        await connection.channel?.sendMessage({ type: 'conversation_event', conversationId: connection.conversationId, eventType: 'conversation_aborted', eventData });
+      }
       this.connectionManager.detachConversationFromAllSessions(id);
 
       logger.info({ conversationId: id, projectId }, 'Conversation aborted due to inactivity timeout');

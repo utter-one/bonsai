@@ -37,14 +37,14 @@ export class RunActionHandler implements WebSocketHandler<RunActionRequest> {
       const result = await context.connection.runner.runAction(message.actionName, message.parameters);
 
       const response: RunActionResponse = { type: 'run_action', sessionId: message.sessionId, success: true, result, requestId: message.requestId };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to run action';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName }, 'Failed to run action');
       const response: RunActionResponse = { type: 'run_action', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

@@ -51,7 +51,7 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
 
     // Return success response
     const response: ResumeConversationResponse = { type: 'resume_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };
-    context.send(context.connection.ws, response);
+    context.send(context.ws, response);
 
     // Resume the conversation
     try {
@@ -63,7 +63,7 @@ export class ResumeConversationHandler implements WebSocketHandler<ResumeConvers
       try {
         await this.conversationService.failConversation(context.connection!.projectId, message.conversationId, errorMessage);
         await this.conversationService.saveConversationEvent(context.connection!.projectId, message.conversationId, 'conversation_failed', failedEventData);
-        this.connectionManager.sendConversationEvent(message.conversationId, 'conversation_failed', failedEventData);
+        await context.connection!.channel?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_failed', eventData: failedEventData });
       } catch (cleanupError) {
         logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId: message.conversationId }, 'Failed to save conversation_failed event during cleanup');
       }

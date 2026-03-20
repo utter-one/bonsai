@@ -47,7 +47,7 @@ export class SendUserTextInputHandler implements WebSocketHandler<SendUserTextIn
         requestId: message.requestId,
         inputTurnId: inputTurnId
       };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User text input received successfully');
     } catch (error) {
@@ -61,7 +61,7 @@ export class SendUserTextInputHandler implements WebSocketHandler<SendUserTextIn
         requestId: message.requestId,
         inputTurnId
       };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

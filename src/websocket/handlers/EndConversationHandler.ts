@@ -38,20 +38,20 @@ export class EndConversationHandler implements WebSocketHandler<EndConversationR
       // Save event and send WebSocket message BEFORE detaching conversation
       const eventData = { reason: '', stageId, metadata: { currentVariables: conversation?.stageVars?.[stageId] || {} } };
       await this.conversationService.saveConversationEvent(projectId, message.conversationId, 'conversation_end', eventData);
-      this.connectionManager.sendConversationEvent(message.conversationId, 'conversation_end', eventData);
+      await context.connection?.channel?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_end', eventData });
       
       // Now detach and finish the conversation
       this.connectionManager.detachConversationInSession(message.sessionId);
       await this.conversationService.finishConversation(projectId, message.conversationId);
 
       const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'Conversation ended successfully');
     } catch (error) {
       logger.error({ error: error instanceof Error ? error.message : String(error), sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end conversation');
       const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: false, error: error instanceof Error ? error.message : 'Failed to end conversation', requestId: message.requestId };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

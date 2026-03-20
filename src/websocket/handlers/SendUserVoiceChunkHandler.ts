@@ -47,7 +47,7 @@ export class SendUserVoiceChunkHandler implements WebSocketHandler<SendUserVoice
         requestId: message.requestId,
         inputTurnId: message.inputTurnId
       };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process voice chunk';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process voice chunk');
@@ -59,7 +59,7 @@ export class SendUserVoiceChunkHandler implements WebSocketHandler<SendUserVoice
         requestId: message.requestId, 
         inputTurnId: message.inputTurnId 
       };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

@@ -37,14 +37,14 @@ export class GetAllVarsHandler implements WebSocketHandler<GetAllVarsRequest> {
       const variables = await context.connection.runner.getAllVariables(message.stageId);
 
       const response: GetAllVarsResponse = { type: 'get_all_vars', sessionId: message.sessionId, success: true, variables, requestId: message.requestId };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Get all variables completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get all variables';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to get all variables');
       const response: GetAllVarsResponse = { type: 'get_all_vars', sessionId: message.sessionId, success: false, variables: {}, error: errorMessage, requestId: message.requestId };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

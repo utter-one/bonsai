@@ -37,14 +37,14 @@ export class GetVarHandler implements WebSocketHandler<GetVarRequest> {
       const variableValue = await context.connection.runner.getVariable(message.stageId, message.variableName);
 
       const response: GetVarResponse = { type: 'get_var', sessionId: message.sessionId, success: true, variableName: message.variableName, variableValue, requestId: message.requestId };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Get variable completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get variable';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to get variable');
       const response: GetVarResponse = { type: 'get_var', sessionId: message.sessionId, success: false, variableName: message.variableName, error: errorMessage, requestId: message.requestId };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

@@ -46,7 +46,7 @@ export class EndUserVoiceInputHandler implements WebSocketHandler<EndUserVoiceIn
         requestId: message.requestId,
         inputTurnId: message.inputTurnId
       };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input ended successfully');
     } catch (error) {
@@ -60,7 +60,7 @@ export class EndUserVoiceInputHandler implements WebSocketHandler<EndUserVoiceIn
         requestId: message.requestId,
         inputTurnId: message.inputTurnId
       };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

@@ -37,14 +37,14 @@ export class CallToolHandler implements WebSocketHandler<CallToolRequest> {
       const result = await context.connection.runner.callTool(message.toolId, message.parameters);
 
       const response: CallToolResponse = { type: 'call_tool', sessionId: message.sessionId, success: true, result, requestId: message.requestId };
-      context.send(context.connection.ws, response);
+      context.send(context.ws, response);
 
       logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, toolId: message.toolId }, 'Call tool completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to call tool';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, toolId: message.toolId }, 'Failed to call tool');
       const response: CallToolResponse = { type: 'call_tool', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.connection!.ws, response);
+      context.send(context.ws, response);
     }
   }
 }

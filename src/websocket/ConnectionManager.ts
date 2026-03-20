@@ -1,9 +1,8 @@
 import { singleton, container } from "tsyringe";
 import type { ConversationRunner } from "../services/live/ConversationRunner";
-import { meta } from "zod/v4/core";
+import type { ICommunicationChannel } from "../services/channels/ICommunicationChannel";
 import { SessionSettings } from "./contracts/auth";
 import { logger } from "../utils/logger";
-import { ConversationEventData, ConversationEventType } from "../types/conversationEvents";
 import { WebSocketChannel } from "./WebSocketChannel";
 
 /** Session data associated with each WebSocket connection. */
@@ -17,8 +16,8 @@ export type Connection =
     conversationId: string
     /** Conversation runner instance for managing the conversation. */
     runner: ConversationRunner;
-    /** WebSocket connection associated with this session. */
-    ws: WebSocket;
+    /** Communication channel used to send messages to this session. */
+    channel: ICommunicationChannel;
     /** Session settings configured during authentication. */
     sessionSettings: SessionSettings;
   };
@@ -63,14 +62,16 @@ export class ConnectionManager {
    */
   createSession(ws: WebSocket, projectId: string, sessionSettings?: SessionSettings): string {
     const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
-    this.socketMap.set(ws, {
+    const connection: Connection = {
       id: sessionId,
       projectId,
       conversationId: null,
       runner: null,
-      ws,
-      sessionSettings: sessionSettings ?? { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true }
-    });
+      channel: null!,
+      sessionSettings: sessionSettings ?? { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true },
+    };
+    connection.channel = new WebSocketChannel(ws, connection);
+    this.socketMap.set(ws, connection);
     this.connectionMap.set(sessionId, ws);
     return sessionId;
   }
@@ -110,8 +111,7 @@ export class ConnectionManager {
       session.conversationId = conversationId;
       const { ConversationRunner } = await import('../services/live/ConversationRunner.js');
       session.runner = container.resolve(ConversationRunner);
-      const channel = new WebSocketChannel(this.socketMap.get(socket).ws, session, this);
-      await session.runner.prepareConversation(conversationId, session, channel);
+      await session.runner.prepareConversation(conversationId, session, session.channel);
       this.socketMap.set(socket, session);
     }
   }
@@ -171,36 +171,16 @@ export class ConnectionManager {
   }
 
   /**
-   * Sends a conversation event message to a connected WebSocket client if the client has enabled receiveEvents.
-   * @param conversationId - The conversation ID to send the event for.
-   * @param eventType - The type of conversation event.
-   * @param eventData - The event data.
-   * @param inputTurnId - Optional input turn ID.
-   * @param outputTurnId - Optional output turn ID.
+   * Returns all active connections that are currently attached to the given conversation.
+   * @param conversationId - The conversation ID to look up.
    */
-  sendConversationEvent(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, inputTurnId?: string, outputTurnId?: string): void {
-    for (const [ws, connection] of this.socketMap.entries()) {
-      if (connection.conversationId === conversationId && connection.sessionSettings.receiveEvents) {
-        const message = { type: 'conversation_event', sessionId: connection.id, conversationId, eventType, eventData, inputTurnId, outputTurnId };
-        try {
-          ws.send(JSON.stringify(message));
-        } catch (error) {
-          logger.error({ error, conversationId, sessionId: connection.id }, 'Failed to send conversation event message');
-        }
+  getConnectionsForConversation(conversationId: string): Connection[] {
+    const result: Connection[] = [];
+    for (const connection of this.socketMap.values()) {
+      if (connection.conversationId === conversationId) {
+        result.push(connection);
       }
     }
-  }
-
-  sendConversationEventUpdate(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, inputTurnId?: string, outputTurnId?: string): void {
-    for (const [ws, connection] of this.socketMap.entries()) {
-      if (connection.conversationId === conversationId && connection.sessionSettings.receiveEvents) {
-        const message = { type: 'conversation_event_update', sessionId: connection.id, conversationId, eventType, eventData, inputTurnId, outputTurnId };
-        try {
-          ws.send(JSON.stringify(message));
-        } catch (error) {
-          logger.error({ error, conversationId, sessionId: connection.id }, 'Failed to send conversation event update message');
-        }
-      }
-    }
+    return result;
   }
 }

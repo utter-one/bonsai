@@ -1,12 +1,12 @@
-import { eq } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
+import { eq } from 'drizzle-orm';
 import { conversations, db } from '../../db';
 import { parseJsonFromMarkdown } from '../../utils/jsonParser';
 import logger from '../../utils/logger';
 import { extractTextFromContent } from '../../utils/llm';
 import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
-import { Connection, ConnectionManager } from '../../websocket/ConnectionManager';
+import { Connection } from '../../websocket/ConnectionManager';
 import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
@@ -51,7 +51,6 @@ export class ContextTransformerExecutor {
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private readonly conversationService: ConversationService,
-    @inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
     @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
   ) {}
 
@@ -133,7 +132,7 @@ export class ContextTransformerExecutor {
         },
       };
       await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData);
-      this.connectionManager.sendConversationEvent(conversation.id, 'transformation', eventData);
+      await session.channel.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'transformation', eventData });
     }
 
     // Build a raw context with the updated stage vars for condition evaluation
