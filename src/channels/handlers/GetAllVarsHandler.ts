@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { GetAllVarsRequest, GetAllVarsResponse } from '../contracts/command';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALGetAllVarsRequest, CALGetAllVarsResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
@@ -10,15 +10,15 @@ import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
  */
 @ChannelMessageHandler('get_all_vars')
 @injectable()
-export class GetAllVarsHandler implements ChannelHandler<GetAllVarsRequest> {
+export class GetAllVarsHandler implements ChannelHandler<CALGetAllVarsRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles get all variables requests.
    */
-  async handle(context: ChannelHandlerContext, message: GetAllVarsRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, requestId: message.requestId }, 'Get all variables request received');
+  async handle(context: ChannelHandlerContext, message: CALGetAllVarsRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, correlationId: message.correlationId }, 'Get all variables request received');
 
     try {
       if (!context.connection) {
@@ -36,15 +36,15 @@ export class GetAllVarsHandler implements ChannelHandler<GetAllVarsRequest> {
       await context.connection.runner.saveCommandEvent('get_all_vars', { stageId: message.stageId });
       const variables = await context.connection.runner.getAllVariables(message.stageId);
 
-      const response: GetAllVarsResponse = { type: 'get_all_vars', sessionId: message.sessionId, success: true, variables, requestId: message.requestId };
-      context.send(context.ws, response);
+      const response: CALGetAllVarsResponse = { type: 'get_all_vars', conversationId: message.conversationId, correlationId: message.correlationId, success: true, variables };
+      context.send(response);
 
-      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Get all variables completed successfully');
+      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId }, 'Get all variables completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get all variables';
-      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to get all variables');
-      const response: GetAllVarsResponse = { type: 'get_all_vars', sessionId: message.sessionId, success: false, variables: {}, error: errorMessage, requestId: message.requestId };
-      context.send(context.ws, response);
+      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to get all variables');
+      const response: CALGetAllVarsResponse = { type: 'get_all_vars', conversationId: message.conversationId, correlationId: message.correlationId, success: false, variables: {}, error: errorMessage };
+      context.send(response);
     }
   }
 }

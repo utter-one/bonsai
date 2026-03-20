@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { EndUserVoiceInputRequest, EndUserVoiceInputResponse } from '../contracts/userInput';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALEndUserVoiceInputRequest, CALEndUserVoiceInputResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
@@ -10,15 +10,15 @@ import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
  */
 @ChannelMessageHandler('end_user_voice_input')
 @injectable()
-export class EndUserVoiceInputHandler implements ChannelHandler<EndUserVoiceInputRequest> {
+export class EndUserVoiceInputHandler implements ChannelHandler<CALEndUserVoiceInputRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles end user voice input requests.
    */
-  async handle(context: ChannelHandlerContext, message: EndUserVoiceInputRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End user voice input request received');
+  async handle(context: ChannelHandlerContext, message: CALEndUserVoiceInputRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'End user voice input request received');
 
     try {
       if (!context.connection) {
@@ -39,28 +39,28 @@ export class EndUserVoiceInputHandler implements ChannelHandler<EndUserVoiceInpu
 
       await context.connection.runner.stopUserVoiceInput(message.inputTurnId);
 
-      const response: EndUserVoiceInputResponse = { 
+      const response: CALEndUserVoiceInputResponse = { 
         type: 'end_user_voice_input', 
-        sessionId: message.sessionId, 
+        conversationId: message.conversationId,
+        correlationId: message.correlationId,
         success: true, 
-        requestId: message.requestId,
         inputTurnId: message.inputTurnId
       };
-      context.send(context.ws, response);
+      context.send(response);
 
-      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input ended successfully');
+      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId }, 'User voice input ended successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to end user voice input';
-      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end user voice input');
-      const response: EndUserVoiceInputResponse = { 
+      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId }, 'Failed to end user voice input');
+      const response: CALEndUserVoiceInputResponse = { 
         type: 'end_user_voice_input', 
-        sessionId: message.sessionId, 
+        conversationId: message.conversationId,
+        correlationId: message.correlationId,
         success: false, 
         error: errorMessage, 
-        requestId: message.requestId,
         inputTurnId: message.inputTurnId
       };
-      context.send(context.ws, response);
+      context.send(response);
     }
   }
 }

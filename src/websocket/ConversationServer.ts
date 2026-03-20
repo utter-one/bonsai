@@ -6,11 +6,11 @@ import type { IncomingMessage } from 'http';
 import { ConnectionManager } from './ConnectionManager';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common'
-import { ChannelHandlerRegistry } from './ChannelHandlerRegistry';
+import { ChannelHandlerRegistry } from '../channels/ChannelHandlerRegistry';
 
 // Import handlers module to trigger decorator registration
-import { ChannelHandler, ChannelHandlerContext } from './ChannelHandler';
-import "./handlers";
+import type { ChannelHandler, ChannelHandlerContext } from '../channels/channel';
+import "../channels/handlers";
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -83,14 +83,14 @@ export class WebSocketChannelHost {
    */
   private async handleMessage(ws: WebSocket, data: Buffer): Promise<void> {
     try {
-      const message = JSON.parse(data.toString()) as BaseInputMessage;
+      const wsMessage = JSON.parse(data.toString()) as BaseInputMessage;
 
-      logger.debug({ messageType: message.type, requestId: message.requestId }, 'Received WebSocket message');
+      logger.debug({ messageType: wsMessage.type, requestId: wsMessage.requestId }, 'Received WebSocket message');
 
-      const handler = this.handlers.get(message.type);
+      const handler = this.handlers.get(wsMessage.type);
       if (!handler) {
-        logger.warn({ messageType: message.type }, 'Unknown message type received');
-        this.sendError(ws, 'Unknown message type', message.requestId);
+        logger.warn({ messageType: wsMessage.type }, 'Unknown message type received');
+        this.sendError(ws, 'Unknown message type', wsMessage.requestId);
         return;
       }
 
@@ -98,13 +98,27 @@ export class WebSocketChannelHost {
       
       // Check if handler requires authentication
       if (handler.requiresAuth && (!connection || !connection.id)) {
-        this.sendError(ws, 'Authentication required', message.requestId);
+        this.sendError(ws, 'Authentication required', wsMessage.requestId);
         return;
       }
 
-      const context: ChannelHandlerContext = { ws, connection, send: this.send.bind(this), sendError: this.sendError.bind(this) };
+      // Translate WS wire format → CAL format: map requestId to correlationId
+      const message = { ...wsMessage, correlationId: wsMessage.requestId };
 
-      await handler.instance.handle(context, message);
+      const context: ChannelHandlerContext = {
+        ws,
+        connection,
+        // Translate CAL response → WS wire format: map correlationId to requestId and inject sessionId
+        send: (msg: any) => {
+          const wsMsg: Record<string, unknown> = { ...msg };
+          if (!wsMsg.requestId && wsMsg.correlationId) wsMsg.requestId = wsMsg.correlationId;
+          if (!wsMsg.sessionId && connection?.id) wsMsg.sessionId = connection.id;
+          this.send(ws, wsMsg as BaseOutputMessage);
+        },
+        sendError: (error: string, requestId?: string) => this.sendError(ws, error, requestId),
+      };
+
+      await handler.instance.handle(context, message as any);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error({ error: message }, 'Failed to handle WebSocket message');

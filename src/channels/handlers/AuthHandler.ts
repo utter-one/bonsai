@@ -1,10 +1,10 @@
 import { inject, injectable } from 'tsyringe';
 import type { ChannelHandler, ChannelHandlerContext } from '../channel';
-import type { AuthRequest, AuthResponse } from '../contracts/auth';
-import { ConnectionManager } from '../ConnectionManager';
+import type { AuthRequest, AuthResponse } from '../../websocket/contracts/auth';
+import { ConnectionManager } from '../../websocket/ConnectionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';
 import { ProjectService } from '../../services/ProjectService';
-import { WsRateLimiter } from '../WsRateLimiter';
+import { WsRateLimiter } from '../../websocket/WsRateLimiter';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 
@@ -30,13 +30,13 @@ export class AuthHandler implements ChannelHandler<AuthRequest> {
    * Validates API key against the database and creates a session on successful authentication.
    */
   async handle(context: ChannelHandlerContext, message: AuthRequest): Promise<void> {
-    const ip = this.connectionManager.getSocketIp(context.ws);
+    const ip = this.connectionManager.getSocketIp(context.ws!);
 
     // Reject re-authentication on an already-authenticated connection
     if (context.connection) {
       logger.warn({ requestId: message.requestId, sessionId: context.connection.id }, 'Auth message received on already-authenticated connection');
       const response: AuthResponse = { type: 'auth', success: false, error: 'Already authenticated', requestId: message.requestId };
-      context.send(context.ws, response);
+      context.send(response);
       return;
     }
 
@@ -44,8 +44,8 @@ export class AuthHandler implements ChannelHandler<AuthRequest> {
       const retryAfter = this.wsRateLimiter.getRetryAfterSeconds(ip);
       logger.warn({ requestId: message.requestId, ip, retryAfter }, 'WebSocket auth rate limit exceeded');
       const response: AuthResponse = { type: 'auth', success: false, error: 'Too many authentication attempts, please try again later', requestId: message.requestId };
-      context.send(context.ws, response);
-      context.ws.close();
+      context.send(response);
+      context.ws!.close();
       return;
     }
 
@@ -55,11 +55,11 @@ export class AuthHandler implements ChannelHandler<AuthRequest> {
       if (!apiKey || !apiKey.isActive) {
         logger.warn({ requestId: message.requestId }, 'Authentication failed: invalid or inactive API key');
         const response: AuthResponse = { type: 'auth', success: false, error: 'Invalid or inactive API key', requestId: message.requestId };
-        context.send(context.ws, response);
+        context.send(response);
         return;
       }
 
-      const sessionId = this.connectionManager.createSession(context.ws, apiKey.projectId, message.sessionSettings);
+      const sessionId = this.connectionManager.createSession(context.ws!, apiKey.projectId, message.sessionSettings);
       logger.info({ sessionId, projectId: apiKey.projectId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
 
       const project = await this.projectService.getProjectById(apiKey.projectId);
@@ -71,11 +71,11 @@ export class AuthHandler implements ChannelHandler<AuthRequest> {
       };
 
       const response: AuthResponse = { type: 'auth', success: true, sessionId, projectSettings, requestId: message.requestId };
-      context.send(context.ws, response);
+      context.send(response);
     } catch (error) {
       logger.error({ error, requestId: message.requestId }, 'Authentication failed: error validating API key');
       const response: AuthResponse = { type: 'auth', success: false, error: 'Invalid API key', requestId: message.requestId };
-      context.send(context.ws, response);
+      context.send(response);
     }
   }
 }

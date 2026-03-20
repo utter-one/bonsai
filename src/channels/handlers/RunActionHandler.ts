@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { RunActionRequest, RunActionResponse } from '../contracts/command';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALRunActionRequest, CALRunActionResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
@@ -10,15 +10,15 @@ import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
  */
 @ChannelMessageHandler('run_action')
 @injectable()
-export class RunActionHandler implements ChannelHandler<RunActionRequest> {
+export class RunActionHandler implements ChannelHandler<CALRunActionRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles run action requests.
    */
-  async handle(context: ChannelHandlerContext, message: RunActionRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName, requestId: message.requestId, message }, 'Run action request received');
+  async handle(context: ChannelHandlerContext, message: CALRunActionRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, actionName: message.actionName, correlationId: message.correlationId }, 'Run action request received');
 
     try {
       if (!context.connection) {
@@ -36,15 +36,15 @@ export class RunActionHandler implements ChannelHandler<RunActionRequest> {
       await context.connection.runner.saveCommandEvent('run_action', { actionName: message.actionName, parameters: message.parameters });
       const result = await context.connection.runner.runAction(message.actionName, message.parameters);
 
-      const response: RunActionResponse = { type: 'run_action', sessionId: message.sessionId, success: true, result, requestId: message.requestId };
-      context.send(context.ws, response);
+      const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: true, result };
+      context.send(response);
 
-      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
+      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to run action';
-      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, actionName: message.actionName }, 'Failed to run action');
-      const response: RunActionResponse = { type: 'run_action', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.ws, response);
+      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Failed to run action');
+      const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
+      context.send(response);
     }
   }
 }

@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { StartConversationRequest, StartConversationResponse } from '../contracts/session';
-import { ConnectionManager } from '../ConnectionManager';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALStartConversationRequest, CALStartConversationResponse } from '../messages';
+import { ConnectionManager } from '../../websocket/ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { StageService } from '../../services/StageService';
 import { ProjectService } from '../../services/ProjectService';
@@ -16,7 +16,7 @@ import type { ConversationFailedEventData } from '../../types/conversationEvents
  */
 @ChannelMessageHandler('start_conversation')
 @injectable()
-export class StartConversationHandler implements ChannelHandler<StartConversationRequest> {
+export class StartConversationHandler implements ChannelHandler<CALStartConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -29,8 +29,8 @@ export class StartConversationHandler implements ChannelHandler<StartConversatio
   /**
    * Handles start conversation requests.
    */
-  async handle(context: ChannelHandlerContext, message: StartConversationRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, agentId: message.agentId, requestId: message.requestId }, 'Start conversation request received');
+  async handle(context: ChannelHandlerContext, message: CALStartConversationRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, agentId: message.agentId, correlationId: message.correlationId }, 'Start conversation request received');
 
     if (!context.connection) {
       throw new NotFoundError('Session not found');
@@ -74,19 +74,19 @@ export class StartConversationHandler implements ChannelHandler<StartConversatio
       const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, clientId: context.connection.id, status: 'initialized', metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null });
       conversationId = conversation.id;
 
-      await this.connectionManager.attachConversationToSession(message.sessionId, conversationId);
+      await this.connectionManager.attachConversationToSession(context.connection.id, conversationId);
       conversationAttached = true;
 
-      logger.info({ sessionId: message.sessionId, conversationId }, 'Conversation created and attached to session');
+      logger.info({ sessionId: context.connection?.id, conversationId }, 'Conversation created and attached to session');
 
       // Start the conversation
       await context.connection.runner.startConversation();
 
-      const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: true, conversationId, requestId: message.requestId };
-      context.send(context.ws, response);
+      const response: CALStartConversationResponse = { type: 'start_conversation', conversationId, correlationId: message.correlationId, success: true };
+      context.send(response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start conversation';
-      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId }, 'Failed to start conversation');
+      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId }, 'Failed to start conversation');
 
       if (conversationAttached && conversationId) {
         const failedEventData: ConversationFailedEventData = { reason: errorMessage, stageId: message.stageId };
@@ -97,11 +97,11 @@ export class StartConversationHandler implements ChannelHandler<StartConversatio
         } catch (cleanupError) {
           logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId }, 'Failed to save conversation_failed event during cleanup');
         }
-        this.connectionManager.detachConversationInSession(message.sessionId);
+        this.connectionManager.detachConversationInSession(context.connection.id);
       }
 
-      const response: StartConversationResponse = { type: 'start_conversation', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.ws, response);
+      const response: CALStartConversationResponse = { type: 'start_conversation', conversationId: conversationId ?? '', correlationId: message.correlationId, success: false, error: errorMessage };
+      context.send(response);
     }
   }
 }

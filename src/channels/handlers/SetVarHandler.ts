@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { SetVarRequest, SetVarResponse } from '../contracts/command';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALSetVarRequest, CALSetVarResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
@@ -10,15 +10,15 @@ import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
  */
 @ChannelMessageHandler('set_var')
 @injectable()
-export class SetVarHandler implements ChannelHandler<SetVarRequest> {
+export class SetVarHandler implements ChannelHandler<CALSetVarRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles set variable requests.
    */
-  async handle(context: ChannelHandlerContext, message: SetVarRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, requestId: message.requestId }, 'Set variable request received');
+  async handle(context: ChannelHandlerContext, message: CALSetVarRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, correlationId: message.correlationId }, 'Set variable request received');
 
     try {
       if (!context.connection) {
@@ -36,15 +36,15 @@ export class SetVarHandler implements ChannelHandler<SetVarRequest> {
       await context.connection.runner.saveCommandEvent('set_var', { stageId: message.stageId, variableName: message.variableName, variableValue: message.variableValue });
       await context.connection.runner.setVariable(message.stageId, message.variableName, message.variableValue);
 
-      const response: SetVarResponse = { type: 'set_var', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      context.send(context.ws, response);
+      const response: CALSetVarResponse = { type: 'set_var_result', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
+      context.send(response);
 
-      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Set variable completed successfully');
+      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Set variable completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to set variable';
-      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to set variable');
-      const response: SetVarResponse = { type: 'set_var', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.ws, response);
+      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to set variable');
+      const response: CALSetVarResponse = { type: 'set_var_result', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
+      context.send(response);
     }
   }
 }

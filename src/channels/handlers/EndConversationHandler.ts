@@ -1,17 +1,17 @@
 import { inject, injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { EndConversationRequest, EndConversationResponse } from '../contracts/session';
-import { ConnectionManager } from '../ConnectionManager';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALEndConversationRequest, CALEndConversationResponse } from '../messages';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
 import { ConversationService } from '../../services/ConversationService';
+import { ConnectionManager } from '../../websocket/ConnectionManager';
 
 /**
  * Handles end conversation requests.
  */
 @ChannelMessageHandler('end_conversation')
 @injectable()
-export class EndConversationHandler implements ChannelHandler<EndConversationRequest> {
+export class EndConversationHandler implements ChannelHandler<CALEndConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -21,8 +21,8 @@ export class EndConversationHandler implements ChannelHandler<EndConversationReq
   /**
    * Handles end conversation requests.
    */
-  async handle(context: ChannelHandlerContext, message: EndConversationRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'End conversation request received');
+  async handle(context: ChannelHandlerContext, message: CALEndConversationRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'End conversation request received');
 
     try {
       const connection = context.connection;
@@ -41,17 +41,26 @@ export class EndConversationHandler implements ChannelHandler<EndConversationReq
       await context.connection?.channel?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_end', eventData });
       
       // Now detach and finish the conversation
-      this.connectionManager.detachConversationInSession(message.sessionId);
+      this.connectionManager.detachConversationInSession(context.connection!.id);
       await this.conversationService.finishConversation(projectId, message.conversationId);
 
-      const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      context.send(context.ws, response);
+      const response: CALEndConversationResponse = { 
+        type: 'end_conversation',
+        conversationId: message.conversationId, 
+        success: true, 
+        correlationId: message.correlationId };
+      context.send(response);
 
-      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'Conversation ended successfully');
+      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId }, 'Conversation ended successfully');
     } catch (error) {
-      logger.error({ error: error instanceof Error ? error.message : String(error), sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to end conversation');
-      const response: EndConversationResponse = { type: 'end_conversation', sessionId: message.sessionId, success: false, error: error instanceof Error ? error.message : 'Failed to end conversation', requestId: message.requestId };
-      context.send(context.ws, response);
+      logger.error({ error: error instanceof Error ? error.message : String(error), sessionId: context.connection?.id, conversationId: message.conversationId }, 'Failed to end conversation');
+      const response: CALEndConversationResponse = { 
+        type: 'end_conversation', 
+        success: false, 
+        conversationId: message.conversationId,
+        correlationId: message.correlationId,
+        error: error instanceof Error ? error.message : 'Failed to end conversation' };
+      context.send(response);
     }
   }
 }

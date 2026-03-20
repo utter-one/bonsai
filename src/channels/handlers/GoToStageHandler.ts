@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { GoToStageRequest, GoToStageResponse } from '../contracts/command';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALGoToStageRequest, CALGoToStageResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
@@ -10,15 +10,15 @@ import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
  */
 @ChannelMessageHandler('go_to_stage')
 @injectable()
-export class GoToStageHandler implements ChannelHandler<GoToStageRequest> {
+export class GoToStageHandler implements ChannelHandler<CALGoToStageRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles go to stage requests.
    */
-  async handle(context: ChannelHandlerContext, message: GoToStageRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId, requestId: message.requestId }, 'Go to stage request received');
+  async handle(context: ChannelHandlerContext, message: CALGoToStageRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, correlationId: message.correlationId }, 'Go to stage request received');
 
     try {
       if (!context.connection) {
@@ -36,15 +36,15 @@ export class GoToStageHandler implements ChannelHandler<GoToStageRequest> {
       await context.connection.runner.saveCommandEvent('go_to_stage', { stageId: message.stageId });
       await context.connection.runner.goToStage(message.stageId);
 
-      const response: GoToStageResponse = { type: 'go_to_stage', sessionId: message.sessionId, success: true, requestId: message.requestId };
-      context.send(context.ws, response);
+      const response: CALGoToStageResponse = { type: 'go_to_stage', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
+      context.send(response);
 
-      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Go to stage completed successfully');
+      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId }, 'Go to stage completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to navigate to stage';
-      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to go to stage');
-      const response: GoToStageResponse = { type: 'go_to_stage', sessionId: message.sessionId, success: false, error: errorMessage, requestId: message.requestId };
-      context.send(context.ws, response);
+      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to go to stage');
+      const response: CALGoToStageResponse = { type: 'go_to_stage', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
+      context.send(response);
     }
   }
 }

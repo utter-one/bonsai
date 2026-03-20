@@ -1,4 +1,6 @@
-import { CALInputMessage, CALOutputMessage } from "./messages";
+import type { WebSocket } from 'ws';
+import type { CALInputMessage, CALOutputMessage } from "./messages";
+import type { Connection } from "../websocket/ConnectionManager";
 
 /**
  * Abstract interface for a communication channel, defining the necessary methods for opening, closing, sending, and receiving data.
@@ -27,15 +29,14 @@ export interface ICommunicationChannel {
     sendMessage(response: CALOutputMessage): Promise<void>;
 }
 
-import type { Connection } from "../websocket/ConnectionManager";
-import type { CALBaseInputMessage } from './messages';
-
 /**
  * Context provided to channel message handlers.
  * Contains the connection metadata and dependencies needed for handling messages.
  */
 export type ChannelHandlerContext = {
   connection?: Connection;
+  /** Transport-specific socket. Only available in WebSocket handler context. */
+  ws?: WebSocket;
   send: (message: any) => void;
   sendError: (error: string, requestId?: string) => void;
 };
@@ -44,7 +45,7 @@ export type ChannelHandlerContext = {
  * Base interface for channel message handlers.
  * Each handler is responsible for processing a specific type of WebSocket message.
  */
-export type ChannelHandler<T extends CALBaseInputMessage = CALBaseInputMessage> = {
+export type ChannelHandler<T extends Record<string, any> = Record<string, any>> = {
   /**
    * Handles the incoming message.
    * @param context - The handler context containing connection metadata and utilities.

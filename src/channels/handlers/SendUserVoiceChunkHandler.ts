@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { SendUserVoiceChunkRequest, SendUserVoiceChunkResponse } from '../contracts/userInput';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { SendUserVoiceChunkRequest, SendUserVoiceChunkResponse } from '../../websocket/contracts/userInput';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
@@ -47,7 +47,7 @@ export class SendUserVoiceChunkHandler implements ChannelHandler<SendUserVoiceCh
         requestId: message.requestId,
         inputTurnId: message.inputTurnId
       };
-      context.send(context.ws, response);
+      context.send(response);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process voice chunk';
       logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to process voice chunk');
@@ -59,7 +59,7 @@ export class SendUserVoiceChunkHandler implements ChannelHandler<SendUserVoiceCh
         requestId: message.requestId, 
         inputTurnId: message.inputTurnId 
       };
-      context.send(context.ws, response);
+      context.send(response);
     }
   }
 }

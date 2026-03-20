@@ -1,6 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../ChannelHandler';
-import type { StartUserVoiceInputRequest, StartUserVoiceInputResponse } from '../contracts/userInput';
+import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { CALStartUserVoiceInputRequest, CALStartUserVoiceInputResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
@@ -10,15 +10,15 @@ import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
  */
 @ChannelMessageHandler('start_user_voice_input')
 @injectable()
-export class StartUserVoiceInputHandler implements ChannelHandler<StartUserVoiceInputRequest> {
+export class StartUserVoiceInputHandler implements ChannelHandler<CALStartUserVoiceInputRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles start user voice input requests.
    */
-  async handle(context: ChannelHandlerContext, message: StartUserVoiceInputRequest): Promise<void> {
-    logger.info({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Start user voice input request received');
+  async handle(context: ChannelHandlerContext, message: CALStartUserVoiceInputRequest): Promise<void> {
+    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'Start user voice input request received');
 
     try {
       if (!context.connection) {
@@ -39,28 +39,27 @@ export class StartUserVoiceInputHandler implements ChannelHandler<StartUserVoice
 
       const inputTurnId = await context.connection.runner.startUserVoiceInput();
 
-      const response: StartUserVoiceInputResponse = {
+      const response: CALStartUserVoiceInputResponse = {
         type: 'start_user_voice_input',
-        sessionId: message.sessionId,
+        conversationId: message.conversationId,
+        correlationId: message.correlationId,
         success: true,
-        requestId: message.requestId,
         inputTurnId
       };
-      context.send(context.ws, response);
+      context.send(response);
 
-      logger.info({ sessionId: message.sessionId, conversationId: message.conversationId }, 'User voice input started successfully');
+      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId }, 'User voice input started successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start user voice input';
-      logger.error({ error: errorMessage, sessionId: message.sessionId, conversationId: message.conversationId }, 'Failed to start user voice input');
-      const response: StartUserVoiceInputResponse = {
+      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId }, 'Failed to start user voice input');
+      const response: CALStartUserVoiceInputResponse = {
         type: 'start_user_voice_input',
-        sessionId: message.sessionId,
+        conversationId: message.conversationId,
+        correlationId: message.correlationId,
         success: false,
-        error: errorMessage,
-        requestId: message.requestId,
-        inputTurnId: '' // Return empty inputTurnId on failure
+        error: errorMessage
       };
-      context.send(context.ws, response);
+      context.send(response);
     }
   }
 }
