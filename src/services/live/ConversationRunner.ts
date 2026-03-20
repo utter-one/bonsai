@@ -500,7 +500,8 @@ export class ConversationRunner {
             if (totalTurnDurationMs !== undefined) backfill.totalTurnDurationMs = totalTurnDurationMs;
             if (ttsDurationMs !== undefined) backfill.ttsDurationMs = ttsDurationMs;
             if (Object.keys(backfill).length > 0) {
-              await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
+              const updated = await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
+              this.connectionManager.sendConversationEventUpdate(this.conversation.projectId, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
             }
           }
 
@@ -1005,17 +1006,20 @@ export class ConversationRunner {
         }
       }
 
-      // Load new stage data
-      const newStageData = await this.buildStageData({ ...this.conversation, stageId });
-
-      // Update stage data and conversation
-      this.stageData = newStageData;
+      // Update stageId on this.conversation before building new stage data.
+      // This keeps stageData.conversation as the same object reference as this.conversation,
+      // so any subsequent applyActionOutcome writes to this.conversation.stageVars are
+      // immediately visible via getRuntimeData().conversation on the next turn.
       this.conversation.stageId = stageId;
 
       // Update conversation in database
       await db.update(conversations)
         .set({ stageId, updatedAt: new Date() })
         .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+
+      // Load new stage data, passing this.conversation directly (not a spread copy)
+      const newStageData = await this.buildStageData(this.conversation);
+      this.stageData = newStageData;
 
       // Re-wire providers for the new stage
       await this.wireUpProviders();
@@ -1446,6 +1450,20 @@ export class ConversationRunner {
     const asrDurationMsValue = asrDurationMs && asrDurationMs > 0 ? asrDurationMs : undefined;
     await this.changeState('processing_user_input');
 
+    // Let's save the message event to fill data about timing and user input after moderation and processing
+    const preliminaryMessageEventData: MessageEventData = {
+      role: 'user',
+      text: userInput || '',
+      originalText: userInput || '',
+      visibility: this.turnMessageVisibility,
+      metadata: {
+        source: userInputSource,
+        inputTurnId: this.turnData.inputTurnId,
+        turnIndex: this.turnData.turnIndex,
+      }
+    };
+    const userMessageEventId = await this.saveAndSendEvent('message', preliminaryMessageEventData);
+
     // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
     // This prevents inappropriate content from reaching provider APIs and risking account bans.
     const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
@@ -1634,16 +1652,12 @@ export class ConversationRunner {
       await this.saveAndSendEvent('action', actionEventData);
     }
 
-    // Save event for user message
     if (executionOutcome.turnVisibility) {
       this.turnMessageVisibility = executionOutcome.turnVisibility;
     }
-    const messageEventData: MessageEventData = {
-      role: 'user',
-      text: context.userInput || '',
-      originalText: context.originalUserInput || context.userInput || '',
-      visibility: this.turnMessageVisibility,
-      metadata: {
+
+    // Update message event with moderation and processing results, which may be needed for response generation and should be sent to client for UI updates
+    const updated = await this.conversationService.updateMessageEvent(this.conversation.projectId, userMessageEventId, context.userInput, {
         source: context.userInputSource,
         inputTurnId: this.turnData.inputTurnId,
         turnIndex: this.turnData.turnIndex,
@@ -1653,9 +1667,9 @@ export class ConversationRunner {
         knowledgeRetrievalDurationMs,
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,
-      }
-    };
-    await this.saveAndSendEvent('message', messageEventData);
+    }, this.turnMessageVisibility);
+    this.connectionManager.sendConversationEventUpdate(this.conversation.id, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
+
     await this.generateResponse(context, executionOutcome);
   }
 

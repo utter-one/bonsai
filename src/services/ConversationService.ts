@@ -14,8 +14,9 @@ import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
-import { ConversationState } from '../types/conversationEvents';
+import { ConversationState, MessageEventData, MessageVisibility } from '../types/conversationEvents';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
+import { meta } from 'zod/v4/core';
 
 /**
  * Input for creating a conversation (internal use only)
@@ -173,7 +174,7 @@ export class ConversationService extends BaseService {
    * @param eventId - The unique identifier of the event to update
    * @param metadataUpdate - Key/value pairs to merge into the existing metadata
    */
-  async updateConversationEventMetadata(projectId: string, eventId: string, metadataUpdate: Record<string, any>): Promise<void> {
+  async updateConversationEventMetadata(projectId: string, eventId: string, metadataUpdate: Record<string, any>): Promise<ConversationEventResponse | null> {
     try {
       const existing = await db.query.conversationEvents.findFirst({ where: and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId)) });
       if (!existing) {
@@ -182,10 +183,43 @@ export class ConversationService extends BaseService {
       }
       const existingData = existing.eventData as Record<string, any>;
       const updatedEventData = { ...existingData, metadata: { ...(existingData.metadata || {}), ...metadataUpdate } };
-      await db.update(conversationEvents).set({ eventData: updatedEventData as ConversationEventData }).where(and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId)));
+      const result = await db.update(conversationEvents).set({ eventData: updatedEventData as ConversationEventData }).where(and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId))).returning();
       logger.debug({ projectId, eventId }, 'Conversation event metadata updated successfully');
+      return result.length > 0 ? result[0] : null;
     } catch (error) {
       logger.error({ error, projectId, eventId }, 'Failed to update conversation event metadata');
+    }
+  }
+
+  /**
+   * Updates the userInput field of an existing message event's eventData.
+   * Used to fill in the user input for a message event that was initially saved with empty userInput when the user message is received,
+   * and then updated once ASR processing completes and the final transcribed text is available.
+   * @param projectId - The project the event belongs to
+   * @param eventId - The unique identifier of the event to update
+   * @param newUserInput - The transcribed user input text to set on the event
+   * @param newMetadata - Additional metadata to merge into the event's existing metadata
+   * @param newMessageVisibility - The visibility of the message
+   */
+  async updateMessageEvent(projectId: string, eventId: string, newUserInput: string, newMetadata: Record<string, any>, newMessageVisibility: MessageVisibility): Promise<ConversationEventResponse | null> {
+    try {
+      const existing = await db.query.conversationEvents.findFirst({ where: and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId)) });
+      if (!existing) {
+        logger.warn({ projectId, eventId }, 'Cannot update message event: conversation event not found');
+        return;
+      }
+      if (existing.eventType !== 'message') {
+        logger.warn({ projectId, eventId, eventType: existing.eventType }, 'Cannot update message event: event is not of type "message"');
+        return;
+      }
+
+      const existingData = existing.eventData as MessageEventData;
+      const updatedEventData = { ...existingData, userInput: newUserInput, visibility: newMessageVisibility, metadata: { ...(existingData.metadata || {}), ...newMetadata } } as ConversationEventData;
+      const result = await db.update(conversationEvents).set({ eventData: updatedEventData }).where(and(eq(conversationEvents.projectId, projectId), eq(conversationEvents.id, eventId))).returning();
+      logger.debug({ projectId, eventId }, 'Conversation event message updated successfully');
+      return result.length > 0 ? conversationEventResponseSchema.parse(result[0]) : null;
+    } catch (error) {
+      logger.error({ error, projectId, eventId }, 'Failed to update conversation event message ID');
     }
   }
 
