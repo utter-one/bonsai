@@ -188,4 +188,17 @@ export class ConnectionManager {
       }
     }
   }
+
+  sendConversationEventUpdate(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, inputTurnId?: string, outputTurnId?: string): void {
+    for (const [ws, connection] of this.socketMap.entries()) {
+      if (connection.conversationId === conversationId && connection.sessionSettings.receiveEvents) {
+        const message = { type: 'conversation_event_update', sessionId: connection.id, conversationId, eventType, eventData, inputTurnId, outputTurnId };
+        try {
+          ws.send(JSON.stringify(message));
+        } catch (error) {
+          logger.error({ error, conversationId, sessionId: connection.id }, 'Failed to send conversation event update message');
+        }
+      }
+    }
+  }
 }
