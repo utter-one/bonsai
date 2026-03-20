@@ -453,6 +453,22 @@ export type CALConversationEventMessage = CALBaseOutputMessage & {
   eventData: ConversationEventData;
 };
 
+/**
+ * Broadcasts an update to a previously emitted conversation event.
+ * Mirrors the conversation_event_update WebSocket message but without session/transport fields.
+ */
+export type CALConversationEventUpdateMessage = CALBaseOutputMessage & {
+  type: 'conversation_event_update';
+  /** Identifier of the input turn associated with this event, when applicable. */
+  inputTurnId?: string;
+  /** Identifier of the output turn associated with this event, when applicable. */
+  outputTurnId?: string;
+  /** Discriminator for the event payload. */
+  eventType: ConversationEventType;
+  /** Updated structured data describing the event. */
+  eventData: ConversationEventData;
+};
+
 // Output union
 
 /**
@@ -478,4 +494,5 @@ export type CALOutputMessage =
   | CALUserTranscribedChunkMessage
   | CALSendAiImageOutputMessage
   | CALSendAiAudioOutputMessage
-  | CALConversationEventMessage;
+  | CALConversationEventMessage
+  | CALConversationEventUpdateMessage;
