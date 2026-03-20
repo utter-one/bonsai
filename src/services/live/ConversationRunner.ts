@@ -500,7 +500,8 @@ export class ConversationRunner {
             if (totalTurnDurationMs !== undefined) backfill.totalTurnDurationMs = totalTurnDurationMs;
             if (ttsDurationMs !== undefined) backfill.ttsDurationMs = ttsDurationMs;
             if (Object.keys(backfill).length > 0) {
-              await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
+              const updated = await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
+              this.connectionManager.sendConversationEventUpdate(this.conversation.projectId, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
             }
           }
 
