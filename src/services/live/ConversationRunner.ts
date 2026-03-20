@@ -1446,6 +1446,20 @@ export class ConversationRunner {
     const asrDurationMsValue = asrDurationMs && asrDurationMs > 0 ? asrDurationMs : undefined;
     await this.changeState('processing_user_input');
 
+    // Let's save the message event to fill data about timing and user input after moderation and processing
+    const preliminaryMessageEventData: MessageEventData = {
+      role: 'user',
+      text: userInput || '',
+      originalText: userInput || '',
+      visibility: this.turnMessageVisibility,
+      metadata: {
+        source: userInputSource,
+        inputTurnId: this.turnData.inputTurnId,
+        turnIndex: this.turnData.turnIndex,
+      }
+    };
+    const userMessageEventId = await this.saveAndSendEvent('message', preliminaryMessageEventData);
+
     // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
     // This prevents inappropriate content from reaching provider APIs and risking account bans.
     const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
@@ -1634,16 +1648,12 @@ export class ConversationRunner {
       await this.saveAndSendEvent('action', actionEventData);
     }
 
-    // Save event for user message
     if (executionOutcome.turnVisibility) {
       this.turnMessageVisibility = executionOutcome.turnVisibility;
     }
-    const messageEventData: MessageEventData = {
-      role: 'user',
-      text: context.userInput || '',
-      originalText: context.originalUserInput || context.userInput || '',
-      visibility: this.turnMessageVisibility,
-      metadata: {
+
+    // Update message event with moderation and processing results, which may be needed for response generation and should be sent to client for UI updates
+    await this.conversationService.updateMessageEvent(this.conversation.projectId, userMessageEventId, context.userInput, {
         source: context.userInputSource,
         inputTurnId: this.turnData.inputTurnId,
         turnIndex: this.turnData.turnIndex,
@@ -1653,9 +1663,8 @@ export class ConversationRunner {
         knowledgeRetrievalDurationMs,
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,
-      }
-    };
-    await this.saveAndSendEvent('message', messageEventData);
+    }, this.turnMessageVisibility);
+
     await this.generateResponse(context, executionOutcome);
   }
 
