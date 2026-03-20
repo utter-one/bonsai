@@ -17,24 +17,6 @@ import type { LlmContent } from '../providers/llm/ILlmProvider';
 import type { AudioFormat } from '../../types/audio';
 import type { ConversationEventType, ConversationEventData } from '../../types/conversationEvents';
 
-// Audio chunk
-
-/**
- * An audio chunk transmitted through the communication channel.
- * Used for both inbound (user voice) and outbound (AI voice) audio streams.
- * When carrying user voice chunks the optional `inputTurnId` and `ordinal` fields
- * allow the receiver to correlate and order chunks across an input turn.
- */
-export type CALAudioChunk = {
-  /** Raw PCM or encoded audio data. Encoding/decoding (e.g. base64) is the channel adapter's responsibility. */
-  data: Buffer;
-  /** Unix timestamp (ms) at which the chunk was produced. */
-  timestamp: number;
-  /** Sequential 0-based position of this chunk within the owning turn's audio stream. */
-  ordinal?: number;
-  /** Identifier of the input turn this chunk belongs to (populated for inbound user voice audio). */
-  inputTurnId?: string;
-};
 
 // Base message types
 

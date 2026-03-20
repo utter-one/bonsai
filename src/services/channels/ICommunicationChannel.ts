@@ -1,4 +1,4 @@
-import { CALAudioChunk ,CALInputMessage, CALOutputMessage } from "./messages";
+import { CALInputMessage, CALOutputMessage } from "./messages";
 
 /**
  * Abstract interface for a communication channel, defining the necessary methods for opening, closing, sending, and receiving data.
@@ -13,18 +13,6 @@ export interface ICommunicationChannel {
      * Closes the communication channel, ensuring all resources are released and connections are properly terminated.
      */
     close(): Promise<void>;
-
-    /**
-     * Receives an audio chunk from the communication channel.
-     * @param chunk The audio chunk to be received.
-     */
-    receiveAudioChunk(chunk: CALAudioChunk): Promise<void>;
-
-    /**
-     * Sends an audio chunk through the communication channel.
-     * @param chunk The audio chunk to be sent.
-     */
-    sendAudioChunk(chunk: CALAudioChunk): Promise<void>;
 
     /**
      * Receives a message from the communication channel.
