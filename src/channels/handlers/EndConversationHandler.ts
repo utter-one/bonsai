@@ -42,7 +42,7 @@ export class EndConversationHandler implements ChannelHandler<CALEndConversation
       await context.connection?.channel?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_end', eventData });
       
       // Now detach and finish the conversation
-      this.connectionManager.detachConversationInSession(context.connection!.id);
+      this.connectionManager.detachConversationFromConnection(context.connection!.id);
       await this.conversationService.finishConversation(projectId, message.conversationId);
 
       const response: CALEndConversationResponse = { 

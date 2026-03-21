@@ -87,7 +87,7 @@ export class ConversationTimeoutService {
       for (const connection of this.connectionManager.getConnectionsForConversation(id)) {
         await connection.channel?.sendMessage({ type: 'conversation_event', conversationId: connection.conversationId, eventType: 'conversation_aborted', eventData });
       }
-      this.connectionManager.detachConversationFromAllSessions(id);
+      this.connectionManager.detachConversationFromConnections(id);
 
       logger.info({ conversationId: id, projectId }, 'Conversation aborted due to inactivity timeout');
     } catch (error) {

@@ -1,10 +1,10 @@
 import { singleton, container } from "tsyringe";
 import type { WebSocket } from 'ws';
 import type { ConversationRunner } from "../services/live/ConversationRunner";
-import type { IClientChannel } from '../channels/IClientChannel';
+import type { IClientConnection } from '../channels/IClientConnection';
 import { SessionSettings } from "./contracts/auth";
 import { logger } from "../utils/logger";
-import { WebSocketChannel } from "./WebSocketChannel";
+import { WebSocketConnection } from "./WebSocketConnection";
 
 /** Session data associated with each WebSocket connection. */
 export type Connection =
@@ -18,7 +18,7 @@ export type Connection =
     /** Conversation runner instance for managing the conversation. */
     runner: ConversationRunner;
     /** Communication channel used to send messages to this session. */
-    channel: IClientChannel;
+    channel: IClientConnection;
     /** Session settings configured during authentication. */
     sessionSettings: SessionSettings;
   };
@@ -71,7 +71,7 @@ export class ConnectionManager {
       channel: null!,
       sessionSettings: sessionSettings ?? { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true },
     };
-    connection.channel = new WebSocketChannel(ws, connection);
+    connection.channel = new WebSocketConnection(ws, connection, this);
     this.socketMap.set(ws, connection);
     this.connectionMap.set(sessionId, ws);
     return sessionId;
@@ -96,15 +96,15 @@ export class ConnectionManager {
   }
 
   /**
-   * Attaches a conversation to an existing session.
-   * @param sessionId - The session ID to attach the conversation to.
+   * Attaches a conversation to an existing connection.
+   * @param connectionId - The connection ID to attach the conversation to.
    * @param conversationId - The conversation ID to attach.
-   * @throws Error if the session is not found.
+   * @throws Error if the connection is not found.
    */
-  async attachConversationToSession(sessionId: string, conversationId: string) {
-    const socket = this.connectionMap.get(sessionId);
+  async attachConversationToConnection(connectionId: string, conversationId: string) {
+    const socket = this.connectionMap.get(connectionId);
     if (!socket) {
-      throw new Error('Session not found');
+      throw new Error('Connection not found');
     }
 
     const session = this.socketMap.get(socket);
@@ -118,14 +118,14 @@ export class ConnectionManager {
   }
 
   /**
-   * Detaches the current conversation from a session.
-   * @param sessionId - The session ID to detach the conversation from.
-   * @throws Error if the session is not found.
+   * Detaches the current conversation from a connection.
+   * @param connectionId - The connection ID to detach the conversation from.
+   * @throws Error if the connection is not found.
    */
-  detachConversationInSession(sessionId: string) {
-    const socket = this.connectionMap.get(sessionId);
+  detachConversationFromConnection(connectionId: string) {
+    const socket = this.connectionMap.get(connectionId);
     if (!socket) {
-      throw new Error('Session not found');
+      throw new Error('Connection not found');
     }
 
     const session = this.socketMap.get(socket);
@@ -137,11 +137,11 @@ export class ConnectionManager {
   }
 
   /**
-   * Detaches the given conversation from all sessions that are currently associated with it.
-   * Used by background jobs (e.g. timeout) that abort a conversation without going through a single session.
-   * @param conversationId - The conversation ID to detach from all sessions.
+   * Detaches the given conversation from all connections that are currently associated with it.
+   * Used by background jobs (e.g. timeout) that abort a conversation without going through a single connection.
+   * @param conversationId - The conversation ID to detach from all connections.
    */
-  detachConversationFromAllSessions(conversationId: string): void {
+  detachConversationFromConnections(conversationId: string): void {
     for (const [ws, session] of this.socketMap.entries()) {
       if (session.conversationId === conversationId) {
         session.conversationId = null;

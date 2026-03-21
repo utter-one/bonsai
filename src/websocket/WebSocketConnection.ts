@@ -1,11 +1,11 @@
-import type { WebSocket } from 'ws';
-import type { Connection } from './ConnectionManager';
-import type { IClientChannel } from '../channels/IClientChannel';
+import { WebSocket } from 'ws';
+import type { Connection, ConnectionManager } from './ConnectionManager';
+import type { IClientConnection } from '../channels/IClientConnection';
 import type { CALInputMessage, CALOutputMessage } from '../channels/messages';
 import { logger } from '../utils/logger';
 
 /**
- * WebSocket-backed implementation of {@link IClientChannel}.
+ * WebSocket-backed implementation of {@link IClientConnection}.
  *
  * Translates CAL output messages to their WebSocket wire-format counterparts and
  * sends them directly to the associated WebSocket client.
@@ -14,20 +14,23 @@ import { logger } from '../utils/logger';
  * externally by {@link ConnectionManager}. `receiveMessage()` is also a no-op because
  * inbound routing is handled by the existing WebSocket handler pipeline.
  */
-export class WebSocketChannel implements IClientChannel {
+export class WebSocketConnection implements IClientConnection {
   constructor(
     private readonly ws: WebSocket,
     private readonly connection: Connection,
+    private readonly connectionManager: ConnectionManager,
   ) {}
 
-  /** No-op: WebSocket lifecycle is managed by {@link ConnectionManager}. */
-  async open(): Promise<void> {}
+  /**
+   * Closes the connection.
+   */
+  async close(): Promise<void> {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.close();
+    }
 
-  /** No-op: WebSocket lifecycle is managed by {@link ConnectionManager}. */
-  async close(): Promise<void> {}
-
-  /** No-op: inbound messages are handled by the WebSocket handler pipeline. */
-  async receiveMessage(_request: CALInputMessage): Promise<void> {}
+    await this.connectionManager.endSession(this.connection.id);
+  }
 
   /**
    * Translates a CAL output message to its WebSocket wire-format equivalent and

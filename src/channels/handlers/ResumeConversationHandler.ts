@@ -48,7 +48,7 @@ export class ResumeConversationHandler implements ChannelHandler<CALResumeConver
       throw new ArchivedProjectError('Cannot resume a conversation belonging to an archived project');
     }
 
-    await this.connectionManager.attachConversationToSession(context.connection.id, message.conversationId);
+    await this.connectionManager.attachConversationToConnection(context.connection.id, message.conversationId);
 
     // Return success response
     const response: CALResumeConversationResponse = { type: 'resume_conversation', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
@@ -68,7 +68,7 @@ export class ResumeConversationHandler implements ChannelHandler<CALResumeConver
       } catch (cleanupError) {
         logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId: message.conversationId }, 'Failed to save conversation_failed event during cleanup');
       }
-      this.connectionManager.detachConversationInSession(context.connection.id);
+      this.connectionManager.detachConversationFromConnection(context.connection.id);
     }
   }
 }

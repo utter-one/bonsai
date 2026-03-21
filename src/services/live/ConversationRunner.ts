@@ -11,7 +11,7 @@ import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
 import type { Connection } from "../../websocket/ConnectionManager";
-import type { IClientChannel } from '../../channels/IClientChannel';
+import type { IClientConnection } from '../../channels/IClientConnection';
 import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
@@ -106,7 +106,7 @@ export class ConversationRunner {
   private stageData: StageRuntimeData;
   private session: Connection;
   private conversation: Conversation;
-  private channel: IClientChannel;
+  private channel: IClientConnection;
   /** True when a filler sentence has already opened the response turn (outputTurnId assigned, start_ai_generation_output sent, TTS started) */
   private responseOutputTurnStarted: boolean = false;
   /** Filler sentence generated for the current turn, passed as assistant prefix to the LLM so it continues naturally */
@@ -145,7 +145,7 @@ export class ConversationRunner {
     return this.stageData;
   }
 
-  async prepareConversation(conversationId: string, session: Connection, channel: IClientChannel): Promise<void> {
+  async prepareConversation(conversationId: string, session: Connection, channel: IClientConnection): Promise<void> {
     this.session = session;
     this.channel = channel;
 

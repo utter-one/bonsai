@@ -75,7 +75,7 @@ export class StartConversationHandler implements ChannelHandler<CALStartConversa
       const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, clientId: context.connection.id, status: 'initialized', metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null });
       conversationId = conversation.id;
 
-      await this.connectionManager.attachConversationToSession(context.connection.id, conversationId);
+      await this.connectionManager.attachConversationToConnection(context.connection.id, conversationId);
       conversationAttached = true;
 
       logger.info({ sessionId: context.connection?.id, conversationId }, 'Conversation created and attached to session');
@@ -98,7 +98,7 @@ export class StartConversationHandler implements ChannelHandler<CALStartConversa
         } catch (cleanupError) {
           logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId }, 'Failed to save conversation_failed event during cleanup');
         }
-        this.connectionManager.detachConversationInSession(context.connection.id);
+        this.connectionManager.detachConversationFromConnection(context.connection.id);
       }
 
       const response: CALStartConversationResponse = { type: 'start_conversation', conversationId: conversationId ?? '', correlationId: message.correlationId, success: false, error: errorMessage };
