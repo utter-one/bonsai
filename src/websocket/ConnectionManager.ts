@@ -1,4 +1,5 @@
 import { singleton, container } from "tsyringe";
+import type { WebSocket } from 'ws';
 import type { ConversationRunner } from "../services/live/ConversationRunner";
 import type { IClientChannel } from '../channels/IClientChannel';
 import { SessionSettings } from "./contracts/auth";
