@@ -1,5 +1,5 @@
 /**
- * Communications Abstraction Layer (CAL) — transport-agnostic message types for live conversation sessions.
+ * Client Abstraction Layer (CAL) — transport-agnostic message types for live conversation sessions.
  *
  * These types mirror the WebSocket contracts but strip all transport-specific concerns
  * (no requestId, no sessionId, binary audio instead of base64). A communication channel

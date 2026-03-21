@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { ChannelHandler } from '../ChannelHandler';
+import type { ChannelHandlerContext } from '../ChannelHandlerContext';
 import type { CALEndConversationRequest, CALEndConversationResponse } from '../messages';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ChannelHandlerRegistry';

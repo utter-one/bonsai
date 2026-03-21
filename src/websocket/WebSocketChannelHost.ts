@@ -8,7 +8,7 @@ import { ChannelHandlerDispatcher } from './ChannelHandlerDispatcher';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
 import type { CALInputMessage } from '../channels/messages';
-import type { ChannelHandlerContext } from '../channels/channel';
+import type { ChannelHandlerContext } from '../channels/ChannelHandlerContext';
 
 /**
  * WebSocket server that manages client connections and message routing.

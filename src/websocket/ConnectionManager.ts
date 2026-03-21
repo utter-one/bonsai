@@ -1,6 +1,6 @@
 import { singleton, container } from "tsyringe";
 import type { ConversationRunner } from "../services/live/ConversationRunner";
-import type { ICommunicationChannel } from "../channels/channel";
+import type { IClientChannel } from '../channels/IClientChannel';
 import { SessionSettings } from "./contracts/auth";
 import { logger } from "../utils/logger";
 import { WebSocketChannel } from "./WebSocketChannel";
@@ -17,7 +17,7 @@ export type Connection =
     /** Conversation runner instance for managing the conversation. */
     runner: ConversationRunner;
     /** Communication channel used to send messages to this session. */
-    channel: ICommunicationChannel;
+    channel: IClientChannel;
     /** Session settings configured during authentication. */
     sessionSettings: SessionSettings;
   };

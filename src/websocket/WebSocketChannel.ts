@@ -1,11 +1,11 @@
 import type { WebSocket } from 'ws';
 import type { Connection } from './ConnectionManager';
-import type { ICommunicationChannel } from '../channels/channel';
+import type { IClientChannel } from '../channels/IClientChannel';
 import type { CALInputMessage, CALOutputMessage } from '../channels/messages';
 import { logger } from '../utils/logger';
 
 /**
- * WebSocket-backed implementation of {@link ICommunicationChannel}.
+ * WebSocket-backed implementation of {@link IClientChannel}.
  *
  * Translates CAL output messages to their WebSocket wire-format counterparts and
  * sends them directly to the associated WebSocket client.
@@ -14,7 +14,7 @@ import { logger } from '../utils/logger';
  * externally by {@link ConnectionManager}. `receiveMessage()` is also a no-op because
  * inbound routing is handled by the existing WebSocket handler pipeline.
  */
-export class WebSocketChannel implements ICommunicationChannel {
+export class WebSocketChannel implements IClientChannel {
   constructor(
     private readonly ws: WebSocket,
     private readonly connection: Connection,

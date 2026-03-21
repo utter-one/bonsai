@@ -1,5 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { ChannelHandler } from '../ChannelHandler';
+import type { ChannelHandlerContext } from '../ChannelHandlerContext';
 import type { CALRunActionRequest, CALRunActionResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';

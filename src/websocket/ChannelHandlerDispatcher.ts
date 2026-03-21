@@ -3,7 +3,8 @@ import { singleton } from 'tsyringe';
 import { logger } from '../utils/logger';
 import type { CALInputMessage } from '../channels/messages';
 import { ChannelHandlerRegistry } from '../channels/ChannelHandlerRegistry';
-import type { ChannelHandler, ChannelHandlerContext } from '../channels/channel';
+import type { ChannelHandler } from '../channels/ChannelHandler';
+import type { ChannelHandlerContext } from '../channels/ChannelHandlerContext';
 
 // Import handlers module to trigger decorator registration
 import '../channels/handlers';

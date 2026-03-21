@@ -1,5 +1,6 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { ChannelHandler } from '../ChannelHandler';
+import type { ChannelHandlerContext } from '../ChannelHandlerContext';
 import type { SendUserVoiceChunkRequest, SendUserVoiceChunkResponse } from '../../websocket/contracts/userInput';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';

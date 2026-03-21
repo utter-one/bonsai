@@ -1,5 +1,6 @@
 import { inject, injectable } from 'tsyringe';
-import type { ChannelHandler, ChannelHandlerContext } from '../channel';
+import type { ChannelHandler } from '../ChannelHandler';
+import type { ChannelHandlerContext } from '../ChannelHandlerContext';
 import type { AuthRequest, AuthResponse } from '../../websocket/contracts/auth';
 import { ConnectionManager } from '../../websocket/ConnectionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';

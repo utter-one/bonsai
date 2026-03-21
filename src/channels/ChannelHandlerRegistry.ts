@@ -1,6 +1,6 @@
 import { container } from 'tsyringe';
 import logger from '../utils/logger';
-import type { ChannelHandler } from './channel';
+import type { ChannelHandler } from './ChannelHandler';
 
 type RegistryItem = {
   handlerFactory: () => ChannelHandler;
