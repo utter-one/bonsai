@@ -1,5 +1,5 @@
 import { singleton } from 'tsyringe';
-import { parseEnvInt } from '../utils/env';
+import { parseEnvInt } from './utils/env';
 
 type WindowEntry = {
   count: number;
@@ -15,7 +15,7 @@ type WindowEntry = {
  * - RATE_LIMIT_WS_AUTH_MAX: max attempts per window per IP (default: 10)
  */
 @singleton()
-export class WsRateLimiter {
+export class IpRateLimiter {
   private readonly windowMs: number;
   private readonly max: number;
   private readonly entries: Map<string, WindowEntry> = new Map();

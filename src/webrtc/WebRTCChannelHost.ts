@@ -6,7 +6,7 @@ import wrtc from '@roamhq/wrtc';
 import { SessionManager } from '../channels/SessionManager';
 import type { Session } from '../channels/SessionManager';
 import { ChannelHandlerDispatcher } from '../channels/ChannelHandlerDispatcher';
-import { WsRateLimiter } from '../websocket/WsRateLimiter';
+import { IpRateLimiter } from '../IpRateLimiter';
 import { WebRTCConnection } from './WebRTCConnection';
 import { asyncHandler } from '../utils/asyncHandler';
 import type { BaseInputMessage } from '../websocket/contracts/common';
@@ -88,7 +88,7 @@ export class WebRTCChannelHost {
   constructor(
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
     @inject(SessionManager) private readonly sessionManager: SessionManager,
-    @inject(WsRateLimiter) private readonly rateLimiter: WsRateLimiter,
+    @inject(IpRateLimiter) private readonly rateLimiter: IpRateLimiter,
   ) {}
 
   /**

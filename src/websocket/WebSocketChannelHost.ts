@@ -4,7 +4,7 @@ import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
 import { Session, SessionManager } from '../channels/SessionManager';
 import { ChannelHandlerDispatcher } from '../channels/ChannelHandlerDispatcher';
-import { WsRateLimiter } from './WsRateLimiter';
+import { IpRateLimiter } from '../IpRateLimiter';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
 import type { CALInputMessage } from '../channels/messages';
@@ -26,7 +26,7 @@ export class WebSocketChannelHost {
   constructor(
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
     @inject(SessionManager) private readonly sessionManager: SessionManager,
-    @inject(WsRateLimiter) private readonly rateLimiter: WsRateLimiter,
+    @inject(IpRateLimiter) private readonly rateLimiter: IpRateLimiter,
   ) {}
 
   /**
