@@ -37,6 +37,7 @@ import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
 import { WebSocketChannelHost } from './websocket/WebSocketChannelHost';
+import { WebRTCChannelHost } from './webrtc/WebRTCChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -192,6 +193,8 @@ export function createApp(): express.Application {
 
   const projectExchangeController = container.resolve(ProjectExchangeController);
   projectExchangeController.registerRoutes(app);
+
+  container.resolve(WebRTCChannelHost).registerRoutes(app);
 
   container.resolve(ConversationTimeoutService).start();
 

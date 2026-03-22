@@ -81,6 +81,7 @@ import { versionResponseSchema } from './http/contracts/version';
 import { MigrationController } from './http/controllers/MigrationController';
 import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
 import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
+import { WebRTCChannelHost } from './webrtc/WebRTCChannelHost';
 import { providerHintSchema, providerHintResolutionTargetSchema, providerHintResolutionSchema, asrConfigExchangeV1Schema, storageConfigExchangeV1Schema, moderationConfigExchangeV1Schema, fillerSettingsExchangeV1Schema, projectExchangeV1Schema, agentExchangeV1Schema, stageExchangeV1Schema, classifierExchangeV1Schema, contextTransformerExchangeV1Schema, toolExchangeV1Schema, globalActionExchangeV1Schema, guardrailExchangeV1Schema, knowledgeCategoryExchangeV1Schema, knowledgeItemExchangeV1Schema, projectExchangeBundleV1Schema, projectExchangeImportResultSchema } from './http/contracts/projectExchange';
 
 extendZodWithOpenApi(z);
@@ -455,6 +456,12 @@ export function getOpenAPISpec(): any {
   registry.register('ProjectExchangeImportResult', projectExchangeImportResultSchema);
   const projectExchangePaths = ProjectExchangeController.getOpenAPIPaths();
   for (const path of projectExchangePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register WebRTC signaling routes
+  const webRTCPaths = WebRTCChannelHost.getOpenAPIPaths();
+  for (const path of webRTCPaths) {
     registry.registerPath(path);
   }
 

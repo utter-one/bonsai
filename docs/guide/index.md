@@ -53,7 +53,8 @@ This guide covers:
 | [Environments](./environments) | Remote instance connections for migration |
 | [Conversations](./conversations) | Conversation lifecycle, states, and events |
 | [Content Moderation](./moderation) | Input screening and safety policies |
-| [WebSocket Protocol](./websocket) | Real-time communication protocol reference |
+| [WebSocket Channel](./websocket) | Real-time communication protocol reference |
+| [WebRTC Channel](./webrtc) | Lower-latency WebRTC DataChannel protocol reference |
 | [Authentication](./authentication) | Operator auth, API keys, and RBAC |
 | [Templating](./templating) | Handlebars templates in prompts |
 | [Scripting](./scripting) | Sandboxed JavaScript execution in effects |

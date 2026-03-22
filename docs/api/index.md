@@ -60,5 +60,6 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 - [Audit Logs](./audit-logs) — Audit trail
 
 ### Real-time
-- [WebSocket](./websocket) — Real-time conversational AI protocol
+- [WebSocket](./websocket) — Real-time conversational AI protocol (WebSocket)
+- [WebRTC](./webrtc) — Real-time conversational AI protocol (WebRTC DataChannel, lower audio latency)
 
