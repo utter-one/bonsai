@@ -12,487 +12,533 @@
  *  - Output push types (server → client, unsolicited): `CAL<Description>Message`
  */
 
-import type { ParameterValue } from '../types/parameters';
-import type { LlmContent } from '../services/providers/llm/ILlmProvider';
-import type { AudioFormat } from '../types/audio';
-import type { ConversationEventType, ConversationEventData } from '../types/conversationEvents';
+import { z } from 'zod';
+import { parameterValueSchema } from '../types/parameters';
+import { llmContentSchema } from '../services/providers/llm/ILlmProvider';
+import { audioFormatSchema } from '../types/audio';
+import { conversationEventTypeSchema, conversationEventDataSchema } from '../types/conversationEvents';
 
 
-// Base message types
+// Base message schemas
 
 /**
  * Base fields shared by all inbound (input) messages.
  */
-export type CALBaseInputMessage = {
+export const calBaseInputMessageSchema = z.object({
   /** Identifies the conversation this message belongs to. */
-  conversationId: string;
+  conversationId: z.string(),
   /** Optional caller-supplied identifier echoed back in the corresponding result message. */
-  correlationId?: string;
-};
+  correlationId: z.string().optional(),
+});
 
 /**
  * Base fields shared by all outbound (output) messages.
  */
-export type CALBaseOutputMessage = {
+export const calBaseOutputMessageSchema = z.object({
   /** Identifies the conversation this message belongs to. */
-  conversationId: string;
+  conversationId: z.string(),
   /** Echoed from the originating input message, when applicable. */
-  correlationId?: string;
-};
+  correlationId: z.string().optional(),
+});
 
-// Input messages
+// Input message schemas
 
 /**
  * Requests that a new conversation is started for the given user and stage.
  */
-export type CALStartConversationRequest = CALBaseInputMessage & {
-  type: 'start_conversation';
+export const calStartConversationRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('start_conversation'),
   /** Identifier of the user initiating the conversation. */
-  userId: string;
+  userId: z.string(),
   /** Optional agent to use for the conversation. */
-  agentId?: string;
+  agentId: z.string().optional(),
   /** Stage at which the conversation should begin. */
-  stageId: string;
+  stageId: z.string(),
   /** IANA timezone identifier (e.g. America/New_York). Defaults to UTC when absent. */
-  timezone?: string;
-};
+  timezone: z.string().optional(),
+});
 
 /**
  * Requests that a previously paused conversation is resumed.
  */
-export type CALResumeConversationRequest = CALBaseInputMessage & {
-  type: 'resume_conversation';
-};
+export const calResumeConversationRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('resume_conversation'),
+});
 
 /**
  * Requests that the active conversation is ended.
  */
-export type CALEndConversationRequest = CALBaseInputMessage & {
-  type: 'end_conversation';
-};
+export const calEndConversationRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('end_conversation'),
+});
 
 /**
  * Signals that the user has started speaking and the channel should begin buffering voice data.
  * Audio chunks are delivered separately via receiveAudioChunk.
  */
-export type CALStartUserVoiceInputRequest = CALBaseInputMessage & {
-  type: 'start_user_voice_input';
-};
+export const calStartUserVoiceInputRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('start_user_voice_input'),
+});
 
 /**
  * Signals that the user has finished speaking and the voice input turn should be finalised.
  */
-export type CALEndUserVoiceInputRequest = CALBaseInputMessage & {
-  type: 'end_user_voice_input';
+export const calEndUserVoiceInputRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('end_user_voice_input'),
   /** Identifier of the input turn to close, as returned by the corresponding result message. */
-  inputTurnId: string;
-};
+  inputTurnId: z.string(),
+});
 
 /**
  * Delivers a text message from the user into the conversation.
  */
-export type CALSendUserTextInputRequest = CALBaseInputMessage & {
-  type: 'send_user_text_input';
+export const calSendUserTextInputRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('send_user_text_input'),
   /** Text content submitted by the user. */
-  text: string;
-};
+  text: z.string(),
+});
 
 /**
  * Instructs the conversation engine to navigate to a specific stage.
  */
-export type CALGoToStageRequest = CALBaseInputMessage & {
-  type: 'go_to_stage';
+export const calGoToStageRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('go_to_stage'),
   /** Identifier of the target stage. */
-  stageId: string;
-};
+  stageId: z.string(),
+});
 
 /**
  * Sets a single variable on a specific stage.
  */
-export type CALSetVarRequest = CALBaseInputMessage & {
-  type: 'set_var';
+export const calSetVarRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('set_var'),
   /** Identifier of the stage that owns the variable. */
-  stageId: string;
+  stageId: z.string(),
   /** Name of the variable to set. */
-  variableName: string;
+  variableName: z.string(),
   /** New value for the variable. */
-  variableValue: ParameterValue;
-};
+  variableValue: parameterValueSchema,
+});
 
 /**
  * Retrieves a single variable from a specific stage.
  */
-export type CALGetVarRequest = CALBaseInputMessage & {
-  type: 'get_var';
+export const calGetVarRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('get_var'),
   /** Identifier of the stage that owns the variable. */
-  stageId: string;
+  stageId: z.string(),
   /** Name of the variable to retrieve. */
-  variableName: string;
-};
+  variableName: z.string(),
+});
 
 /**
  * Retrieves all variables for a specific stage.
  */
-export type CALGetAllVarsRequest = CALBaseInputMessage & {
-  type: 'get_all_vars';
+export const calGetAllVarsRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('get_all_vars'),
   /** Identifier of the stage whose variables should be retrieved. */
-  stageId: string;
-};
+  stageId: z.string(),
+});
 
 /**
  * Triggers execution of a named global action with the supplied parameter values.
  */
-export type CALRunActionRequest = CALBaseInputMessage & {
-  type: 'run_action';
+export const calRunActionRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('run_action'),
   /** Name of the global action to execute. */
-  actionName: string;
+  actionName: z.string(),
   /** Parameter values keyed by parameter name. */
-  parameters: Record<string, ParameterValue>;
-};
+  parameters: z.record(z.string(), parameterValueSchema),
+});
 
 /**
  * Requests execution of a tool by its identifier with the supplied parameter values.
  */
-export type CALCallToolRequest = CALBaseInputMessage & {
-  type: 'call_tool';
+export const calCallToolRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('call_tool'),
   /** Identifier of the tool to execute. */
-  toolId: string;
+  toolId: z.string(),
   /** Parameter values keyed by parameter name. */
-  parameters: Record<string, ParameterValue>;
-};
+  parameters: z.record(z.string(), parameterValueSchema),
+});
 
 /**
  * Discriminated union of all inbound message types accepted by a communication channel.
  */
-export type CALInputMessage =
-  | CALStartConversationRequest
-  | CALResumeConversationRequest
-  | CALEndConversationRequest
-  | CALStartUserVoiceInputRequest
-  | CALEndUserVoiceInputRequest
-  | CALSendUserTextInputRequest
-  | CALGoToStageRequest
-  | CALSetVarRequest
-  | CALGetVarRequest
-  | CALGetAllVarsRequest
-  | CALRunActionRequest
-  | CALCallToolRequest;
+export const calInputMessageSchema = z.discriminatedUnion('type', [
+  calStartConversationRequestSchema,
+  calResumeConversationRequestSchema,
+  calEndConversationRequestSchema,
+  calStartUserVoiceInputRequestSchema,
+  calEndUserVoiceInputRequestSchema,
+  calSendUserTextInputRequestSchema,
+  calGoToStageRequestSchema,
+  calSetVarRequestSchema,
+  calGetVarRequestSchema,
+  calGetAllVarsRequestSchema,
+  calRunActionRequestSchema,
+  calCallToolRequestSchema,
+]);
 
-// Output result messages
+// Output result message schemas
 
 /**
  * Result of a start_conversation command.
  */
-export type CALStartConversationResponse = CALBaseOutputMessage & {
-  type: 'start_conversation';
-  success: boolean;
-  error?: string;
-};
+export const calStartConversationResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('start_conversation'),
+  success: z.boolean(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a resume_conversation command.
  */
-export type CALResumeConversationResponse = CALBaseOutputMessage & {
-  type: 'resume_conversation';
-  success: boolean;
-  error?: string;
-};
+export const calResumeConversationResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('resume_conversation'),
+  success: z.boolean(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of an end_conversation command.
  */
-export type CALEndConversationResponse = CALBaseOutputMessage & {
-  type: 'end_conversation';
-  success: boolean;
-  error?: string;
-};
+export const calEndConversationResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('end_conversation'),
+  success: z.boolean(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a start_user_voice_input command.
  * On success, inputTurnId must be supplied to subsequent voice chunks and the end_user_voice_input message.
  */
-export type CALStartUserVoiceInputResponse = CALBaseOutputMessage & {
-  type: 'start_user_voice_input';
-  success: boolean;
+export const calStartUserVoiceInputResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('start_user_voice_input'),
+  success: z.boolean(),
   /** Identifier for the new voice input turn. Present when success is true. */
-  inputTurnId?: string;
-  error?: string;
-};
+  inputTurnId: z.string().optional(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of an end_user_voice_input command.
  */
-export type CALEndUserVoiceInputResponse = CALBaseOutputMessage & {
-  type: 'end_user_voice_input';
-  success: boolean;
+export const calEndUserVoiceInputResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('end_user_voice_input'),
+  success: z.boolean(),
   /** Identifier of the voice input turn that was closed. */
-  inputTurnId: string;
-  error?: string;
-};
+  inputTurnId: z.string(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a send_user_text_input command.
  * inputTurnId identifies the turn created for this text input and can be used to correlate
  * the resulting conversation events.
  */
-export type CALSendUserTextInputResponse = CALBaseOutputMessage & {
-  type: 'send_user_text_input';
-  success: boolean;
+export const calSendUserTextInputResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('send_user_text_input'),
+  success: z.boolean(),
   /** Identifier of the input turn created for this text submission. */
-  inputTurnId: string;
-  error?: string;
-};
+  inputTurnId: z.string(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a go_to_stage command.
  */
-export type CALGoToStageResponse = CALBaseOutputMessage & {
-  type: 'go_to_stage';
-  success: boolean;
-  error?: string;
-};
+export const calGoToStageResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('go_to_stage'),
+  success: z.boolean(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a set_var command.
  */
-export type CALSetVarResponse = CALBaseOutputMessage & {
-  type: 'set_var_result';
-  success: boolean;
-  error?: string;
-};
+export const calSetVarResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('set_var_result'),
+  success: z.boolean(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a get_var command.
  */
-export type CALGetVarResponse = CALBaseOutputMessage & {
-  type: 'get_var';
-  success: boolean;
+export const calGetVarResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('get_var'),
+  success: z.boolean(),
   /** Name of the requested variable, echoed for easy correlation. */
-  variableName: string;
+  variableName: z.string(),
   /** Retrieved value. Absent when the variable does not exist or success is false. */
-  variableValue?: ParameterValue;
-  error?: string;
-};
+  variableValue: parameterValueSchema.optional(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a get_all_vars command.
  */
-export type CALGetAllVarsResponse = CALBaseOutputMessage & {
-  type: 'get_all_vars';
-  success: boolean;
+export const calGetAllVarsResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('get_all_vars'),
+  success: z.boolean(),
   /** All stage variables keyed by name. Empty object when none exist. */
-  variables: Record<string, ParameterValue>;
-  error?: string;
-};
+  variables: z.record(z.string(), parameterValueSchema),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a run_action command.
  */
-export type CALRunActionResponse = CALBaseOutputMessage & {
-  type: 'run_action';
-  success: boolean;
+export const calRunActionResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('run_action'),
+  success: z.boolean(),
   /** Multi-modal content blocks returned by the action. */
-  result?: LlmContent[];
-  error?: string;
-};
+  result: z.array(llmContentSchema).optional(),
+  error: z.string().optional(),
+});
 
 /**
  * Result of a call_tool command.
  */
-export type CALCallToolResponse = CALBaseOutputMessage & {
-  type: 'call_tool';
-  success: boolean;
+export const calCallToolResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('call_tool'),
+  success: z.boolean(),
   /** Multi-modal content blocks returned by the tool. */
-  result?: LlmContent[];
-  error?: string;
-};
+  result: z.array(llmContentSchema).optional(),
+  error: z.string().optional(),
+});
 
-// Output push messages — AI generation
+// Output push message schemas — AI generation
 
 /**
  * Signals the beginning of an AI response generation turn.
  * Sent before any voice chunks or transcription chunks are emitted.
  */
-export type CALStartAiGenerationOutputMessage = CALBaseOutputMessage & {
-  type: 'start_ai_generation_output';
+export const calStartAiGenerationOutputMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('start_ai_generation_output'),
   /** Identifier for this generation turn; used to correlate all subsequent output messages. */
-  outputTurnId: string;
+  outputTurnId: z.string(),
   /** Whether the response will include synthesised voice audio. */
-  expectVoice: boolean;
-};
+  expectVoice: z.boolean(),
+});
 
 /**
  * Carries a single chunk of AI-synthesised speech audio.
  * Chunks arrive in order and the final chunk is marked by isFinal.
  */
-export type CALSendAiVoiceChunkMessage = CALBaseOutputMessage & {
-  type: 'send_ai_voice_chunk';
+export const calSendAiVoiceChunkMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('send_ai_voice_chunk'),
   /** Generation turn this chunk belongs to. */
-  outputTurnId: string;
+  outputTurnId: z.string(),
   /** Raw audio data. Encoding is the channel adapter's responsibility. */
-  audioData: Buffer;
+  audioData: z.instanceof(Buffer),
   /** Encoding of audioData. */
-  audioFormat: AudioFormat;
+  audioFormat: audioFormatSchema,
   /** Unique identifier for this specific chunk. */
-  chunkId: string;
+  chunkId: z.string(),
   /** Sequential 0-based position within the output turn's audio stream. */
-  ordinal: number;
+  ordinal: z.number(),
   /** Whether this is the final audio chunk for this output turn. */
-  isFinal: boolean;
+  isFinal: z.boolean(),
   /** Sample rate in Hz (e.g. 24000). */
-  sampleRate?: number;
+  sampleRate: z.number().optional(),
   /** Bit rate in bits per second (e.g. 64000). */
-  bitRate?: number;
-};
+  bitRate: z.number().optional(),
+});
 
 /**
  * Signals that the AI generation turn has completed.
  */
-export type CALEndAiGenerationOutputMessage = CALBaseOutputMessage & {
-  type: 'end_ai_generation_output';
+export const calEndAiGenerationOutputMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('end_ai_generation_output'),
   /** Generation turn that has ended. */
-  outputTurnId: string;
+  outputTurnId: z.string(),
   /** Full text that was synthesised to speech (or generated, when voice is disabled). */
-  fullText: string;
-};
+  fullText: z.string(),
+});
 
 /**
  * Carries an interim or final text transcription chunk of the AI's speech output.
  */
-export type CALAiTranscribedChunkMessage = CALBaseOutputMessage & {
-  type: 'ai_transcribed_chunk';
+export const calAiTranscribedChunkMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('ai_transcribed_chunk'),
   /** Generation turn this chunk belongs to. */
-  outputTurnId: string;
+  outputTurnId: z.string(),
   /** Unique identifier for this chunk. */
-  chunkId: string;
+  chunkId: z.string(),
   /** Transcribed text content. */
-  chunkText: string;
+  chunkText: z.string(),
   /** Sequential 0-based position within the transcription stream. */
-  ordinal: number;
+  ordinal: z.number(),
   /** Whether this is the final transcription chunk for this output turn. */
-  isFinal: boolean;
-};
+  isFinal: z.boolean(),
+});
 
-// Output push messages — user transcription
+// Output push message schemas — user transcription
 
 /**
  * Carries an interim or final ASR transcription chunk of the user's speech input.
  */
-export type CALUserTranscribedChunkMessage = CALBaseOutputMessage & {
-  type: 'user_transcribed_chunk';
+export const calUserTranscribedChunkMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('user_transcribed_chunk'),
   /** Input turn this transcription chunk belongs to. */
-  inputTurnId: string;
+  inputTurnId: z.string(),
   /** Unique identifier for this chunk. */
-  chunkId: string;
+  chunkId: z.string(),
   /** Transcribed text content. */
-  chunkText: string;
+  chunkText: z.string(),
   /** Sequential 0-based position within the transcription stream. */
-  ordinal: number;
+  ordinal: z.number(),
   /** true once ASR has finalised its transcript for this chunk. */
-  isFinal: boolean;
-};
+  isFinal: z.boolean(),
+});
 
-// Output push messages — multi-modal AI output
+// Output push message schemas — multi-modal AI output
 
 /**
  * Carries an AI-generated image block.
  */
-export type CALSendAiImageOutputMessage = CALBaseOutputMessage & {
-  type: 'send_ai_image_output';
+export const calSendAiImageOutputMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('send_ai_image_output'),
   /** Generation turn this image belongs to. */
-  outputTurnId: string;
+  outputTurnId: z.string(),
   /** Raw image data. Encoding is the channel adapter's responsibility. */
-  imageData: Buffer;
+  imageData: z.instanceof(Buffer),
   /** MIME type of imageData (e.g. image/png, image/jpeg). */
-  mimeType: string;
+  mimeType: z.string(),
   /** 0-based index when multiple images are produced in a single response. */
-  sequenceNumber: number;
-};
+  sequenceNumber: z.number(),
+});
 
 /**
  * Carries a non-TTS AI-generated audio block (e.g. a sound effect or audio file).
  */
-export type CALSendAiAudioOutputMessage = CALBaseOutputMessage & {
-  type: 'send_ai_audio_output';
+export const calSendAiAudioOutputMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('send_ai_audio_output'),
   /** Generation turn this audio belongs to. */
-  outputTurnId: string;
+  outputTurnId: z.string(),
   /** Raw audio data. Encoding is the channel adapter's responsibility. */
-  audioData: Buffer;
+  audioData: z.instanceof(Buffer),
   /** Encoding of audioData. */
-  audioFormat: AudioFormat;
+  audioFormat: audioFormatSchema,
   /** MIME type of audioData (e.g. audio/mpeg, audio/wav). */
-  mimeType: string;
+  mimeType: z.string(),
   /** 0-based index when multiple audio blocks are produced in a single response. */
-  sequenceNumber: number;
+  sequenceNumber: z.number(),
   /** Optional low-level audio metadata. */
-  metadata?: {
+  metadata: z.object({
     /** Sample rate in Hz. */
-    sampleRate?: number;
+    sampleRate: z.number().optional(),
     /** Number of audio channels. */
-    channels?: number;
+    channels: z.number().optional(),
     /** Bit depth per sample. */
-    bitDepth?: number;
-  };
-};
+    bitDepth: z.number().optional(),
+  }).optional(),
+});
 
-// Output push messages — conversation events
+// Output push message schemas — conversation events
 
 /**
  * Broadcasts a conversation lifecycle or activity event to the channel.
  * Mirrors the conversation_event WebSocket message but without session/transport fields.
  */
-export type CALConversationEventMessage = CALBaseOutputMessage & {
-  type: 'conversation_event';
+export const calConversationEventMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('conversation_event'),
   /** Identifier of the input turn associated with this event, when applicable. */
-  inputTurnId?: string;
+  inputTurnId: z.string().optional(),
   /** Identifier of the output turn associated with this event, when applicable. */
-  outputTurnId?: string;
+  outputTurnId: z.string().optional(),
   /** Discriminator for the event payload. */
-  eventType: ConversationEventType;
+  eventType: conversationEventTypeSchema,
   /** Structured data describing the event. */
-  eventData: ConversationEventData;
-};
+  eventData: conversationEventDataSchema,
+});
 
 /**
  * Broadcasts an update to a previously emitted conversation event.
  * Mirrors the conversation_event_update WebSocket message but without session/transport fields.
  */
-export type CALConversationEventUpdateMessage = CALBaseOutputMessage & {
-  type: 'conversation_event_update';
+export const calConversationEventUpdateMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('conversation_event_update'),
   /** Identifier of the input turn associated with this event, when applicable. */
-  inputTurnId?: string;
+  inputTurnId: z.string().optional(),
   /** Identifier of the output turn associated with this event, when applicable. */
-  outputTurnId?: string;
+  outputTurnId: z.string().optional(),
   /** Discriminator for the event payload. */
-  eventType: ConversationEventType;
+  eventType: conversationEventTypeSchema,
   /** Updated structured data describing the event. */
-  eventData: ConversationEventData;
-};
+  eventData: conversationEventDataSchema,
+});
 
-// Output union
+// Output union schema
 
 /**
  * Discriminated union of all outbound message types emitted by a communication channel.
  */
-export type CALOutputMessage =
-  | CALStartConversationResponse
-  | CALResumeConversationResponse
-  | CALEndConversationResponse
-  | CALStartUserVoiceInputResponse
-  | CALEndUserVoiceInputResponse
-  | CALSendUserTextInputResponse
-  | CALGoToStageResponse
-  | CALSetVarResponse
-  | CALGetVarResponse
-  | CALGetAllVarsResponse
-  | CALRunActionResponse
-  | CALCallToolResponse
-  | CALStartAiGenerationOutputMessage
-  | CALSendAiVoiceChunkMessage
-  | CALEndAiGenerationOutputMessage
-  | CALAiTranscribedChunkMessage
-  | CALUserTranscribedChunkMessage
-  | CALSendAiImageOutputMessage
-  | CALSendAiAudioOutputMessage
-  | CALConversationEventMessage
-  | CALConversationEventUpdateMessage;
+export const calOutputMessageSchema = z.discriminatedUnion('type', [
+  calStartConversationResponseSchema,
+  calResumeConversationResponseSchema,
+  calEndConversationResponseSchema,
+  calStartUserVoiceInputResponseSchema,
+  calEndUserVoiceInputResponseSchema,
+  calSendUserTextInputResponseSchema,
+  calGoToStageResponseSchema,
+  calSetVarResponseSchema,
+  calGetVarResponseSchema,
+  calGetAllVarsResponseSchema,
+  calRunActionResponseSchema,
+  calCallToolResponseSchema,
+  calStartAiGenerationOutputMessageSchema,
+  calSendAiVoiceChunkMessageSchema,
+  calEndAiGenerationOutputMessageSchema,
+  calAiTranscribedChunkMessageSchema,
+  calUserTranscribedChunkMessageSchema,
+  calSendAiImageOutputMessageSchema,
+  calSendAiAudioOutputMessageSchema,
+  calConversationEventMessageSchema,
+  calConversationEventUpdateMessageSchema,
+]);
+
+// Types inferred from schemas
+
+export type CALBaseInputMessage = z.infer<typeof calBaseInputMessageSchema>;
+export type CALBaseOutputMessage = z.infer<typeof calBaseOutputMessageSchema>;
+
+export type CALStartConversationRequest = z.infer<typeof calStartConversationRequestSchema>;
+export type CALResumeConversationRequest = z.infer<typeof calResumeConversationRequestSchema>;
+export type CALEndConversationRequest = z.infer<typeof calEndConversationRequestSchema>;
+export type CALStartUserVoiceInputRequest = z.infer<typeof calStartUserVoiceInputRequestSchema>;
+export type CALEndUserVoiceInputRequest = z.infer<typeof calEndUserVoiceInputRequestSchema>;
+export type CALSendUserTextInputRequest = z.infer<typeof calSendUserTextInputRequestSchema>;
+export type CALGoToStageRequest = z.infer<typeof calGoToStageRequestSchema>;
+export type CALSetVarRequest = z.infer<typeof calSetVarRequestSchema>;
+export type CALGetVarRequest = z.infer<typeof calGetVarRequestSchema>;
+export type CALGetAllVarsRequest = z.infer<typeof calGetAllVarsRequestSchema>;
+export type CALRunActionRequest = z.infer<typeof calRunActionRequestSchema>;
+export type CALCallToolRequest = z.infer<typeof calCallToolRequestSchema>;
+export type CALInputMessage = z.infer<typeof calInputMessageSchema>;
+
+export type CALStartConversationResponse = z.infer<typeof calStartConversationResponseSchema>;
+export type CALResumeConversationResponse = z.infer<typeof calResumeConversationResponseSchema>;
+export type CALEndConversationResponse = z.infer<typeof calEndConversationResponseSchema>;
+export type CALStartUserVoiceInputResponse = z.infer<typeof calStartUserVoiceInputResponseSchema>;
+export type CALEndUserVoiceInputResponse = z.infer<typeof calEndUserVoiceInputResponseSchema>;
+export type CALSendUserTextInputResponse = z.infer<typeof calSendUserTextInputResponseSchema>;
+export type CALGoToStageResponse = z.infer<typeof calGoToStageResponseSchema>;
+export type CALSetVarResponse = z.infer<typeof calSetVarResponseSchema>;
+export type CALGetVarResponse = z.infer<typeof calGetVarResponseSchema>;
+export type CALGetAllVarsResponse = z.infer<typeof calGetAllVarsResponseSchema>;
+export type CALRunActionResponse = z.infer<typeof calRunActionResponseSchema>;
+export type CALCallToolResponse = z.infer<typeof calCallToolResponseSchema>;
+
+export type CALStartAiGenerationOutputMessage = z.infer<typeof calStartAiGenerationOutputMessageSchema>;
+export type CALSendAiVoiceChunkMessage = z.infer<typeof calSendAiVoiceChunkMessageSchema>;
+export type CALEndAiGenerationOutputMessage = z.infer<typeof calEndAiGenerationOutputMessageSchema>;
+export type CALAiTranscribedChunkMessage = z.infer<typeof calAiTranscribedChunkMessageSchema>;
+export type CALUserTranscribedChunkMessage = z.infer<typeof calUserTranscribedChunkMessageSchema>;
+export type CALSendAiImageOutputMessage = z.infer<typeof calSendAiImageOutputMessageSchema>;
+export type CALSendAiAudioOutputMessage = z.infer<typeof calSendAiAudioOutputMessageSchema>;
+export type CALConversationEventMessage = z.infer<typeof calConversationEventMessageSchema>;
+export type CALConversationEventUpdateMessage = z.infer<typeof calConversationEventUpdateMessageSchema>;
+export type CALOutputMessage = z.infer<typeof calOutputMessageSchema>;
