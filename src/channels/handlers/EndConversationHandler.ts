@@ -1,9 +1,9 @@
 import { inject, injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALEndConversationRequest, CALEndConversationResponse } from '../messages';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 import { ConversationService } from '../../services/ConversationService';
 import { ConnectionManager } from '../../websocket/ConnectionManager';
 
@@ -12,7 +12,7 @@ import { ConnectionManager } from '../../websocket/ConnectionManager';
  */
 @ChannelMessageHandler('end_conversation')
 @injectable()
-export class EndConversationHandler implements ChannelHandler<CALEndConversationRequest> {
+export class EndConversationHandler implements ClientMessageHandler<CALEndConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -22,7 +22,7 @@ export class EndConversationHandler implements ChannelHandler<CALEndConversation
   /**
    * Handles end conversation requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALEndConversationRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALEndConversationRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'End conversation request received');
 
     try {

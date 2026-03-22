@@ -1,24 +1,24 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALGoToStageRequest, CALGoToStageResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 
 /**
  * Handles go to stage requests.
  */
 @ChannelMessageHandler('go_to_stage')
 @injectable()
-export class GoToStageHandler implements ChannelHandler<CALGoToStageRequest> {
+export class GoToStageHandler implements ClientMessageHandler<CALGoToStageRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles go to stage requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALGoToStageRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALGoToStageRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, correlationId: message.correlationId }, 'Go to stage request received');
 
     try {

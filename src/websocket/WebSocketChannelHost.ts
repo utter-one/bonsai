@@ -8,7 +8,7 @@ import { ChannelHandlerDispatcher } from './ChannelHandlerDispatcher';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
 import type { CALInputMessage } from '../channels/messages';
-import type { ChannelHandlerContext } from '../channels/ChannelHandlerContext';
+import type { ClientMessageHandlerContext } from '../channels/ClientMessageHandlerContext';
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -78,7 +78,7 @@ export class WebSocketChannelHost {
       conversationId: connection?.conversationId ?? '',
     } as CALInputMessage;
 
-    const context: ChannelHandlerContext = {
+    const context: ClientMessageHandlerContext = {
       ws,
       connection,
       // Translate CAL response → WS wire format: map correlationId → requestId and inject sessionId

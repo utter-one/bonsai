@@ -1,24 +1,24 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALSendUserTextInputRequest, CALSendUserTextInputResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 
 /**
  * Handles send user text input requests.
  */
 @ChannelMessageHandler('send_user_text_input')
 @injectable()
-export class SendUserTextInputHandler implements ChannelHandler<CALSendUserTextInputRequest> {
+export class SendUserTextInputHandler implements ClientMessageHandler<CALSendUserTextInputRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles send user text input requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALSendUserTextInputRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALSendUserTextInputRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'Send user text input request received');
 
     let inputTurnId = '';

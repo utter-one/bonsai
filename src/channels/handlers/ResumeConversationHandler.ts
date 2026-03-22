@@ -1,12 +1,12 @@
 import { inject, injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALResumeConversationRequest, CALResumeConversationResponse } from '../messages';
 import { ConnectionManager } from '../../websocket/ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { NotFoundError, InvalidOperationError, ArchivedProjectError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 import type { ConversationFailedEventData } from '../../types/conversationEvents';
 
 /**
@@ -14,7 +14,7 @@ import type { ConversationFailedEventData } from '../../types/conversationEvents
  */
 @ChannelMessageHandler('resume_conversation')
 @injectable()
-export class ResumeConversationHandler implements ChannelHandler<CALResumeConversationRequest> {
+export class ResumeConversationHandler implements ClientMessageHandler<CALResumeConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -23,7 +23,7 @@ export class ResumeConversationHandler implements ChannelHandler<CALResumeConver
   /**
    * Handles resume conversation requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALResumeConversationRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALResumeConversationRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'Resume conversation request received');
 
     if (!context.connection) {

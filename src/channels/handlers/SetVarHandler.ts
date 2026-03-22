@@ -1,24 +1,24 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALSetVarRequest, CALSetVarResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 
 /**
  * Handles set variable requests.
  */
 @ChannelMessageHandler('set_var')
 @injectable()
-export class SetVarHandler implements ChannelHandler<CALSetVarRequest> {
+export class SetVarHandler implements ClientMessageHandler<CALSetVarRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles set variable requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALSetVarRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALSetVarRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, correlationId: message.correlationId }, 'Set variable request received');
 
     try {

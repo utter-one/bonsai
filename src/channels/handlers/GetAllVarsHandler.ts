@@ -1,24 +1,24 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALGetAllVarsRequest, CALGetAllVarsResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 
 /**
  * Handles get all variables requests.
  */
 @ChannelMessageHandler('get_all_vars')
 @injectable()
-export class GetAllVarsHandler implements ChannelHandler<CALGetAllVarsRequest> {
+export class GetAllVarsHandler implements ClientMessageHandler<CALGetAllVarsRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles get all variables requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALGetAllVarsRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALGetAllVarsRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, correlationId: message.correlationId }, 'Get all variables request received');
 
     try {

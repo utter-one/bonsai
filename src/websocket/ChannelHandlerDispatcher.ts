@@ -2,9 +2,9 @@ import 'reflect-metadata';
 import { singleton } from 'tsyringe';
 import { logger } from '../utils/logger';
 import type { CALInputMessage } from '../channels/messages';
-import { ChannelHandlerRegistry } from '../channels/ChannelHandlerRegistry';
-import type { ChannelHandler } from '../channels/ChannelHandler';
-import type { ChannelHandlerContext } from '../channels/ChannelHandlerContext';
+import { ClientMessageHandlerRegistry } from '../channels/ClientMessageHandlerRegistry';
+import type { ClientMessageHandler } from '../channels/ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../channels/ClientMessageHandlerContext';
 
 // Import handlers module to trigger decorator registration
 import '../channels/handlers';
@@ -16,7 +16,7 @@ import '../channels/handlers';
  */
 @singleton()
 export class ChannelHandlerDispatcher {
-  private handlers = new Map<string, { instance: ChannelHandler; requiresAuth: boolean }>();
+  private handlers = new Map<string, { instance: ClientMessageHandler; requiresAuth: boolean }>();
 
   constructor() {
     this.registerHandlers();
@@ -27,7 +27,7 @@ export class ChannelHandlerDispatcher {
    * Handlers are automatically discovered via the @ChannelMessageHandler decorator.
    */
   private registerHandlers(): void {
-    const registryItems = ChannelHandlerRegistry.getAll();
+    const registryItems = ClientMessageHandlerRegistry.getAll();
 
     for (const messageType of registryItems.keys()) {
       const registryItem = registryItems.get(messageType);
@@ -48,7 +48,7 @@ export class ChannelHandlerDispatcher {
    * @param message - The already-translated CAL input message.
    * @param context - The handler context supplied by the transport layer.
    */
-  async dispatch(message: CALInputMessage, context: ChannelHandlerContext): Promise<void> {
+  async dispatch(message: CALInputMessage, context: ClientMessageHandlerContext): Promise<void> {
     try {
       logger.debug({ messageType: message.type, correlationId: message.correlationId }, 'Dispatching message');
 

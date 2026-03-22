@@ -1,24 +1,24 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALRunActionRequest, CALRunActionResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 
 /**
  * Handles run action requests.
  */
 @ChannelMessageHandler('run_action')
 @injectable()
-export class RunActionHandler implements ChannelHandler<CALRunActionRequest> {
+export class RunActionHandler implements ClientMessageHandler<CALRunActionRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles run action requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALRunActionRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALRunActionRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, actionName: message.actionName, correlationId: message.correlationId }, 'Run action request received');
 
     try {

@@ -1,6 +1,6 @@
 import { inject, injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALStartConversationRequest, CALStartConversationResponse } from '../messages';
 import { ConnectionManager } from '../../websocket/ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
@@ -8,7 +8,7 @@ import { StageService } from '../../services/StageService';
 import { ProjectService } from '../../services/ProjectService';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 import { UserService } from '../../services/UserService';
 import type { ConversationFailedEventData } from '../../types/conversationEvents';
 
@@ -17,7 +17,7 @@ import type { ConversationFailedEventData } from '../../types/conversationEvents
  */
 @ChannelMessageHandler('start_conversation')
 @injectable()
-export class StartConversationHandler implements ChannelHandler<CALStartConversationRequest> {
+export class StartConversationHandler implements ClientMessageHandler<CALStartConversationRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
@@ -30,7 +30,7 @@ export class StartConversationHandler implements ChannelHandler<CALStartConversa
   /**
    * Handles start conversation requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALStartConversationRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALStartConversationRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, agentId: message.agentId, correlationId: message.correlationId }, 'Start conversation request received');
 
     if (!context.connection) {

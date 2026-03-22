@@ -1,24 +1,24 @@
 import { injectable } from 'tsyringe';
-import type { ChannelHandler } from '../ChannelHandler';
-import type { ChannelHandlerContext } from '../ChannelHandlerContext';
+import type { ClientMessageHandler } from '../ClientMessageHandler';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALEndUserVoiceInputRequest, CALEndUserVoiceInputResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
-import { ChannelMessageHandler } from '../ChannelHandlerRegistry';
+import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 
 /**
  * Handles end user voice input requests.
  */
 @ChannelMessageHandler('end_user_voice_input')
 @injectable()
-export class EndUserVoiceInputHandler implements ChannelHandler<CALEndUserVoiceInputRequest> {
+export class EndUserVoiceInputHandler implements ClientMessageHandler<CALEndUserVoiceInputRequest> {
   readonly messageType!: string;
   readonly requiresAuth!: boolean;
 
   /**
    * Handles end user voice input requests.
    */
-  async handle(context: ChannelHandlerContext, message: CALEndUserVoiceInputRequest): Promise<void> {
+  async handle(context: ClientMessageHandlerContext, message: CALEndUserVoiceInputRequest): Promise<void> {
     logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'End user voice input request received');
 
     try {

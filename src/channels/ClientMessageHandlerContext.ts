@@ -6,7 +6,7 @@ import type { Connection } from '../websocket/ConnectionManager';
  * Contains the connection metadata and dependencies needed for handling messages.
  */
 
-export type ChannelHandlerContext = {
+export type ClientMessageHandlerContext = {
   connection?: Connection;
   /** Transport-specific socket. Only available in WebSocket handler context. */
   ws?: WebSocket;

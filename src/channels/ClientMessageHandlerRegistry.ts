@@ -1,24 +1,24 @@
 import { container } from 'tsyringe';
 import logger from '../utils/logger';
-import type { ChannelHandler } from './ChannelHandler';
+import type { ClientMessageHandler } from './ClientMessageHandler';
 
 type RegistryItem = {
-  handlerFactory: () => ChannelHandler;
+  handlerFactory: () => ClientMessageHandler;
   requiresAuth: boolean;
 }
 
 /**
  * Global registry for WebSocket message handlers.
- * Handlers are automatically registered via the @ChannelHandlerRegistry decorator.
+ * Handlers are automatically registered via the @ClientMessageHandler decorator.
  */
-export class ChannelHandlerRegistry {
+export class ClientMessageHandlerRegistry {
   private static handlers: Map<string, RegistryItem> = new Map();
   /**
    * Registers a handler class for a specific message type.
    * @param messageType - The message type this handler processes.
    * @param handlerFactory - The handler class factory function.
    */
-  static register(messageType: string, handlerFactory: () => ChannelHandler, requiresAuth: boolean): void {
+  static register(messageType: string, handlerFactory: () => ClientMessageHandler, requiresAuth: boolean): void {
     if (this.handlers.has(messageType)) {
       throw new Error(`Handler for message type "${messageType}" is already registered`);
     }
@@ -61,10 +61,10 @@ export class ChannelHandlerRegistry {
  * ```
  */
 export function ChannelMessageHandler(messageType: string, requiresAuth: boolean = true) {
-  return function <T extends new (...args: any[]) => ChannelHandler>(constructor: T): T {
+  return function <T extends new (...args: any[]) => ClientMessageHandler>(constructor: T): T {
     logger.debug({ messageType, requiresAuth }, `Registering message handler for type "${messageType}"`);
     // Register the handler class
-    ChannelHandlerRegistry.register(messageType, () => container.resolve(constructor), requiresAuth);
+    ClientMessageHandlerRegistry.register(messageType, () => container.resolve(constructor), requiresAuth);
 
     return constructor;  
   };
