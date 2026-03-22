@@ -1,7 +1,19 @@
 import { z } from 'zod';
-import { sessionInputMessageSchema, sessionOutputMessageSchema } from './common';
-import { llmContentSchema } from '../../services/providers/llm/ILlmProvider';
-import { parameterValueSchema } from '../../types/parameters';
+import { calToWsInput, calToWsOutput } from './utils';
+import {
+  calGoToStageRequestSchema,
+  calGoToStageResponseSchema,
+  calSetVarRequestSchema,
+  calSetVarResponseSchema,
+  calGetVarRequestSchema,
+  calGetVarResponseSchema,
+  calGetAllVarsRequestSchema,
+  calGetAllVarsResponseSchema,
+  calRunActionRequestSchema,
+  calRunActionResponseSchema,
+  calCallToolRequestSchema,
+  calCallToolResponseSchema,
+} from '../../channels/messages';
 
 /**
  * Schema for webhook call results stored in context.
@@ -17,119 +29,52 @@ export const webhookResultSchema = z.object({
 export type WebhookResult = z.infer<typeof webhookResultSchema>;
 
 /** Request to navigate to a specific stage in a conversation. */
-export const goToStageRequestSchema = sessionInputMessageSchema.extend({
-  type: z.literal('go_to_stage').describe('Message type for navigating to a stage'),
-  conversationId: z.string().describe('Unique identifier of the conversation'),
-  stageId: z.string().describe('Unique identifier of the target stage'),
-});
-
+export const goToStageRequestSchema = calToWsInput(calGoToStageRequestSchema);
 export type GoToStageRequest = z.infer<typeof goToStageRequestSchema>;
 
 /** Response to go to stage request. */
-export const goToStageResponseSchema = sessionOutputMessageSchema.extend({
-  type: z.literal('go_to_stage').describe('Message type for go to stage response'),
-  success: z.boolean().describe('Whether navigation to the stage was successful'),
-  error: z.string().optional().describe('Error message if navigation failed'),
-});
-
+export const goToStageResponseSchema = calToWsOutput(calGoToStageResponseSchema);
 export type GoToStageResponse = z.infer<typeof goToStageResponseSchema>;
 
 /** Request to set a variable value in a specific stage. */
-export const setVarRequestSchema = sessionInputMessageSchema.extend({
-  type: z.literal('set_var').describe('Message type for setting a variable'),
-  conversationId: z.string().describe('Unique identifier of the conversation'),
-  stageId: z.string().describe('Unique identifier of the stage'),
-  variableName: z.string().describe('Name of the variable to set'),
-  variableValue: parameterValueSchema.describe('Value to set for the variable (can be string, number, boolean, object, or array)'),
-});
-
+export const setVarRequestSchema = calToWsInput(calSetVarRequestSchema);
 export type SetVarRequest = z.infer<typeof setVarRequestSchema>;
 
-/** Response to set variable request. */
-export const setVarResponseSchema = sessionOutputMessageSchema.extend({
-  type: z.literal('set_var').describe('Message type for set variable response'),
-  success: z.boolean().describe('Whether the variable was successfully set'),
-  error: z.string().optional().describe('Error message if setting the variable failed'),
-});
-
+/**
+ * Response to set variable request.
+ * Note: the response type is `set_var_result` (not `set_var`) to distinguish it from the request.
+ */
+export const setVarResponseSchema = calToWsOutput(calSetVarResponseSchema);
 export type SetVarResponse = z.infer<typeof setVarResponseSchema>;
 
 /** Request to get a variable value from a specific stage. */
-export const getVarRequestSchema = sessionInputMessageSchema.extend({
-  type: z.literal('get_var').describe('Message type for getting a variable'),
-  conversationId: z.string().describe('Unique identifier of the conversation'),
-  stageId: z.string().describe('Unique identifier of the stage'),
-  variableName: z.string().describe('Name of the variable to retrieve'),
-});
-
+export const getVarRequestSchema = calToWsInput(calGetVarRequestSchema);
 export type GetVarRequest = z.infer<typeof getVarRequestSchema>;
 
 /** Response to get variable request. */
-export const getVarResponseSchema = sessionOutputMessageSchema.extend({
-  type: z.literal('get_var').describe('Message type for get variable response'),
-  success: z.boolean().describe('Whether the variable was successfully retrieved'),
-  variableName: z.string().describe('Name of the retrieved variable'),
-  variableValue: parameterValueSchema.optional().describe('Value of the variable (undefined if not found)'),
-  error: z.string().optional().describe('Error message if retrieving the variable failed'),
-});
-
+export const getVarResponseSchema = calToWsOutput(calGetVarResponseSchema);
 export type GetVarResponse = z.infer<typeof getVarResponseSchema>;
 
 /** Request to get all variables from a specific stage. */
-export const getAllVarsRequestSchema = sessionInputMessageSchema.extend({
-  type: z.literal('get_all_vars').describe('Message type for getting all variables'),
-  conversationId: z.string().describe('Unique identifier of the conversation'),
-  stageId: z.string().describe('Unique identifier of the stage'),
-});
-
+export const getAllVarsRequestSchema = calToWsInput(calGetAllVarsRequestSchema);
 export type GetAllVarsRequest = z.infer<typeof getAllVarsRequestSchema>;
 
 /** Response to get all variables request. */
-export const getAllVarsResponseSchema = sessionOutputMessageSchema.extend({
-  type: z.literal('get_all_vars').describe('Message type for get all variables response'),
-  success: z.boolean().describe('Whether the variables were successfully retrieved'),
-  variables: z.record(z.string(), parameterValueSchema).describe('Map of variable names to their values'),
-  error: z.string().optional().describe('Error message if retrieving variables failed'),
-});
-
+export const getAllVarsResponseSchema = calToWsOutput(calGetAllVarsResponseSchema);
 export type GetAllVarsResponse = z.infer<typeof getAllVarsResponseSchema>;
 
 /** Request to run a global action with parameters. */
-export const runActionRequestSchema = sessionInputMessageSchema.extend({
-  type: z.literal('run_action').describe('Message type for running an action'),
-  conversationId: z.string().describe('Unique identifier of the conversation'),
-  actionName: z.string().describe('Name of the global action to execute'),
-  parameters: z.record(z.string(), parameterValueSchema).describe('Map of parameter names to their values'),
-});
-
+export const runActionRequestSchema = calToWsInput(calRunActionRequestSchema);
 export type RunActionRequest = z.infer<typeof runActionRequestSchema>;
 
 /** Response to run action request. */
-export const runActionResponseSchema = sessionOutputMessageSchema.extend({
-  type: z.literal('run_action').describe('Message type for run action response'),
-  success: z.boolean().describe('Whether the action was successfully executed'),
-  result: z.array(llmContentSchema).optional().describe('Result returned by the action as array of multi-modal content blocks (text, image, or audio)'),
-  error: z.string().optional().describe('Error message if action execution failed'),
-});
-
+export const runActionResponseSchema = calToWsOutput(calRunActionResponseSchema);
 export type RunActionResponse = z.infer<typeof runActionResponseSchema>;
 
 /** Request to call a tool with parameters. */
-export const callToolRequestSchema = sessionInputMessageSchema.extend({
-  type: z.literal('call_tool').describe('Message type for calling a tool'),
-  conversationId: z.string().describe('Unique identifier of the conversation'),
-  toolId: z.string().describe('Unique identifier of the tool to execute'),
-  parameters: z.record(z.string(), parameterValueSchema).describe('Map of parameter names to their values'),
-});
-
+export const callToolRequestSchema = calToWsInput(calCallToolRequestSchema);
 export type CallToolRequest = z.infer<typeof callToolRequestSchema>;
 
 /** Response to call tool request. */
-export const callToolResponseSchema = sessionOutputMessageSchema.extend({
-  type: z.literal('call_tool').describe('Message type for call tool response'),
-  success: z.boolean().describe('Whether the tool was successfully executed'),
-  result: z.array(llmContentSchema).optional().describe('Result returned by the tool execution as array of multi-modal content blocks (text, image, or audio)'),
-  error: z.string().optional().describe('Error message if tool execution failed'),
-});
-
+export const callToolResponseSchema = calToWsOutput(calCallToolResponseSchema);
 export type CallToolResponse = z.infer<typeof callToolResponseSchema>;

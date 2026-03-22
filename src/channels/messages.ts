@@ -25,20 +25,16 @@ import { conversationEventTypeSchema, conversationEventDataSchema } from '../typ
  * Base fields shared by all inbound (input) messages.
  */
 export const calBaseInputMessageSchema = z.object({
-  /** Identifies the conversation this message belongs to. */
-  conversationId: z.string(),
-  /** Optional caller-supplied identifier echoed back in the corresponding result message. */
-  correlationId: z.string().optional(),
+  conversationId: z.string().describe('Unique identifier of the conversation'),
+  correlationId: z.string().optional().describe('Optional caller-supplied identifier echoed back in the corresponding result message'),
 });
 
 /**
  * Base fields shared by all outbound (output) messages.
  */
 export const calBaseOutputMessageSchema = z.object({
-  /** Identifies the conversation this message belongs to. */
-  conversationId: z.string(),
-  /** Echoed from the originating input message, when applicable. */
-  correlationId: z.string().optional(),
+  conversationId: z.string().describe('Unique identifier of the conversation'),
+  correlationId: z.string().optional().describe('Echoed from the originating input message, when applicable'),
 });
 
 // Input message schemas
@@ -48,14 +44,10 @@ export const calBaseOutputMessageSchema = z.object({
  */
 export const calStartConversationRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('start_conversation'),
-  /** Identifier of the user initiating the conversation. */
-  userId: z.string(),
-  /** Optional agent to use for the conversation. */
-  agentId: z.string().optional(),
-  /** Stage at which the conversation should begin. */
-  stageId: z.string(),
-  /** IANA timezone identifier (e.g. America/New_York). Defaults to UTC when absent. */
-  timezone: z.string().optional(),
+  userId: z.string().describe('Identifier of the user initiating the conversation'),
+  agentId: z.string().optional().describe('Optional agent identifier to use for the conversation'),
+  stageId: z.string().describe('Stage ID to initiate the conversation at a specific stage'),
+  timezone: z.string().optional().describe('IANA timezone identifier for this conversation (e.g. America/New_York, Europe/Warsaw). Overrides user profile and project timezone settings. Defaults to UTC when not provided by any source.'),
 });
 
 /**
@@ -85,8 +77,7 @@ export const calStartUserVoiceInputRequestSchema = calBaseInputMessageSchema.ext
  */
 export const calEndUserVoiceInputRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('end_user_voice_input'),
-  /** Identifier of the input turn to close, as returned by the corresponding result message. */
-  inputTurnId: z.string(),
+  inputTurnId: z.string().describe('Identifier of the input turn to close, as returned by the corresponding result message'),
 });
 
 /**
@@ -94,8 +85,7 @@ export const calEndUserVoiceInputRequestSchema = calBaseInputMessageSchema.exten
  */
 export const calSendUserTextInputRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('send_user_text_input'),
-  /** Text content submitted by the user. */
-  text: z.string(),
+  text: z.string().describe('Text content submitted by the user'),
 });
 
 /**
@@ -103,8 +93,7 @@ export const calSendUserTextInputRequestSchema = calBaseInputMessageSchema.exten
  */
 export const calGoToStageRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('go_to_stage'),
-  /** Identifier of the target stage. */
-  stageId: z.string(),
+  stageId: z.string().describe('Identifier of the target stage'),
 });
 
 /**
@@ -112,12 +101,9 @@ export const calGoToStageRequestSchema = calBaseInputMessageSchema.extend({
  */
 export const calSetVarRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('set_var'),
-  /** Identifier of the stage that owns the variable. */
-  stageId: z.string(),
-  /** Name of the variable to set. */
-  variableName: z.string(),
-  /** New value for the variable. */
-  variableValue: parameterValueSchema,
+  stageId: z.string().describe('Identifier of the stage that owns the variable'),
+  variableName: z.string().describe('Name of the variable to set'),
+  variableValue: parameterValueSchema.describe('Value to set for the variable (can be string, number, boolean, object, or array)'),
 });
 
 /**
@@ -125,10 +111,8 @@ export const calSetVarRequestSchema = calBaseInputMessageSchema.extend({
  */
 export const calGetVarRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('get_var'),
-  /** Identifier of the stage that owns the variable. */
-  stageId: z.string(),
-  /** Name of the variable to retrieve. */
-  variableName: z.string(),
+  stageId: z.string().describe('Identifier of the stage that owns the variable'),
+  variableName: z.string().describe('Name of the variable to retrieve'),
 });
 
 /**
@@ -136,8 +120,7 @@ export const calGetVarRequestSchema = calBaseInputMessageSchema.extend({
  */
 export const calGetAllVarsRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('get_all_vars'),
-  /** Identifier of the stage whose variables should be retrieved. */
-  stageId: z.string(),
+  stageId: z.string().describe('Identifier of the stage whose variables should be retrieved'),
 });
 
 /**
@@ -145,10 +128,8 @@ export const calGetAllVarsRequestSchema = calBaseInputMessageSchema.extend({
  */
 export const calRunActionRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('run_action'),
-  /** Name of the global action to execute. */
-  actionName: z.string(),
-  /** Parameter values keyed by parameter name. */
-  parameters: z.record(z.string(), parameterValueSchema),
+  actionName: z.string().describe('Name of the global action to execute'),
+  parameters: z.record(z.string(), parameterValueSchema).describe('Map of parameter names to their values'),
 });
 
 /**
@@ -156,10 +137,8 @@ export const calRunActionRequestSchema = calBaseInputMessageSchema.extend({
  */
 export const calCallToolRequestSchema = calBaseInputMessageSchema.extend({
   type: z.literal('call_tool'),
-  /** Identifier of the tool to execute. */
-  toolId: z.string(),
-  /** Parameter values keyed by parameter name. */
-  parameters: z.record(z.string(), parameterValueSchema),
+  toolId: z.string().describe('Unique identifier of the tool to execute'),
+  parameters: z.record(z.string(), parameterValueSchema).describe('Map of parameter names to their values'),
 });
 
 /**
@@ -187,8 +166,8 @@ export const calInputMessageSchema = z.discriminatedUnion('type', [
  */
 export const calStartConversationResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('start_conversation'),
-  success: z.boolean(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether conversation was successfully started'),
+  error: z.string().optional().describe('Error message if conversation creation failed'),
 });
 
 /**
@@ -196,8 +175,8 @@ export const calStartConversationResponseSchema = calBaseOutputMessageSchema.ext
  */
 export const calResumeConversationResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('resume_conversation'),
-  success: z.boolean(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether conversation was successfully resumed'),
+  error: z.string().optional().describe('Error message if conversation resumption failed'),
 });
 
 /**
@@ -205,8 +184,8 @@ export const calResumeConversationResponseSchema = calBaseOutputMessageSchema.ex
  */
 export const calEndConversationResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('end_conversation'),
-  success: z.boolean(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether conversation was successfully ended'),
+  error: z.string().optional().describe('Error message if conversation termination failed'),
 });
 
 /**
@@ -215,10 +194,9 @@ export const calEndConversationResponseSchema = calBaseOutputMessageSchema.exten
  */
 export const calStartUserVoiceInputResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('start_user_voice_input'),
-  success: z.boolean(),
-  /** Identifier for the new voice input turn. Present when success is true. */
-  inputTurnId: z.string().optional(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether voice input was successfully started'),
+  inputTurnId: z.string().optional().describe('Identifier for the new voice input turn. Present when success is true'),
+  error: z.string().optional().describe('Error message if voice input start failed'),
 });
 
 /**
@@ -226,10 +204,9 @@ export const calStartUserVoiceInputResponseSchema = calBaseOutputMessageSchema.e
  */
 export const calEndUserVoiceInputResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('end_user_voice_input'),
-  success: z.boolean(),
-  /** Identifier of the voice input turn that was closed. */
-  inputTurnId: z.string(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether voice input was successfully ended'),
+  inputTurnId: z.string().describe('Identifier of the voice input turn that was closed'),
+  error: z.string().optional().describe('Error message if voice input ending failed'),
 });
 
 /**
@@ -239,10 +216,9 @@ export const calEndUserVoiceInputResponseSchema = calBaseOutputMessageSchema.ext
  */
 export const calSendUserTextInputResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('send_user_text_input'),
-  success: z.boolean(),
-  /** Identifier of the input turn created for this text submission. */
-  inputTurnId: z.string(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether text input was successfully received'),
+  inputTurnId: z.string().describe('Identifier of the input turn created for this text submission, can be used to correlate with conversation events'),
+  error: z.string().optional().describe('Error message if text input processing failed'),
 });
 
 /**
@@ -250,8 +226,8 @@ export const calSendUserTextInputResponseSchema = calBaseOutputMessageSchema.ext
  */
 export const calGoToStageResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('go_to_stage'),
-  success: z.boolean(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether navigation to the stage was successful'),
+  error: z.string().optional().describe('Error message if navigation failed'),
 });
 
 /**
@@ -259,8 +235,8 @@ export const calGoToStageResponseSchema = calBaseOutputMessageSchema.extend({
  */
 export const calSetVarResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('set_var_result'),
-  success: z.boolean(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether the variable was successfully set'),
+  error: z.string().optional().describe('Error message if setting the variable failed'),
 });
 
 /**
@@ -268,12 +244,10 @@ export const calSetVarResponseSchema = calBaseOutputMessageSchema.extend({
  */
 export const calGetVarResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('get_var'),
-  success: z.boolean(),
-  /** Name of the requested variable, echoed for easy correlation. */
-  variableName: z.string(),
-  /** Retrieved value. Absent when the variable does not exist or success is false. */
-  variableValue: parameterValueSchema.optional(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether the variable was successfully retrieved'),
+  variableName: z.string().describe('Name of the retrieved variable'),
+  variableValue: parameterValueSchema.optional().describe('Value of the variable (absent when not found or success is false)'),
+  error: z.string().optional().describe('Error message if retrieving the variable failed'),
 });
 
 /**
@@ -281,10 +255,9 @@ export const calGetVarResponseSchema = calBaseOutputMessageSchema.extend({
  */
 export const calGetAllVarsResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('get_all_vars'),
-  success: z.boolean(),
-  /** All stage variables keyed by name. Empty object when none exist. */
-  variables: z.record(z.string(), parameterValueSchema),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether the variables were successfully retrieved'),
+  variables: z.record(z.string(), parameterValueSchema).describe('Map of variable names to their values'),
+  error: z.string().optional().describe('Error message if retrieving variables failed'),
 });
 
 /**
@@ -292,10 +265,9 @@ export const calGetAllVarsResponseSchema = calBaseOutputMessageSchema.extend({
  */
 export const calRunActionResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('run_action'),
-  success: z.boolean(),
-  /** Multi-modal content blocks returned by the action. */
-  result: z.array(llmContentSchema).optional(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether the action was successfully executed'),
+  result: z.array(llmContentSchema).optional().describe('Result returned by the action as array of multi-modal content blocks (text, image, or audio)'),
+  error: z.string().optional().describe('Error message if action execution failed'),
 });
 
 /**
@@ -303,10 +275,9 @@ export const calRunActionResponseSchema = calBaseOutputMessageSchema.extend({
  */
 export const calCallToolResponseSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('call_tool'),
-  success: z.boolean(),
-  /** Multi-modal content blocks returned by the tool. */
-  result: z.array(llmContentSchema).optional(),
-  error: z.string().optional(),
+  success: z.boolean().describe('Whether the tool was successfully executed'),
+  result: z.array(llmContentSchema).optional().describe('Result returned by the tool execution as array of multi-modal content blocks (text, image, or audio)'),
+  error: z.string().optional().describe('Error message if tool execution failed'),
 });
 
 // Output push message schemas — AI generation
@@ -317,10 +288,8 @@ export const calCallToolResponseSchema = calBaseOutputMessageSchema.extend({
  */
 export const calStartAiGenerationOutputMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('start_ai_generation_output'),
-  /** Identifier for this generation turn; used to correlate all subsequent output messages. */
-  outputTurnId: z.string(),
-  /** Whether the response will include synthesised voice audio. */
-  expectVoice: z.boolean(),
+  outputTurnId: z.string().describe('Unique identifier for this generation turn; used to correlate all subsequent output messages'),
+  expectVoice: z.boolean().describe('Whether the response will include synthesised voice audio'),
 });
 
 /**
@@ -329,22 +298,14 @@ export const calStartAiGenerationOutputMessageSchema = calBaseOutputMessageSchem
  */
 export const calSendAiVoiceChunkMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('send_ai_voice_chunk'),
-  /** Generation turn this chunk belongs to. */
-  outputTurnId: z.string(),
-  /** Raw audio data. Encoding is the channel adapter's responsibility. */
-  audioData: z.instanceof(Buffer),
-  /** Encoding of audioData. */
-  audioFormat: audioFormatSchema,
-  /** Unique identifier for this specific chunk. */
-  chunkId: z.string(),
-  /** Sequential 0-based position within the output turn's audio stream. */
-  ordinal: z.number(),
-  /** Whether this is the final audio chunk for this output turn. */
-  isFinal: z.boolean(),
-  /** Sample rate in Hz (e.g. 24000). */
-  sampleRate: z.number().optional(),
-  /** Bit rate in bits per second (e.g. 64000). */
-  bitRate: z.number().optional(),
+  outputTurnId: z.string().describe('Generation turn this chunk belongs to'),
+  audioData: z.instanceof(Buffer).describe('Raw audio data (encoding is the channel adapter\'s responsibility)'),
+  audioFormat: audioFormatSchema.describe('Encoding of audioData'),
+  chunkId: z.string().describe('Unique identifier for this specific chunk'),
+  ordinal: z.number().describe('Sequential 0-based position within the output turn\'s audio stream'),
+  isFinal: z.boolean().describe('Whether this is the final audio chunk for this output turn'),
+  sampleRate: z.number().optional().describe('Sample rate in Hz (e.g. 24000)'),
+  bitRate: z.number().optional().describe('Bit rate in bits per second (e.g. 64000)'),
 });
 
 /**
@@ -352,10 +313,8 @@ export const calSendAiVoiceChunkMessageSchema = calBaseOutputMessageSchema.exten
  */
 export const calEndAiGenerationOutputMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('end_ai_generation_output'),
-  /** Generation turn that has ended. */
-  outputTurnId: z.string(),
-  /** Full text that was synthesised to speech (or generated, when voice is disabled). */
-  fullText: z.string(),
+  outputTurnId: z.string().describe('Generation turn that has ended'),
+  fullText: z.string().describe('Full text that was synthesised to speech (or generated, when voice is disabled)'),
 });
 
 /**
@@ -363,16 +322,11 @@ export const calEndAiGenerationOutputMessageSchema = calBaseOutputMessageSchema.
  */
 export const calAiTranscribedChunkMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('ai_transcribed_chunk'),
-  /** Generation turn this chunk belongs to. */
-  outputTurnId: z.string(),
-  /** Unique identifier for this chunk. */
-  chunkId: z.string(),
-  /** Transcribed text content. */
-  chunkText: z.string(),
-  /** Sequential 0-based position within the transcription stream. */
-  ordinal: z.number(),
-  /** Whether this is the final transcription chunk for this output turn. */
-  isFinal: z.boolean(),
+  outputTurnId: z.string().describe('Generation turn this chunk belongs to'),
+  chunkId: z.string().describe('Unique identifier for this chunk'),
+  chunkText: z.string().describe('Transcribed text content'),
+  ordinal: z.number().describe('Sequential 0-based position within the transcription stream'),
+  isFinal: z.boolean().describe('Whether this is the final transcription chunk for this output turn'),
 });
 
 // Output push message schemas — user transcription
@@ -382,16 +336,11 @@ export const calAiTranscribedChunkMessageSchema = calBaseOutputMessageSchema.ext
  */
 export const calUserTranscribedChunkMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('user_transcribed_chunk'),
-  /** Input turn this transcription chunk belongs to. */
-  inputTurnId: z.string(),
-  /** Unique identifier for this chunk. */
-  chunkId: z.string(),
-  /** Transcribed text content. */
-  chunkText: z.string(),
-  /** Sequential 0-based position within the transcription stream. */
-  ordinal: z.number(),
-  /** true once ASR has finalised its transcript for this chunk. */
-  isFinal: z.boolean(),
+  inputTurnId: z.string().describe('Input turn this transcription chunk belongs to'),
+  chunkId: z.string().describe('Unique identifier for this chunk'),
+  chunkText: z.string().describe('Transcribed text content'),
+  ordinal: z.number().describe('Sequential 0-based position within the transcription stream'),
+  isFinal: z.boolean().describe('True once ASR has finalised its transcript for this chunk'),
 });
 
 // Output push message schemas — multi-modal AI output
@@ -401,14 +350,10 @@ export const calUserTranscribedChunkMessageSchema = calBaseOutputMessageSchema.e
  */
 export const calSendAiImageOutputMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('send_ai_image_output'),
-  /** Generation turn this image belongs to. */
-  outputTurnId: z.string(),
-  /** Raw image data. Encoding is the channel adapter's responsibility. */
-  imageData: z.instanceof(Buffer),
-  /** MIME type of imageData (e.g. image/png, image/jpeg). */
-  mimeType: z.string(),
-  /** 0-based index when multiple images are produced in a single response. */
-  sequenceNumber: z.number(),
+  outputTurnId: z.string().describe('Generation turn this image belongs to'),
+  imageData: z.instanceof(Buffer).describe('Raw image data (encoding is the channel adapter\'s responsibility)'),
+  mimeType: z.string().describe('MIME type of imageData (e.g. image/png, image/jpeg)'),
+  sequenceNumber: z.number().describe('0-based index when multiple images are produced in a single response'),
 });
 
 /**
@@ -416,25 +361,16 @@ export const calSendAiImageOutputMessageSchema = calBaseOutputMessageSchema.exte
  */
 export const calSendAiAudioOutputMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('send_ai_audio_output'),
-  /** Generation turn this audio belongs to. */
-  outputTurnId: z.string(),
-  /** Raw audio data. Encoding is the channel adapter's responsibility. */
-  audioData: z.instanceof(Buffer),
-  /** Encoding of audioData. */
-  audioFormat: audioFormatSchema,
-  /** MIME type of audioData (e.g. audio/mpeg, audio/wav). */
-  mimeType: z.string(),
-  /** 0-based index when multiple audio blocks are produced in a single response. */
-  sequenceNumber: z.number(),
-  /** Optional low-level audio metadata. */
+  outputTurnId: z.string().describe('Generation turn this audio belongs to'),
+  audioData: z.instanceof(Buffer).describe('Raw audio data (encoding is the channel adapter\'s responsibility)'),
+  audioFormat: audioFormatSchema.describe('Encoding of audioData'),
+  mimeType: z.string().describe('MIME type of audioData (e.g. audio/mpeg, audio/wav)'),
+  sequenceNumber: z.number().describe('0-based index when multiple audio blocks are produced in a single response'),
   metadata: z.object({
-    /** Sample rate in Hz. */
-    sampleRate: z.number().optional(),
-    /** Number of audio channels. */
-    channels: z.number().optional(),
-    /** Bit depth per sample. */
-    bitDepth: z.number().optional(),
-  }).optional(),
+    sampleRate: z.number().optional().describe('Sample rate in Hz'),
+    channels: z.number().optional().describe('Number of audio channels'),
+    bitDepth: z.number().optional().describe('Bit depth per sample'),
+  }).optional().describe('Optional low-level audio metadata'),
 });
 
 // Output push message schemas — conversation events
@@ -445,14 +381,10 @@ export const calSendAiAudioOutputMessageSchema = calBaseOutputMessageSchema.exte
  */
 export const calConversationEventMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('conversation_event'),
-  /** Identifier of the input turn associated with this event, when applicable. */
-  inputTurnId: z.string().optional(),
-  /** Identifier of the output turn associated with this event, when applicable. */
-  outputTurnId: z.string().optional(),
-  /** Discriminator for the event payload. */
-  eventType: conversationEventTypeSchema,
-  /** Structured data describing the event. */
-  eventData: conversationEventDataSchema,
+  inputTurnId: z.string().optional().describe('Identifier of the input turn associated with this event, when applicable'),
+  outputTurnId: z.string().optional().describe('Identifier of the output turn associated with this event, when applicable'),
+  eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
+  eventData: conversationEventDataSchema.describe('Data associated with the conversation event'),
 });
 
 /**
@@ -461,14 +393,10 @@ export const calConversationEventMessageSchema = calBaseOutputMessageSchema.exte
  */
 export const calConversationEventUpdateMessageSchema = calBaseOutputMessageSchema.extend({
   type: z.literal('conversation_event_update'),
-  /** Identifier of the input turn associated with this event, when applicable. */
-  inputTurnId: z.string().optional(),
-  /** Identifier of the output turn associated with this event, when applicable. */
-  outputTurnId: z.string().optional(),
-  /** Discriminator for the event payload. */
-  eventType: conversationEventTypeSchema,
-  /** Updated structured data describing the event. */
-  eventData: conversationEventDataSchema,
+  inputTurnId: z.string().optional().describe('Identifier of the input turn associated with this event, when applicable'),
+  outputTurnId: z.string().optional().describe('Identifier of the output turn associated with this event, when applicable'),
+  eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
+  eventData: conversationEventDataSchema.describe('Updated data for the conversation event'),
 });
 
 // Output union schema
