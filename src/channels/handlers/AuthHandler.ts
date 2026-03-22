@@ -7,7 +7,6 @@ import { ApiKeyService } from '../../services/ApiKeyService';
 import { ProjectService } from '../../services/ProjectService';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
-import { WebSocketConnection } from '../../websocket/WebSocketConnection';
 
 /**
  * Handles WebSocket authentication requests.

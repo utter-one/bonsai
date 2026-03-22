@@ -141,7 +141,6 @@ export class WebSocketChannelHost {
     } as CALInputMessage;
 
     const context: ClientMessageHandlerContext = {
-      ws,
       connection,
       // Translate CAL response → WS wire format: map correlationId → requestId and inject sessionId
       send: (msg: any) => {
