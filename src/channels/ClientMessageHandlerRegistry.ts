@@ -8,7 +8,7 @@ type RegistryItem = {
 }
 
 /**
- * Global registry for WebSocket message handlers.
+ * Global registry for client message handlers.
  * Handlers are automatically registered via the @ClientMessageHandler decorator.
  */
 export class ClientMessageHandlerRegistry {

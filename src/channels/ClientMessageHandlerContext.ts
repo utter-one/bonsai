@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws';
-import type { Connection } from '../websocket/ConnectionManager';
+import type { Connection } from './ConnectionManager';
 
 /**
  * Context provided to channel message handlers.

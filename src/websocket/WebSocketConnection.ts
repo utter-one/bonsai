@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import type { Connection, ConnectionManager } from './ConnectionManager';
+import type { Connection, ConnectionManager } from '../channels/ConnectionManager';
 import type { IClientConnection } from '../channels/IClientConnection';
 import type { CALInputMessage, CALOutputMessage } from '../channels/messages';
 import { logger } from '../utils/logger';
@@ -8,16 +8,13 @@ import { logger } from '../utils/logger';
  * WebSocket-backed implementation of {@link IClientConnection}.
  *
  * Translates CAL output messages to their WebSocket wire-format counterparts and
- * sends them directly to the associated WebSocket client.
- *
- * `open()` and `close()` are no-ops because the WebSocket lifecycle is managed
- * externally by {@link ConnectionManager}. `receiveMessage()` is also a no-op because
- * inbound routing is handled by the existing WebSocket handler pipeline.
+ * sends them directly to the associated WebSocket client. Also handles connection closure and session cleanup.
  */
 export class WebSocketConnection implements IClientConnection {
+  private connection: Connection;
+
   constructor(
     private readonly ws: WebSocket,
-    private readonly connection: Connection,
     private readonly connectionManager: ConnectionManager,
   ) {}
 
@@ -29,7 +26,11 @@ export class WebSocketConnection implements IClientConnection {
       this.ws.close();
     }
 
-    await this.connectionManager.endSession(this.connection.id);
+    await this.connectionManager.unregisterConnection(this.connection.id);
+  }
+
+  attachConnection(connection: Connection): void {
+    this.connection = connection;  
   }
 
   /**

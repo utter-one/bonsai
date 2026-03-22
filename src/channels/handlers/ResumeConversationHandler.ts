@@ -2,7 +2,7 @@ import { inject, injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import type { CALResumeConversationRequest, CALResumeConversationResponse } from '../messages';
-import { ConnectionManager } from '../../websocket/ConnectionManager';
+import { ConnectionManager } from '../ConnectionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { NotFoundError, InvalidOperationError, ArchivedProjectError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -64,7 +64,7 @@ export class ResumeConversationHandler implements ClientMessageHandler<CALResume
       try {
         await this.conversationService.failConversation(context.connection!.projectId, message.conversationId, errorMessage);
         await this.conversationService.saveConversationEvent(context.connection!.projectId, message.conversationId, 'conversation_failed', failedEventData);
-        await context.connection!.channel?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_failed', eventData: failedEventData });
+        await context.connection!.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_failed', eventData: failedEventData });
       } catch (cleanupError) {
         logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId: message.conversationId }, 'Failed to save conversation_failed event during cleanup');
       }

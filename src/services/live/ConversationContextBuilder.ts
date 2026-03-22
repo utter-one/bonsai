@@ -1,6 +1,6 @@
 import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
-import { Connection } from "../../websocket/ConnectionManager";
+import { Connection } from "../../channels/ConnectionManager";
 import { inject, singleton } from "tsyringe";
 import { Conversation, GlobalAction, Guardrail, Stage } from "../../types/models";
 import { FieldDescriptor } from "../../types/parameters";

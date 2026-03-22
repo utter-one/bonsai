@@ -1,13 +1,13 @@
 import 'reflect-metadata';
 import { singleton } from 'tsyringe';
 import { logger } from '../utils/logger';
-import type { CALInputMessage } from '../channels/messages';
-import { ClientMessageHandlerRegistry } from '../channels/ClientMessageHandlerRegistry';
-import type { ClientMessageHandler } from '../channels/ClientMessageHandler';
-import type { ClientMessageHandlerContext } from '../channels/ClientMessageHandlerContext';
+import type { CALInputMessage } from './messages';
+import { ClientMessageHandlerRegistry } from './ClientMessageHandlerRegistry';
+import type { ClientMessageHandler } from './ClientMessageHandler';
+import type { ClientMessageHandlerContext } from './ClientMessageHandlerContext';
 
 // Import handlers module to trigger decorator registration
-import '../channels/handlers';
+import './handlers';
 
 /**
  * Responsible for registering channel message handlers and dispatching

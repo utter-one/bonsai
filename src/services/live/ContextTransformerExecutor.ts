@@ -6,7 +6,7 @@ import logger from '../../utils/logger';
 import { extractTextFromContent } from '../../utils/llm';
 import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
-import { Connection } from '../../websocket/ConnectionManager';
+import { Connection } from '../../channels/ConnectionManager';
 import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
@@ -132,7 +132,7 @@ export class ContextTransformerExecutor {
         },
       };
       await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData);
-      await session.channel.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'transformation', eventData });
+      await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'transformation', eventData });
     }
 
     // Build a raw context with the updated stage vars for condition evaluation

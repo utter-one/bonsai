@@ -1,5 +1,5 @@
 import { inject, singleton } from "tsyringe";
-import { Connection } from "../../websocket/ConnectionManager";
+import { Connection } from "../../channels/ConnectionManager";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
@@ -114,7 +114,7 @@ export class UserInputProcessor {
           },
         };
         await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
-        await session.channel.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
       // Register classification event for guardrail classifier
@@ -133,7 +133,7 @@ export class UserInputProcessor {
           },
         };
         await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
-        await session.channel.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
       const allActions = [

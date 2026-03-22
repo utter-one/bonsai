@@ -4,7 +4,7 @@ import { and, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { conversations, projects } from '../db/schema';
 import { ConversationService } from './ConversationService';
-import { ConnectionManager } from '../websocket/ConnectionManager';
+import { ConnectionManager } from '../channels/ConnectionManager';
 import type { ConversationAbortedEventData } from '../types/conversationEvents';
 import logger from '../utils/logger';
 
@@ -85,7 +85,7 @@ export class ConversationTimeoutService {
       await this.conversationService.saveConversationEvent(projectId, id, 'conversation_aborted', eventData);
 
       for (const connection of this.connectionManager.getConnectionsForConversation(id)) {
-        await connection.channel?.sendMessage({ type: 'conversation_event', conversationId: connection.conversationId, eventType: 'conversation_aborted', eventData });
+        await connection.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: connection.conversationId, eventType: 'conversation_aborted', eventData });
       }
       this.connectionManager.detachConversationFromConnections(id);
 
