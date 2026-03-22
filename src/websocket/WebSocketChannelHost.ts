@@ -5,6 +5,7 @@ import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
 import { Connection, ConnectionManager } from '../channels/ConnectionManager';
 import { ChannelHandlerDispatcher } from '../channels/ChannelHandlerDispatcher';
+import { WsRateLimiter } from './WsRateLimiter';
 import { logger } from '../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
 import type { CALInputMessage } from '../channels/messages';
@@ -26,6 +27,7 @@ export class WebSocketChannelHost {
   constructor(
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
     @inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
+    @inject(WsRateLimiter) private readonly rateLimiter: WsRateLimiter,
   ) {}
 
   /**
@@ -116,6 +118,17 @@ export class WebSocketChannelHost {
     } catch {
       this.sendError(ws, 'Invalid JSON');
       return;
+    }
+
+    if (wsMessage.type === 'auth') {
+      const ip = this.getSocketIp(ws);
+      if (!this.rateLimiter.tryConsume(ip)) {
+        const retryAfter = this.rateLimiter.getRetryAfterSeconds(ip);
+        logger.warn({ ip, retryAfter }, 'WebSocket auth rate limit exceeded');
+        this.sendError(ws, 'Too many authentication attempts, please try again later', wsMessage.requestId);
+        ws.close();
+        return;
+      }
     }
 
     const connection = this.getConnectionForWebSocket(ws);

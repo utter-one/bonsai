@@ -5,7 +5,6 @@ import type { AuthRequest, AuthResponse } from '../../websocket/contracts/auth';
 import { ConnectionManager } from '../ConnectionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';
 import { ProjectService } from '../../services/ProjectService';
-import { WsRateLimiter } from '../../websocket/WsRateLimiter';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 import { WebSocketConnection } from '../../websocket/WebSocketConnection';
@@ -24,7 +23,6 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
     @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(ApiKeyService) private apiKeyService: ApiKeyService,
     @inject(ProjectService) private projectService: ProjectService,
-    @inject(WsRateLimiter) private wsRateLimiter: WsRateLimiter
   ) {}
 
   /**
@@ -32,8 +30,6 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
    * Validates API key against the database and creates a session on successful authentication.
    */
   async handle(context: ClientMessageHandlerContext, message: AuthRequest): Promise<void> {
-    // const ip = this.connectionManager.getSocketIp(context.ws!);
-
     // Reject re-authentication on an already-authenticated connection
     if (context.connection?.projectId) {
       logger.warn({ requestId: message.requestId, sessionId: context.connection.id }, 'Auth message received on already-authenticated connection');
@@ -41,15 +37,6 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
       context.send(response);
       return;
     }
-
-    // if (!this.wsRateLimiter.tryConsume(ip)) {
-    //   const retryAfter = this.wsRateLimiter.getRetryAfterSeconds(ip);
-    //   logger.warn({ requestId: message.requestId, ip, retryAfter }, 'WebSocket auth rate limit exceeded');
-    //   const response: AuthResponse = { type: 'auth', success: false, error: 'Too many authentication attempts, please try again later', requestId: message.requestId };
-    //   context.send(response);
-    //   context.ws!.close();
-    //   return;
-    // }
 
     try {
       const apiKey = await this.apiKeyService.getApiKeyByKey(message.apiKey);
