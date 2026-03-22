@@ -15,19 +15,6 @@ import {
   calCallToolResponseSchema,
 } from '../../channels/messages';
 
-/**
- * Schema for webhook call results stored in context.
- * Contains HTTP response details including status, headers, and data.
- */
-export const webhookResultSchema = z.object({
-  status: z.number().describe('HTTP status code'),
-  statusText: z.string().describe('HTTP status text'),
-  headers: z.record(z.string(), z.string()).describe('HTTP response headers'),
-  data: z.unknown().describe('Response body (parsed JSON or raw text)'),
-});
-
-export type WebhookResult = z.infer<typeof webhookResultSchema>;
-
 /** Request to navigate to a specific stage in a conversation. */
 export const goToStageRequestSchema = calToWsInput(calGoToStageRequestSchema);
 export type GoToStageRequest = z.infer<typeof goToStageRequestSchema>;
