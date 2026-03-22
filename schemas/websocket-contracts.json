@@ -757,10 +757,6 @@
     "start-conversation-request": {
       "type": "object",
       "properties": {
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
         "type": {
           "type": "string",
           "enum": [
@@ -793,7 +789,6 @@
         }
       },
       "required": [
-        "conversationId",
         "type",
         "userId",
         "stageId",

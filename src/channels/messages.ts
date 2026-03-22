@@ -42,7 +42,7 @@ export const calBaseOutputMessageSchema = z.object({
 /**
  * Requests that a new conversation is started for the given user and stage.
  */
-export const calStartConversationRequestSchema = calBaseInputMessageSchema.extend({
+export const calStartConversationRequestSchema = calBaseInputMessageSchema.omit({ conversationId: true }).extend({
   type: z.literal('start_conversation'),
   userId: z.string().describe('Identifier of the user initiating the conversation'),
   agentId: z.string().optional().describe('Optional agent identifier to use for the conversation'),
