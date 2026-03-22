@@ -6,7 +6,7 @@ import logger from '../../utils/logger';
 import { extractTextFromContent } from '../../utils/llm';
 import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
-import { Connection } from '../../channels/ConnectionManager';
+import { Session } from '../../channels/SessionManager';
 import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
@@ -67,7 +67,7 @@ export class ContextTransformerExecutor {
    * @param originalUserInput - The original user input before any processing
    * @returns Triggered stage actions based on variable changes
    */
-  async executeTransformers(session: Connection, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
+  async executeTransformers(session: Session, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
     const { transformers, stage, conversation, globalActions } = session.runner.getRuntimeData();
 
     if (transformers.length === 0) {
@@ -185,7 +185,7 @@ export class ContextTransformerExecutor {
    * @param conditionContext - Conversation context used to evaluate action conditions (has updated stage vars)
    * @returns Array of triggered action classification results
    */
-  private async findTriggeredActions(session: Connection, changeEvents: VariableChangeEvents, stageActions: Record<string, StageAction>, conditionContext: ConversationContext): Promise<ActionClassificationResult[]> {
+  private async findTriggeredActions(session: Session, changeEvents: VariableChangeEvents, stageActions: Record<string, StageAction>, conditionContext: ConversationContext): Promise<ActionClassificationResult[]> {
     logger.info({ changeEvents }, 'Finding triggered actions based on variable change events');
     if (Object.keys(changeEvents).length === 0) {
       return [];
@@ -225,7 +225,7 @@ export class ContextTransformerExecutor {
    * @param transformerData - Runtime data containing the transformer config and its LLM provider
    * @param context - The conversation context built for this transformer
    */
-  private async executeTransformer(session: Connection, transformerData: TransformerRuntimeData, context: ConversationContext): Promise<TransformerExecutionResult> {
+  private async executeTransformer(session: Session, transformerData: TransformerRuntimeData, context: ConversationContext): Promise<TransformerExecutionResult> {
     const { transformer, llmProvider } = transformerData;
     const startMs = Date.now();
 

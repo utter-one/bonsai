@@ -19,26 +19,26 @@ export class StartUserVoiceInputHandler implements ClientMessageHandler<CALStart
    * Handles start user voice input requests.
    */
   async handle(context: ClientMessageHandlerContext, message: CALStartUserVoiceInputRequest): Promise<void> {
-    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'Start user voice input request received');
+    logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'Start user voice input request received');
 
     try {
-      if (!context.connection) {
+      if (!context.session) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!context.connection.sessionSettings.sendVoiceInput) {
+      if (!context.session.sessionSettings.sendVoiceInput) {
         throw new InvalidOperationError('Voice input is disabled for this session');
       }
 
-      if (!context.connection.conversationId) {
+      if (!context.session.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (context.connection.conversationId !== message.conversationId) {
+      if (context.session.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      const inputTurnId = await context.connection.runner.startUserVoiceInput();
+      const inputTurnId = await context.session.runner.startUserVoiceInput();
 
       const response: CALStartUserVoiceInputResponse = {
         type: 'start_user_voice_input',
@@ -49,10 +49,10 @@ export class StartUserVoiceInputHandler implements ClientMessageHandler<CALStart
       };
       context.send(response);
 
-      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId }, 'User voice input started successfully');
+      logger.info({ sessionId: context.session?.id, conversationId: message.conversationId }, 'User voice input started successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to start user voice input';
-      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId }, 'Failed to start user voice input');
+      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to start user voice input');
       const response: CALStartUserVoiceInputResponse = {
         type: 'start_user_voice_input',
         conversationId: message.conversationId,

@@ -19,31 +19,31 @@ export class RunActionHandler implements ClientMessageHandler<CALRunActionReques
    * Handles run action requests.
    */
   async handle(context: ClientMessageHandlerContext, message: CALRunActionRequest): Promise<void> {
-    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, actionName: message.actionName, correlationId: message.correlationId }, 'Run action request received');
+    logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, actionName: message.actionName, correlationId: message.correlationId }, 'Run action request received');
 
     try {
-      if (!context.connection) {
+      if (!context.session) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!context.connection.conversationId) {
+      if (!context.session.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (context.connection.conversationId !== message.conversationId) {
+      if (context.session.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.connection.runner.saveCommandEvent('run_action', { actionName: message.actionName, parameters: message.parameters });
-      const result = await context.connection.runner.runAction(message.actionName, message.parameters);
+      await context.session.runner.saveCommandEvent('run_action', { actionName: message.actionName, parameters: message.parameters });
+      const result = await context.session.runner.runAction(message.actionName, message.parameters);
 
       const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: true, result };
       context.send(response);
 
-      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
+      logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to run action';
-      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Failed to run action');
+      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Failed to run action');
       const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
       context.send(response);
     }

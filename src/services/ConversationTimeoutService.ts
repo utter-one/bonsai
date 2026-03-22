@@ -4,7 +4,7 @@ import { and, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { conversations, projects } from '../db/schema';
 import { ConversationService } from './ConversationService';
-import { ConnectionManager } from '../channels/ConnectionManager';
+import { SessionManager } from '../channels/SessionManager';
 import type { ConversationAbortedEventData } from '../types/conversationEvents';
 import logger from '../utils/logger';
 
@@ -22,7 +22,7 @@ const TIMEOUT_REASON = 'Conversation timed out due to inactivity';
 export class ConversationTimeoutService {
   constructor(
     @inject(ConversationService) private readonly conversationService: ConversationService,
-    @inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
+    @inject(SessionManager) private readonly sessionManager: SessionManager,
   ) { }
 
   /**
@@ -84,10 +84,10 @@ export class ConversationTimeoutService {
       const eventData: ConversationAbortedEventData = { stageId, reason: TIMEOUT_REASON };
       await this.conversationService.saveConversationEvent(projectId, id, 'conversation_aborted', eventData);
 
-      for (const connection of this.connectionManager.getConnectionsForConversation(id)) {
-        await connection.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: connection.conversationId, eventType: 'conversation_aborted', eventData });
+      for (const session of this.sessionManager.getSessionsForConversation(id)) {
+        await session.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: session.conversationId, eventType: 'conversation_aborted', eventData });
       }
-      this.connectionManager.detachConversationFromConnections(id);
+      this.sessionManager.detachConversationFromSessions(id);
 
       logger.info({ conversationId: id, projectId }, 'Conversation aborted due to inactivity timeout');
     } catch (error) {

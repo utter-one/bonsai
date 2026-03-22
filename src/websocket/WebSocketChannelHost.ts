@@ -1,9 +1,8 @@
-import 'reflect-metadata';
 import { inject, singleton } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
-import { Connection, ConnectionManager } from '../channels/ConnectionManager';
+import { Session, SessionManager } from '../channels/SessionManager';
 import { ChannelHandlerDispatcher } from '../channels/ChannelHandlerDispatcher';
 import { WsRateLimiter } from './WsRateLimiter';
 import { logger } from '../utils/logger';
@@ -19,14 +18,14 @@ import { WebSocketConnection } from './WebSocketConnection';
 @singleton()
 export class WebSocketChannelHost {
   private wss: WebSocketServer | null = null;
-  private socketMap: Map<WebSocket, Connection> = new Map();
-  private connectionMap: Map<string, WebSocket> = new Map();
+  private socketMap: Map<WebSocket, Session> = new Map();
+  private sessionMap: Map<string, WebSocket> = new Map();
   private socketIpMap: WeakMap<WebSocket, string> = new WeakMap();
 
 
   constructor(
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
-    @inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
+    @inject(SessionManager) private readonly sessionManager: SessionManager,
     @inject(WsRateLimiter) private readonly rateLimiter: WsRateLimiter,
   ) {}
 
@@ -46,11 +45,11 @@ export class WebSocketChannelHost {
       logger.info({ ip: clientIp }, 'New WebSocket connection established');
 
       // Create a new WebSocketConnection and session for the authenticated client
-      const wsConnection = new WebSocketConnection(ws, this.connectionManager);
-      const sessionId = this.connectionManager.registerConnection(wsConnection);
-      wsConnection.attachConnection(this.connectionManager.getConnection(sessionId));
-      this.socketMap.set(ws, this.connectionManager.getConnection(sessionId));
-      this.connectionMap.set(sessionId, ws);
+      const wsConnection = new WebSocketConnection(ws, this.sessionManager);
+      const sessionId = this.sessionManager.registerSession(wsConnection);
+      wsConnection.attachSession(this.sessionManager.getSession(sessionId));
+      this.socketMap.set(ws, this.sessionManager.getSession(sessionId));
+      this.sessionMap.set(sessionId, ws);
 
       ws.on('message', (data: Buffer) => {
         this.handleMessage(ws, data);
@@ -93,7 +92,7 @@ export class WebSocketChannelHost {
    * @returns The WebSocket connection if found, otherwise undefined.
    */
   getWebSocketForSession(sessionId: string): WebSocket | undefined {
-    return this.connectionMap.get(sessionId);
+    return this.sessionMap.get(sessionId);
   }
 
   /**
@@ -101,7 +100,7 @@ export class WebSocketChannelHost {
    * @param ws - The WebSocket connection to look up.
    * @returns The session data if found, otherwise undefined.
    */
-  getConnectionForWebSocket(ws: WebSocket): Connection | undefined {
+  getSessionForWebSocket(ws: WebSocket): Session | undefined {
     return this.socketMap.get(ws);
   }
 
@@ -131,22 +130,22 @@ export class WebSocketChannelHost {
       }
     }
 
-    const connection = this.getConnectionForWebSocket(ws);
+    const session = this.getSessionForWebSocket(ws);
 
     // Translate WS wire format → CAL format: map requestId → correlationId, resolve conversationId from session
     const calMessage = {
       ...wsMessage,
       correlationId: wsMessage.requestId,
-      conversationId: connection?.conversationId ?? '',
+      conversationId: session?.conversationId ?? '',
     } as CALInputMessage;
 
     const context: ClientMessageHandlerContext = {
-      connection,
+      session,
       // Translate CAL response → WS wire format: map correlationId → requestId and inject sessionId
       send: (msg: any) => {
         const wsMsg: Record<string, unknown> = { ...msg };
         if (!wsMsg.requestId && wsMsg.correlationId) wsMsg.requestId = wsMsg.correlationId;
-        if (!wsMsg.sessionId && connection?.id) wsMsg.sessionId = connection.id;
+        if (!wsMsg.sessionId && session?.id) wsMsg.sessionId = session.id;
         this.send(ws, wsMsg as BaseOutputMessage);
       },
       sendError: (error: string, correlationId?: string) => this.sendError(ws, error, correlationId),
@@ -161,10 +160,10 @@ export class WebSocketChannelHost {
    * @param ws - The WebSocket connection that was disconnected.
    */
   private async handleDisconnect(ws: WebSocket): Promise<void> {
-    const connection = this.getConnectionForWebSocket(ws);
-    if (connection) {
-      logger.info({ sessionId: connection.id, conversationId: connection.conversationId || undefined }, 'WebSocket connection closed, cleaning up session');
-      await this.connectionManager.unregisterConnection(connection.id);
+    const session = this.getSessionForWebSocket(ws);
+    if (session) {
+      logger.info({ sessionId: session.id, conversationId: session.conversationId || undefined }, 'WebSocket connection closed, cleaning up session');
+      await this.sessionManager.unregisterSession(session.id);
     } else {
       logger.info('WebSocket connection closed (no session found)');
     }

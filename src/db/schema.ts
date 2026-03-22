@@ -29,7 +29,7 @@ export const conversations = pgTable('conversations', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
   userId: text('user_id').notNull(),
-  clientId: text('client_id').notNull(),
+  sessionId: text('session_id').notNull(),
   stageId: text('stage_id').notNull(),
   startingStageId: text('starting_stage_id'),
   endingStageId: text('ending_stage_id'),

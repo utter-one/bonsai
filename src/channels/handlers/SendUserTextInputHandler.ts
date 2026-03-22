@@ -19,27 +19,27 @@ export class SendUserTextInputHandler implements ClientMessageHandler<CALSendUse
    * Handles send user text input requests.
    */
   async handle(context: ClientMessageHandlerContext, message: CALSendUserTextInputRequest): Promise<void> {
-    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'Send user text input request received');
+    logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'Send user text input request received');
 
     let inputTurnId = '';
     try {
-      if (!context.connection) {
+      if (!context.session) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!context.connection.sessionSettings.sendTextInput) {
+      if (!context.session.sessionSettings.sendTextInput) {
         throw new InvalidOperationError('Text input is disabled for this session');
       }
 
-      if (!context.connection.conversationId) {
+      if (!context.session.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (context.connection.conversationId !== message.conversationId) {
+      if (context.session.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      inputTurnId = await context.connection.runner.receiveUserTextInput(message.text);
+      inputTurnId = await context.session.runner.receiveUserTextInput(message.text);
 
       const response: CALSendUserTextInputResponse = { 
         type: 'send_user_text_input', 
@@ -50,10 +50,10 @@ export class SendUserTextInputHandler implements ClientMessageHandler<CALSendUse
       };
       context.send(response);
 
-      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId }, 'User text input received successfully');
+      logger.info({ sessionId: context.session?.id, conversationId: message.conversationId }, 'User text input received successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process text input';
-      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId }, 'Failed to process text input');
+      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to process text input');
       const response: CALSendUserTextInputResponse = { 
         type: 'send_user_text_input', 
         conversationId: message.conversationId,

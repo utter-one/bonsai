@@ -22,24 +22,24 @@ export class SendUserVoiceChunkHandler implements ClientMessageHandler<SendUserV
     logger.debug({ sessionId: message.sessionId, conversationId: message.conversationId, requestId: message.requestId }, 'Send user voice chunk request received');
 
     try {
-      if (!context.connection) {
+      if (!context.session) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!context.connection.sessionSettings.sendVoiceInput) {
+      if (!context.session.sessionSettings.sendVoiceInput) {
         throw new InvalidOperationError('Voice input is disabled for this session');
       }
 
-      if (!context.connection.conversationId) {
+      if (!context.session.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (context.connection.conversationId !== message.conversationId) {
+      if (context.session.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
       const audioBuffer = Buffer.from(message.audioData, 'base64');
-      await context.connection.runner.receiveUserVoiceData(message.inputTurnId, audioBuffer);
+      await context.session.runner.receiveUserVoiceData(message.inputTurnId, audioBuffer);
 
       const response: SendUserVoiceChunkResponse = { 
         type: 'send_user_voice_chunk', 

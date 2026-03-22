@@ -10,7 +10,7 @@ import { MessageEventData, ActionEventData, CommandEventData, CommandType, Conve
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
-import type { Connection } from "../../channels/ConnectionManager";
+import type { Session } from "../../channels/SessionManager";
 import type { IClientConnection } from '../../channels/IClientConnection';
 import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
@@ -104,7 +104,7 @@ export type StageRuntimeData = {
 @injectable()
 export class ConversationRunner {
   private stageData: StageRuntimeData;
-  private session: Connection;
+  private session: Session;
   private conversation: Conversation;
   private channel: IClientConnection;
   /** True when a filler sentence has already opened the response turn (outputTurnId assigned, start_ai_generation_output sent, TTS started) */
@@ -145,7 +145,7 @@ export class ConversationRunner {
     return this.stageData;
   }
 
-  async prepareConversation(conversationId: string, session: Connection, channel: IClientConnection): Promise<void> {
+  async prepareConversation(conversationId: string, session: Session, channel: IClientConnection): Promise<void> {
     this.session = session;
     this.channel = channel;
 

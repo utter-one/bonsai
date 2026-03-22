@@ -19,23 +19,23 @@ export class CallToolHandler implements ClientMessageHandler<CALCallToolRequest>
    * Handles call tool requests.
    */
   async handle(context: ClientMessageHandlerContext, message: CALCallToolRequest): Promise<void> {
-    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, toolId: message.toolId, correlationId: message.correlationId }, 'Call tool request received');
+    logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, toolId: message.toolId, correlationId: message.correlationId }, 'Call tool request received');
 
     try {
-      if (!context.connection) {
+      if (!context.session) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!context.connection.conversationId) {
+      if (!context.session.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (context.connection.conversationId !== message.conversationId) {
+      if (context.session.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.connection.runner.saveCommandEvent('call_tool', { toolId: message.toolId, parameters: message.parameters });
-      const result = await context.connection.runner.callTool(message.toolId, message.parameters);
+      await context.session.runner.saveCommandEvent('call_tool', { toolId: message.toolId, parameters: message.parameters });
+      const result = await context.session.runner.callTool(message.toolId, message.parameters);
 
       const response: CALCallToolResponse = { 
         type: 'call_tool', 
@@ -46,10 +46,10 @@ export class CallToolHandler implements ClientMessageHandler<CALCallToolRequest>
       };
       context.send(response);
 
-      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, toolId: message.toolId, correlationId: message.correlationId }, 'Call tool completed successfully');
+      logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, toolId: message.toolId, correlationId: message.correlationId }, 'Call tool completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to call tool';
-      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId, toolId: message.toolId, correlationId: message.correlationId }, 'Failed to call tool');
+      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId, toolId: message.toolId, correlationId: message.correlationId }, 'Failed to call tool');
       const response: CALCallToolResponse = { 
         type: 'call_tool', 
         success: false, 

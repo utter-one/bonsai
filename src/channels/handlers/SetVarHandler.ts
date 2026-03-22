@@ -19,31 +19,31 @@ export class SetVarHandler implements ClientMessageHandler<CALSetVarRequest> {
    * Handles set variable requests.
    */
   async handle(context: ClientMessageHandlerContext, message: CALSetVarRequest): Promise<void> {
-    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, correlationId: message.correlationId }, 'Set variable request received');
+    logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName, correlationId: message.correlationId }, 'Set variable request received');
 
     try {
-      if (!context.connection) {
+      if (!context.session) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!context.connection.conversationId) {
+      if (!context.session.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (context.connection.conversationId !== message.conversationId) {
+      if (context.session.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.connection.runner.saveCommandEvent('set_var', { stageId: message.stageId, variableName: message.variableName, variableValue: message.variableValue });
-      await context.connection.runner.setVariable(message.stageId, message.variableName, message.variableValue);
+      await context.session.runner.saveCommandEvent('set_var', { stageId: message.stageId, variableName: message.variableName, variableValue: message.variableValue });
+      await context.session.runner.setVariable(message.stageId, message.variableName, message.variableValue);
 
       const response: CALSetVarResponse = { type: 'set_var_result', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
       context.send(response);
 
-      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Set variable completed successfully');
+      logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Set variable completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to set variable';
-      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to set variable');
+      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to set variable');
       const response: CALSetVarResponse = { type: 'set_var_result', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
       context.send(response);
     }

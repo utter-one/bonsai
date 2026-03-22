@@ -47,7 +47,7 @@ export class ConversationController {
         path: '/api/projects/{projectId}/conversations',
         tags: ['Conversations'],
         summary: 'List conversations',
-        description: 'Retrieves a paginated list of conversations with optional filtering, sorting, and search. Supports filtering by userId, clientId, stageId, status, and timestamps.',
+        description: 'Retrieves a paginated list of conversations with optional filtering, sorting, and search. Supports filtering by userId, sessionId, stageId, status, and timestamps.',
         request: {
           query: listParamsSchema,
         },

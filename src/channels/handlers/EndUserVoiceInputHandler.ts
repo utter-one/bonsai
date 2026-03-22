@@ -19,26 +19,26 @@ export class EndUserVoiceInputHandler implements ClientMessageHandler<CALEndUser
    * Handles end user voice input requests.
    */
   async handle(context: ClientMessageHandlerContext, message: CALEndUserVoiceInputRequest): Promise<void> {
-    logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'End user voice input request received');
+    logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, correlationId: message.correlationId }, 'End user voice input request received');
 
     try {
-      if (!context.connection) {
+      if (!context.session) {
         throw new NotFoundError('Session not found');
       }
 
-      if (!context.connection.sessionSettings.sendVoiceInput) {
+      if (!context.session.sessionSettings.sendVoiceInput) {
         throw new InvalidOperationError('Voice input is disabled for this session');
       }
 
-      if (!context.connection.conversationId) {
+      if (!context.session.conversationId) {
         throw new InvalidOperationError('No active conversation in this session');
       }
 
-      if (context.connection.conversationId !== message.conversationId) {
+      if (context.session.conversationId !== message.conversationId) {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.connection.runner.stopUserVoiceInput(message.inputTurnId);
+      await context.session.runner.stopUserVoiceInput(message.inputTurnId);
 
       const response: CALEndUserVoiceInputResponse = { 
         type: 'end_user_voice_input', 
@@ -49,10 +49,10 @@ export class EndUserVoiceInputHandler implements ClientMessageHandler<CALEndUser
       };
       context.send(response);
 
-      logger.info({ sessionId: context.connection?.id, conversationId: message.conversationId }, 'User voice input ended successfully');
+      logger.info({ sessionId: context.session?.id, conversationId: message.conversationId }, 'User voice input ended successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to end user voice input';
-      logger.error({ error: errorMessage, sessionId: context.connection?.id, conversationId: message.conversationId }, 'Failed to end user voice input');
+      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to end user voice input');
       const response: CALEndUserVoiceInputResponse = { 
         type: 'end_user_voice_input', 
         conversationId: message.conversationId,

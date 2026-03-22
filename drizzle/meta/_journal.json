@@ -246,6 +246,13 @@
       "when": 1773998961161,
       "tag": "0034_black_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1774183980827,
+      "tag": "0035_careful_ezekiel_stane",
+      "breakpoints": true
     }
   ]
 }

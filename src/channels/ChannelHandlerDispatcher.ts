@@ -60,7 +60,7 @@ export class ChannelHandlerDispatcher {
       }
 
       // Check if handler requires authentication
-      if (handler.requiresAuth && (!context.connection || !context.connection.id)) {
+      if (handler.requiresAuth && (!context.session || !context.session.id)) {
         context.sendError('Authentication required', message.correlationId);
         return;
       }

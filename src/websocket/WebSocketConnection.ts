@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import type { Connection, ConnectionManager } from '../channels/ConnectionManager';
+import type { Session, SessionManager } from '../channels/SessionManager';
 import type { IClientConnection } from '../channels/IClientConnection';
 import type { CALInputMessage, CALOutputMessage } from '../channels/messages';
 import { logger } from '../utils/logger';
@@ -11,11 +11,11 @@ import { logger } from '../utils/logger';
  * sends them directly to the associated WebSocket client. Also handles connection closure and session cleanup.
  */
 export class WebSocketConnection implements IClientConnection {
-  private connection: Connection;
+  private session: Session;
 
   constructor(
     private readonly ws: WebSocket,
-    private readonly connectionManager: ConnectionManager,
+    private readonly sessionManager: SessionManager,
   ) {}
 
   /**
@@ -26,11 +26,11 @@ export class WebSocketConnection implements IClientConnection {
       this.ws.close();
     }
 
-    await this.connectionManager.unregisterConnection(this.connection.id);
+    await this.sessionManager.unregisterSession(this.session.id);
   }
 
-  attachConnection(connection: Connection): void {
-    this.connection = connection;  
+  attachSession(session: Session): void {
+    this.session = session;
   }
 
   /**
@@ -39,7 +39,7 @@ export class WebSocketConnection implements IClientConnection {
    * @param msg - The CAL output message to transmit.
    */
   async sendMessage(msg: CALOutputMessage): Promise<void> {
-    const { id: sessionId, conversationId, sessionSettings } = this.connection;
+    const { id: sessionId, conversationId, sessionSettings } = this.session;
 
     switch (msg.type) {
       case 'user_transcribed_chunk': {
@@ -184,7 +184,7 @@ export class WebSocketConnection implements IClientConnection {
     try {
       this.ws.send(JSON.stringify(message));
     } catch (error) {
-      logger.error({ error, conversationId: this.connection.conversationId, sessionId: this.connection.id }, 'WebSocketChannel failed to send message');
+      logger.error({ error, conversationId: this.session.conversationId, sessionId: this.session.id }, 'WebSocketChannel failed to send message');
     }
   }
 }

@@ -25,7 +25,7 @@ export type CreateConversationInput = {
   id?: string;
   projectId: string;
   userId: string;
-  clientId: string;
+  sessionId: string;
   stageId: string;
   stageVars?: Record<string, Record<string, any>>;
   status: ConversationState;
@@ -52,7 +52,7 @@ export class ConversationService extends BaseService {
    */
   async createConversation(input: CreateConversationInput, context?: RequestContext): Promise<ConversationResponse> {
     const conversationId = input.id ?? generateId(ID_PREFIXES.CONVERSATION);
-    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, operatorId: context?.operatorId }, 'Creating conversation');
+    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, sessionId: input.sessionId, stageId: input.stageId, operatorId: context?.operatorId }, 'Creating conversation');
 
     await this.requireProjectNotArchived(input.projectId);
 
@@ -61,7 +61,7 @@ export class ConversationService extends BaseService {
         id: conversationId,
         projectId: input.projectId,
         userId: input.userId,
-        clientId: input.clientId,
+        sessionId: input.sessionId,
         stageId: input.stageId,
         startingStageId: input.stageId,
         stageVars: {},
@@ -265,7 +265,7 @@ export class ConversationService extends BaseService {
         id: conversations.id,
         projectId: conversations.projectId,
         userId: conversations.userId,
-        clientId: conversations.clientId,
+        sessionId: conversations.sessionId,
         stageId: conversations.stageId,
         status: conversations.status,
         statusDetails: conversations.statusDetails,
@@ -283,7 +283,7 @@ export class ConversationService extends BaseService {
         }
       }
 
-      // Apply text search (searches id, userId, clientId, stageId, and status)
+      // Apply text search (searches id, userId, sessionId, stageId, and status)
       if (params?.textSearch) {
         const searchTerm = `%${params.textSearch}%`;
         conditions.push(like(conversations.id, searchTerm));

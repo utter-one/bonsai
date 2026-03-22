@@ -1,12 +1,12 @@
-import type { Connection } from './ConnectionManager';
+import type { Session } from './SessionManager';
 
 /**
  * Context provided to channel message handlers.
- * Contains the connection metadata and dependencies needed for handling messages.
+ * Contains the session metadata and dependencies needed for handling messages.
  */
 
 export type ClientMessageHandlerContext = {
-  connection?: Connection;
+  session?: Session;
   send: (message: any) => void;
   sendError: (error: string, correlationId?: string) => void;
 };
