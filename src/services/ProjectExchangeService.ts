@@ -37,8 +37,9 @@ function hintKey(hint: ProviderHint): string {
  * produces a `ProjectExchangeBundleV1`.
  *
  * Import resolves each hint back to a local provider UUID (best-effort, first match
- * on `providerType + apiType`), remaps all entity IDs to fresh UUIDs so repeated
- * imports never collide with existing data, and inserts everything in FK-safe order.
+ * on `providerType + apiType`), assigns a fresh UUID only to the project (all other
+ * entity IDs are preserved from the bundle since they use composite primary keys), and
+ * inserts everything in FK-safe order.
  */
 @singleton()
 export class ProjectExchangeService extends BaseService {
@@ -277,7 +278,8 @@ export class ProjectExchangeService extends BaseService {
   /**
    * Imports a project from an exchange bundle.
    *
-   * Each entity receives a fresh UUID so repeated imports never collide.
+   * Only the project receives a fresh UUID; all other entity IDs are kept as-is
+   * from the bundle because they use composite primary keys (projectId + id).
    * Provider hints are resolved to local provider IDs by matching on
    * `providerType + apiType` (first match wins; `null` when unresolved).
    *
@@ -323,27 +325,11 @@ export class ProjectExchangeService extends BaseService {
 
     const resolveHint = (h: ProviderHint | null | undefined): string | null => (h ? (hintToProviderId.get(hintKey(h)) ?? null) : null);
 
-    // Build ID remap table (old bundle IDs → new local IDs)
-    const idMap = new Map<string, string>();
-    const remap = (oldId: string, prefix: string): string => {
-      if (!idMap.has(oldId)) idMap.set(oldId, generateId(prefix));
-      return idMap.get(oldId)!;
-    };
-    const remapNullable = (oldId: string | null | undefined): string | null => (oldId ? remap(oldId, 'unknown') : null);
+    // Only the project receives a new ID; all other entities keep their original IDs
+    // because they use composite primary keys (projectId + id).
+    const newProjectId = generateId(ID_PREFIXES.PROJECT);
 
-    // Pre-generate all IDs
-    const newProjectId = remap(v1.project.id, ID_PREFIXES.PROJECT);
-    for (const a of v1.agents) remap(a.id, ID_PREFIXES.AGENT);
-    for (const c of v1.classifiers) remap(c.id, ID_PREFIXES.CLASSIFIER);
-    for (const t of v1.contextTransformers) remap(t.id, ID_PREFIXES.CONTEXT_TRANSFORMER);
-    for (const t of v1.tools) remap(t.id, ID_PREFIXES.TOOL);
-    for (const g of v1.globalActions) remap(g.id, ID_PREFIXES.GLOBAL_ACTION);
-    for (const g of v1.guardrails) remap(g.id, ID_PREFIXES.GUARDRAIL);
-    for (const k of v1.knowledgeCategories) remap(k.id, ID_PREFIXES.KNOWLEDGE_CATEGORY);
-    for (const k of v1.knowledgeItems) remap(k.id, ID_PREFIXES.KNOWLEDGE_ITEM);
-    for (const s of v1.stages) remap(s.id, ID_PREFIXES.STAGE);
-
-    // Build hint → targets map now that all new IDs are known
+    // Build hint → targets map
     const hintTargets = new Map<string, ProviderHintResolutionTarget[]>();
     const addTarget = (h: ProviderHint | null | undefined, target: ProviderHintResolutionTarget) => {
       if (!h) return;
@@ -356,13 +342,13 @@ export class ProjectExchangeService extends BaseService {
     if (v1.project.storageConfig?.storageHint) addTarget(v1.project.storageConfig.storageHint, { entityType: 'project', entityId: newProjectId, entityName: v1.project.name, field: 'storageConfig.storageProviderId' });
     if (v1.project.moderationConfig?.llmHint) addTarget(v1.project.moderationConfig.llmHint, { entityType: 'project', entityId: newProjectId, entityName: v1.project.name, field: 'moderationConfig.llmProviderId' });
     for (const a of v1.agents) {
-      if (a.ttsHint) addTarget(a.ttsHint, { entityType: 'agent', entityId: idMap.get(a.id)!, entityName: a.name, field: 'ttsProviderId' });
-      if (a.fillerSettings?.llmHint) addTarget(a.fillerSettings.llmHint, { entityType: 'agent', entityId: idMap.get(a.id)!, entityName: a.name, field: 'fillerSettings.llmProviderId' });
+      if (a.ttsHint) addTarget(a.ttsHint, { entityType: 'agent', entityId: a.id, entityName: a.name, field: 'ttsProviderId' });
+      if (a.fillerSettings?.llmHint) addTarget(a.fillerSettings.llmHint, { entityType: 'agent', entityId: a.id, entityName: a.name, field: 'fillerSettings.llmProviderId' });
     }
-    for (const s of v1.stages) if (s.llmHint) addTarget(s.llmHint, { entityType: 'stage', entityId: idMap.get(s.id)!, entityName: s.name, field: 'llmProviderId' });
-    for (const c of v1.classifiers) if (c.llmHint) addTarget(c.llmHint, { entityType: 'classifier', entityId: idMap.get(c.id)!, entityName: c.name, field: 'llmProviderId' });
-    for (const t of v1.contextTransformers) if (t.llmHint) addTarget(t.llmHint, { entityType: 'contextTransformer', entityId: idMap.get(t.id)!, entityName: t.name, field: 'llmProviderId' });
-    for (const t of v1.tools) if (t.llmHint) addTarget(t.llmHint, { entityType: 'tool', entityId: idMap.get(t.id)!, entityName: t.name, field: 'llmProviderId' });
+    for (const s of v1.stages) if (s.llmHint) addTarget(s.llmHint, { entityType: 'stage', entityId: s.id, entityName: s.name, field: 'llmProviderId' });
+    for (const c of v1.classifiers) if (c.llmHint) addTarget(c.llmHint, { entityType: 'classifier', entityId: c.id, entityName: c.name, field: 'llmProviderId' });
+    for (const t of v1.contextTransformers) if (t.llmHint) addTarget(t.llmHint, { entityType: 'contextTransformer', entityId: t.id, entityName: t.name, field: 'llmProviderId' });
+    for (const t of v1.tools) if (t.llmHint) addTarget(t.llmHint, { entityType: 'tool', entityId: t.id, entityName: t.name, field: 'llmProviderId' });
 
     await db.transaction(async (tx) => {
       // 1. Project
@@ -394,7 +380,7 @@ export class ProjectExchangeService extends BaseService {
         languageCode: p.languageCode ?? null,
         autoCreateUsers: p.autoCreateUsers ?? false,
         userProfileVariableDescriptors: p.userProfileVariableDescriptors ?? [],
-        defaultGuardrailClassifierId: p.defaultGuardrailClassifierId ? idMap.get(p.defaultGuardrailClassifierId) ?? null : null,
+        defaultGuardrailClassifierId: p.defaultGuardrailClassifierId ?? null,
         conversationTimeoutSeconds: p.conversationTimeoutSeconds ?? null,
       });
 
@@ -406,7 +392,7 @@ export class ProjectExchangeService extends BaseService {
           prompt: a.fillerSettings.prompt,
         } : null;
         await tx.insert(agents).values({
-          id: idMap.get(a.id)!,
+          id: a.id,
           projectId: newProjectId,
           name: a.name,
           description: a.description ?? null,
@@ -422,7 +408,7 @@ export class ProjectExchangeService extends BaseService {
       // 3. Classifiers
       for (const c of v1.classifiers) {
         await tx.insert(classifiers).values({
-          id: idMap.get(c.id)!,
+          id: c.id,
           projectId: newProjectId,
           name: c.name,
           description: c.description ?? null,
@@ -437,7 +423,7 @@ export class ProjectExchangeService extends BaseService {
       // 4. Context transformers
       for (const t of v1.contextTransformers) {
         await tx.insert(contextTransformers).values({
-          id: idMap.get(t.id)!,
+          id: t.id,
           projectId: newProjectId,
           name: t.name,
           description: t.description ?? null,
@@ -453,7 +439,7 @@ export class ProjectExchangeService extends BaseService {
       // 5. Tools
       for (const t of v1.tools) {
         await tx.insert(tools).values({
-          id: idMap.get(t.id)!,
+          id: t.id,
           projectId: newProjectId,
           name: t.name,
           description: t.description ?? null,
@@ -481,14 +467,14 @@ export class ProjectExchangeService extends BaseService {
       // 6. Global actions
       for (const g of v1.globalActions) {
         await tx.insert(globalActions).values({
-          id: idMap.get(g.id)!,
+          id: g.id,
           projectId: newProjectId,
           name: g.name,
           condition: g.condition ?? null,
           triggerOnUserInput: g.triggerOnUserInput ?? true,
           triggerOnClientCommand: g.triggerOnClientCommand ?? false,
           classificationTrigger: g.classificationTrigger ?? null,
-          overrideClassifierId: g.overrideClassifierId ? (idMap.get(g.overrideClassifierId) ?? null) : null,
+          overrideClassifierId: g.overrideClassifierId ?? null,
           parameters: g.parameters ?? [],
           effects: g.effects ?? [],
           examples: g.examples ?? null,
@@ -500,7 +486,7 @@ export class ProjectExchangeService extends BaseService {
       // 7. Guardrails
       for (const g of v1.guardrails) {
         await tx.insert(guardrails).values({
-          id: idMap.get(g.id)!,
+          id: g.id,
           projectId: newProjectId,
           name: g.name,
           condition: g.condition ?? null,
@@ -515,7 +501,7 @@ export class ProjectExchangeService extends BaseService {
       // 8. Knowledge categories
       for (const k of v1.knowledgeCategories) {
         await tx.insert(knowledgeCategories).values({
-          id: idMap.get(k.id)!,
+          id: k.id,
           projectId: newProjectId,
           name: k.name,
           promptTrigger: k.promptTrigger,
@@ -527,9 +513,9 @@ export class ProjectExchangeService extends BaseService {
       // 9. Knowledge items
       for (const k of v1.knowledgeItems) {
         await tx.insert(knowledgeItems).values({
-          id: idMap.get(k.id)!,
+          id: k.id,
           projectId: newProjectId,
-          categoryId: idMap.get(k.categoryId) ?? k.categoryId,
+          categoryId: k.categoryId,
           question: k.question,
           answer: k.answer,
           order: k.order ?? 0,
@@ -539,31 +525,23 @@ export class ProjectExchangeService extends BaseService {
       // 10. Stages (last — depend on agents and classifiers)
       for (const s of v1.stages) {
         await tx.insert(stages).values({
-          id: idMap.get(s.id)!,
+          id: s.id,
           projectId: newProjectId,
           name: s.name,
           description: s.description ?? null,
           prompt: s.prompt,
           llmProviderId: resolveHint(s.llmHint) ?? null,
           llmSettings: s.llmSettings as any,
-          agentId: idMap.get(s.agentId) ?? s.agentId,
+          agentId: s.agentId,
           enterBehavior: s.enterBehavior ?? 'generate_response',
           useKnowledge: s.useKnowledge ?? false,
           knowledgeTags: s.knowledgeTags ?? [],
           useGlobalActions: s.useGlobalActions ?? true,
-          globalActions: (s.globalActions ?? []).map(gid => idMap.get(gid) ?? gid),
+          globalActions: s.globalActions ?? [],
           variableDescriptors: s.variableDescriptors ?? [],
-          defaultClassifierId: s.defaultClassifierId ? (idMap.get(s.defaultClassifierId) ?? null) : null,
-          actions: Object.fromEntries(
-            Object.entries(s.actions ?? {}).map(([key, action]) => [
-              key,
-              {
-                ...action,
-                overrideClassifierId: action.overrideClassifierId ? (idMap.get(action.overrideClassifierId) ?? null) : action.overrideClassifierId,
-              },
-            ])
-          ),
-          transformerIds: (s.transformerIds ?? []).map(tid => idMap.get(tid) ?? tid),
+          defaultClassifierId: s.defaultClassifierId ?? null,
+          actions: s.actions ?? {},
+          transformerIds: s.transformerIds ?? [],
           tags: s.tags ?? [],
           metadata: s.metadata ?? null,
         });
