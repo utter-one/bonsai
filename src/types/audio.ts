@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * Supported audio output formats for TTS providers
  */
@@ -19,6 +21,11 @@ export const audioFormatValues = [
 ] as const;
 
 /**
+ * Zod schema for audio output format identifiers.
+ */
+export const audioFormatSchema = z.enum(audioFormatValues);
+
+/**
  * Audio output format identifier
  */
-export type AudioFormat = typeof audioFormatValues[number];
+export type AudioFormat = z.infer<typeof audioFormatSchema>;

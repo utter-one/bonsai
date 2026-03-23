@@ -10,8 +10,9 @@ import { MessageEventData, ActionEventData, CommandEventData, CommandType, Conve
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
-import { Connection, ConnectionManager } from "../../websocket/ConnectionManager";
-import { AiTranscribedChunkMessage, EndAiGenerationOutputMessage, SendAiVoiceChunkMessage, StartAiGenerationOutputMessage } from "../../websocket/contracts/aiResponse";
+import type { Session } from "../../channels/SessionManager";
+import type { IClientConnection } from '../../channels/IClientConnection';
+import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
@@ -26,7 +27,7 @@ import { and, eq, notInArray } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
 import { ToolExecutor } from "./ToolExecutor";
 import { generateId, ID_PREFIXES } from "../../utils/idGenerator";
-import { UserTranscribedChunkMessage } from "../../websocket/contracts/userInput";
+
 import { TemplatingEngine } from "./TemplatingEngine";
 import { extractTextFromContent, getContentSize } from "../../utils/llm";
 import { KnowledgeService } from "../KnowledgeService";
@@ -103,9 +104,9 @@ export type StageRuntimeData = {
 @injectable()
 export class ConversationRunner {
   private stageData: StageRuntimeData;
-  private session: Connection;
+  private session: Session;
   private conversation: Conversation;
-  private ws: WebSocket;
+  private channel: IClientConnection;
   /** True when a filler sentence has already opened the response turn (outputTurnId assigned, start_ai_generation_output sent, TTS started) */
   private responseOutputTurnStarted: boolean = false;
   /** Filler sentence generated for the current turn, passed as assistant prefix to the LLM so it continues naturally */
@@ -135,7 +136,6 @@ export class ConversationRunner {
     @inject(ActionsExecutor) private actionsExecutor: ActionsExecutor,
     @inject(ResponseGenerator) private responseGenerator: ResponseGenerator,
     @inject(ToolExecutor) private toolExecutor: ToolExecutor,
-    @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
     @inject(ModerationService) private moderationService: ModerationService,
@@ -145,9 +145,9 @@ export class ConversationRunner {
     return this.stageData;
   }
 
-  async prepareConversation(conversationId: string, session: Connection, ws: WebSocket): Promise<void> {
+  async prepareConversation(conversationId: string, session: Session, channel: IClientConnection): Promise<void> {
     this.session = session;
-    this.ws = ws;
+    this.channel = channel;
 
     // Load conversation data
     this.conversation = await db.query.conversations.findFirst({
@@ -392,41 +392,31 @@ export class ConversationRunner {
         asrProvider.setOnRecognizing(async (chunkId, text) => {
           logger.debug({ conversationId, chunkId }, `ASR recognizing chunk for conversation ${conversationId}: "${text}"`);
 
-          // Send interim recognition result to client through WebSocket if enabled
-          if (this.session.sessionSettings.receiveTranscriptionUpdates) {
-            const message = {
-              type: 'user_transcribed_chunk',
-              conversationId,
-              chunkId,
-              chunkText: text,
-              ordinal: chunkOrdinal++,
-              inputTurnId: this.turnData.inputTurnId,
-              isFinal: false,
-              sessionId: this.session.id,
-              requestId: null
-            } as UserTranscribedChunkMessage;
-            this.ws.send(JSON.stringify(message));
-          }
+          const message: CALUserTranscribedChunkMessage = {
+            type: 'user_transcribed_chunk',
+            conversationId,
+            chunkId,
+            chunkText: text,
+            ordinal: chunkOrdinal++,
+            inputTurnId: this.turnData.inputTurnId,
+            isFinal: false,
+          };
+          await this.channel.sendMessage(message);
         });
 
         asrProvider.setOnRecognized(async (chunkId, text) => {
           logger.debug({ conversationId, chunkId }, `ASR recognized chunk for conversation ${conversationId}`);
 
-          // Send final recognition result to client through WebSocket if enabled
-          if (this.session.sessionSettings.receiveTranscriptionUpdates) {
-            const message = {
-              type: 'user_transcribed_chunk',
-              conversationId,
-              chunkId,
-              chunkText: text,
-              ordinal: chunkOrdinal++,
-              inputTurnId: this.turnData.inputTurnId,
-              isFinal: true,
-              sessionId: this.session.id,
-              requestId: null
-            } as UserTranscribedChunkMessage;
-            this.ws.send(JSON.stringify(message));
-          }
+          const message: CALUserTranscribedChunkMessage = {
+            type: 'user_transcribed_chunk',
+            conversationId,
+            chunkId,
+            chunkText: text,
+            ordinal: chunkOrdinal++,
+            inputTurnId: this.turnData.inputTurnId,
+            isFinal: true,
+          };
+          await this.channel.sendMessage(message);
 
           chunkOrdinal = 0;
         });
@@ -501,20 +491,27 @@ export class ConversationRunner {
             if (ttsDurationMs !== undefined) backfill.ttsDurationMs = ttsDurationMs;
             if (Object.keys(backfill).length > 0) {
               const updated = await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
-              this.connectionManager.sendConversationEventUpdate(this.conversation.projectId, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
+              const eventUpdateMessage: CALConversationEventUpdateMessage = {
+                type: 'conversation_event_update',
+                conversationId: this.conversation.id,
+                eventType: 'message',
+                eventData: updated.eventData,
+                inputTurnId: this.turnData.inputTurnId,
+                outputTurnId: this.turnData.outputTurnId,
+              };
+              await this.channel.sendMessage(eventUpdateMessage);
             }
           }
 
-          // Send AI response end notification to client through WebSocket
-          const message = {
+          // Send AI response end notification to client through channel
+          // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
+          const endMessage: CALEndAiGenerationOutputMessage = {
             type: 'end_ai_generation_output',
             conversationId,
-            outputTurnId: outputTurnId,
-            sessionId: this.session.id,
-            requestId: null,
-            fullText: this.stageData.lastCompletionResult?.content || '' // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
-          } as EndAiGenerationOutputMessage;
-          this.ws.send(JSON.stringify(message));
+            outputTurnId,
+            fullText: extractTextFromContent(this.stageData.lastCompletionResult?.content ?? []),
+          };
+          await this.channel.sendMessage(endMessage);
 
           await this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
         });
@@ -529,18 +526,18 @@ export class ConversationRunner {
             }
           }
 
-          // Send TTS audio chunk to client through WebSocket
-          const message = {
+          // Send TTS audio chunk to client through channel
+          const voiceChunkMessage: CALSendAiVoiceChunkMessage = {
             type: 'send_ai_voice_chunk',
             conversationId,
             outputTurnId: this.turnData.outputTurnId,
-            ...chunk,
-            audio: undefined, // don't send raw audio buffer through WebSocket message, instead convert to base64 string
-            audioData: chunk.audio.toString('base64'),
-            sessionId: this.session.id,
-            requestId: null
-          } as SendAiVoiceChunkMessage;
-          this.ws.send(JSON.stringify(message));
+            audioData: chunk.audio,
+            audioFormat: chunk.audioFormat,
+            chunkId: chunk.chunkId,
+            ordinal: chunk.ordinal,
+            isFinal: chunk.isFinal,
+          };
+          await this.channel.sendMessage(voiceChunkMessage);
           logger.debug({ conversationId, chunkId: chunk.chunkId, ordinal: chunk.ordinal, isFinal: chunk.isFinal }, `TTS chunk generated for conversation ${conversationId}`);
 
           if (chunk.isFinal) {
@@ -579,21 +576,17 @@ export class ConversationRunner {
           await ttsProvider.sendText(chunk.content);
         }
 
-        // Send completion chunk to client through WebSocket if enabled
-        if (this.session.sessionSettings.receiveTranscriptionUpdates) {
-          const message = {
-            type: 'ai_transcribed_chunk',
-            conversationId,
-            outputTurnId: this.turnData.outputTurnId,
-            chunkId: generateId(ID_PREFIXES.CHUNK),
-            chunkText: chunk.content,
-            ordinal: aiTextChunkOrdinal++,
-            isFinal: chunk.finishReason !== null,
-            sessionId: this.session.id,
-            requestId: null
-          } as AiTranscribedChunkMessage;
-          this.ws.send(JSON.stringify(message));
-        }
+        // Send completion chunk to client through channel
+        const aiChunkMessage: CALAiTranscribedChunkMessage = {
+          type: 'ai_transcribed_chunk',
+          conversationId,
+          outputTurnId: this.turnData.outputTurnId,
+          chunkId: generateId(ID_PREFIXES.CHUNK),
+          chunkText: chunk.content,
+          ordinal: aiTextChunkOrdinal++,
+          isFinal: chunk.finishReason !== null,
+        };
+        await this.channel.sendMessage(aiChunkMessage);
       });
 
       completionLlmProvider.setOnGenerationCompleted(async (result) => {
@@ -637,15 +630,13 @@ export class ConversationRunner {
 
         if (!ttsProvider) {
           // send end generation message to client to signal that response is complete and change state to awaiting user input
-          const message = {
+          const endGenerationMessage: CALEndAiGenerationOutputMessage = {
             type: 'end_ai_generation_output',
             conversationId,
             outputTurnId: this.turnData.outputTurnId,
-            sessionId: this.session.id,
-            requestId: null,
-            fullText: textContent
-          } as EndAiGenerationOutputMessage;
-          this.ws.send(JSON.stringify(message));
+            fullText: textContent,
+          };
+          await this.channel.sendMessage(endGenerationMessage);
 
           await this.changeState('awaiting_user_input'); // In case of no TTS provider, change state to awaiting user input
         } else {
@@ -1509,33 +1500,27 @@ export class ConversationRunner {
     if (fillerSentence) {
       this.turnData.fillerDurationMs = Date.now() - fillerStartMs;
       this.turnData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
-      const fillerStartMessage = {
+      const fillerStartMessage: CALStartAiGenerationOutputMessage = {
         type: 'start_ai_generation_output',
         conversationId: this.conversation.id,
         outputTurnId: this.turnData.outputTurnId,
-        sessionId: this.session.id,
-        requestId: null,
         expectVoice: !!this.stageData.ttsProvider,
-      } as StartAiGenerationOutputMessage;
-      this.ws.send(JSON.stringify(fillerStartMessage));
+      };
+      await this.channel.sendMessage(fillerStartMessage);
       if (this.stageData.ttsProvider) {
         await this.stageData.ttsProvider.start();
         await this.stageData.ttsProvider.sendText(fillerSentence);
       }
-      if (this.session.sessionSettings.receiveTranscriptionUpdates) {
-        const chunkMessage = {
-          type: 'ai_transcribed_chunk',
-          conversationId: this.conversation.id,
-          outputTurnId: this.turnData.outputTurnId,
-          chunkId: generateId(ID_PREFIXES.CHUNK),
-          chunkText: fillerSentence,
-          ordinal: 0,
-          isFinal: true,
-          sessionId: this.session.id,
-          requestId: null,
-        } as AiTranscribedChunkMessage;
-        this.ws.send(JSON.stringify(chunkMessage));
-      }
+      const fillerChunkMessage: CALAiTranscribedChunkMessage = {
+        type: 'ai_transcribed_chunk',
+        conversationId: this.conversation.id,
+        outputTurnId: this.turnData.outputTurnId,
+        chunkId: generateId(ID_PREFIXES.CHUNK),
+        chunkText: fillerSentence,
+        ordinal: 0,
+        isFinal: true,
+      };
+      await this.channel.sendMessage(fillerChunkMessage);
       this.responseOutputTurnStarted = true;
       this.lastFillerSentence = fillerSentence;
     }
@@ -1668,7 +1653,15 @@ export class ConversationRunner {
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,
     }, this.turnMessageVisibility);
-    this.connectionManager.sendConversationEventUpdate(this.conversation.id, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
+    const messageUpdateMessage: CALConversationEventUpdateMessage = {
+      type: 'conversation_event_update',
+      conversationId: this.conversation.id,
+      eventType: 'message',
+      eventData: updated.eventData,
+      inputTurnId: this.turnData.inputTurnId,
+      outputTurnId: this.turnData.outputTurnId,
+    };
+    await this.channel.sendMessage(messageUpdateMessage);
 
     await this.generateResponse(context, executionOutcome);
   }
@@ -1689,15 +1682,13 @@ export class ConversationRunner {
       } else {
         // Normal path: open the turn now.
         this.turnData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
-        const message = {
+        const startGenerationMessage: CALStartAiGenerationOutputMessage = {
           type: 'start_ai_generation_output',
           conversationId: this.conversation.id,
           outputTurnId: this.turnData.outputTurnId,
-          sessionId: this.session.id,
-          requestId: null,
-          expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null
-        } as StartAiGenerationOutputMessage;
-        this.ws.send(JSON.stringify(message));
+          expectVoice: this.stageData.ttsProvider !== undefined && this.stageData.ttsProvider !== null,
+        };
+        await this.channel.sendMessage(startGenerationMessage);
 
         if (this.stageData.ttsProvider) {
           await this.stageData.ttsProvider.start();
@@ -1818,20 +1809,16 @@ export class ConversationRunner {
       await ttsProvider.sendText(text);
     }
 
-    if (this.session.sessionSettings.receiveTranscriptionUpdates) {
-      const chunkMessage = {
-        type: 'ai_transcribed_chunk',
-        conversationId,
-        outputTurnId: this.turnData.outputTurnId,
-        chunkId: generateId(ID_PREFIXES.CHUNK),
-        chunkText: text,
-        ordinal: 0,
-        isFinal: true,
-        sessionId: this.session.id,
-        requestId: null,
-      } as AiTranscribedChunkMessage;
-      this.ws.send(JSON.stringify(chunkMessage));
-    }
+    const prescriptedChunkMessage: CALAiTranscribedChunkMessage = {
+      type: 'ai_transcribed_chunk',
+      conversationId,
+      outputTurnId: this.turnData.outputTurnId,
+      chunkId: generateId(ID_PREFIXES.CHUNK),
+      chunkText: text,
+      ordinal: 0,
+      isFinal: true,
+    };
+    await this.channel.sendMessage(prescriptedChunkMessage);
 
     const messageEventData: MessageEventData = {
       text,
@@ -1845,15 +1832,13 @@ export class ConversationRunner {
     await this.saveAndSendEvent('message', messageEventData);
 
     if (!ttsProvider) {
-      const endMessage = {
+      const prescriptedEndMessage: CALEndAiGenerationOutputMessage = {
         type: 'end_ai_generation_output',
         conversationId,
         outputTurnId: this.turnData.outputTurnId,
-        sessionId: this.session.id,
-        requestId: null,
         fullText: text,
-      } as EndAiGenerationOutputMessage;
-      this.ws.send(JSON.stringify(endMessage));
+      };
+      await this.channel.sendMessage(prescriptedEndMessage);
       await this.changeState('awaiting_user_input');
     } else {
       await ttsProvider.end();
@@ -1901,7 +1886,15 @@ export class ConversationRunner {
     eventData.metadata['currentVariables'] = this.conversation.stageVars?.[this.stageData.id] || {};
 
     const eventId = await this.conversationService.saveConversationEvent(this.conversation.projectId, this.conversation.id, eventType, eventData);
-    this.connectionManager.sendConversationEvent(this.conversation.id, eventType, eventData, inputTurnId, outputTurnId);
+    const eventMessage: CALConversationEventMessage = {
+      type: 'conversation_event',
+      conversationId: this.conversation.id,
+      eventType,
+      eventData,
+      inputTurnId,
+      outputTurnId,
+    };
+    await this.channel.sendMessage(eventMessage);
     return eventId;
   }
 

@@ -25,7 +25,7 @@ export const deepgramTtsSettingsSchema = z.object({
   provider: z.literal('deepgram').describe('TTS provider type identifier'),
   model: z.enum(['aura-1', 'aura-2']).optional().describe('Model version to use ("aura-1" or "aura-2")'),
   voiceId: z.string().optional().describe('Voice ID to use for speech synthesis (e.g., "thalia-en", "andromeda-en"). Combined with model to form full model string (e.g., "aura-2-thalia-en")'),
-  audioFormat: z.enum(['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac']).optional().describe('Preferred audio output format. Streaming supports: linear16, opus, mulaw, alaw. REST-only: mp3, flac, aac'),
+  audioFormat: z.enum(['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac']).optional().describe('Preferred audio output format. Streaming supports: linear16, mulaw, alaw. REST-only: opus, mp3, flac, aac'),
   sampleRate: z.number().int().positive().optional().describe('Sample rate for audio output in Hz (e.g., 8000, 16000, 24000, 48000). Availability depends on audio format'),
   bitRate: z.number().int().positive().optional().describe('Bit rate for audio output (e.g., 32000, 64000, 128000). Applies to certain formats like mp3, opus, aac'),
   container: z.enum(['none', 'wav', 'ogg']).optional().describe('Audio container format. Use "none" for raw audio, "wav" for WAV container, "ogg" for Ogg container'),
@@ -526,7 +526,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     }
 
     // Warn if using REST-only formats with streaming
-    if (['mp3', 'flac', 'aac'].includes(this.audioFormat)) {
+    if (['opus', 'mp3', 'flac', 'aac'].includes(this.audioFormat)) {
       logger.warn(`[Deepgram] Audio format ${this.audioFormat} is typically used with REST API, not WebSocket streaming. Connection may fail.`);
     }
   }

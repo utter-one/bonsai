@@ -36,7 +36,8 @@ import { requestContextMiddleware } from './http/middleware/requestContext';
 import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
-import { ConversationServer } from './websocket/ConversationServer';
+import { WebSocketChannelHost } from './channels/websocket/WebSocketChannelHost';
+import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -193,6 +194,8 @@ export function createApp(): express.Application {
   const projectExchangeController = container.resolve(ProjectExchangeController);
   projectExchangeController.registerRoutes(app);
 
+  container.resolve(WebRTCChannelHost).registerRoutes(app);
+
   container.resolve(ConversationTimeoutService).start();
 
   app.use(errorHandler);
@@ -208,7 +211,7 @@ export function startServer(port: number = 3000): void {
   const server = createServer(app);
 
   // Initialize WebSocket host
-  const wsHost = container.resolve(ConversationServer);
+  const wsHost = container.resolve(WebSocketChannelHost);
   wsHost.initialize(server);
 
   server.listen(port, () => {

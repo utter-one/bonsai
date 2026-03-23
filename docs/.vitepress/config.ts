@@ -44,7 +44,8 @@ export default defineConfig({
             { text: 'Conversations', link: '/guide/conversations' },
             { text: 'Actions & Effects', link: '/guide/actions-and-effects' },
             { text: 'Content Moderation', link: '/guide/moderation' },
-            { text: 'WebSocket Protocol', link: '/guide/websocket' },
+            { text: 'WebSocket Channel', link: '/guide/websocket' },
+            { text: 'WebRTC Channel', link: '/guide/webrtc' },
             { text: 'Templating', link: '/guide/templating' },
             { text: 'Scripting', link: '/guide/scripting' },
           ],
@@ -118,6 +119,7 @@ export default defineConfig({
           text: 'Real-time',
           items: [
             { text: 'WebSocket', link: '/api/websocket' },
+            { text: 'WebRTC', link: '/api/webrtc' },
           ],
         },
       ],

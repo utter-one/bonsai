@@ -1,5 +1,5 @@
 import { inject, singleton } from "tsyringe";
-import { Connection, ConnectionManager } from "../../websocket/ConnectionManager";
+import { Session } from "../../channels/SessionManager";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
@@ -31,7 +31,6 @@ export class UserInputProcessor {
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private conversationService: ConversationService,
-    @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
     @inject(ContextTransformerExecutor) private transformerExecutor: ContextTransformerExecutor,
   ) { }
@@ -41,7 +40,7 @@ export class UserInputProcessor {
    * @param text - The text input from the user.
    * @returns A promise that resolves to the processing result with actions and timing metadata.
    */
-  async processTextInput(session: Connection, userInput: string, originalUserInput: string): Promise<ProcessTextInputResult> {
+  async processTextInput(session: Session, userInput: string, originalUserInput: string): Promise<ProcessTextInputResult> {
     // How to process:
     // - Get all classifiers for the current stage.
     // - For each classifier, run the text through it to determine actions with filtered actions based on overrideClassifierId. Do this in parallel.
@@ -115,7 +114,7 @@ export class UserInputProcessor {
           },
         };
         await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
-        this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
       // Register classification event for guardrail classifier
@@ -134,7 +133,7 @@ export class UserInputProcessor {
           },
         };
         await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
-        this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
       const allActions = [
@@ -180,7 +179,7 @@ export class UserInputProcessor {
     }
   }
 
-  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number }> {
+  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number }> {
     const classifyStartMs = Date.now();
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');

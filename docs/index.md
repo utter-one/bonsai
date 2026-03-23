@@ -20,8 +20,8 @@ features:
   - title: REST API
     details: Full-featured HTTP API for managing projects, agents, stages, classifiers, tools, knowledge, providers, users, and more.
     link: /api/
-  - title: Real-Time WebSocket
-    details: Bidirectional streaming protocol for live AI sessions with incremental audio and text, stage transitions, and client commands.
+  - title: Real-Time Channels
+    details: Two channel options for live AI sessions — WebSocket for maximum compatibility, WebRTC for lower audio latency. Both share the same conversation protocol.
     link: /guide/websocket
   - title: Multi-Provider Support
     details: Integrate with OpenAI, Anthropic, Google Gemini, Azure, ElevenLabs, Deepgram, Cartesia, and more — swap providers without changing your code.

@@ -15,6 +15,7 @@
 - Place private methods AFTER the public ones
 - When modifying database entities (e.g. add, rename, remove fields), apply these changes to the corresponding contracts and services
 - Make sure that MigrationService is synchronized with the current state of the database schema
+- Do not use horizontal dividers in comments
 
 ## Database Migrations
 

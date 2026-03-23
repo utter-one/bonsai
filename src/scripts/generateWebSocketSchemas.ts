@@ -15,9 +15,9 @@ import {
   baseOutputMessageSchema,
   sessionInputMessageSchema,
   sessionOutputMessageSchema,
-} from '../websocket/contracts/common';
+} from '../channels/websocket/contracts/common';
 
-import { authRequestSchema, authResponseSchema, projectSettingsSchema } from '../websocket/contracts/auth';
+import { authRequestSchema, authResponseSchema, projectSettingsSchema } from '../channels/websocket/contracts/auth';
 
 import {
   startConversationRequestSchema,
@@ -28,7 +28,7 @@ import {
   endConversationResponseSchema,
   conversationEventMessageSchema,
   conversationEventUpdateMessageSchema,
-} from '../websocket/contracts/session';
+} from '../channels/websocket/contracts/session';
 
 import {
   startUserVoiceInputRequestSchema,
@@ -40,7 +40,7 @@ import {
   sendUserTextInputRequestSchema,
   sendUserTextInputResponseSchema,
   userTranscribedChunkMessageSchema
-} from '../websocket/contracts/userInput';
+} from '../channels/websocket/contracts/userInput';
 
 import {
   goToStageRequestSchema,
@@ -55,7 +55,7 @@ import {
   runActionResponseSchema,
   callToolRequestSchema,
   callToolResponseSchema,
-} from '../websocket/contracts/command';
+} from '../channels/websocket/contracts/command';
 
 import {
   startAiGenerationOutputMessageSchema,
@@ -64,7 +64,7 @@ import {
   aiTranscribedChunkMessageSchema,
   sendAiImageOutputMessageSchema,
   sendAiAudioOutputMessageSchema,
-} from '../websocket/contracts/aiResponse';
+} from '../channels/websocket/contracts/aiResponse';
 
 /**
  * Generates a single JSON Schema file for all WebSocket contracts.
