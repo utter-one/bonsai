@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { classificationResultWithClassifierSchema } from "./classification";
 import { effectSchema } from "./actions";
-import { llmContentSchema } from '../services/providers/llm/ILlmProvider';
 import { parameterValueSchema } from './parameters';
 
 // Conversation State Schema
@@ -37,11 +36,19 @@ export const conversationEventTypeSchema = z.enum([
 
 export type ConversationEventType = z.infer<typeof conversationEventTypeSchema>;
 
+export const messageVisibilitySchema = z.object({
+  visibility: z.enum(['always', 'stage', 'never', 'conditional']).describe('Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)'),
+  condition: z.string().optional().describe('Condition for visibility, evaluated against conversation variables'),
+})
+
+export type MessageVisibility = z.infer<typeof messageVisibilitySchema>;
+
 // Event Data Schemas
 export const messageEventDataSchema = z.object({
   role: z.enum(['user', 'assistant']),
   text: z.string(),
   originalText: z.string(),
+  visibility: messageVisibilitySchema.optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -82,8 +89,12 @@ export const actionEventDataSchema = z.object({
 
 export type ActionEventData = z.infer<typeof actionEventDataSchema>;
 
+export const commandTypeSchema = z.enum(['go_to_stage', 'set_var', 'get_var', 'get_all_vars', 'run_action', 'call_tool']);
+
+export type CommandType = z.infer<typeof commandTypeSchema>;
+
 export const commandEventDataSchema = z.object({
-  command: z.string(),
+  command: commandTypeSchema,
   parameters: z.record(z.string(), parameterValueSchema).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
@@ -93,9 +104,10 @@ export type CommandEventData = z.infer<typeof commandEventDataSchema>;
 export const toolCallEventDataSchema = z.object({
   toolId: z.string(),
   toolName: z.string(),
+  toolType: z.enum(['smart_function', 'webhook', 'script']).optional(),
   parameters: z.record(z.string(), parameterValueSchema),
   success: z.boolean(),
-  result: z.array(llmContentSchema).optional(),
+  result: z.unknown().optional(),
   error: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });

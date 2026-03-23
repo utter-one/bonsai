@@ -123,11 +123,11 @@ export const createProviderSchema = z.object({
 export const updateProviderBodySchema = z.object({
   version: z.number().int().positive().describe('Current version number for optimistic locking (prevents concurrent updates)'),
   name: z.string().min(1).optional().describe('Updated human-readable name for the provider'),
-  description: z.string().optional().describe('Updated description of provider purpose'),
+  description: z.string().optional().nullable().describe('Updated description of provider purpose'),
   providerType: providerTypeSchema.optional().describe('Updated provider category'),
   apiType: providerNameSchema.optional().describe('Updated specific provider implementation'),
   config: providerConfigSchema.optional().describe('Updated provider-specific configuration'),
-  tags: z.array(z.string()).optional().describe('Updated searchable tags'),
+  tags: z.array(z.string()).optional().nullable().describe('Updated searchable tags'),
 });
 
 /**

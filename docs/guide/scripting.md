@@ -1,6 +1,6 @@
 # Scripting
 
-Bonsai Backend supports executing custom JavaScript within conversation actions via the `run_script` effect. Scripts run in a secure, isolated sandbox with strict resource limits.
+Bonsai Backend supports executing custom JavaScript within conversation actions via `script` tools. Scripts run in a secure, isolated sandbox with strict resource limits.
 
 ## Sandbox Environment
 
@@ -30,6 +30,7 @@ Scripts have access to these global variables:
 | `originalUserInput` | Read-only | Original unmodified user input |
 | `results` | Read-only | Results from tools and webhooks |
 | `time` | Read-only | Rich time context: `iso`, `date`, `time`, `dayOfWeek`, `timezone`, `calendar`, `anchor`, etc. |
+| `project` | Read-only | Project-level settings: `timezone` (IANA identifier or `null`), `languageCode` (ISO code or `null`), `language` (human-readable name or `null`) |
 | `userInputSource` | Read-only | Input channel: `'text'` \| `'voice'` \| `null` |
 | `consts` | Read-only | Project-level constants (from project settings) |
 | `stageVars` | Read-only | Variables for all stages, keyed by stage ID |
@@ -82,8 +83,13 @@ const lastMessage = history[history.length - 1];
 // Check classification results
 const matchedActions = actions;
 
-// Access webhook/tool results
+// Access smart_function / script tool results
+const analysisResult = results.tools?.sentimentAnalyzer?.result;
+
+// Access webhook tool results (also mirrored at results.webhooks for backward compat)
 const orderData = results.webhooks?.orderLookup;
+// equivalently:
+const orderData2 = results.tools?.orderLookup?.result;
 
 // Current stage metadata
 const isBookingStage = stage.name === 'Booking';
@@ -192,7 +198,7 @@ vars.stageRetries = stageUserMsgs.length;
 
 ## Flow Control
 
-Flow control functions are available in `run_script` effects only. They are silently ignored in action conditions and inline `=` expressions.
+Flow control functions are available in `script` tools and `script` tool calls only. They are silently ignored in action conditions and inline `=` expressions.
 
 All signals are queued and applied after the script finishes — the script always runs to completion first.
 
@@ -200,7 +206,7 @@ All signals are queued and applied after the script finishes — the script alwa
 
 Transition to a different stage after the script.
 
-> **Note:** `goToStage()` is **silently ignored** when called inside a `run_script` effect that belongs to a lifecycle action (`__on_enter` or `__on_leave`). Use it only in regular user-triggered or command-triggered actions.
+> **Note:** `goToStage()` is **silently ignored** when called inside a `script` tool that belongs to a lifecycle action (`__on_enter` or `__on_leave`). Use it only in regular user-triggered or command-triggered actions.
 
 ```javascript
 if (vars.retryCount >= 3) {
@@ -326,12 +332,20 @@ if (vars.retryCount >= 3) {
 ### Data Transformation
 
 ```javascript
-// Parse and restructure webhook response
+// Parse and restructure webhook tool response
+// Webhook results land in both results.webhooks and results.tools
 const response = results.webhooks?.customerLookup;
 if (response) {
-  vars.customerName = response.firstName + " " + response.lastName;
-  vars.accountTier = response.subscription?.tier || "free";
-  vars.isActive = response.status === "active";
+  vars.customerName = response.data.firstName + " " + response.data.lastName;
+  vars.accountTier = response.data.subscription?.tier || "free";
+  vars.isActive = response.data.status === "active";
+}
+
+// Parse a smart_function or script tool result
+const analysis = results.tools?.sentimentAnalyzer?.result;
+if (analysis) {
+  vars.sentiment = analysis.label;
+  vars.sentimentScore = analysis.score;
 }
 ```
 
@@ -361,7 +375,7 @@ vars.allowNavigation = vars.allFieldsFilled && vars.termsAccepted;
 
 - **No async/await** — All code must be synchronous
 - **No external modules** — Cannot import or require packages
-- **No network calls** — Use `call_webhook` effect instead
+- **No network calls** — Use a `webhook` tool instead
 - **No timers** — `setTimeout`, `setInterval` are not available
 - **16 MB memory** — Complex data structures or large strings may hit the limit
 - **5 second timeout** — Long-running computations will be terminated
@@ -370,6 +384,6 @@ vars.allowNavigation = vars.allFieldsFilled && vars.termsAccepted;
 
 - **Keep scripts short** — Use scripts for data manipulation, not complex logic
 - **Guard against undefined** — Always check if variables exist before accessing them
-- **Use effects for external calls** — Scripts handle local state; `call_webhook` and `call_tool` handle external interactions
+- **Use tools for external calls** — Scripts handle local state; `webhook` and `smart_function` tools handle external interactions
 - **Log for debugging** — Use `console.log()` to track script execution in conversation events
 - **Avoid side effects** — Only modify `vars`, `userProfile`, and `userInput`

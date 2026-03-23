@@ -29,13 +29,13 @@ Stages support three reserved lifecycle actions with special names (prefixed wit
 
 Runs when the conversation enters this stage — either at the start of a conversation or via a `go_to_stage` effect. Executes **before** the `enterBehavior` (generate response or await input).
 
-Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
+Restricted effects: cannot use `end_conversation`, `abort_conversation`, or `go_to_stage`. Calling `goToStage()` inside a `script` tool is also silently ignored.
 
 ### `__on_leave`
 
 Runs when the conversation is about to leave this stage (before loading the new stage). Useful for cleanup or persisting state.
 
-Restricted effects: cannot use `go_to_stage` or `generate_response`. Calling `goToStage()` inside a `run_script` effect is also silently ignored.
+Restricted effects: cannot use `go_to_stage` or `generate_response`. Calling `goToStage()` inside a `script` tool is also silently ignored.
 
 ### `__on_fallback`
 
@@ -128,17 +128,6 @@ Navigates to a different stage. Triggers `__on_leave` on the current stage and `
 { "type": "go_to_stage", "stageId": "troubleshooting" }
 ```
 
-### `run_script`
-
-Executes JavaScript in a secure isolated sandbox. See [Scripting](./scripting) for details.
-
-```json
-{
-  "type": "run_script",
-  "code": "vars.retryCount = (vars.retryCount || 0) + 1; if (vars.retryCount >= 3) { vars.escalate = true; }"
-}
-```
-
 ### `modify_user_input`
 
 Replaces the user's input text using a Handlebars template. This modifies what the LLM sees as the user's message.
@@ -187,7 +176,7 @@ Same operations as `modify_variables`, but applied to the user's profile instead
 
 ### `call_tool`
 
-Invokes an LLM-powered tool. See [Tools](./tools).
+Invokes a tool. The tool's `type` determines both its execution behaviour and when it runs relative to other effects (see [Effect Execution Priority](#effect-execution-priority)). See [Tools](./tools).
 
 ```json
 {
@@ -197,22 +186,9 @@ Invokes an LLM-powered tool. See [Tools](./tools).
 }
 ```
 
-### `call_webhook`
-
-Makes an HTTP request to an external service:
-
-```json
-{
-  "type": "call_webhook",
-  "method": "POST",
-  "url": "https://api.example.com/orders/{{vars.orderId}}",
-  "headers": { "Authorization": "Bearer {{consts.apiToken}}" },
-  "body": { "action": "check_status" },
-  "resultKey": "orderStatus"
-}
-```
-
-The response is stored under `context.results.webhooks.<resultKey>` and accessible in subsequent effects and prompts.
+Results are stored differently depending on the tool type:
+- **`smart_function`** and **`script`** tools — stored under `context.results.tools.<toolId>`
+- **`webhook`** tools — stored under `context.results.webhooks.<toolId>`
 
 ### `generate_response`
 
@@ -235,28 +211,54 @@ Explicitly triggers AI response generation. Two modes:
 
 Selection strategies: `random` (pick randomly) or `round_robin` (cycle through).
 
+### `change_visibility`
+
+Sets the visibility of the current turn's messages (both the user input and the AI response). This controls whether those messages are included when building the conversation history sent to the LLM, templates and scripts on future turns.
+
+```json
+{
+  "type": "change_visibility",
+  "target": "action",
+  "id": "collect-payment-info",
+  "visibility": "never"
+}
+```
+
+| Field | Description |
+|---|---|
+| `target` | `"action"` or `"stage"` — what the `id` refers to |
+| `id` | ID of the action or stage this effect belongs to |
+| `visibility` | `"always"`, `"stage"`, `"never"`, or `"conditional"` (see [Message Visibility](#message-visibility)) |
+| `condition` | JavaScript expression evaluated against the conversation context — required when `visibility` is `"conditional"` |
+
+The visibility is recorded on the message event and evaluated when building history on subsequent turns. See [Message Visibility](#message-visibility) for how each value is interpreted.
+
 ## Effect Execution Priority
 
 Effects from **all** triggered actions are gathered into a single global list, sorted by priority, and then conflict-resolved before execution. Effects within the same priority tier run in the order they appeared across all actions.
 
 | Priority | Effect type |
 |---|---|
-| 1 | `call_webhook` |
-| 2 | `call_tool` |
+| 1 | `call_tool` _(webhook tools)_ |
+| 2 | `call_tool` _(smart\_function tools)_ |
 | 3 | `modify_variables` |
 | 4 | `modify_user_profile` |
 | 5 | `modify_user_input` |
-| 6 | `run_script` |
-| 7 | `generate_response` |
-| 8 | `end_conversation` |
-| 9 | `abort_conversation` |
-| 10 | `go_to_stage` |
+| 6 | `call_tool` _(script tools)_ |
+| 50 | `change_visibility` |
+| 100 | `generate_response` |
+| 200 | `end_conversation` |
+| 201 | `abort_conversation` |
+| 202 | `go_to_stage` |
+
+`call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1, `script` tools at priority 6, and `smart_function` tools at priority 2.
 
 ### Conflict Resolution
 
 - **Multiple `go_to_stage`** — only the first one (lowest priority index) is kept; the rest are discarded
 - **`abort_conversation` + `end_conversation`** — `abort_conversation` wins; `end_conversation` is removed
 - **Multiple `modify_user_input`** — all are applied in sequence, each receiving the output of the previous
+- **Multiple `change_visibility`** — the last one applied wins (highest priority index)
 
 ## Execution Flow
 
@@ -270,3 +272,28 @@ When a user sends input, the system:
 6. Applies the combined outcome (variable changes, stage navigation, response generation)
 
 Effects within a single action run in order, and their results can be used by subsequent effects. If any effect triggers `end_conversation`, `abort_conversation`, or `go_to_stage`, it takes effect after all current effects complete.
+
+## Message Visibility
+
+Every `message` event (user input and AI response) can carry a `visibility` setting that controls whether it appears in the conversation history sent to the LLM on future turns. Visibility is set by the [`change_visibility`](#change_visibility) effect and evaluated each time history is built.
+
+| Value | Behaviour |
+|---|---|
+| `always` | Always included in history (default when no visibility is set) |
+| `never` | Never included in history |
+| `stage` | Included only when the current stage matches the stage the message was recorded in |
+| `conditional` | Included only when a JavaScript condition expression evaluates to truthy |
+
+The `conditional` value supports an arbitrary JavaScript expression evaluated against the full conversation context. It can be set via the `change_visibility` effect (using the `condition` field) or directly on the message event data:
+
+```json
+{
+  "type": "change_visibility",
+  "target": "action",
+  "id": "my-action",
+  "visibility": "conditional",
+  "condition": "vars.includeHistory === true"
+}
+```
+
+Visibility is evaluated lazily: it is recorded on the message event when the turn completes and re-evaluated on every subsequent turn when history is assembled. This means a `stage` or `conditional` message can move in and out of the visible history as the conversation progresses.

@@ -72,4 +72,17 @@ export const conversationEventMessageSchema = sessionOutputMessageSchema.extend(
   eventData: conversationEventDataSchema.describe('Data associated with the conversation event'),
 });
 
-export type ConversationEventMessage = z.infer<typeof conversationEventMessageSchema>;  
+export type ConversationEventMessage = z.infer<typeof conversationEventMessageSchema>; 
+
+/** Message sent when a conversation event is updated. */
+export const conversationEventUpdateMessageSchema = sessionOutputMessageSchema.extend({
+  type: z.literal('conversation_event_update').describe('Message type for conversation events'),
+  sessionId: z.string().describe('Session ID containing the conversation'),
+  conversationId: z.string().describe('Unique identifier of the conversation'),
+  inputTurnId: z.string().optional().describe('Identifier of the input turn associated with the event, if applicable'),
+  outputTurnId: z.string().optional().describe('Identifier of the output turn associated with the event, if applicable'),
+  eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
+  eventData: conversationEventDataSchema.describe('Data associated with the conversation event'),
+});
+
+export type ConversationEventUpdateMessage = z.infer<typeof conversationEventUpdateMessageSchema>;

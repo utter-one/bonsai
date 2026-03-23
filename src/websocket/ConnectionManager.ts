@@ -32,6 +32,27 @@ export class ConnectionManager {
   private socketMap: Map<WebSocket, Connection> = new Map();
   /** Maps session IDs to their WebSocket connections for quick lookup. */
   private connectionMap: Map<string, WebSocket> = new Map();
+  /** Tracks client IP addresses per WebSocket connection for rate limiting. Keys are GC'd automatically. */
+  private socketIpMap: WeakMap<WebSocket, string> = new WeakMap();
+
+  /**
+   * Records the client IP address for a WebSocket connection.
+   * Must be called during the HTTP upgrade handshake when the IP is available.
+   * @param ws - The WebSocket connection.
+   * @param ip - The client IP address.
+   */
+  trackSocketIp(ws: WebSocket, ip: string): void {
+    this.socketIpMap.set(ws, ip);
+  }
+
+  /**
+   * Returns the client IP address associated with a WebSocket connection.
+   * @param ws - The WebSocket connection.
+   * @returns The IP address, or an empty string if not tracked.
+   */
+  getSocketIp(ws: WebSocket): string {
+    return this.socketIpMap.get(ws) ?? '';
+  }
 
   /**
    * Creates a new session for a WebSocket connection.
@@ -163,6 +184,19 @@ export class ConnectionManager {
           ws.send(JSON.stringify(message));
         } catch (error) {
           logger.error({ error, conversationId, sessionId: connection.id }, 'Failed to send conversation event message');
+        }
+      }
+    }
+  }
+
+  sendConversationEventUpdate(conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, inputTurnId?: string, outputTurnId?: string): void {
+    for (const [ws, connection] of this.socketMap.entries()) {
+      if (connection.conversationId === conversationId && connection.sessionSettings.receiveEvents) {
+        const message = { type: 'conversation_event_update', sessionId: connection.id, conversationId, eventType, eventData, inputTurnId, outputTurnId };
+        try {
+          ws.send(JSON.stringify(message));
+        } catch (error) {
+          logger.error({ error, conversationId, sessionId: connection.id }, 'Failed to send conversation event update message');
         }
       }
     }

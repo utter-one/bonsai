@@ -57,13 +57,13 @@ export const createAgentSchema = z.object({
  */
 export const updateAgentBodySchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
-  description: z.string().optional().describe('Updated detailed description of the agent'),
+  description: z.string().optional().nullable().describe('Updated detailed description of the agent'),
   prompt: z.string().min(1).optional().describe('Updated prompt defining behavior'),
-  ttsProviderId: z.string().optional().describe('Updated TTS provider ID'),
-  ttsSettings: ttsSettingsSchema.describe('Updated TTS provider-specific settings'),
+  ttsProviderId: z.string().optional().nullable().describe('Updated TTS provider ID'),
+  ttsSettings: ttsSettingsSchema.nullable().describe('Updated TTS provider-specific settings'),
   tags: z.array(z.string()).optional().describe('Updated tags'),
   metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
-  fillerSettings: fillerSettingsSchema.optional().describe('Updated filler response settings'),
+  fillerSettings: fillerSettingsSchema.optional().nullable().describe('Updated filler response settings'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
 

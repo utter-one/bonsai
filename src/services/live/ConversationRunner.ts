@@ -6,7 +6,7 @@ import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS 
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users } from "../../db/schema";
-import { MessageEventData, ActionEventData, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState } from "../../types/conversationEvents";
+import { MessageEventData, ActionEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
@@ -118,6 +118,8 @@ export class ConversationRunner {
   private responseGeneratedInTurn = false;
   /** Conversation-level lifecycle global actions keyed by reserved ID, loaded once in prepareConversation */
   private conversationLifecycleActions: Map<string, GlobalAction> = new Map();
+  /** Visibility override for the current turn's messages, set by change_visibility effects */
+  private turnMessageVisibility: MessageVisibility | undefined = undefined;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsStartMs: null, turnIndex: 0 };
@@ -498,7 +500,8 @@ export class ConversationRunner {
             if (totalTurnDurationMs !== undefined) backfill.totalTurnDurationMs = totalTurnDurationMs;
             if (ttsDurationMs !== undefined) backfill.ttsDurationMs = ttsDurationMs;
             if (Object.keys(backfill).length > 0) {
-              await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
+              const updated = await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
+              this.connectionManager.sendConversationEventUpdate(this.conversation.projectId, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
             }
           }
 
@@ -568,7 +571,7 @@ export class ConversationRunner {
       completionLlmProvider.setOnChunk(async (chunk: LlmChunk) => {
         logger.debug({ conversationId, chunkLength: chunk.content.length }, `LLM completion chunk for conversation ${conversationId}: ${chunk.content.length} characters`);
         // Record the timestamp of the first token if not already captured
-        if (this.turnData.firstTokenMs === null) {
+        if (this.turnData.firstTokenMs === null && this.turnData.llmStartMs !== null) {
           this.turnData.firstTokenMs = Date.now();
         }
         if (ttsProvider) {
@@ -614,6 +617,7 @@ export class ConversationRunner {
           text: textContent,
           role: 'assistant',
           originalText: textContent,
+          visibility: this.turnMessageVisibility,
           metadata: {
             llmUsage: result.usage || {},
             systemPrompt: this.stageData.lastCompletionPrompt,
@@ -691,6 +695,7 @@ export class ConversationRunner {
 
   async startConversation() {
     this.responseGeneratedInTurn = false;
+    this.resetTurnData();
     if (this.conversation.status !== 'initialized') {
       throw new Error(`Cannot start conversation in current state: ${this.conversation.status}`);
     }
@@ -898,6 +903,16 @@ export class ConversationRunner {
   }
 
   /**
+   * Saves a command event for the current conversation.
+   * @param command - The type of command received
+   * @param parameters - Optional parameters associated with the command
+   */
+  async saveCommandEvent(command: CommandType, parameters?: Record<string, any>): Promise<void> {
+    const eventData: CommandEventData = { command, parameters };
+    await this.saveAndSendEvent('command', eventData);
+  }
+
+  /**
    * Releases all ASR, TTS, and LLM provider resources held by this runner.
    * Must be called when the associated WebSocket connection closes so that sockets,
    * HTTP streams, and SDK sessions are properly torn down and do not leak.
@@ -945,6 +960,11 @@ export class ConversationRunner {
     this.navigationDepth++;
     if (isTopLevel) {
       this.responseGeneratedInTurn = false;
+      // Only reset turn timing for top-level (client-initiated) navigation; internal goToStage
+      // calls triggered mid-turn by applyActionOutcome must preserve the ongoing turn's data.
+      if (!isProcessingUserInput) {
+        this.resetTurnData();
+      }
     }
 
     try {
@@ -986,17 +1006,20 @@ export class ConversationRunner {
         }
       }
 
-      // Load new stage data
-      const newStageData = await this.buildStageData({ ...this.conversation, stageId });
-
-      // Update stage data and conversation
-      this.stageData = newStageData;
+      // Update stageId on this.conversation before building new stage data.
+      // This keeps stageData.conversation as the same object reference as this.conversation,
+      // so any subsequent applyActionOutcome writes to this.conversation.stageVars are
+      // immediately visible via getRuntimeData().conversation on the next turn.
       this.conversation.stageId = stageId;
 
       // Update conversation in database
       await db.update(conversations)
         .set({ stageId, updatedAt: new Date() })
         .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+
+      // Load new stage data, passing this.conversation directly (not a spread copy)
+      const newStageData = await this.buildStageData(this.conversation);
+      this.stageData = newStageData;
 
       // Re-wire providers for the new stage
       await this.wireUpProviders();
@@ -1204,9 +1227,10 @@ export class ConversationRunner {
       throw new Error(`Cannot run action in current state: ${this.conversation.status}`);
     }
 
-    // Reset the per-turn response guard so a client-initiated action can generate a response,
+    // Reset per-turn data so timing fields are clean for this client-initiated action turn,
     // just like processUserInput does at the start of each user turn.
     this.responseGeneratedInTurn = false;
+    this.resetTurnData();
 
     // Load the action from the database
     const globalAction = await db.query.globalActions.findFirst({
@@ -1278,6 +1302,7 @@ export class ConversationRunner {
     const eventData: ToolCallEventData = {
       toolId: tool.id,
       toolName: tool.name,
+      toolType: tool.type,
       parameters,
       success: executeResult.success,
       result: executeResult.result,
@@ -1290,7 +1315,7 @@ export class ConversationRunner {
     };
     await this.saveAndSendEvent('tool_call', eventData);
 
-    logger.info({ conversationId: this.conversation.id, toolId, success: executeResult.success }, `Tool ${tool.name} executed`);
+    logger.info({ conversationId: this.conversation.id, toolId, success: executeResult.success, result: executeResult.result }, `Tool ${tool.name} executed`);
 
     return executeResult;
   }
@@ -1336,7 +1361,7 @@ export class ConversationRunner {
     if (outcome.shouldAbortConversation) {
       logger.info({ conversationId }, `Conversation marked for abortion by action execution`);
       await db.update(conversations)
-        .set({ status: 'aborted', updatedAt: new Date() })
+        .set({ status: 'aborted', endingStageId: this.stageData.id, updatedAt: new Date() })
         .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
       return false;
     }
@@ -1395,11 +1420,12 @@ export class ConversationRunner {
    * @param userInputSource Whether the input is text or voice
    * @param asrEndMs Unix timestamp (ms) when ASR recognition completed, if applicable
    */
-  private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
-    this.responseGeneratedInTurn = false;
-    const nextTurnIndex = this.turnData.turnIndex + 1;
-    const asrDurationMs = asrEndMs && this.turnData.asrStartMs !== null ? asrEndMs - this.turnData.asrStartMs : null;
-    // Reset per-turn data, preserving inputTurnId which was assigned before processUserInput was called
+  /**
+   * Resets the response-timing fields of turnData for a new turn, preserving correlation IDs.
+   * Called at the start of every entry point that may lead to generateResponse.
+   */
+  private resetTurnData(): void {
+    this.turnMessageVisibility = undefined;
     this.turnData = {
       inputTurnId: this.turnData.inputTurnId,
       outputTurnId: undefined,
@@ -1412,10 +1438,31 @@ export class ConversationRunner {
       moderationDurationMs: null,
       asrStartMs: null,
       ttsStartMs: null,
-      turnIndex: nextTurnIndex,
+      turnIndex: this.turnData.turnIndex + 1,
     };
+  }
+
+  private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
+    this.responseGeneratedInTurn = false;
+    // Capture asrStartMs before resetting turnData so we can compute asrDurationMs
+    const asrDurationMs = asrEndMs && this.turnData.asrStartMs !== null ? asrEndMs - this.turnData.asrStartMs : null;
+    this.resetTurnData();
     const asrDurationMsValue = asrDurationMs && asrDurationMs > 0 ? asrDurationMs : undefined;
     await this.changeState('processing_user_input');
+
+    // Let's save the message event to fill data about timing and user input after moderation and processing
+    const preliminaryMessageEventData: MessageEventData = {
+      role: 'user',
+      text: userInput || '',
+      originalText: userInput || '',
+      visibility: this.turnMessageVisibility,
+      metadata: {
+        source: userInputSource,
+        inputTurnId: this.turnData.inputTurnId,
+        turnIndex: this.turnData.turnIndex,
+      }
+    };
+    const userMessageEventId = await this.saveAndSendEvent('message', preliminaryMessageEventData);
 
     // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
     // This prevents inappropriate content from reaching provider APIs and risking account bans.
@@ -1435,7 +1482,13 @@ export class ConversationRunner {
         const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
         const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context);
         await this.applyActionOutcome(context, executionOutcome);
-        const messageEventData: MessageEventData = { text: '[Content removed by moderation]', originalText: userInput, role: 'user', metadata: { moderationDurationMs: this.turnData.moderationDurationMs } };
+        const messageEventData: MessageEventData = {
+          text: '[Content removed by moderation]',
+          originalText: userInput,
+          role: 'user',
+          visibility: this.turnMessageVisibility,
+          metadata: { moderationDurationMs: this.turnData.moderationDurationMs }
+        };
         await this.saveAndSendEvent('message', messageEventData);
         await this.saveAndSendOutcomeEvents(executionOutcome);
         const actionEventData: ActionEventData = { actionName: moderationBlockedAction.name || '', stageId: this.stageData.id, effects: moderationBlockedAction.effects };
@@ -1599,12 +1652,12 @@ export class ConversationRunner {
       await this.saveAndSendEvent('action', actionEventData);
     }
 
-    // Save event for user message
-    const messageEventData: MessageEventData = {
-      role: 'user',
-      text: context.userInput || '',
-      originalText: context.originalUserInput || context.userInput || '',
-      metadata: {
+    if (executionOutcome.turnVisibility) {
+      this.turnMessageVisibility = executionOutcome.turnVisibility;
+    }
+
+    // Update message event with moderation and processing results, which may be needed for response generation and should be sent to client for UI updates
+    const updated = await this.conversationService.updateMessageEvent(this.conversation.projectId, userMessageEventId, context.userInput, {
         source: context.userInputSource,
         inputTurnId: this.turnData.inputTurnId,
         turnIndex: this.turnData.turnIndex,
@@ -1614,9 +1667,9 @@ export class ConversationRunner {
         knowledgeRetrievalDurationMs,
         actionsDurationMs,
         fillerDurationMs: this.turnData.fillerDurationMs,
-      }
-    };
-    await this.saveAndSendEvent('message', messageEventData);
+    }, this.turnMessageVisibility);
+    this.connectionManager.sendConversationEventUpdate(this.conversation.id, 'message', updated.eventData, this.turnData.inputTurnId, this.turnData.outputTurnId);
+
     await this.generateResponse(context, executionOutcome);
   }
 
@@ -1655,6 +1708,7 @@ export class ConversationRunner {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
         this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        this.turnData.firstTokenMs = null;
         this.turnData.llmStartMs = Date.now();
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
       }
@@ -1678,7 +1732,7 @@ export class ConversationRunner {
           reason: executionOutcome.endReason || 'Action execution completed conversation',
         };
         await this.saveAndSendEvent('conversation_end', eventData);
-        await this.changeState('finished');
+        await this.changeTerminalState('finished');
       }
     } else if (executionOutcome.shouldAbortConversation) {
       // Close the filler turn if it was opened but no response follows
@@ -1704,7 +1758,7 @@ export class ConversationRunner {
         reason: executionOutcome.abortReason || 'Conversation aborted by action',
       };
       await this.saveAndSendEvent('conversation_aborted', eventData);
-      await this.changeState('finished');
+      await this.changeTerminalState('finished');
     } else {
       // Close the filler turn if it was opened but no response follows
       if (this.responseOutputTurnStarted) {
@@ -1783,6 +1837,7 @@ export class ConversationRunner {
       text,
       role: 'assistant',
       originalText: text,
+      visibility: this.turnMessageVisibility,
       metadata: {
         prescripted: true,
       },
@@ -1825,6 +1880,15 @@ export class ConversationRunner {
   }
 
   /**
+   * Transitions the conversation to a terminal state and records the stage at which it ended.
+   * @param newState - The terminal state to transition to
+   */
+  private async changeTerminalState(newState: ConversationState): Promise<void> {
+    this.conversation.status = newState;
+    await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, newState, undefined, undefined, this.stageData.id);
+  }
+
+  /**
    * Helper method to save a conversation event and send it to connected clients via WebSocket.
    * @returns The generated event ID
    */
@@ -1850,6 +1914,7 @@ export class ConversationRunner {
         const eventData = {
           toolId: toolCallEvent.toolId,
           toolName: toolCallEvent.toolName,
+          toolType: toolCallEvent.toolType,
           parameters: toolCallEvent.parameters,
           success: toolCallEvent.success,
           result: toolCallEvent.result,

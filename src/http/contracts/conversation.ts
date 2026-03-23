@@ -44,6 +44,8 @@ export const conversationResponseSchema = z.object({
   userId: z.string().describe('Identifier of the user associated with this conversation'),
   clientId: z.string().describe('Client identifier for the conversation'),
   stageId: z.string().describe('Current stage identifier for the conversation'),
+  startingStageId: z.string().nullable().describe('Stage identifier at the start of the conversation'),
+  endingStageId: z.string().nullable().describe('Stage identifier when the conversation reached a terminal state (finished/failed/aborted)'),
   stageVars: z.record(z.string(), z.record(z.string(), z.unknown())).nullable().describe('Variables stored per stage in the conversation'),
   status: z.string().describe('Current status of the conversation (e.g., initialized, active, completed, failed)'),
   statusDetails: z.string().nullable().describe('Optional details about the current status'),

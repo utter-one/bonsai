@@ -52,10 +52,38 @@ export class VersionService {
 
   private computeVersion(): VersionResponse {
     return {
+      version: this.readPackageVersion() + this.getVersionSuffix(),
       restSchemaHash: this.hashRestSchema(),
       wsSchemaHash: this.hashWsSchema(),
-      gitCommit: process.env.GIT_COMMIT ?? null,
+      gitCommit: process.env.GIT_COMMIT ?? process.env.SOURCE_COMMIT,
     };
+  }
+
+  private readPackageVersion(): string {
+    try {
+      const pkgPath = join(__dirname, '../../package.json');
+      const content = readFileSync(pkgPath, 'utf-8');
+      return (JSON.parse(content) as { version: string }).version;
+    } catch (error) {
+      logger.warn({ error }, 'Failed to read package.json for version — returning "unknown"');
+      return 'unknown';
+    }
+  }
+
+  private getVersionSuffix(): string {
+    const commitHash = process.env.GIT_COMMIT ?? process.env.SOURCE_COMMIT;
+    const environment = process.env.NODE_ENV ?? 'dev';
+    let suffix = '';
+    if (environment !== 'production') { 
+      suffix = environment ? `${environment}-` : '';
+      if (!commitHash) {
+        suffix += `${Date.now()}+local`;
+      } else {
+        suffix += `${commitHash.slice(0, 7)}`;
+      }
+    }
+
+    return suffix ? `-${suffix}` : '';
   }
 
   private hashRestSchema(): string {

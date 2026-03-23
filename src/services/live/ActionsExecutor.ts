@@ -1,14 +1,15 @@
 import { injectable, inject } from 'tsyringe';
 import { logger } from '../../utils/logger';
-import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
 import { ToolExecutor } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
-import type { AbortConversationEffect, CallToolEffect, CallWebhookEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, RunScriptEffect, StageAction, LifecycleContext } from '../../types/actions';
+import type { AbortConversationEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
+import type { MessageVisibility } from '../../types/conversationEvents';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
+import type { ToolType } from '../../db/schema';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 import { NotFoundError } from '../../errors';
 import { ParameterValue } from '../../types/parameters';
@@ -29,9 +30,12 @@ export type ActionsExecutionOutcome = {
   hasModifiedUserProfile: boolean;
   goToStageId?: string;
   error?: string;
+  /** Pending visibility override to apply to the current turn's messages, produced by change_visibility effects */
+  turnVisibility?: MessageVisibility;
   toolCallEvents?: Array<{
     toolId: string;
     toolName: string;
+    toolType?: ToolType;
     parameters: Record<string, any>;
     success: boolean;
     result?: any;
@@ -56,9 +60,12 @@ export type EffectOutcome = {
   hasModifiedUserInput?: boolean;
   hasModifiedUserProfile?: boolean;
   newStageId?: string;
+  /** Pending visibility override for the current turn's messages */
+  turnVisibility?: MessageVisibility;
   toolCallEvent?: {
     toolId: string;
     toolName: string;
+    toolType?: ToolType;
     parameters: Record<string, any>;
     success: boolean;
     result?: any;
@@ -81,12 +88,11 @@ type EffectWithSource = {
 
 /**
  * Service responsible for executing effects defined in stage actions and global actions
- * Handles all effect types: end_conversation, abort_conversation, go_to_stage, run_script, modify_user_input, call_tool
+ * Handles all effect types: end_conversation, abort_conversation, go_to_stage, modify_user_input, call_tool
  */
 @injectable()
 export class ActionsExecutor {
   constructor(
-    @inject(IsolatedScriptExecutor) private readonly scriptRunner: IsolatedScriptExecutor,
     @inject(ToolService) private readonly toolService: ToolService,
     @inject(ToolExecutor) private readonly toolExecutor: ToolExecutor,
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
@@ -108,33 +114,38 @@ export class ActionsExecutor {
   }
 
   /**
-   * Gets the execution priority for an effect type
-   * Lower numbers execute first
+   * Gets the execution priority for an effect type.
+   * Lower numbers execute first.
+   * For call_tool effects, priority is determined by the referenced tool's type:
+   * webhook tools run at priority 1, script tools at priority 6, smart_function tools at priority 2.
    * @param effect - The effect to get priority for
-   * @returns Priority number (1-7)
+   * @param toolTypes - Optional map of toolId → ToolType for call_tool priority resolution
+   * @returns Priority number
    */
-  private getEffectPriority(effect: Effect): number {
+  private getEffectPriority(effect: Effect, toolTypes?: Map<string, ToolType>): number {
     switch (effect.type) {
-      case 'call_webhook':
-        return 1;
-      case 'call_tool':
-        return 2;
+      case 'call_tool': {
+        const toolType = toolTypes?.get((effect as CallToolEffect).toolId);
+        if (toolType === 'webhook') return 1;
+        if (toolType === 'script') return 6;
+        return 2; // smart_function or unknown
+      }
       case 'modify_variables':
         return 3;
       case 'modify_user_profile':
         return 4;
       case 'modify_user_input':
         return 5;
-      case 'run_script':
-        return 6;
+      case 'change_visibility':
+        return 50;
       case 'generate_response':
-        return 7;
+        return 100;
       case 'end_conversation':
-        return 8;
+        return 200;
       case 'abort_conversation':
-        return 9;
+        return 201;
       case 'go_to_stage':
-        return 10;
+        return 202;
       default:
         return 999; // Unknown effects execute last
     }
@@ -288,9 +299,15 @@ export class ActionsExecutor {
       }
     }
 
+    // Pre-fetch tool types for all call_tool effects so priority can be resolved per tool type
+    const toolIds = [...new Set(
+      filteredEffects.filter(e => e.effect.type === 'call_tool').map(e => (e.effect as CallToolEffect).toolId)
+    )];
+    const toolTypeMap = await this.toolService.getToolTypesByIds(context.projectId, toolIds);
+
     // Sort all effects by priority (lower numbers execute first)
     let sortedEffects = filteredEffects.sort(
-      (a, b) => this.getEffectPriority(a.effect) - this.getEffectPriority(b.effect)
+      (a, b) => this.getEffectPriority(a.effect, toolTypeMap) - this.getEffectPriority(b.effect, toolTypeMap)
     );
 
     // Resolve conflicts between effects
@@ -350,6 +367,11 @@ export class ActionsExecutor {
           outcome.goToStageId = effectResult.newStageId;
         }
 
+        // Propagate visibility override from change_visibility effect
+        if (effectResult.turnVisibility) {
+          outcome.turnVisibility = effectResult.turnVisibility;
+        }
+
         // Check if effect resulted in conversation termination
         if (effectResult.shouldEndConversation) {
 
@@ -407,9 +429,6 @@ export class ActionsExecutor {
       case 'go_to_stage':
         return await this.executeGoToStage(effect, context);
 
-      case 'run_script':
-        return await this.executeRunScript(effect, context);
-
       case 'modify_user_input':
         return await this.executeModifyUserInput(effect, context);
 
@@ -422,11 +441,11 @@ export class ActionsExecutor {
       case 'call_tool':
         return await this.executeCallTool(effect, context);
 
-      case 'call_webhook':
-        return await this.executeCallWebhook(effect, context);
-
       case 'generate_response':
         return await this.executeGenerateResponse(effect, context, actionName);
+
+      case 'change_visibility':
+        return this.executeChangeVisibility(effect);
 
       default:
         throw new Error(`Unknown effect`);
@@ -481,33 +500,6 @@ export class ActionsExecutor {
       shouldEndConversation: false,
       shouldAbortConversation: false,
       newStageId: effect.stageId,
-    };
-  }
-
-  /**
-   * Executes run_script effect
-   * Delegates to IsolatedScriptExecutor for secure script execution in isolated VM.
-   * Flow control signals (goToStage, endConversation, etc.) emitted by the script are mapped
-   * directly onto EffectOutcome fields.
-   */
-  private async executeRunScript(
-    effect: RunScriptEffect,
-    context: ConversationContext,
-  ): Promise<EffectOutcome> {
-    logger.info({ effect }, `Executing run_script effect`);
-    const result = await this.scriptRunner.executeScript(effect.code, context);
-
-    return {
-      shouldEndConversation: result.flowControl.shouldEndConversation ?? false,
-      endReason: result.flowControl.endReason,
-      shouldAbortConversation: result.flowControl.shouldAbortConversation ?? false,
-      abortReason: result.flowControl.abortReason,
-      newStageId: result.flowControl.goToStageId,
-      shouldGenerateResponse: result.flowControl.shouldGenerateResponse,
-      prescriptedResponse: result.flowControl.prescriptedResponse,
-      hasModifiedVars: result.hasModifiedVars,
-      hasModifiedUserInput: result.hasModifiedUserInput,
-      hasModifiedUserProfile: result.hasModifiedUserProfile,
     };
   }
 
@@ -656,7 +648,7 @@ export class ActionsExecutor {
     effect: CallToolEffect,
     context: ConversationContext,
   ): Promise<EffectOutcome> {
-    logger.info({ context, toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
+    logger.info({ toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
 
     try {
       // 1. Load the tool
@@ -694,24 +686,7 @@ export class ActionsExecutor {
 
       logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, hasResult: !!executionResult.result }, `Tool executed successfully`);
 
-      // 4. Validate output against tool.outputType
-      // Check that the result format matches what we expect
-      if (executionResult.result !== undefined && executionResult.result !== null) {
-
-        if (tool.outputType === 'text') {
-          // For text output, result should be a string or easily convertible
-          if (!executionResult.result.every(x => x.contentType === 'text')) {
-            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool output type is '${tool.outputType}' but result contains non-text content, will convert to string`);
-          }
-        } else if (tool.outputType === 'image') {
-          if (!executionResult.result.every(x => x.contentType === 'image')) {
-            logger.warn({ conversationId: context.conversationId, toolId: effect.toolId }, `Tool output type is '${tool.outputType}' but result contains non-image content`);
-          }
-        }
-        // For 'multi-modal', we accept any format
-      }
-
-      // 5. Store the result in context.results.tools
+      // 4. Store the result in context.results.tools
       if (!context.results) {
         context.results = { webhooks: {}, tools: {} };
       }
@@ -719,25 +694,41 @@ export class ActionsExecutor {
         context.results.tools = {};
       }
 
+      // Store result in the context bucket
+      if (tool.type === 'webhook') { // for backwards compatibility, also store webhook tool results in context.results.webhooks
+        if (!context.results.webhooks) context.results.webhooks = {};
+        context.results.webhooks[tool.id] = executionResult.result;
+      } 
+
       context.results.tools[tool.id] = {
         toolId: tool.id,
         toolName: tool.name,
-        inputType: tool.inputType,
-        outputType: tool.outputType,
+        toolType: tool.type,
         parameters: resolvedParameters,
         result: executionResult.result,
         executedAt: new Date().toISOString(),
       };
+      
 
-      logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name }, `Tool called successfully and result stored: ${tool.name}`);
+      logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, toolType: tool.type }, `Tool called successfully and result stored: ${tool.name}`);
 
-      // Return tool call event data so caller can save/send it
+      // For script tools, propagate flow control and mutable-state change flags onto the outcome
+      const flowControl = executionResult.flowControl ?? {};
       return {
-        shouldEndConversation: false,
-        shouldAbortConversation: false,
+        shouldEndConversation: flowControl.shouldEndConversation ?? false,
+        endReason: flowControl.endReason,
+        shouldAbortConversation: flowControl.shouldAbortConversation ?? false,
+        abortReason: flowControl.abortReason,
+        newStageId: flowControl.goToStageId,
+        shouldGenerateResponse: flowControl.shouldGenerateResponse,
+        prescriptedResponse: flowControl.prescriptedResponse,
+        hasModifiedVars: executionResult.hasModifiedVars ?? false,
+        hasModifiedUserInput: executionResult.hasModifiedUserInput ?? false,
+        hasModifiedUserProfile: executionResult.hasModifiedUserProfile ?? false,
         toolCallEvent: {
           toolId: tool.id,
           toolName: tool.name,
+          toolType: tool.type,
           parameters: resolvedParameters,
           success: executionResult.success,
           result: executionResult.result,
@@ -751,89 +742,6 @@ export class ActionsExecutor {
       logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
       throw error;
     }
-  }
-
-  /**
-   * Executes call_webhook effect
-   * Calls an HTTP(S) endpoint and stores the result in conversation context
-   */
-  private async executeCallWebhook(
-    effect: CallWebhookEffect,
-    context: ConversationContext,
-  ): Promise<EffectOutcome> {
-    logger.info({ conversationId: context.conversationId, url: effect.url, method: effect.method || 'GET', resultKey: effect.resultKey }, `Calling webhook: ${effect.url}`);
-
-    try {
-      // Render URL through templating engine
-      const renderedUrl = await this.templatingEngine.render(effect.url, context);
-
-      // Render headers through templating engine
-      const renderedHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (effect.headers) {
-        for (const [key, value] of Object.entries(effect.headers)) {
-          renderedHeaders[key] = await this.templatingEngine.render(value, context);
-        }
-      }
-
-      // Prepare fetch options
-      const fetchOptions: RequestInit = {
-        method: effect.method || 'GET',
-        headers: renderedHeaders,
-      };
-
-      // Add body for POST/PUT/PATCH requests
-      if (effect.body && ['POST', 'PUT', 'PATCH'].includes(effect.method || 'GET')) {
-        // Render body through templating engine
-        const bodyString = typeof effect.body === 'string' ? effect.body : JSON.stringify(effect.body);
-        const renderedBody = await this.templatingEngine.render(bodyString, context);
-        fetchOptions.body = renderedBody;
-      }
-
-      // Make the HTTP request
-      const response = await fetch(renderedUrl, fetchOptions);
-
-      // Parse response
-      let result: any;
-      const contentType = response.headers.get('content-type');
-      if (contentType?.includes('application/json')) {
-        result = await response.json();
-      } else {
-        result = await response.text();
-      }
-
-      // Store result in context
-      if (!context.results) {
-        context.results = { webhooks: {}, tools: {} };
-      }
-      if (!context.results.webhooks) {
-        context.results.webhooks = {};
-      }
-
-      // Convert headers to plain object
-      const headersObj: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        headersObj[key] = value;
-      });
-
-      context.results.webhooks[effect.resultKey] = {
-        status: response.status,
-        statusText: response.statusText,
-        headers: headersObj,
-        data: result,
-      };
-
-      logger.info({ conversationId: context.conversationId, url: effect.url, status: response.status, resultKey: effect.resultKey }, `Webhook called successfully and result stored`);
-    } catch (error) {
-      logger.error({ conversationId: context.conversationId, url: effect.url, error: error instanceof Error ? error.message : String(error) }, `Failed to call webhook`);
-      throw error;
-    }
-
-    return {
-      shouldEndConversation: false,
-      shouldAbortConversation: false,
-    };
   }
 
   /**
@@ -888,6 +796,19 @@ export class ActionsExecutor {
       shouldEndConversation: false,
       shouldAbortConversation: false,
       shouldGenerateResponse: true,
+    };
+  }
+
+  /**
+   * Executes change_visibility effect.
+   * Produces a visibility override that the caller (ConversationRunner) applies to current-turn message events before saving.
+   */
+  private executeChangeVisibility(effect: ChangeVisibilityEffect): EffectOutcome {
+    logger.info({ visibility: effect.visibility }, `Setting turn visibility override: ${effect.visibility}`);
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
+      turnVisibility: { visibility: effect.visibility, condition: effect.condition },
     };
   }
 }

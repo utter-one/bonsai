@@ -1031,6 +1031,28 @@
                 "originalText": {
                   "type": "string"
                 },
+                "visibility": {
+                  "type": "object",
+                  "properties": {
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "always",
+                        "stage",
+                        "never",
+                        "conditional"
+                      ],
+                      "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Condition for visibility, evaluated against conversation variables"
+                    }
+                  },
+                  "required": [
+                    "visibility"
+                  ]
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1166,7 +1188,15 @@
               "type": "object",
               "properties": {
                 "command": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "go_to_stage",
+                    "set_var",
+                    "get_var",
+                    "get_all_vars",
+                    "run_action",
+                    "call_tool"
+                  ]
                 },
                 "parameters": {
                   "type": "object",
@@ -1194,6 +1224,14 @@
                 "toolName": {
                   "type": "string"
                 },
+                "toolType": {
+                  "type": "string",
+                  "enum": [
+                    "smart_function",
+                    "webhook",
+                    "script"
+                  ]
+                },
                 "parameters": {
                   "type": "object",
                   "additionalProperties": {
@@ -1204,119 +1242,7 @@
                   "type": "boolean"
                 },
                 "result": {
-                  "type": "array",
-                  "items": {
-                    "oneOf": [
-                      {
-                        "type": "object",
-                        "properties": {
-                          "contentType": {
-                            "type": "string",
-                            "enum": [
-                              "text"
-                            ]
-                          },
-                          "text": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "contentType",
-                          "text"
-                        ]
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "contentType": {
-                            "type": "string",
-                            "enum": [
-                              "image"
-                            ]
-                          },
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded image data"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type (e.g., image/png, image/jpeg)"
-                          },
-                          "metadata": {
-                            "type": "object",
-                            "properties": {
-                              "width": {
-                                "type": "number"
-                              },
-                              "height": {
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": {
-                              "nullable": true
-                            }
-                          }
-                        },
-                        "required": [
-                          "contentType",
-                          "data",
-                          "mimeType"
-                        ]
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "contentType": {
-                            "type": "string",
-                            "enum": [
-                              "audio"
-                            ]
-                          },
-                          "data": {
-                            "type": "string",
-                            "description": "Base64-encoded audio data"
-                          },
-                          "format": {
-                            "type": "string",
-                            "enum": [
-                              "pcm",
-                              "mp3",
-                              "wav",
-                              "opus"
-                            ],
-                            "description": "Audio format"
-                          },
-                          "mimeType": {
-                            "type": "string",
-                            "description": "MIME type (e.g., audio/pcm, audio/mpeg)"
-                          },
-                          "metadata": {
-                            "type": "object",
-                            "properties": {
-                              "sampleRate": {
-                                "type": "number"
-                              },
-                              "channels": {
-                                "type": "number"
-                              },
-                              "bitDepth": {
-                                "type": "number"
-                              }
-                            },
-                            "additionalProperties": {
-                              "nullable": true
-                            }
-                          }
-                        },
-                        "required": [
-                          "contentType",
-                          "data",
-                          "format",
-                          "mimeType"
-                        ]
-                      }
-                    ]
-                  }
+                  "nullable": true
                 },
                 "error": {
                   "type": "string"
@@ -1534,9 +1460,6 @@
           "$ref": "#/definitions/GoToStageEffect"
         },
         {
-          "$ref": "#/definitions/RunScriptEffect"
-        },
-        {
           "$ref": "#/definitions/ModifyUserInputEffect"
         },
         {
@@ -1549,10 +1472,10 @@
           "$ref": "#/definitions/CallToolEffect"
         },
         {
-          "$ref": "#/definitions/CallWebhookEffect"
+          "$ref": "#/definitions/GenerateResponseEffect"
         },
         {
-          "$ref": "#/definitions/GenerateResponseEffect"
+          "$ref": "#/definitions/ChangeVisibilityEffect"
         }
       ],
       "discriminator": {
@@ -1561,13 +1484,12 @@
           "end_conversation": "#/definitions/EndConversationEffect",
           "abort_conversation": "#/definitions/AbortConversationEffect",
           "go_to_stage": "#/definitions/GoToStageEffect",
-          "run_script": "#/definitions/RunScriptEffect",
           "modify_user_input": "#/definitions/ModifyUserInputEffect",
           "modify_variables": "#/definitions/ModifyVariablesEffect",
           "modify_user_profile": "#/definitions/ModifyUserProfileEffect",
           "call_tool": "#/definitions/CallToolEffect",
-          "call_webhook": "#/definitions/CallWebhookEffect",
-          "generate_response": "#/definitions/GenerateResponseEffect"
+          "generate_response": "#/definitions/GenerateResponseEffect",
+          "change_visibility": "#/definitions/ChangeVisibilityEffect"
         }
       }
     },
@@ -1628,27 +1550,6 @@
       "required": [
         "type",
         "stageId"
-      ]
-    },
-    "RunScriptEffect": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": [
-            "run_script"
-          ],
-          "description": "Effect type"
-        },
-        "code": {
-          "type": "string",
-          "minLength": 1,
-          "description": "JavaScript code to execute in isolated context"
-        }
-      },
-      "required": [
-        "type",
-        "code"
       ]
     },
     "ModifyUserInputEffect": {
@@ -1805,56 +1706,6 @@
         "parameters"
       ]
     },
-    "CallWebhookEffect": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": [
-            "call_webhook"
-          ],
-          "description": "Effect type"
-        },
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "description": "HTTP(S) URL to call"
-        },
-        "method": {
-          "type": "string",
-          "enum": [
-            "GET",
-            "POST",
-            "PUT",
-            "PATCH",
-            "DELETE"
-          ],
-          "default": "GET",
-          "description": "HTTP method to use"
-        },
-        "headers": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "HTTP headers to send with the request"
-        },
-        "body": {
-          "nullable": true,
-          "description": "Request body for POST/PUT/PATCH requests"
-        },
-        "resultKey": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Key name to store the webhook result under in context.results.webhooks"
-        }
-      },
-      "required": [
-        "type",
-        "url",
-        "resultKey"
-      ]
-    },
     "GenerateResponseEffect": {
       "type": "object",
       "properties": {
@@ -1893,6 +1744,520 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChangeVisibilityEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "change_visibility"
+          ],
+          "description": "Effect type"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "always",
+            "stage",
+            "never",
+            "conditional"
+          ],
+          "description": "Visibility setting: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on a JavaScript condition expression)"
+        },
+        "condition": {
+          "type": "string",
+          "description": "JavaScript condition expression evaluated against the conversation context — required when visibility is \"conditional\""
+        }
+      },
+      "required": [
+        "type",
+        "visibility"
+      ]
+    },
+    "conversation-event-update": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "conversation_event_update"
+          ],
+          "description": "Message type for conversation events"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Session ID containing the conversation"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Identifier of the input turn associated with the event, if applicable"
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Identifier of the output turn associated with the event, if applicable"
+        },
+        "eventType": {
+          "type": "string",
+          "enum": [
+            "message",
+            "classification",
+            "transformation",
+            "action",
+            "command",
+            "tool_call",
+            "conversation_start",
+            "conversation_resume",
+            "conversation_end",
+            "conversation_aborted",
+            "conversation_failed",
+            "jump_to_stage",
+            "moderation"
+          ],
+          "description": "Type of the conversation event"
+        },
+        "eventData": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "originalText": {
+                  "type": "string"
+                },
+                "visibility": {
+                  "type": "object",
+                  "properties": {
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "always",
+                        "stage",
+                        "never",
+                        "conditional"
+                      ],
+                      "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Condition for visibility, evaluated against conversation variables"
+                    }
+                  },
+                  "required": [
+                    "visibility"
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "role",
+                "text",
+                "originalText"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "classifierId": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "string"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "classifierId": {
+                        "type": "string"
+                      },
+                      "classifierName": {
+                        "type": "string"
+                      },
+                      "actions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "parameters": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "$ref": "#/definitions/ParameterValue"
+                              }
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "parameters"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "classifierId",
+                      "classifierName",
+                      "actions"
+                    ]
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "classifierId",
+                "input",
+                "actions"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "transformerId": {
+                  "type": "string"
+                },
+                "input": {
+                  "type": "string"
+                },
+                "appliedFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "transformerId",
+                "input",
+                "appliedFields"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "actionName": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Effect"
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "actionName",
+                "stageId",
+                "effects"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "enum": [
+                    "go_to_stage",
+                    "set_var",
+                    "get_var",
+                    "get_all_vars",
+                    "run_action",
+                    "call_tool"
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "command"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "toolId": {
+                  "type": "string"
+                },
+                "toolName": {
+                  "type": "string"
+                },
+                "toolType": {
+                  "type": "string",
+                  "enum": [
+                    "smart_function",
+                    "webhook",
+                    "script"
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  }
+                },
+                "success": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "nullable": true
+                },
+                "error": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "toolId",
+                "toolName",
+                "parameters",
+                "success"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "stageId": {
+                  "type": "string"
+                },
+                "initialVariables": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "stageId"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "previousStatus": {
+                  "type": "string",
+                  "enum": [
+                    "initialized",
+                    "awaiting_user_input",
+                    "receiving_user_voice",
+                    "processing_user_input",
+                    "generating_response",
+                    "finished",
+                    "aborted",
+                    "failed"
+                  ]
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "previousStatus",
+                "stageId"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "stageId"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "reason",
+                "stageId"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                },
+                "stageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "reason"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "fromStageId": {
+                  "type": "string"
+                },
+                "toStageId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "fromStageId",
+                "toStageId"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "string"
+                },
+                "flagged": {
+                  "type": "boolean"
+                },
+                "blockingCategories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "detectedCategories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "durationMs": {
+                  "type": "number"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "input",
+                "flagged",
+                "blockingCategories",
+                "detectedCategories",
+                "durationMs"
+              ]
+            }
+          ],
+          "description": "Data associated with the conversation event"
+        }
+      },
+      "required": [
+        "type",
+        "sessionId",
+        "conversationId",
+        "eventType",
+        "eventData"
       ]
     },
     "start-user-voice-input-request": {

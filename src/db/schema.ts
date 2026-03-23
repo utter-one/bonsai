@@ -31,6 +31,8 @@ export const conversations = pgTable('conversations', {
   userId: text('user_id').notNull(),
   clientId: text('client_id').notNull(),
   stageId: text('stage_id').notNull(),
+  startingStageId: text('starting_stage_id'),
+  endingStageId: text('ending_stage_id'),
   stageVars: jsonb('stage_vars').$type<Record<string, Record<string, any>>>(),
   status: text('status').notNull().$type<ConversationState>().default('initialized'),
   statusDetails: text('status_reason').default(null),
@@ -97,6 +99,7 @@ export const projects = pgTable('projects', {
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   timezone: text('timezone'),
+  languageCode: text('language_code'),
   autoCreateUsers: boolean('auto_create_users').notNull().default(false),
   userProfileVariableDescriptors: jsonb('user_profile_variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
   defaultGuardrailClassifierId: text('default_guardrail_classifier_id'),
@@ -180,6 +183,7 @@ export const contextTransformers = pgTable('context_transformers', {
 
 export type ToolInputType = 'text' | 'image' | 'multi-modal';
 export type ToolOutputType = 'text' | 'image' | 'multi-modal';
+export type ToolType = 'smart_function' | 'webhook' | 'script';
 
 // Tool table
 export const tools = pgTable('tools', {
@@ -187,11 +191,20 @@ export const tools = pgTable('tools', {
   projectId: text('project_id').notNull().references(() => projects.id),
   name: text('name').notNull(),
   description: text('description'),
-  prompt: text('prompt').notNull(),
+  type: text('type').$type<ToolType>().notNull().default('smart_function'),
+  // smart_function fields
+  prompt: text('prompt'),
   llmProviderId: text('llm_provider_id'),
   llmSettings: jsonb('llm_settings').$type<LlmSettings>(),
-  inputType: text('input_type').$type<ToolInputType>().notNull(),
-  outputType: text('output_type').$type<ToolOutputType>().notNull(),
+  inputType: text('input_type').$type<ToolInputType>(),
+  outputType: text('output_type').$type<ToolOutputType>(),
+  // webhook fields
+  url: text('url'),
+  webhookMethod: text('webhook_method'),
+  webhookHeaders: jsonb('webhook_headers').$type<Record<string, string>>(),
+  webhookBody: text('webhook_body'),
+  // script fields
+  code: text('code'),
   parameters: jsonb('parameters').notNull().default([]).$type<ToolParameter[]>(),
   tags: jsonb('tags').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),

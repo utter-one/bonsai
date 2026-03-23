@@ -27,6 +27,7 @@ import {
   endConversationRequestSchema,
   endConversationResponseSchema,
   conversationEventMessageSchema,
+  conversationEventUpdateMessageSchema,
 } from '../websocket/contracts/session';
 
 import {
@@ -96,6 +97,7 @@ function generateWebSocketSchemas(): void {
   registry.register('end-conversation-request', endConversationRequestSchema);
   registry.register('end-conversation-response', endConversationResponseSchema);
   registry.register('conversation-event', conversationEventMessageSchema);
+  registry.register('conversation-event-update', conversationEventUpdateMessageSchema);
   registry.register('start-user-voice-input-request', startUserVoiceInputRequestSchema);
   registry.register('start-user-voice-input-response', startUserVoiceInputResponseSchema);
   registry.register('send-user-voice-chunk-request', sendUserVoiceChunkRequestSchema);

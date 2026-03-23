@@ -15,5 +15,10 @@ By contributing, you agree that your contributions will be licensed under the **
 - Add logging for production-facing changes
 - Keep configuration backwards-compatible when possible
 
+## Branches & Versions
+- We create PRs to `dev` branch
+- `main` branch is where the production code lives
+- For each public release there's a version tag: `vX.Y.Z`
+
 ## Code of conduct
 Be respectful. Assume good intent. We want a welcoming community.

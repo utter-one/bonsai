@@ -14,7 +14,7 @@ import { conversationResponseSchema, conversationListResponseSchema, conversatio
 import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './http/contracts/stage';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './http/contracts/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
-import { createToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema } from './http/contracts/tool';
+import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
@@ -25,7 +25,7 @@ import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema } fro
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { asrConfigSchema } from './http/contracts/project';
-import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, runScriptEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, callWebhookEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema } from './types/actions';
+import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, changeVisibilityEffectSchema } from './types/actions';
 import { fieldDescriptorSchema } from './types/parameters';
 import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
@@ -80,6 +80,8 @@ import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
 import { MigrationController } from './http/controllers/MigrationController';
 import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
+import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
+import { providerHintSchema, providerHintResolutionTargetSchema, providerHintResolutionSchema, asrConfigExchangeV1Schema, storageConfigExchangeV1Schema, moderationConfigExchangeV1Schema, fillerSettingsExchangeV1Schema, projectExchangeV1Schema, agentExchangeV1Schema, stageExchangeV1Schema, classifierExchangeV1Schema, contextTransformerExchangeV1Schema, toolExchangeV1Schema, globalActionExchangeV1Schema, guardrailExchangeV1Schema, knowledgeCategoryExchangeV1Schema, knowledgeItemExchangeV1Schema, projectExchangeBundleV1Schema, projectExchangeImportResultSchema } from './http/contracts/projectExchange';
 
 extendZodWithOpenApi(z);
 
@@ -153,14 +155,13 @@ export function getOpenAPISpec(): any {
   registry.register('EndConversationEffect', endConversationEffectSchema);
   registry.register('AbortConversationEffect', abortConversationEffectSchema);
   registry.register('GoToStageEffect', goToStageEffectSchema);
-  registry.register('RunScriptEffect', runScriptEffectSchema);
   registry.register('ModifyUserInputEffect', modifyUserInputEffectSchema);
   registry.register('ModifyVariablesEffect', modifyVariablesEffectSchema);
   registry.register('ModifyUserProfileEffect', modifyUserProfileEffectSchema);
+  registry.register('ChangeVisibilityEffect', changeVisibilityEffectSchema);
   registry.register('VariableOperation', variableOperationSchema);
   registry.register('UserProfileOperation', userProfileOperationSchema);
   registry.register('CallToolEffect', callToolEffectSchema);
-  registry.register('CallWebhookEffect', callWebhookEffectSchema);
   registry.register('GenerateResponseEffect', generateResponseEffectSchema);
   registry.register('Effect', effectSchema);
   registry.register('StageActionParameter', stageActionParameterSchema);
@@ -228,6 +229,10 @@ export function getOpenAPISpec(): any {
   registry.register('DeleteContextTransformerRequest', deleteContextTransformerBodySchema);
   registry.register('ContextTransformerResponse', contextTransformerResponseSchema);
   registry.register('ContextTransformerListResponse', contextTransformerListResponseSchema);
+  registry.register('CreateSmartFunctionTool', createSmartFunctionToolSchema);
+  registry.register('CreateWebhookTool', createWebhookToolSchema);
+  registry.register('CreateScriptTool', createScriptToolSchema);
+  registry.register('ToolType', toolTypeSchema);
   registry.register('CreateToolRequest', createToolSchema);
   registry.register('UpdateToolRequest', updateToolBodySchema);
   registry.register('DeleteToolRequest', deleteToolBodySchema);
@@ -425,6 +430,31 @@ export function getOpenAPISpec(): any {
   registry.register('ExportBundle', exportBundleSchema);
   const migrationPaths = MigrationController.getOpenAPIPaths();
   for (const path of migrationPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Project Exchange schemas and routes
+  registry.register('ProviderHint', providerHintSchema);
+  registry.register('ProviderHintResolutionTarget', providerHintResolutionTargetSchema);
+  registry.register('ProviderHintResolution', providerHintResolutionSchema);
+  registry.register('AsrConfigExchangeV1', asrConfigExchangeV1Schema);
+  registry.register('StorageConfigExchangeV1', storageConfigExchangeV1Schema);
+  registry.register('ModerationConfigExchangeV1', moderationConfigExchangeV1Schema);
+  registry.register('FillerSettingsExchangeV1', fillerSettingsExchangeV1Schema);
+  registry.register('ProjectExchangeV1', projectExchangeV1Schema);
+  registry.register('AgentExchangeV1', agentExchangeV1Schema);
+  registry.register('StageExchangeV1', stageExchangeV1Schema);
+  registry.register('ClassifierExchangeV1', classifierExchangeV1Schema);
+  registry.register('ContextTransformerExchangeV1', contextTransformerExchangeV1Schema);
+  registry.register('ToolExchangeV1', toolExchangeV1Schema);
+  registry.register('GlobalActionExchangeV1', globalActionExchangeV1Schema);
+  registry.register('GuardrailExchangeV1', guardrailExchangeV1Schema);
+  registry.register('KnowledgeCategoryExchangeV1', knowledgeCategoryExchangeV1Schema);
+  registry.register('KnowledgeItemExchangeV1', knowledgeItemExchangeV1Schema);
+  registry.register('ProjectExchangeBundleV1', projectExchangeBundleV1Schema);
+  registry.register('ProjectExchangeImportResult', projectExchangeImportResultSchema);
+  const projectExchangePaths = ProjectExchangeController.getOpenAPIPaths();
+  for (const path of projectExchangePaths) {
     registry.registerPath(path);
   }
 

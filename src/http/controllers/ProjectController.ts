@@ -196,6 +196,22 @@ export class ProjectController {
           400: { description: 'Project is not archived' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/projects/{id}/audit-logs',
+        tags: ['Projects'],
+        summary: 'Get project audit logs',
+        description: 'Retrieves audit logs for a specific project',
+        request: {
+          params: projectIdParamSchema,
+        },
+        responses: {
+          200: {
+            description: 'Audit logs retrieved successfully',
+          },
+          404: { description: 'Project not found' },
+        },
+      },
     ];
   }
 
@@ -210,6 +226,7 @@ export class ProjectController {
     router.delete('/api/projects/:id', asyncHandler(this.deleteProject.bind(this)));
     router.post('/api/projects/:id/archive', asyncHandler(this.archiveProject.bind(this)));
     router.post('/api/projects/:id/unarchive', asyncHandler(this.unarchiveProject.bind(this)));
+    router.get('/api/projects/:id/audit-logs', asyncHandler(this.getProjectAuditLogs.bind(this)));
   }
 
   /**
@@ -292,5 +309,16 @@ export class ProjectController {
     const body = archiveProjectSchema.parse(req.body);
     const project = await this.projectService.unarchiveProject(params.id, body as ArchiveProjectRequest, req.context);
     res.status(200).json(project);
+  }
+
+  /**
+   * GET /api/projects/:id/audit-logs
+   * Get audit logs for a project
+   */
+  private async getProjectAuditLogs(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
+    const params = projectRouteParamsSchema.parse(req.params);
+    const auditLogs = await this.projectService.getProjectAuditLogs(params.id);
+    res.status(200).json(auditLogs);
   }
 }

@@ -55,6 +55,7 @@ Content-Type: application/json
 |--------|-------------|
 | `400` | Invalid request body |
 | `401` | Invalid credentials |
+| `429` | Too many login attempts — rate limit exceeded |
 
 ## Using the Token
 
@@ -105,6 +106,34 @@ Content-Type: application/json
 |--------|-------------|
 | `400` | Invalid request body |
 | `401` | Invalid or expired refresh token |
+| `429` | Too many requests — rate limit exceeded |
+
+## Rate Limiting
+
+Authentication endpoints are protected by IP-based rate limiting to prevent brute-force attacks.
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| `POST /api/auth/login` | 10 requests per IP | 15 minutes |
+| `POST /api/auth/refresh` | 10 requests per IP | 15 minutes |
+
+When the limit is exceeded, the server responds with `429 Too Many Requests`:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 847
+Content-Type: application/json
+```
+
+```json
+{
+  "error": "Too many login attempts, please try again later"
+}
+```
+
+The `Retry-After` header indicates the number of seconds to wait before retrying.
+
+Limits are configurable via environment variables — see `RATE_LIMIT_AUTH_WINDOW_MS` and `RATE_LIMIT_AUTH_MAX` in the deployment configuration.
 
 ## API Keys
 

@@ -98,3 +98,13 @@ export class ContentModerationError extends Error {
     this.name = 'ContentModerationError';
   }
 }
+
+/**
+ * Error thrown when a rate limit has been exceeded
+ */
+export class TooManyRequestsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TooManyRequestsError';
+  }
+}
