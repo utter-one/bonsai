@@ -120,7 +120,7 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
     this.textBuffer = '';
     this.requestQueue = Promise.resolve();
 
-    this.audioFormat = this.resolveAudioFormat(this.settings.audioFormat);
+    this.audioFormat = this.resolveAudioFormat(this.preferredOutputFormat ?? this.settings.audioFormat);
 
     const useSentenceSplitter = this.settings.useSentenceSplitter ?? false;
     if (useSentenceSplitter) {
@@ -335,7 +335,7 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
    * @param requestedFormat Optional requested audio format
    * @returns Supported audio format to use for output
    */
-  private resolveAudioFormat(requestedFormat?: AmazonPollyTtsSettings['audioFormat']): AudioFormat {
+  private resolveAudioFormat(requestedFormat?: AudioFormat): AudioFormat {
     if (!requestedFormat) {
       return 'pcm_16000';
     }

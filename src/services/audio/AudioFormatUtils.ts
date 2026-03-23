@@ -1,12 +1,12 @@
 import type { AudioFormat } from '../../types/audio';
 import type { ConverterTier } from './IAudioConverter';
 
-const PCM_FORMATS = new Set<AudioFormat>(['pcm_8000', 'pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'pcm_48000', 'linear16']);
+const PCM_FORMATS = new Set<AudioFormat>(['pcm_8000', 'pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'pcm_48000']);
 const G711_FORMATS = new Set<AudioFormat>(['mulaw', 'alaw']);
 
 /**
  * Returns true if the given format is a raw 16-bit signed LE PCM format.
- * All pcm_* variants and linear16 qualify.
+ * All pcm_* variants qualify.
  */
 export function isPcmFormat(format: AudioFormat): boolean {
   return PCM_FORMATS.has(format);
@@ -27,7 +27,6 @@ export function pcmSampleRate(format: AudioFormat): number {
   switch (format) {
     case 'pcm_8000': return 8000;
     case 'pcm_16000': return 16000;
-    case 'linear16': return 16000;
     case 'pcm_22050': return 22050;
     case 'pcm_24000': return 24000;
     case 'pcm_44100': return 44100;

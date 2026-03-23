@@ -130,7 +130,7 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
     }
 
     // Resolve audio format
-    this.audioFormat = this.resolveAudioFormat(this.settings.audioFormat);
+    this.audioFormat = this.resolveAudioFormat(this.preferredOutputFormat ?? this.settings.audioFormat);
 
     // Map audio format to Azure's output format enum
     this.speechConfig.speechSynthesisOutputFormat = this.mapAudioFormatToAzure(this.audioFormat);

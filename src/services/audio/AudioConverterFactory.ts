@@ -7,6 +7,7 @@ import { SpeexPcmResampler } from './SpeexPcmResampler';
 import { OpusConverter } from './OpusConverter';
 import { G711Converter } from './G711Converter';
 import { FfmpegAudioConverter } from './FfmpegAudioConverter';
+import logger from '../../utils/logger';
 
 /**
  * A no-op converter for identical format pairs.
@@ -31,6 +32,7 @@ export class AudioConverterFactory {
    */
   static async create(from: AudioFormat, to: AudioFormat): Promise<IAudioConverter> {
     const tier = selectConverterTier(from, to);
+    logger.info(`Creating audio converter: ${from} → ${to} (tier: ${tier})`);
 
     switch (tier) {
       case 'passthrough':

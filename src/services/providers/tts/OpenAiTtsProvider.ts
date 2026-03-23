@@ -107,7 +107,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
       this.sentenceSplitter = null;
     }
 
-    this.audioFormat = this.resolveAudioFormat(this.settings.audioFormat);
+    this.audioFormat = this.resolveAudioFormat(this.preferredOutputFormat ?? this.settings.audioFormat);
 
     logger.info(`[OpenAI TTS] Starting speech generation with model: ${effectiveModel}, voice: ${effectiveVoice}, speed: ${effectiveSpeed}, audioFormat: ${this.audioFormat}`);
 

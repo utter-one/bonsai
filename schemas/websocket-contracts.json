@@ -282,8 +282,7 @@
                 "pcm_44100",
                 "pcm_48000",
                 "mulaw",
-                "alaw",
-                "linear16"
+                "alaw"
               ],
               "default": "pcm_16000",
               "description": "Audio format the client sends for voice input (e.g. pcm_16000, opus, mulaw). Defaults to pcm_16000."
@@ -303,8 +302,7 @@
                 "pcm_44100",
                 "pcm_48000",
                 "mulaw",
-                "alaw",
-                "linear16"
+                "alaw"
               ],
               "default": "pcm_16000",
               "description": "Preferred audio format for AI voice output. Omit to receive the provider native format without conversion. Defaults to pcm_16000."
@@ -442,8 +440,7 @@
             "pcm_44100",
             "pcm_48000",
             "mulaw",
-            "alaw",
-            "linear16"
+            "alaw"
           ],
           "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
         }
@@ -3496,8 +3493,7 @@
             "pcm_44100",
             "pcm_48000",
             "mulaw",
-            "alaw",
-            "linear16"
+            "alaw"
           ],
           "description": "Encoding of audioData"
         },
@@ -3717,8 +3713,7 @@
             "pcm_44100",
             "pcm_48000",
             "mulaw",
-            "alaw",
-            "linear16"
+            "alaw"
           ],
           "description": "Encoding of audioData"
         },
