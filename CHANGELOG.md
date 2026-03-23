@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
 - **`toolType` field** in WebSocket tool call events, identifying the execution variant that was invoked.
 - **`version` field** in `GET /api/version` response — returns the semver from `package.json`. Non-production builds also include a version suffix.
 - Audit log entries for several previously untracked entity lifecycle events.
+- **Project `conversationTimeoutSeconds`** field — when set to a positive integer, a background service running every minute automatically aborts active conversations that have been inactive for longer than the configured threshold. Set to `0` or `null` to disable.
+- **`startingStageId` and `endingStageId`** fields on conversations — record the stage the conversation began on and the stage it was in when it reached a terminal state (finished, failed, or aborted).
 
 ### Fixed
 
