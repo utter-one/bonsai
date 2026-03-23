@@ -34,6 +34,12 @@ import { KnowledgeService } from "../KnowledgeService";
 import { ModerationService } from "../ModerationService";
 import type { FaqItem } from "./ConversationContextBuilder";
 import type { AgentResponse } from "../../http/contracts/agent";
+import type { IAudioConverter } from '../audio/IAudioConverter';
+import type { AudioFormat } from '../../types/audio';
+import { AudioConverterFactory } from '../audio/AudioConverterFactory';
+
+/** Buffer holding the last converted audio chunk, used by the last-chunk-buffer pattern. */
+type PendingOutboundChunk = { chunkId: string; ordinal: number; audio: Buffer };
 
 export type ClassifierRuntimeData = {
   classifier: Classifier;
@@ -121,6 +127,15 @@ export class ConversationRunner {
   private conversationLifecycleActions: Map<string, GlobalAction> = new Map();
   /** Visibility override for the current turn's messages, set by change_visibility effects */
   private turnMessageVisibility: MessageVisibility | undefined = undefined;
+
+  /** Session-scoped inbound converter: client audio format → ASR input format. Null when no conversion is needed. */
+  private inboundConverter: IAudioConverter | null = null;
+  /** Session-scoped outbound converter: TTS native format → client preferred format. Null when no conversion is needed. */
+  private outboundConverter: IAudioConverter | null = null;
+  /** Sequential ordinal for outbound converted chunks; reset at the start of each TTS turn. */
+  private outboundOrdinalCounter = 0;
+  /** Last-chunk buffer for the outbound converter pathway; ensures isFinal is only applied to the terminal chunk. */
+  private outboundPendingChunk: PendingOutboundChunk | null = null;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsStartMs: null, turnIndex: 0 };
@@ -450,6 +465,9 @@ export class ConversationRunner {
         });
 
         logger.info({ conversationId }, `ASR provider initialized for conversation ${conversationId}`);
+
+        // Set up inbound audio converter (client send format → ASR input format)
+        await this.setupInboundConverter(asrProvider, conversationId);
       } catch (error) {
         logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to initialize ASR provider for conversation ${conversationId}`);
         throw error;
@@ -460,6 +478,15 @@ export class ConversationRunner {
     if (ttsProvider) {
       try {
         await ttsProvider.init();
+
+        // Negotiate TTS output format with the client's preference (must happen before start())
+        const { receiveAudioFormat } = this.session.sessionSettings;
+        const ttsNativeFormat = receiveAudioFormat
+          ? ttsProvider.setPreferredOutputFormat(receiveAudioFormat)
+          : ttsProvider.getSupportedFormats()[0];
+
+        // Set up outbound audio converter (TTS native format → client preferred format) if there is a gap
+        await this.setupOutboundConverter(ttsNativeFormat, receiveAudioFormat ?? ttsNativeFormat, conversationId);
 
         let firstTtsChunkGenerated = false;
         let isGenerating = false;
@@ -520,29 +547,42 @@ export class ConversationRunner {
           if (!firstTtsChunkGenerated) {
             logger.info({ conversationId, chunkId: chunk.chunkId }, `First TTS chunk generated for conversation ${conversationId}`);
             firstTtsChunkGenerated = true;
+            // Reset per-turn outbound converter state on first chunk of each TTS turn
+            this.outboundConverter?.reset();
+            this.outboundOrdinalCounter = 0;
+            this.outboundPendingChunk = null;
             // Record the timestamp of the first audio chunk if not already captured
             if (this.turnData.firstAudioMs === null) {
               this.turnData.firstAudioMs = Date.now();
             }
           }
 
-          // Send TTS audio chunk to client through channel
-          const voiceChunkMessage: CALSendAiVoiceChunkMessage = {
-            type: 'send_ai_voice_chunk',
-            conversationId,
-            outputTurnId: this.turnData.outputTurnId,
-            audioData: chunk.audio,
-            audioFormat: chunk.audioFormat,
-            chunkId: chunk.chunkId,
-            ordinal: chunk.ordinal,
-            isFinal: chunk.isFinal,
-          };
-          await this.channel.sendMessage(voiceChunkMessage);
-          logger.debug({ conversationId, chunkId: chunk.chunkId, ordinal: chunk.ordinal, isFinal: chunk.isFinal }, `TTS chunk generated for conversation ${conversationId}`);
+          if (this.outboundConverter) {
+            // Converter path: push audio into the converter; it emits 'data' for each output chunk
+            this.outboundConverter.push(chunk.audio);
+            if (chunk.isFinal) {
+              this.outboundConverter.end();
+            }
+            logger.debug({ conversationId, chunkId: chunk.chunkId, ordinal: chunk.ordinal, isFinal: chunk.isFinal }, `TTS chunk pushed to outbound converter for conversation ${conversationId}`);
+          } else {
+            // Direct path: no conversion needed — send straight to the client
+            const voiceChunkMessage: CALSendAiVoiceChunkMessage = {
+              type: 'send_ai_voice_chunk',
+              conversationId,
+              outputTurnId: this.turnData.outputTurnId,
+              audioData: chunk.audio,
+              audioFormat: chunk.audioFormat,
+              chunkId: chunk.chunkId,
+              ordinal: chunk.ordinal,
+              isFinal: chunk.isFinal,
+            };
+            await this.channel.sendMessage(voiceChunkMessage);
+            logger.debug({ conversationId, chunkId: chunk.chunkId, ordinal: chunk.ordinal, isFinal: chunk.isFinal }, `TTS chunk generated for conversation ${conversationId}`);
 
-          if (chunk.isFinal) {
-            logger.info({ conversationId }, `TTS generation completed for conversation ${conversationId}`);
-            firstTtsChunkGenerated = false;
+            if (chunk.isFinal) {
+              logger.info({ conversationId }, `TTS generation completed for conversation ${conversationId}`);
+              firstTtsChunkGenerated = false;
+            }
           }
         });
 
@@ -824,6 +864,8 @@ export class ConversationRunner {
 
     try {
       this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
+      // Reset the inbound converter state for this new turn (reuses the session-scoped instance)
+      this.inboundConverter?.reset();
       await this.stageData.asrProvider.start();
       await this.changeState('receiving_user_voice');
       logger.info({ conversationId: this.stageData.conversation.id }, `Started voice input for conversation ${this.stageData.conversation.id}`);
@@ -852,7 +894,12 @@ export class ConversationRunner {
     }
 
     try {
-      await this.stageData.asrProvider.sendAudio(voiceData);
+      if (this.inboundConverter) {
+        // Route through the inbound converter; the converter's 'data' handler forwards to ASR
+        this.inboundConverter.push(voiceData);
+      } else {
+        await this.stageData.asrProvider.sendAudio(voiceData);
+      }
       logger.debug({ conversationId: this.stageData.conversation.id, bufferSize: voiceData.length }, `Sent ${voiceData.length} bytes of audio data for conversation ${this.stageData.conversation.id}`);
     } catch (error) {
       const errorMessage = `Failed to process voice data: ${error instanceof Error ? error.message : String(error)}`;
@@ -877,6 +924,8 @@ export class ConversationRunner {
     }
 
     try {
+      // Signal end of input to the inbound converter so it can flush any buffered data to ASR
+      this.inboundConverter?.end();
       await this.stageData.asrProvider.stop();
       await this.changeState('processing_user_input');
 
@@ -920,6 +969,12 @@ export class ConversationRunner {
         logger.error({ conversationId, error: error instanceof Error ? error.message : String(error) }, `Failed to clean up ${label} for conversation ${conversationId}`);
       }
     };
+
+    // Destroy session-scoped audio converters
+    this.inboundConverter?.destroy();
+    this.inboundConverter = null;
+    this.outboundConverter?.destroy();
+    this.outboundConverter = null;
 
     if (this.stageData) {
       await cleanupProvider(this.stageData.asrProvider, 'ASR provider');
@@ -1365,6 +1420,100 @@ export class ConversationRunner {
 
     logger.debug({ conversationId, hasModifiedVars: outcome.hasModifiedVars, hasModifiedUserInput: outcome.hasModifiedUserInput, hasModifiedUserProfile: outcome.hasModifiedUserProfile, shouldEndConversation: outcome.shouldEndConversation, shouldAbortConversation: outcome.shouldAbortConversation }, `Action outcome applied successfully`);
     return true;
+  }
+
+  /**
+   * Sets up the inbound audio converter from the client's declared send format to the ASR provider's
+   * expected input format. A null converter means the formats match and no conversion is needed.
+   * @param asrProvider The initialized ASR provider
+   * @param conversationId For log context
+   */
+  private async setupInboundConverter(asrProvider: import('../providers/asr/IAsrProvider').IAsrProvider, conversationId: string): Promise<void> {
+    const sendFormat: AudioFormat = this.session.sessionSettings.sendAudioFormat;
+    const asrFormat = asrProvider.getSupportedInputFormats()[0];
+
+    if (sendFormat === asrFormat) {
+      logger.debug({ conversationId, sendFormat, asrFormat }, `Inbound audio formats match (${sendFormat}), no converter needed`);
+      return;
+    }
+
+    logger.info({ conversationId, sendFormat, asrFormat }, `Creating inbound audio converter: ${sendFormat} → ${asrFormat}`);
+    this.inboundConverter = await AudioConverterFactory.create(sendFormat, asrFormat);
+
+    this.inboundConverter.on('data', async (chunk: Buffer) => {
+      await asrProvider.sendAudio(chunk);
+    });
+
+    this.inboundConverter.on('error', async (err: Error) => {
+      logger.error({ conversationId, error: err.message }, `Inbound audio converter error for conversation ${conversationId}: ${err.message}`);
+      await this.markAsFailed(`Inbound audio converter error: ${err.message}`);
+    });
+  }
+
+  /**
+   * Sets up the outbound audio converter from the TTS provider's native output format to the
+   * client's preferred receive format. Applies the last-chunk-buffer pattern so isFinal is
+   * correctly propagated even when the converter emits more than one output chunk.
+   * A null converter means the formats match and no conversion is needed.
+   * @param ttsNativeFormat The format the TTS provider will actually produce
+   * @param clientFormat The format the client wants to receive
+   * @param conversationId For log context
+   */
+  private async setupOutboundConverter(ttsNativeFormat: AudioFormat, clientFormat: AudioFormat, conversationId: string): Promise<void> {
+    if (ttsNativeFormat === clientFormat) {
+      logger.debug({ conversationId, ttsNativeFormat, clientFormat }, `Outbound audio formats match (${ttsNativeFormat}), no converter needed`);
+      return;
+    }
+
+    logger.info({ conversationId, ttsNativeFormat, clientFormat }, `Creating outbound audio converter: ${ttsNativeFormat} → ${clientFormat}`);
+    this.outboundConverter = await AudioConverterFactory.create(ttsNativeFormat, clientFormat);
+
+    this.outboundConverter.on('data', async (audioData: Buffer) => {
+      // Last-chunk-buffer: send the previously buffered chunk as non-final before buffering the new one
+      const pending = this.outboundPendingChunk;
+      if (pending) {
+        const msg: CALSendAiVoiceChunkMessage = {
+          type: 'send_ai_voice_chunk',
+          conversationId,
+          outputTurnId: this.turnData.outputTurnId,
+          audioData: pending.audio,
+          audioFormat: clientFormat,
+          chunkId: pending.chunkId,
+          ordinal: pending.ordinal,
+          isFinal: false,
+        };
+        await this.channel.sendMessage(msg);
+        logger.debug({ conversationId, chunkId: pending.chunkId, ordinal: pending.ordinal }, `Outbound converter chunk sent for conversation ${conversationId}`);
+      }
+      this.outboundPendingChunk = {
+        chunkId: generateId(ID_PREFIXES.CHUNK),
+        ordinal: this.outboundOrdinalCounter++,
+        audio: audioData,
+      };
+    });
+
+    this.outboundConverter.on('end', async () => {
+      // Flush the last buffered chunk with isFinal: true
+      if (this.outboundPendingChunk) {
+        const msg: CALSendAiVoiceChunkMessage = {
+          type: 'send_ai_voice_chunk',
+          conversationId,
+          outputTurnId: this.turnData.outputTurnId,
+          audioData: this.outboundPendingChunk.audio,
+          audioFormat: clientFormat,
+          chunkId: this.outboundPendingChunk.chunkId,
+          ordinal: this.outboundPendingChunk.ordinal,
+          isFinal: true,
+        };
+        await this.channel.sendMessage(msg);
+        logger.debug({ conversationId, chunkId: this.outboundPendingChunk.chunkId }, `Final outbound converter chunk sent for conversation ${conversationId}`);
+        this.outboundPendingChunk = null;
+      }
+    });
+
+    this.outboundConverter.on('error', (err: Error) => {
+      logger.error({ conversationId, error: err.message }, `Outbound audio converter error for conversation ${conversationId}: ${err.message}`);
+    });
   }
 
   /**

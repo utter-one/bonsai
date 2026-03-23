@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { baseInputMessageSchema, baseOutputMessageSchema } from './common';
 import { asrConfigSchema } from '../../../http/contracts/project';
+import { audioFormatSchema } from '../../../types/audio';
 
 export const sessionSettingsSchema = z.object({
   sendVoiceInput: z.boolean().optional().default(true).describe('Whether the client can send voice input'),
@@ -8,6 +9,8 @@ export const sessionSettingsSchema = z.object({
   receiveVoiceOutput: z.boolean().optional().default(true).describe('Whether the client wants to receive voice output'),
   receiveTranscriptionUpdates: z.boolean().optional().default(true).describe('Whether the client wants to receive intermediate transcription updates for voice input and output'),
   receiveEvents: z.boolean().optional().default(true).describe('Whether the client wants to receive all conversation events (e.g. turn start/end, agent actions)'),
+  sendAudioFormat: audioFormatSchema.optional().default('pcm_16000').describe('Audio format the client sends for voice input (e.g. pcm_16000, opus, mulaw). Defaults to pcm_16000.'),
+  receiveAudioFormat: audioFormatSchema.optional().default('pcm_16000').describe('Preferred audio format for AI voice output. Omit to receive the provider native format without conversion. Defaults to pcm_16000.'),
 });
 
 export type SessionSettings = z.infer<typeof sessionSettingsSchema>;

@@ -29,6 +29,12 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
   protected config: TConfig;
 
   /**
+   * The negotiated output format set by setPreferredOutputFormat().
+   * Subclasses should use this when configuring audio generation in start().
+   */
+  protected preferredOutputFormat?: AudioFormat;
+
+  /**
    * Creates a new TTS provider base instance
    * @param config Provider-specific configuration
    */
@@ -66,6 +72,21 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
    * @param text The text content to be converted to speech
    */
   abstract sendText(text: string): Promise<void>;
+
+  /**
+   * Negotiates the TTS output format against the client's preference.
+   * Stores the resolved format in preferredOutputFormat for use in start().
+   * @param preferred The format the client wants to receive
+   * @returns The format this provider will actually produce
+   */
+  setPreferredOutputFormat(preferred: AudioFormat): AudioFormat {
+    const supported = this.getSupportedFormats();
+    if (supported.includes(preferred)) {
+      this.preferredOutputFormat = preferred;
+      return preferred;
+    }
+    return supported[0];
+  }
 
   /**
    * Registers a callback for when speech generation begins
