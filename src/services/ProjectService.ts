@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, SQL, desc, and, isNull, isNotNull } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
-import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, agents, conversations, issues } from '../db/schema';
+import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, agents, conversations, issues, users, guardrails } from '../db/schema';
 import type { CreateProjectRequest, UpdateProjectRequest, ProjectResponse, ProjectListResponse, ArchiveProjectRequest, ListProjectsQuery } from '../http/contracts/project';
 import { projectResponseSchema, projectListResponseSchema } from '../http/contracts/project';
 import { AuditService } from './AuditService';
@@ -295,7 +295,23 @@ export class ProjectService extends BaseService {
         }
         logger.debug({ projectId: id, count: conversationRecords.length }, 'Deleted conversations');
 
-        // 11. Delete issues
+        // 11. Delete users (must come after conversations due to composite FK from conversations to users)
+        const userRecords = await tx.query.users.findMany({ where: eq(users.projectId, id) });
+        for (const user of userRecords) {
+          await tx.delete(users).where(and(eq(users.projectId, id), eq(users.id, user.id)));
+          await this.auditService.logDelete('user', user.id, user, context?.operatorId, id);
+        }
+        logger.debug({ projectId: id, count: userRecords.length }, 'Deleted users');
+
+        // 12. Delete guardrails
+        const guardrailRecords = await tx.query.guardrails.findMany({ where: eq(guardrails.projectId, id) });
+        for (const guardrail of guardrailRecords) {
+          await tx.delete(guardrails).where(and(eq(guardrails.projectId, id), eq(guardrails.id, guardrail.id)));
+          await this.auditService.logDelete('guardrail', guardrail.id, guardrail, context?.operatorId, id);
+        }
+        logger.debug({ projectId: id, count: guardrailRecords.length }, 'Deleted guardrails');
+
+        // 13. Delete issues
         const issueRecords = await tx.query.issues.findMany({ where: eq(issues.projectId, id) });
         for (const issue of issueRecords) {
           await tx.delete(issues).where(and(eq(issues.projectId, id), eq(issues.id, issue.id)));
@@ -303,7 +319,7 @@ export class ProjectService extends BaseService {
         }
         logger.debug({ projectId: id, count: issueRecords.length }, 'Deleted issues');
 
-        // 12. Finally delete the project itself
+        // 14. Finally delete the project itself
         await tx.delete(projects).where(eq(projects.id, id));
         await this.auditService.logDelete('project', id, existingProject, context?.operatorId);
       });
