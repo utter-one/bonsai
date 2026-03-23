@@ -1,7 +1,7 @@
-import type { Session, SessionManager } from '../channels/SessionManager';
-import type { IClientConnection } from '../channels/IClientConnection';
-import type { CALOutputMessage } from '../channels/messages';
-import { logger } from '../utils/logger';
+import type { Session, SessionManager } from '../SessionManager';
+import type { IClientConnection } from '../IClientConnection';
+import type { CALOutputMessage } from '../messages';
+import { logger } from '../../utils/logger';
 
 /**
  * Encodes a binary audio frame for the audio DataChannel.

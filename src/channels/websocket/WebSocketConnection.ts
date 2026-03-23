@@ -1,8 +1,8 @@
 import { WebSocket } from 'ws';
-import type { Session, SessionManager } from '../channels/SessionManager';
-import type { IClientConnection } from '../channels/IClientConnection';
-import type { CALInputMessage, CALOutputMessage } from '../channels/messages';
-import { logger } from '../utils/logger';
+import type { Session, SessionManager } from '../SessionManager';
+import type { IClientConnection } from '../IClientConnection';
+import type { CALInputMessage, CALOutputMessage } from '../messages';
+import { logger } from '../../utils/logger';
 
 /**
  * WebSocket-backed implementation of {@link IClientConnection}.

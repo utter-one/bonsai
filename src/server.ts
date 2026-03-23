@@ -36,8 +36,8 @@ import { requestContextMiddleware } from './http/middleware/requestContext';
 import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
-import { WebSocketChannelHost } from './websocket/WebSocketChannelHost';
-import { WebRTCChannelHost } from './webrtc/WebRTCChannelHost';
+import { WebSocketChannelHost } from './channels/websocket/WebSocketChannelHost';
+import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 

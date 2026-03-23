@@ -7,7 +7,7 @@ import {
   calAiTranscribedChunkMessageSchema,
   calSendAiImageOutputMessageSchema,
   calSendAiAudioOutputMessageSchema,
-} from '../../channels/messages';
+} from '../../messages';
 
 /** Message indicating the start of AI voice output. */
 export const startAiGenerationOutputMessageSchema = calToWsOutput(calStartAiGenerationOutputMessageSchema);

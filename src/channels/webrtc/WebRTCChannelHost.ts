@@ -3,16 +3,16 @@ import { z } from 'zod';
 import type { Request, Response } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import wrtc from '@roamhq/wrtc';
-import { SessionManager } from '../channels/SessionManager';
-import type { Session } from '../channels/SessionManager';
-import { ChannelHandlerDispatcher } from '../channels/ChannelHandlerDispatcher';
-import { IpRateLimiter } from '../IpRateLimiter';
+import { SessionManager } from '../SessionManager';
+import type { Session } from '../SessionManager';
+import { ChannelHandlerDispatcher } from '../ChannelHandlerDispatcher';
+import { IpRateLimiter } from '../../IpRateLimiter';
 import { WebRTCConnection } from './WebRTCConnection';
-import { asyncHandler } from '../utils/asyncHandler';
+import { asyncHandler } from '../../utils/asyncHandler';
 import type { BaseInputMessage } from '../websocket/contracts/common';
-import type { CALInputMessage } from '../channels/messages';
-import type { ClientMessageHandlerContext } from '../channels/ClientMessageHandlerContext';
-import { logger } from '../utils/logger';
+import type { CALInputMessage } from '../messages';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { logger } from '../../utils/logger';
 
 const { RTCPeerConnection: NodeRTCPeerConnection } = wrtc as unknown as { RTCPeerConnection: typeof RTCPeerConnection };
 

@@ -9,7 +9,7 @@ import {
   calEndConversationResponseSchema,
   calConversationEventMessageSchema,
   calConversationEventUpdateMessageSchema,
-} from '../../channels/messages';
+} from '../../messages';
 
 /** Request to start a new conversation within a session. */
 export const startConversationRequestSchema = calToWsInput(calStartConversationRequestSchema);

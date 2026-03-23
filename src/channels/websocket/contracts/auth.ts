@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { baseInputMessageSchema, baseOutputMessageSchema } from './common';
-import { asrConfigSchema } from '../../http/contracts/project';
+import { asrConfigSchema } from '../../../http/contracts/project';
 
 export const sessionSettingsSchema = z.object({
   sendVoiceInput: z.boolean().optional().default(true).describe('Whether the client can send voice input'),

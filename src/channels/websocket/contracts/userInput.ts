@@ -9,7 +9,7 @@ import {
   calSendUserTextInputRequestSchema,
   calSendUserTextInputResponseSchema,
   calUserTranscribedChunkMessageSchema,
-} from '../../channels/messages';
+} from '../../messages';
 
 /** Request to start voice input from the user. */
 export const startUserVoiceInputRequestSchema = calToWsInput(calStartUserVoiceInputRequestSchema);

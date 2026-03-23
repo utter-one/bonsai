@@ -2,13 +2,13 @@ import { inject, singleton } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import type { IncomingMessage } from 'http';
-import { Session, SessionManager } from '../channels/SessionManager';
-import { ChannelHandlerDispatcher } from '../channels/ChannelHandlerDispatcher';
-import { IpRateLimiter } from '../IpRateLimiter';
-import { logger } from '../utils/logger';
+import { Session, SessionManager } from '../SessionManager';
+import { ChannelHandlerDispatcher } from '../ChannelHandlerDispatcher';
+import { IpRateLimiter } from '../../IpRateLimiter';
+import { logger } from '../../utils/logger';
 import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
-import type { CALInputMessage } from '../channels/messages';
-import type { ClientMessageHandlerContext } from '../channels/ClientMessageHandlerContext';
+import type { CALInputMessage } from '../messages';
+import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { WebSocketConnection } from './WebSocketConnection';
 
 /**

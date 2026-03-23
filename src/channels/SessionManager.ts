@@ -1,7 +1,7 @@
 import { singleton, container } from "tsyringe";
 import type { ConversationRunner } from "../services/live/ConversationRunner";
 import type { IClientConnection } from './IClientConnection';
-import { SessionSettings } from "../websocket/contracts/auth";
+import { SessionSettings } from "./websocket/contracts/auth";
 import { logger } from "../utils/logger";
 
 /** Data associated with an active WebSocket session. */

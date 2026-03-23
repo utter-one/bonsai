@@ -13,7 +13,7 @@ import {
   calRunActionResponseSchema,
   calCallToolRequestSchema,
   calCallToolResponseSchema,
-} from '../../channels/messages';
+} from '../../messages';
 
 /** Request to navigate to a specific stage in a conversation. */
 export const goToStageRequestSchema = calToWsInput(calGoToStageRequestSchema);

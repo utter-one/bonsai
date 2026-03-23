@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
-import type { AuthRequest, AuthResponse } from '../../websocket/contracts/auth';
+import type { AuthRequest, AuthResponse } from '../websocket/contracts/auth';
 import { SessionManager } from '../SessionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';
 import { ProjectService } from '../../services/ProjectService';
