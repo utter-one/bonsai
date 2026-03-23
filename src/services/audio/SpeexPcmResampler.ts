@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import SpeexResamplerClass from 'speex-resampler';
+import SpeexResamplerClass from './speexResampler';
 import type { IAudioConverter } from './IAudioConverter';
 import type { AudioFormat } from '../../types/audio';
 import { pcmSampleRate } from './AudioFormatUtils';
