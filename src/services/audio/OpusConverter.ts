@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import { OpusEncoder } from '@discordjs/opus';
 import SpeexResamplerClass from 'speex-resampler';
 import type { IAudioConverter } from './IAudioConverter';
 import type { AudioFormat } from '../../types/audio';
@@ -43,6 +42,7 @@ export class OpusConverter extends EventEmitter implements IAudioConverter {
 
     const pcmRate = pcmSampleRate(pcmFormat);
     // OpusEncoder handles both encode and decode in @discordjs/opus
+    const OpusEncoder = (await import('@discordjs/opus')).OpusEncoder;
     const codec = new OpusEncoder(OPUS_NATIVE_RATE, OPUS_CHANNELS);
     let resampler: any = null;
 

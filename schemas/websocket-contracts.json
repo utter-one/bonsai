@@ -306,7 +306,8 @@
                 "alaw",
                 "linear16"
               ],
-              "description": "Preferred audio format for AI voice output. Omit to receive the provider native format without conversion."
+              "default": "pcm_16000",
+              "description": "Preferred audio format for AI voice output. Omit to receive the provider native format without conversion. Defaults to pcm_16000."
             }
           },
           "description": "Session settings for the client"
