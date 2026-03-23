@@ -7,7 +7,7 @@ type WindowEntry = {
 };
 
 /**
- * In-memory rate limiter for WebSocket authentication attempts.
+ * In-memory rate limiter for WebSocket/WebRTC authentication attempts.
  * Uses a fixed-window counter keyed by client IP address.
  * Expired entries are periodically pruned to prevent unbounded memory growth.
  * Configurable via environment variables:

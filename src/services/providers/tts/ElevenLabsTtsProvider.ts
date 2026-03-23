@@ -25,7 +25,7 @@ export const elevenLabsTtsSettingsSchema = z.object({
   provider: z.literal('elevenlabs').describe('TTS provider type identifier'),
   model: z.string().optional().describe('Model ID to use for speech synthesis (e.g., "eleven_flash_v2_5", "eleven_multilingual_v2")'),
   voiceId: z.string().optional().describe('Voice UUID to use for speech synthesis'),
-  audioFormat: z.enum(['pcm_16000', 'pcm_22050', 'pcm_44100']).optional().describe('Preferred audio output format for synthesized speech'),
+  audioFormat: z.enum(['pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100']).optional().describe('Preferred audio output format for synthesized speech'),
   noSpeechMarkers: z.array(z.object({ start: z.string(), end: z.string() })).optional().describe('Markers to identify sections of text that should not be spoken'),
   removeExclamationMarks: z.boolean().optional().describe('Whether to replace exclamation marks with periods'),
   stability: z.number().min(0).max(1).nullable().optional().describe('Voice stability setting (0.0-1.0), defaults to 0.5'),
@@ -77,7 +77,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
    * Gets the list of supported audio output formats for ElevenLabs
    */
   getSupportedFormats(): AudioFormat[] {
-    return ['pcm_16000', 'pcm_22050', 'pcm_44100'];
+    return ['pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100'];
   }
 
   /**
