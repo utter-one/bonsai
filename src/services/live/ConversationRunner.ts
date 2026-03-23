@@ -1361,7 +1361,7 @@ export class ConversationRunner {
     if (outcome.shouldAbortConversation) {
       logger.info({ conversationId }, `Conversation marked for abortion by action execution`);
       await db.update(conversations)
-        .set({ status: 'aborted', updatedAt: new Date() })
+        .set({ status: 'aborted', endingStageId: this.stageData.id, updatedAt: new Date() })
         .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
       return false;
     }
@@ -1482,12 +1482,12 @@ export class ConversationRunner {
         const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
         const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context);
         await this.applyActionOutcome(context, executionOutcome);
-        const messageEventData: MessageEventData = { 
-          text: '[Content removed by moderation]', 
-          originalText: userInput, 
-          role: 'user', 
+        const messageEventData: MessageEventData = {
+          text: '[Content removed by moderation]',
+          originalText: userInput,
+          role: 'user',
           visibility: this.turnMessageVisibility,
-          metadata: { moderationDurationMs: this.turnData.moderationDurationMs } 
+          metadata: { moderationDurationMs: this.turnData.moderationDurationMs }
         };
         await this.saveAndSendEvent('message', messageEventData);
         await this.saveAndSendOutcomeEvents(executionOutcome);
@@ -1732,7 +1732,7 @@ export class ConversationRunner {
           reason: executionOutcome.endReason || 'Action execution completed conversation',
         };
         await this.saveAndSendEvent('conversation_end', eventData);
-        await this.changeState('finished');
+        await this.changeTerminalState('finished');
       }
     } else if (executionOutcome.shouldAbortConversation) {
       // Close the filler turn if it was opened but no response follows
@@ -1758,7 +1758,7 @@ export class ConversationRunner {
         reason: executionOutcome.abortReason || 'Conversation aborted by action',
       };
       await this.saveAndSendEvent('conversation_aborted', eventData);
-      await this.changeState('finished');
+      await this.changeTerminalState('finished');
     } else {
       // Close the filler turn if it was opened but no response follows
       if (this.responseOutputTurnStarted) {
@@ -1877,6 +1877,15 @@ export class ConversationRunner {
   private async changeState(newState: ConversationState) {
     this.conversation.status = newState;
     await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, newState);
+  }
+
+  /**
+   * Transitions the conversation to a terminal state and records the stage at which it ended.
+   * @param newState - The terminal state to transition to
+   */
+  private async changeTerminalState(newState: ConversationState): Promise<void> {
+    this.conversation.status = newState;
+    await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, newState, undefined, undefined, this.stageData.id);
   }
 
   /**
