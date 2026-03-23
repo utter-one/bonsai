@@ -480,11 +480,10 @@ export class ConversationRunner {
         await ttsProvider.init();
 
         // Negotiate TTS output format with the client's preference (must happen before start())
-        const { receiveAudioFormat } = this.session.sessionSettings;
-        logger.warn({ conversationId, receiveAudioFormat }, `Client preferred receive audio format: ${receiveAudioFormat}`);
-        const ttsNativeFormat = receiveAudioFormat
-          ? ttsProvider.setPreferredOutputFormat(receiveAudioFormat)
-          : ttsProvider.getSupportedFormats()[0];
+        const receiveAudioFormat = this.session.sessionSettings.receiveAudioFormat ?? 'pcm_16000';
+        const ttsNativeFormat = ttsProvider.getSupportedFormats()[0];
+          //? ttsProvider.setPreferredOutputFormat(receiveAudioFormat)
+          //: ttsProvider.setPreferredOutputFormat('pcm_16000'); // default to pcm_16000 if client doesn't specify
 
         // Set up outbound audio converter (TTS native format → client preferred format) if there is a gap
         await this.setupOutboundConverter(ttsNativeFormat, receiveAudioFormat ?? ttsNativeFormat, conversationId);
@@ -1430,7 +1429,7 @@ export class ConversationRunner {
    * @param conversationId For log context
    */
   private async setupInboundConverter(asrProvider: IAsrProvider, conversationId: string): Promise<void> {
-    const sendFormat: AudioFormat = this.session.sessionSettings.sendAudioFormat;
+    const sendFormat: AudioFormat = this.session.sessionSettings.sendAudioFormat ?? 'pcm_16000';
     const asrFormat = asrProvider.getSupportedInputFormats()[0];
 
     if (sendFormat === asrFormat) {
