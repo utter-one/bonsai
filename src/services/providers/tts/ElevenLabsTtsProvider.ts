@@ -81,6 +81,13 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   }
 
   /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    return this.resolveAudioFormat(this.settings.audioFormat);
+  }
+
+  /**
    * Starts the speech generation session
    */
   async start(): Promise<void> {
@@ -112,7 +119,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
       this.sentenceSplitter = null;
     }
 
-    this.audioFormat = this.resolveAudioFormat(this.preferredOutputFormat ?? this.settings.audioFormat);
+    this.audioFormat = this.getOutputFormat();
 
     logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.settings.stability}, similarityBoost: ${this.settings.similarityBoost}, audioFormat: ${this.audioFormat}`);
 

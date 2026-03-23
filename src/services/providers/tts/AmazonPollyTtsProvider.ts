@@ -107,6 +107,13 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
   }
 
   /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    return this.resolveAudioFormat(this.settings.audioFormat);
+  }
+
+  /**
    * Starts the speech generation session
    */
   async start(): Promise<void> {
@@ -120,7 +127,7 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
     this.textBuffer = '';
     this.requestQueue = Promise.resolve();
 
-    this.audioFormat = this.resolveAudioFormat(this.preferredOutputFormat ?? this.settings.audioFormat);
+    this.audioFormat = this.getOutputFormat();
 
     const useSentenceSplitter = this.settings.useSentenceSplitter ?? false;
     if (useSentenceSplitter) {

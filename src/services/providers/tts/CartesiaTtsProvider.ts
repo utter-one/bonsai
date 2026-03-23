@@ -166,6 +166,13 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
   }
 
   /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    return this.resolveAudioFormat(this.settings.audioFormat);
+  }
+
+  /**
    * Starts the speech generation session
    */
   async start(): Promise<void> {
@@ -192,7 +199,7 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
     }
 
     // Resolve audio format
-    this.audioFormat = this.resolveAudioFormat(this.preferredOutputFormat ?? this.settings.audioFormat);
+    this.audioFormat = this.getOutputFormat();
 
     const effectiveModel = this.settings.model ?? 'sonic-3-latest';
     const effectiveVoiceId = this.settings.voiceId ?? 'f786b574-daa5-4673-aa0c-cbe3e8534c02'; // Katie (stable voice for agents)

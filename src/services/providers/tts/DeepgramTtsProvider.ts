@@ -130,6 +130,18 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   }
 
   /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    const requestedFormat = this.settings.audioFormat ?? 'pcm_16000';
+    const supportedFormats = this.getSupportedFormats();
+    if (!supportedFormats.includes(requestedFormat)) {
+      return 'pcm_16000';
+    }
+    return requestedFormat;
+  }
+
+  /**
    * Starts the speech generation session
    */
   async start(): Promise<void> {
@@ -513,7 +525,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     const requestedContainer = this.settings.container;
 
     // Default values for streaming WebSocket
-    this.audioFormat = this.preferredOutputFormat ?? requestedAudioFormat ?? 'pcm_16000';
+    this.audioFormat = requestedAudioFormat ?? 'pcm_16000';
     this.sampleRate = requestedSampleRate || this.getDefaultSampleRate(this.audioFormat);
     this.bitRate = requestedBitRate;
     this.container = requestedContainer;

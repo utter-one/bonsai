@@ -479,11 +479,9 @@ export class ConversationRunner {
       try {
         await ttsProvider.init();
 
-        // Negotiate TTS output format with the client's preference (must happen before start())
+        // Get the TTS output format from provider configuration
         const receiveAudioFormat = this.session.sessionSettings.receiveAudioFormat ?? 'pcm_16000';
-        const ttsNativeFormat = ttsProvider.getSupportedFormats()[0];
-          //? ttsProvider.setPreferredOutputFormat(receiveAudioFormat)
-          //: ttsProvider.setPreferredOutputFormat('pcm_16000'); // default to pcm_16000 if client doesn't specify
+        const ttsNativeFormat = ttsProvider.getOutputFormat();
 
         // Set up outbound audio converter (TTS native format → client preferred format) if there is a gap
         await this.setupOutboundConverter(ttsNativeFormat, receiveAudioFormat ?? ttsNativeFormat, conversationId);
