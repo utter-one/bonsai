@@ -104,6 +104,13 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
   }
 
   /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    return this.resolveAudioFormat(this.settings.audioFormat);
+  }
+
+  /**
    * Starts the speech generation session
    */
   async start(): Promise<void> {
@@ -130,7 +137,7 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
     }
 
     // Resolve audio format
-    this.audioFormat = this.resolveAudioFormat(this.settings.audioFormat);
+    this.audioFormat = this.getOutputFormat();
 
     // Map audio format to Azure's output format enum
     this.speechConfig.speechSynthesisOutputFormat = this.mapAudioFormatToAzure(this.audioFormat);

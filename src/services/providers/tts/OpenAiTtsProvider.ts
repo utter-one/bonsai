@@ -78,6 +78,13 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
   }
 
   /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    return this.resolveAudioFormat(this.settings.audioFormat);
+  }
+
+  /**
    * Starts the speech generation session
    */
   async start(): Promise<void> {
@@ -107,7 +114,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
       this.sentenceSplitter = null;
     }
 
-    this.audioFormat = this.resolveAudioFormat(this.settings.audioFormat);
+    this.audioFormat = this.getOutputFormat();
 
     logger.info(`[OpenAI TTS] Starting speech generation with model: ${effectiveModel}, voice: ${effectiveVoice}, speed: ${effectiveSpeed}, audioFormat: ${this.audioFormat}`);
 

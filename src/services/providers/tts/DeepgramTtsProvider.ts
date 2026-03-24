@@ -25,7 +25,7 @@ export const deepgramTtsSettingsSchema = z.object({
   provider: z.literal('deepgram').describe('TTS provider type identifier'),
   model: z.enum(['aura-1', 'aura-2']).optional().describe('Model version to use ("aura-1" or "aura-2")'),
   voiceId: z.string().optional().describe('Voice ID to use for speech synthesis (e.g., "thalia-en", "andromeda-en"). Combined with model to form full model string (e.g., "aura-2-thalia-en")'),
-  audioFormat: z.enum(['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac']).optional().describe('Preferred audio output format. Streaming supports: linear16, mulaw, alaw. REST-only: opus, mp3, flac, aac'),
+  audioFormat: z.enum(['pcm_8000', 'pcm_16000', 'pcm_24000', 'pcm_48000', 'mulaw', 'alaw']).optional().describe('Preferred audio output format. Defaults to "pcm_16000"'),  
   sampleRate: z.number().int().positive().optional().describe('Sample rate for audio output in Hz (e.g., 8000, 16000, 24000, 48000). Availability depends on audio format'),
   bitRate: z.number().int().positive().optional().describe('Bit rate for audio output (e.g., 32000, 64000, 128000). Applies to certain formats like mp3, opus, aac'),
   container: z.enum(['none', 'wav', 'ogg']).optional().describe('Audio container format. Use "none" for raw audio, "wav" for WAV container, "ogg" for Ogg container'),
@@ -85,7 +85,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   private settings: DeepgramTtsSettings;
 
   /** Audio output format for the current session */
-  private audioFormat: AudioFormat = 'linear16';
+  private audioFormat: AudioFormat = 'pcm_16000';
 
   /** Sample rate for audio output */
   private sampleRate: number = 24000;
@@ -123,11 +123,22 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
 
   /**
    * Gets the list of supported audio output formats for Deepgram
-   * Note: For WebSocket streaming, only linear16, opus, mulaw, alaw are supported
-   * For REST API, mp3, flac, aac are also available
+   * Supported formats are PCM variants (8/16/24/48 kHz), μ-law, and A-law.
    */
   getSupportedFormats(): AudioFormat[] {
-    return ['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac'];
+    return ['pcm_8000', 'pcm_16000', 'pcm_24000', 'pcm_48000', 'mulaw', 'alaw'];
+  }
+
+  /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    const requestedFormat = this.settings.audioFormat ?? 'pcm_16000';
+    const supportedFormats = this.getSupportedFormats();
+    if (!supportedFormats.includes(requestedFormat)) {
+      return 'pcm_16000';
+    }
+    return requestedFormat;
   }
 
   /**
@@ -167,7 +178,9 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     logger.info(`[Deepgram] Starting speech generation with model: ${effectiveModel}, encoding: ${this.audioFormat}, sample_rate: ${this.sampleRate}, audioFormat: ${this.audioFormat}`);
 
     // Build WebSocket URL with query parameters
-    let wsUrl = `wss://api.deepgram.com/v1/speak?model=${effectiveModel}&encoding=${this.audioFormat}`;
+    // Map pcm_* formats to Deepgram's API encoding name 'linear16' (sample rate is set separately)
+    const deepgramEncoding = this.audioFormat.startsWith('pcm_') ? 'linear16' : this.audioFormat;
+    let wsUrl = `wss://api.deepgram.com/v1/speak?model=${effectiveModel}&encoding=${deepgramEncoding}`;
 
     // Add optional parameters
     if (this.sampleRate) {
@@ -512,7 +525,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     const requestedContainer = this.settings.container;
 
     // Default values for streaming WebSocket
-    this.audioFormat = requestedAudioFormat || 'linear16';
+    this.audioFormat = requestedAudioFormat ?? 'pcm_16000';
     this.sampleRate = requestedSampleRate || this.getDefaultSampleRate(this.audioFormat);
     this.bitRate = requestedBitRate;
     this.container = requestedContainer;
@@ -520,14 +533,9 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     // Validate audio format is supported
     const supportedFormats = this.getSupportedFormats();
     if (!supportedFormats.includes(this.audioFormat)) {
-      logger.warn(`[Deepgram] Requested audio format ${this.audioFormat} is not supported. Falling back to linear16.`);
-      this.audioFormat = 'linear16';
-      this.sampleRate = 24000;
-    }
-
-    // Warn if using REST-only formats with streaming
-    if (['opus', 'mp3', 'flac', 'aac'].includes(this.audioFormat)) {
-      logger.warn(`[Deepgram] Audio format ${this.audioFormat} is typically used with REST API, not WebSocket streaming. Connection may fail.`);
+      logger.warn(`[Deepgram] Requested audio format ${this.audioFormat} is not supported. Falling back to pcm_16000.`);
+      this.audioFormat = 'pcm_16000';
+      this.sampleRate = 16000;
     }
   }
 
@@ -538,16 +546,15 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
    */
   private getDefaultSampleRate(audioFormat: string): number {
     switch (audioFormat) {
+      case 'pcm_8000': return 8000;
+      case 'pcm_16000': return 16000;
+      case 'pcm_24000': return 24000;
+      case 'pcm_48000': return 48000;
       case 'mulaw':
       case 'alaw':
         return 8000;
-      case 'linear16':
-      case 'opus':
-      case 'mp3':
-      case 'flac':
-      case 'aac':
       default:
-        return 24000;
+        return 16000;
     }
   }
 

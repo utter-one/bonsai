@@ -58,6 +58,12 @@ export interface ITtsProvider<TChunk extends GeneratedAudioChunk = GeneratedAudi
   getSupportedFormats(): AudioFormat[];
 
   /**
+   * Returns the audio format this provider will produce, based on its internal configuration.
+   * @returns The audio format this provider produces
+   */
+  getOutputFormat(): AudioFormat;
+
+  /**
    * Initializes the speech generation session
    * Prepares the TTS provider for text-to-speech synthesis
    * @returns Promise that resolves when initialization is complete

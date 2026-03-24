@@ -17,7 +17,6 @@ export const audioFormatValues = [
   'pcm_48000',
   'mulaw',
   'alaw',
-  'linear16',
 ] as const;
 
 /**

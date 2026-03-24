@@ -49,6 +49,12 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
   abstract getSupportedFormats(): AudioFormat[];
 
   /**
+   * Returns the audio format this provider will produce, based on its internal configuration.
+   * @returns The audio format this provider produces
+   */
+  abstract getOutputFormat(): AudioFormat;
+
+  /**
    * Starts the speech generation session
    * Subclasses must implement this method to start provider-specific generation
    */

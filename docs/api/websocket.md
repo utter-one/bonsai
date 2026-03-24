@@ -486,7 +486,7 @@ The `eventData.metadata` object of `message`, `classification`, `transformation`
 
 Supported audio formats for voice chunks:
 
-`mp3`, `opus`, `aac`, `flac`, `wav`, `pcm_8000`, `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`, `pcm_48000`, `mulaw`, `alaw`, `linear16`
+`mp3`, `opus`, `aac`, `flac`, `wav`, `pcm_8000`, `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`, `pcm_48000`, `mulaw`, `alaw`
 
 ## Parameter Value Types
 

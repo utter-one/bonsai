@@ -46,7 +46,7 @@ export class SessionManager {
       conversationId: null,
       runner: null,
       clientConnection,
-      sessionSettings: { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true },
+      sessionSettings: { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true, sendAudioFormat: 'pcm_16000' as const, receiveAudioFormat: 'pcm_16000' as const },
     };
 
     this.clientMap.set(clientConnection, session);

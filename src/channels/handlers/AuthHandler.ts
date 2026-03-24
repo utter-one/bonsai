@@ -39,7 +39,6 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
 
     try {
       const apiKey = await this.apiKeyService.getApiKeyByKey(message.apiKey);
-      logger.info({ session: context.session, requestId: message.requestId, apiKeyId: apiKey.id, projectId: apiKey.projectId }, 'API key validated successfully');
 
       if (!apiKey || !apiKey.isActive) {
         logger.warn({ requestId: message.requestId }, 'Authentication failed: invalid or inactive API key');
