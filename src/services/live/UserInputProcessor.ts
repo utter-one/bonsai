@@ -20,6 +20,10 @@ export type ProcessTextInputResult = {
   actions: ActionClassificationResult[];
   /** Duration of the knowledge category retrieval in milliseconds; undefined when knowledge is not used */
   knowledgeRetrievalDurationMs?: number;
+  /** Unix timestamp (ms) when knowledge retrieval started; undefined when knowledge is not used */
+  knowledgeRetrievalStartMs?: number;
+  /** Unix timestamp (ms) when knowledge retrieval completed; undefined when knowledge is not used */
+  knowledgeRetrievalEndMs?: number;
 };
 
 /**
@@ -57,12 +61,17 @@ export class UserInputProcessor {
       // Fetch knowledge categories for the default classifier when knowledge is enabled
       let knowledgeCategories: KnowledgeCategoryResponse[] = [];
       let knowledgeRetrievalDurationMs: number | undefined;
+      let knowledgeRetrievalStartMs: number | undefined;
+      let knowledgeRetrievalEndMs: number | undefined;
       if (stage.useKnowledge && stage.defaultClassifierId) {
         const knowledgeStartMs = Date.now();
         knowledgeCategories = stage.knowledgeTags.length > 0
           ? await this.knowledgeService.getCategoriesByTags(conversation.projectId, stage.knowledgeTags)
           : (await this.knowledgeService.listKnowledgeCategories(conversation.projectId, { offset: 0, limit: 100 })).items;
-        knowledgeRetrievalDurationMs = Date.now() - knowledgeStartMs;
+        const knowledgeEndMs = Date.now();
+        knowledgeRetrievalDurationMs = knowledgeEndMs - knowledgeStartMs;
+        knowledgeRetrievalStartMs = knowledgeStartMs;
+        knowledgeRetrievalEndMs = knowledgeEndMs;
         logger.debug({ conversationId: conversation.id, categoryCount: knowledgeCategories.length, classifierId: stage.defaultClassifierId, knowledgeRetrievalDurationMs }, 'Fetched knowledge categories for default classifier');
       }
 
@@ -111,6 +120,8 @@ export class UserInputProcessor {
             llmSettings: classifier?.classifier.llmSettings,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: result.durationMs,
+            startMs: result.startMs,
+            endMs: result.endMs,
           },
         };
         await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
@@ -130,6 +141,8 @@ export class UserInputProcessor {
             llmSettings: guardrailClassifier?.classifier.llmSettings,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: guardrailResult.durationMs,
+            startMs: guardrailResult.startMs,
+            endMs: guardrailResult.endMs,
           },
         };
         await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
@@ -172,14 +185,14 @@ export class UserInputProcessor {
         return true;
       });
 
-      return { actions: filteredActions, knowledgeRetrievalDurationMs };
+      return { actions: filteredActions, knowledgeRetrievalDurationMs, knowledgeRetrievalStartMs, knowledgeRetrievalEndMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id }, 'Error processing text input using classifiers');
       throw error;
     }
   }
 
-  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number }> {
+  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
@@ -211,21 +224,27 @@ export class UserInputProcessor {
         parameters,
       }));
 
+      const endMs = Date.now();
       return {
         classifierId: classifier.id,
         classifierName: classifier.name,
         actions,
         renderedPrompt,
-        durationMs: Date.now() - classifyStartMs,
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
       };
     } catch (error) {
       logger.error({ error, sessionId: session.id, classifierId: classifierData.classifier.id }, 'Error classifying text input');
+      const endMs = Date.now();
       return {
         classifierId: classifierData.classifier.id,
         classifierName: classifierData.classifier.name,
         actions: [],
         renderedPrompt: null,
-        durationMs: Date.now() - classifyStartMs,
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
       };
     }
   }

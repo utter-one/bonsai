@@ -63,6 +63,10 @@ export type TurnData = {
   outputTurnId?: string;
   /** Unix timestamp (ms) when the current turn started processing */
   startMs: number | null;
+  /** Unix timestamp (ms) when prompt template rendering started */
+  promptRenderStartMs: number | null;
+  /** Unix timestamp (ms) when prompt template rendering completed */
+  promptRenderEndMs: number | null;
   /** Unix timestamp (ms) when LLM completion generation was started */
   llmStartMs: number | null;
   /** Unix timestamp (ms) when the first LLM completion token was received */
@@ -77,6 +81,14 @@ export type TurnData = {
   moderationDurationMs: number | null;
   /** Unix timestamp (ms) when ASR recognition started */
   asrStartMs: number | null;
+  /** Unix timestamp (ms) when a stage transition (goToStage) was initiated by an action outcome */
+  stageTransitionStartMs: number | null;
+  /** Unix timestamp (ms) when the stage transition completed (stage data reloaded, providers re-wired, on_enter executed) */
+  stageTransitionEndMs: number | null;
+  /** Unix timestamp (ms) when the TTS WebSocket connection was initiated */
+  ttsConnectStartMs: number | null;
+  /** Unix timestamp (ms) when the TTS WebSocket connection was established and ready */
+  ttsConnectEndMs: number | null;
   /** Unix timestamp (ms) when the TTS provider started synthesising the first chunk */
   ttsStartMs: number | null;
   /** Sequential 1-based turn number within the conversation */
@@ -138,7 +150,7 @@ export class ConversationRunner {
   private outboundPendingChunk: PendingOutboundChunk | null = null;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsStartMs: null, turnIndex: 0 };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0 };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -514,6 +526,10 @@ export class ConversationRunner {
             const backfill: Record<string, any> = {};
             if (totalTurnDurationMs !== undefined) backfill.totalTurnDurationMs = totalTurnDurationMs;
             if (ttsDurationMs !== undefined) backfill.ttsDurationMs = ttsDurationMs;
+            if (startMs !== null) backfill.turnStartMs = startMs;
+            backfill.turnEndMs = ttsEndMs;
+            if (ttsStartMs !== null) backfill.ttsStartMs = ttsStartMs;
+            backfill.ttsEndMs = ttsEndMs;
             if (Object.keys(backfill).length > 0) {
               const updated = await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
               const eventUpdateMessage: CALConversationEventUpdateMessage = {
@@ -640,6 +656,9 @@ export class ConversationRunner {
         const timeToFirstTokenMs = this.turnData.firstTokenMs !== null && this.turnData.llmStartMs !== null ? this.turnData.firstTokenMs - this.turnData.llmStartMs : undefined;
         const timeToFirstTokenFromTurnStartMs = this.turnData.firstTokenMs !== null && this.turnData.startMs !== null ? this.turnData.firstTokenMs - this.turnData.startMs : undefined;
         const timeToFirstAudioMs = this.turnData.firstAudioMs !== null && this.turnData.startMs !== null ? this.turnData.firstAudioMs - this.turnData.startMs : undefined;
+        const ttsConnectDurationMs = this.turnData.ttsConnectStartMs !== null && this.turnData.ttsConnectEndMs !== null ? this.turnData.ttsConnectEndMs - this.turnData.ttsConnectStartMs : undefined;
+        const promptRenderDurationMs = this.turnData.promptRenderStartMs !== null && this.turnData.promptRenderEndMs !== null ? this.turnData.promptRenderEndMs - this.turnData.promptRenderStartMs : undefined;
+        const stageTransitionDurationMs = this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined;
         // For the text-only path, total turn duration is known now; for the TTS path it will be updated in setOnGenerationEnded
         const totalTurnDurationMs = !ttsProvider && this.turnData.startMs !== null ? llmEndMs - this.turnData.startMs : undefined;
 
@@ -655,6 +674,17 @@ export class ConversationRunner {
             llmSettings: this.stageData.stage.llmSettings,
             outputTurnId: this.turnData.outputTurnId,
             turnIndex: this.turnData.turnIndex,
+            turnStartMs: this.turnData.startMs ?? undefined,
+            ttsConnectStartMs: this.turnData.ttsConnectStartMs ?? undefined,
+            ttsConnectEndMs: this.turnData.ttsConnectEndMs ?? undefined,
+            ttsConnectDurationMs,
+            promptRenderStartMs: this.turnData.promptRenderStartMs ?? undefined,
+            promptRenderEndMs: this.turnData.promptRenderEndMs ?? undefined,
+            promptRenderDurationMs,
+            llmStartMs: this.turnData.llmStartMs ?? undefined,
+            llmEndMs,
+            firstTokenMs: this.turnData.firstTokenMs ?? undefined,
+            firstAudioMs: this.turnData.firstAudioMs ?? undefined,
             llmDurationMs,
             timeToFirstTokenMs,
             timeToFirstTokenFromTurnStartMs,
@@ -1101,6 +1131,11 @@ export class ConversationRunner {
         }
       }
 
+      // Stage setup is complete (providers wired, on_enter executed) — mark end before response generation
+      if (this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs === null) {
+        this.turnData.stageTransitionEndMs = Date.now();
+      }
+
       if (enterOutcome?.shouldGenerateResponse) {
         // on_enter action explicitly requested a response (may include a prescripted response)
         await this.generateResponse(enterContext, enterOutcome);
@@ -1355,6 +1390,8 @@ export class ConversationRunner {
         systemPrompt: executeResult.renderedPrompt,
         llmSettings: executeResult.llmSettings,
         durationMs: executeResult.durationMs,
+        startMs: executeResult.startMs,
+        endMs: executeResult.endMs,
       }
     };
     await this.saveAndSendEvent('tool_call', eventData);
@@ -1399,6 +1436,7 @@ export class ConversationRunner {
     // Apply stage navigation if specified
     if (outcome.goToStageId && outcome.goToStageId !== this.stageData.id) {
       logger.info({ conversationId, currentStageId: this.stageData.id, targetStageId: outcome.goToStageId }, `Applying stage navigation`);
+      this.turnData.stageTransitionStartMs = Date.now();
       await this.goToStage(outcome.goToStageId, true);
     }
 
@@ -1568,6 +1606,8 @@ export class ConversationRunner {
       inputTurnId: this.turnData.inputTurnId,
       outputTurnId: undefined,
       startMs: Date.now(),
+      promptRenderStartMs: null,
+      promptRenderEndMs: null,
       llmStartMs: null,
       firstTokenMs: null,
       firstAudioMs: null,
@@ -1575,6 +1615,10 @@ export class ConversationRunner {
       fillerDurationMs: null,
       moderationDurationMs: null,
       asrStartMs: null,
+      stageTransitionStartMs: null,
+      stageTransitionEndMs: null,
+      ttsConnectStartMs: null,
+      ttsConnectEndMs: null,
       ttsStartMs: null,
       turnIndex: this.turnData.turnIndex + 1,
     };
@@ -1582,7 +1626,9 @@ export class ConversationRunner {
 
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
     this.responseGeneratedInTurn = false;
-    // Capture asrStartMs before resetting turnData so we can compute asrDurationMs
+    // Capture asrStartMs and asrEndMs before resetting turnData so we can compute asrDurationMs and persist raw timestamps
+    const savedAsrStartMs = this.turnData.asrStartMs;
+    const savedAsrEndMs = asrEndMs ?? null;
     const asrDurationMs = asrEndMs && this.turnData.asrStartMs !== null ? asrEndMs - this.turnData.asrStartMs : null;
     this.resetTurnData();
     const asrDurationMsValue = asrDurationMs && asrDurationMs > 0 ? asrDurationMs : undefined;
@@ -1606,8 +1652,10 @@ export class ConversationRunner {
     // This prevents inappropriate content from reaching provider APIs and risking account bans.
     const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
     this.turnData.moderationDurationMs = moderationResult.durationMs > 0 ? moderationResult.durationMs : null;
+    const moderationStartMs = moderationResult.durationMs > 0 ? moderationResult.startMs : null;
+    const moderationEndMs = moderationStartMs !== null ? moderationStartMs + moderationResult.durationMs : null;
     if (moderationResult.detectedCategories.length > 0) {
-      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs };
+      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs, startMs: moderationResult.startMs, endMs: moderationResult.startMs + moderationResult.durationMs };
       await this.saveAndSendEvent('moderation', moderationEventData);
     }
     if (moderationResult.flagged) {
@@ -1644,8 +1692,9 @@ export class ConversationRunner {
     this.lastFillerPrompt = null;
     const fillerStartMs = Date.now();
     const fillerSentence = await this.generateFillerSentence(userInput);
+    const fillerEndMs = Date.now();
     if (fillerSentence) {
-      this.turnData.fillerDurationMs = Date.now() - fillerStartMs;
+      this.turnData.fillerDurationMs = fillerEndMs - fillerStartMs;
       this.turnData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
       const fillerStartMessage: CALStartAiGenerationOutputMessage = {
         type: 'start_ai_generation_output',
@@ -1674,7 +1723,8 @@ export class ConversationRunner {
 
     const processingStartMs = Date.now();
     const processingResult = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
-    const processingDurationMs = Date.now() - processingStartMs;
+    const processingEndMs = Date.now();
+    const processingDurationMs = processingEndMs - processingStartMs;
     const classificationResults = processingResult.actions;
     const knowledgeRetrievalDurationMs = processingResult.knowledgeRetrievalDurationMs;
 
@@ -1746,12 +1796,15 @@ export class ConversationRunner {
     // If no actions matched and __on_fallback is defined, execute it
     let executionOutcome: ActionsExecutionOutcome;
     let actionsDurationMs: number;
+    let actionsStartMs: number;
+    let actionsEndMs: number;
     const onFallbackAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_FALLBACK];
     if (actions.length === 0 && onFallbackAction) {
       logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
-      const actionsStartMs = Date.now();
+      actionsStartMs = Date.now();
       executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
-      actionsDurationMs = Date.now() - actionsStartMs;
+      actionsEndMs = Date.now();
+      actionsDurationMs = actionsEndMs - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
 
       // Save/send tool call events from action execution
@@ -1765,9 +1818,10 @@ export class ConversationRunner {
       };
       await this.saveAndSendEvent('action', actionEventData);
     } else {
-      const actionsStartMs = Date.now();
+      actionsStartMs = Date.now();
       executionOutcome = await this.actionsExecutor.executeActions(actions, context);
-      actionsDurationMs = Date.now() - actionsStartMs;
+      actionsEndMs = Date.now();
+      actionsDurationMs = actionsEndMs - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
 
       // Save/send tool call events from action execution
@@ -1793,12 +1847,28 @@ export class ConversationRunner {
         source: context.userInputSource,
         inputTurnId: this.turnData.inputTurnId,
         turnIndex: this.turnData.turnIndex,
+        turnStartMs: this.turnData.startMs ?? undefined,
+        asrStartMs: savedAsrStartMs ?? undefined,
+        asrEndMs: savedAsrEndMs ?? undefined,
         asrDurationMs: asrDurationMsValue,
+        moderationStartMs: moderationStartMs ?? undefined,
+        moderationEndMs: moderationEndMs ?? undefined,
         moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
+        fillerStartMs: fillerSentence ? fillerStartMs : undefined,
+        fillerEndMs: fillerSentence ? fillerEndMs : undefined,
+        fillerDurationMs: this.turnData.fillerDurationMs ?? undefined,
+        processingStartMs,
+        processingEndMs,
         processingDurationMs,
+        knowledgeRetrievalStartMs: processingResult.knowledgeRetrievalStartMs,
+        knowledgeRetrievalEndMs: processingResult.knowledgeRetrievalEndMs,
         knowledgeRetrievalDurationMs,
+        actionsStartMs,
+        actionsEndMs,
         actionsDurationMs,
-        fillerDurationMs: this.turnData.fillerDurationMs,
+        stageTransitionStartMs: this.turnData.stageTransitionStartMs ?? undefined,
+        stageTransitionEndMs: this.turnData.stageTransitionEndMs ?? undefined,
+        stageTransitionDurationMs: this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined,
     }, this.turnMessageVisibility);
     const messageUpdateMessage: CALConversationEventUpdateMessage = {
       type: 'conversation_event_update',
@@ -1838,14 +1908,18 @@ export class ConversationRunner {
         await this.channel.sendMessage(startGenerationMessage);
 
         if (this.stageData.ttsProvider) {
+          this.turnData.ttsConnectStartMs = Date.now();
           await this.stageData.ttsProvider.start();
+          this.turnData.ttsConnectEndMs = Date.now();
         }
       }
       await this.changeState('generating_response');
       if (executionOutcome.prescriptedResponse !== undefined) {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
+        this.turnData.promptRenderStartMs = Date.now();
         this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        this.turnData.promptRenderEndMs = Date.now();
         this.turnData.firstTokenMs = null;
         this.turnData.llmStartMs = Date.now();
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
@@ -2063,6 +2137,8 @@ export class ConversationRunner {
             systemPrompt: toolCallEvent.systemPrompt,
             llmSettings: toolCallEvent.llmSettings,
             durationMs: toolCallEvent.durationMs,
+            startMs: toolCallEvent.startMs,
+            endMs: toolCallEvent.endMs,
           }
         };
         await this.saveAndSendEvent('tool_call', eventData);
