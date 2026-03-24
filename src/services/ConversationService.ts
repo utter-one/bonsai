@@ -575,15 +575,16 @@ export class ConversationService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific conversation
    * @param conversationId - The unique identifier of the conversation
+   * @param projectId - The project ID the conversation belongs to
    * @returns Array of audit log entries for the conversation
    */
-  async getConversationAuditLogs(conversationId: string): Promise<any[]> {
-    logger.debug({ conversationId }, 'Fetching audit logs for conversation');
+  async getConversationAuditLogs(conversationId: string, projectId: string): Promise<any[]> {
+    logger.debug({ conversationId, projectId }, 'Fetching audit logs for conversation');
 
     try {
-      return await this.auditService.getEntityAuditLogs('conversation', conversationId);
+      return await this.auditService.getEntityAuditLogs('conversation', conversationId, projectId);
     } catch (error) {
-      logger.error({ error, conversationId }, 'Failed to fetch conversation audit logs');
+      logger.error({ error, conversationId, projectId }, 'Failed to fetch conversation audit logs');
       throw error;
     }
   }

@@ -15,7 +15,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class GlobalActionController {
-  constructor(@inject(GlobalActionService) private readonly globalActionService: GlobalActionService) {}
+  constructor(@inject(GlobalActionService) private readonly globalActionService: GlobalActionService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -272,7 +272,7 @@ export class GlobalActionController {
   private async getGlobalActionAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = globalActionRouteParamsSchema.parse(req.params);
-    const logs = await this.globalActionService.getGlobalActionAuditLogs(params.id);
+    const logs = await this.globalActionService.getGlobalActionAuditLogs(params.id, params.projectId);
     res.status(200).json(logs);
   }
 

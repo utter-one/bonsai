@@ -249,15 +249,16 @@ export class UserService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific user
    * @param userId - The unique identifier of the user
+   * @param projectId - The project ID the user belongs to
    * @returns Array of audit log entries for the user
    */
-  async getUserAuditLogs(userId: string): Promise<any[]> {
-    logger.debug({ userId }, 'Fetching audit logs for user');
+  async getUserAuditLogs(userId: string, projectId: string): Promise<any[]> {
+    logger.debug({ userId, projectId }, 'Fetching audit logs for user');
 
     try {
-      return await this.auditService.getEntityAuditLogs('user', userId);
+      return await this.auditService.getEntityAuditLogs('user', userId, projectId);
     } catch (error) {
-      logger.error({ error, userId }, 'Failed to fetch user audit logs');
+      logger.error({ error, userId, projectId }, 'Failed to fetch user audit logs');
       throw error;
     }
   }

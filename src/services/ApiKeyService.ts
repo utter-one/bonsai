@@ -279,15 +279,16 @@ export class ApiKeyService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific API key
    * @param apiKeyId - The unique identifier of the API key
+   * @param projectId - The project ID the API key belongs to
    * @returns Array of audit log entries for the API key
    */
-  async getApiKeyAuditLogs(apiKeyId: string): Promise<any[]> {
-    logger.debug({ apiKeyId }, 'Fetching audit logs for API key');
+  async getApiKeyAuditLogs(apiKeyId: string, projectId: string): Promise<any[]> {
+    logger.debug({ apiKeyId, projectId }, 'Fetching audit logs for API key');
 
     try {
-      return await this.auditService.getEntityAuditLogs('api_key', apiKeyId);
+      return await this.auditService.getEntityAuditLogs('api_key', apiKeyId, projectId);
     } catch (error) {
-      logger.error({ error, apiKeyId }, 'Failed to fetch API key audit logs');
+      logger.error({ error, apiKeyId, projectId }, 'Failed to fetch API key audit logs');
       throw error;
     }
   }
