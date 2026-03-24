@@ -25,7 +25,7 @@ import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema } fro
 import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { asrConfigSchema } from './http/contracts/project';
-import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, changeVisibilityEffectSchema } from './types/actions';
+import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, changeVisibilityEffectSchema, banUserEffectSchema } from './types/actions';
 import { fieldDescriptorSchema } from './types/parameters';
 import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
@@ -160,6 +160,7 @@ export function getOpenAPISpec(): any {
   registry.register('ModifyVariablesEffect', modifyVariablesEffectSchema);
   registry.register('ModifyUserProfileEffect', modifyUserProfileEffectSchema);
   registry.register('ChangeVisibilityEffect', changeVisibilityEffectSchema);
+  registry.register('BanUserEffect', banUserEffectSchema);
   registry.register('VariableOperation', variableOperationSchema);
   registry.register('UserProfileOperation', userProfileOperationSchema);
   registry.register('CallToolEffect', callToolEffectSchema);

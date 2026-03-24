@@ -7,7 +7,7 @@ import { SessionManager } from '../SessionManager';
 import { ConversationService } from '../../services/ConversationService';
 import { StageService } from '../../services/StageService';
 import { ProjectService } from '../../services/ProjectService';
-import { NotFoundError, InvalidOperationError } from '../../errors';
+import { NotFoundError, InvalidOperationError, UserBannedError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 import { UserService } from '../../services/UserService';
@@ -59,6 +59,11 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
         } else {
           throw userError;
         }
+      }
+
+      // Get stage to extract projectId
+      if (user.banned) {
+        throw new UserBannedError(`User ${user.id} is banned and cannot start a conversation${user.banReason ? `: ${user.banReason}` : ''}`);
       }
 
       // Get stage to extract projectId

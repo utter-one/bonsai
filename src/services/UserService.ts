@@ -164,7 +164,7 @@ export class UserService extends BaseService {
         throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
-      const updatedUser = await db.update(users).set({ profile: input.profile, updatedAt: new Date() }).where(and(eq(users.projectId, projectId), eq(users.id, id))).returning();
+      const updatedUser = await db.update(users).set({ profile: input.profile, banned: input.banned, banReason: input.banReason, updatedAt: new Date() }).where(and(eq(users.projectId, projectId), eq(users.id, id))).returning();
 
       if (updatedUser.length === 0) {
         throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
@@ -242,6 +242,38 @@ export class UserService extends BaseService {
       return userResponseSchema.parse(createdUser);
     } catch (error) {
       logger.error({ error, userId, projectId }, 'Failed to ensure user exists');
+      throw error;
+    }
+  }
+
+  /**
+   * Bans a user within a project. Intended for internal system use (e.g. triggered by conversation effects).
+   * @param projectId - The project the user belongs to
+   * @param userId - The unique identifier of the user to ban
+   * @param reason - Optional reason for the ban
+   * @throws {NotFoundError} When user is not found
+   */
+  async banUser(projectId: string, userId: string, reason?: string): Promise<void> {
+    logger.info({ userId, projectId, reason }, 'Banning user');
+
+    try {
+      const existingUser = await db.query.users.findFirst({ where: and(eq(users.projectId, projectId), eq(users.id, userId)) });
+
+      if (!existingUser) {
+        throw new NotFoundError(`User with id ${userId} not found in project ${projectId}`);
+      }
+
+      const updatedUsers = await db.update(users).set({ banned: true, banReason: reason ?? null, updatedAt: new Date() }).where(and(eq(users.projectId, projectId), eq(users.id, userId))).returning();
+
+      if (updatedUsers.length === 0) {
+        throw new NotFoundError(`User with id ${userId} not found in project ${projectId}`);
+      }
+
+      await this.auditService.logUpdate('user', userId, existingUser, updatedUsers[0], undefined);
+
+      logger.info({ userId, projectId }, 'User banned successfully');
+    } catch (error) {
+      logger.error({ error, userId, projectId }, 'Failed to ban user');
       throw error;
     }
   }

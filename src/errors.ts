@@ -108,3 +108,13 @@ export class TooManyRequestsError extends Error {
     this.name = 'TooManyRequestsError';
   }
 }
+
+/**
+ * Error thrown when a user is banned and cannot perform the requested operation
+ */
+export class UserBannedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UserBannedError';
+  }
+}

@@ -18,6 +18,8 @@ export const users = pgTable('users', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
   profile: jsonb('profile').notNull().$type<Record<string, any>>(),
+  banned: boolean('banned').notNull().default(false),
+  banReason: text('ban_reason'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [

@@ -5,7 +5,8 @@ import { ToolService } from '../ToolService';
 import { ToolExecutor } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
-import type { AbortConversationEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
+import { UserService } from '../UserService';
+import type { AbortConversationEffect, BanUserEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
 import type { MessageVisibility } from '../../types/conversationEvents';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
@@ -103,6 +104,7 @@ export class ActionsExecutor {
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
     @inject(ModifyVariablesEffectExecutor) private readonly modifyVariablesExecutor: ModifyVariablesEffectExecutor,
     @inject(ModifyUserProfileEffectExecutor) private readonly modifyUserProfileExecutor: ModifyUserProfileEffectExecutor,
+    @inject(UserService) private readonly userService: UserService,
   ) { }
 
   /**
@@ -140,6 +142,8 @@ export class ActionsExecutor {
         return 4;
       case 'modify_user_input':
         return 5;
+      case 'ban_user':
+        return 7;
       case 'change_visibility':
         return 50;
       case 'generate_response':
@@ -451,6 +455,9 @@ export class ActionsExecutor {
       case 'change_visibility':
         return this.executeChangeVisibility(effect);
 
+      case 'ban_user':
+        return await this.executeBanUser(effect, context);
+
       default:
         throw new Error(`Unknown effect`);
     }
@@ -702,7 +709,7 @@ export class ActionsExecutor {
       if (tool.type === 'webhook') { // for backwards compatibility, also store webhook tool results in context.results.webhooks
         if (!context.results.webhooks) context.results.webhooks = {};
         context.results.webhooks[tool.id] = executionResult.result;
-      } 
+      }
 
       context.results.tools[tool.id] = {
         toolId: tool.id,
@@ -712,7 +719,7 @@ export class ActionsExecutor {
         result: executionResult.result,
         executedAt: new Date().toISOString(),
       };
-      
+
 
       logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, toolType: tool.type }, `Tool called successfully and result stored: ${tool.name}`);
 
@@ -815,6 +822,23 @@ export class ActionsExecutor {
       shouldEndConversation: false,
       shouldAbortConversation: false,
       turnVisibility: { visibility: effect.visibility, condition: effect.condition },
+    };
+  }
+
+  /**
+   * Executes ban_user effect.
+   * Bans the user associated with the current conversation.
+   */
+  private async executeBanUser(
+    effect: BanUserEffect,
+    context: ConversationContext,
+  ): Promise<EffectOutcome> {
+    logger.info({ conversationId: context.conversationId, userId: context.userId, reason: effect.reason }, `Banning user`);
+    await this.userService.banUser(context.projectId, context.userId, effect.reason);
+    logger.info({ conversationId: context.conversationId, userId: context.userId }, `User banned successfully`);
+    return {
+      shouldEndConversation: false,
+      shouldAbortConversation: false,
     };
   }
 }
