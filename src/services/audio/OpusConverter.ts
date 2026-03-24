@@ -19,6 +19,9 @@ const OPUS_FRAME_SAMPLES = 960;
  * is automatically chained (PCM→48k before encode; 48k→PCM after decode).
  * All operations are synchronous after construction.
  * Use the static create() factory instead of constructing directly.
+ * 
+ * NOTE: This only converts raw Opus packets to/from PCM frames. 
+ * It does not handle any container formats or RTP packetization.
  */
 export class OpusConverter extends EventEmitter implements IAudioConverter {
   private aligner: OpusFrameAligner;
