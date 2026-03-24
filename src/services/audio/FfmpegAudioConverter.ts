@@ -10,11 +10,13 @@ import { buildFfmpegArgs } from './AudioFormatUtils';
  * supported by the in-process tiers (e.g. mp3, aac, flac, wav).
  * This is the last-resort tier; prefer the faster in-process converters when possible.
  *
- * reset() kills the current process and spawns a fresh one, so the converter
- * is reusable across turns despite the subprocess overhead.
+ * After end() closes stdin and ffmpeg flushes, the process auto-respawns so the
+ * converter is immediately reusable for the next sentence without an explicit reset().
+ * reset() kills the current process and spawns a fresh one for start-of-turn reuse.
  */
 export class FfmpegAudioConverter extends EventEmitter implements IAudioConverter {
   private process: ChildProcess | null = null;
+  private destroyed = false;
 
   constructor(
     private readonly from: AudioFormat,
@@ -48,6 +50,7 @@ export class FfmpegAudioConverter extends EventEmitter implements IAudioConverte
 
   /** Kills the ffmpeg process and releases resources. */
   destroy(): void {
+    this.destroyed = true;
     this.killProcess();
   }
 
@@ -57,10 +60,6 @@ export class FfmpegAudioConverter extends EventEmitter implements IAudioConverte
 
     this.process.stdout?.on('data', (chunk: Buffer) => {
       this.emit('data', chunk);
-    });
-
-    this.process.stdout?.on('end', () => {
-      this.emit('end');
     });
 
     this.process.stderr?.on('data', () => {
@@ -74,6 +73,11 @@ export class FfmpegAudioConverter extends EventEmitter implements IAudioConverte
     this.process.on('close', (code: number | null) => {
       if (code !== null && code !== 0) {
         this.emit('error', new Error(`ffmpeg exited with code ${code}`));
+      } else if (!this.destroyed) {
+        // Emit 'end' to flush the last-chunk buffer, then auto-respawn so the converter
+        // is immediately ready for the next sentence (sentence splitter reuse).
+        this.emit('end');
+        this.spawnProcess();
       }
     });
   }
