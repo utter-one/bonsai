@@ -164,7 +164,7 @@ export class UserService extends BaseService {
         throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);
       }
 
-      const updatedUser = await db.update(users).set({ profile: input.profile, updatedAt: new Date() }).where(and(eq(users.projectId, projectId), eq(users.id, id))).returning();
+      const updatedUser = await db.update(users).set({ profile: input.profile, banned: input.banned, banReason: input.banReason, updatedAt: new Date() }).where(and(eq(users.projectId, projectId), eq(users.id, id))).returning();
 
       if (updatedUser.length === 0) {
         throw new NotFoundError(`User with id ${id} not found in project ${projectId}`);

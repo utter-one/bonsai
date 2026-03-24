@@ -38,21 +38,25 @@ export const createUserSchema = z.object({
 
 /**
  * Schema for updating a user
- * Optional fields: profile
+ * Optional fields: profile, banned, banReason
  * Profile updates are merged with existing profile data
  */
 export const updateUserBodySchema = z.object({
   profile: z.record(z.string(), z.unknown()).optional().describe('Updated profile data (merges with existing profile)'),
+  banned: z.boolean().optional().describe('Whether the user is banned from starting conversations'),
+  banReason: z.string().nullable().optional().describe('Reason for banning the user (null to clear)'),
 });
 
 /**
  * Schema for user response
- * Includes: id, projectId, profile, createdAt, updatedAt
+ * Includes: id, projectId, profile, banned, banReason, createdAt, updatedAt
  */
 export const userResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the user'),
   projectId: z.string().describe('Project this user belongs to'),
   profile: z.record(z.string(), z.unknown()).describe('User profile data as key-value pairs'),
+  banned: z.boolean().describe('Whether the user is banned from starting conversations'),
+  banReason: z.string().nullable().optional().describe('Reason the user was banned'),
   createdAt: z.coerce.date().describe('Timestamp when the user was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the user was last updated'),
   archived: z.boolean().optional().describe('Whether this entity belongs to an archived project'),
