@@ -5,6 +5,7 @@ import type { CALInputMessage } from './messages';
 import { ClientMessageHandlerRegistry } from './ClientMessageHandlerRegistry';
 import type { ClientMessageHandler } from './ClientMessageHandler';
 import type { ClientMessageHandlerContext } from './ClientMessageHandlerContext';
+import type { ZodTypeAny } from 'zod';
 
 // Import handlers module to trigger decorator registration
 import './handlers';
@@ -16,7 +17,7 @@ import './handlers';
  */
 @singleton()
 export class ChannelHandlerDispatcher {
-  private handlers = new Map<string, { instance: ClientMessageHandler; requiresAuth: boolean }>();
+  private handlers = new Map<string, { instance: ClientMessageHandler; requiresAuth: boolean; schema: ZodTypeAny }>();
 
   constructor() {
     this.registerHandlers();
@@ -33,7 +34,7 @@ export class ChannelHandlerDispatcher {
       const registryItem = registryItems.get(messageType);
       const handler = registryItem.handlerFactory();
       if (handler) {
-        this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth });
+        this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth, schema: registryItem.schema });
         logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth }, 'Registered message handler');
       }
     }
@@ -56,6 +57,14 @@ export class ChannelHandlerDispatcher {
       if (!handler) {
         logger.warn({ messageType: message.type }, 'Unknown message type received');
         context.sendError('Unknown message type', message.correlationId);
+        return;
+      }
+
+      const validation = handler.schema.safeParse(message);
+      if (!validation.success) {
+        const errorDetails = validation.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');
+        logger.warn({ messageType: message.type, correlationId: message.correlationId, issues: validation.error.issues }, 'Invalid message format received');
+        context.sendError(`Invalid message: ${errorDetails}`, message.correlationId);
         return;
       }
 

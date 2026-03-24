@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calSetVarRequestSchema } from '../messages';
 import type { CALSetVarRequest, CALSetVarResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles set variable requests.
  */
-@ChannelMessageHandler('set_var')
+@ChannelMessageHandler('set_var', true, calSetVarRequestSchema)
 @injectable()
 export class SetVarHandler implements ClientMessageHandler<CALSetVarRequest> {
   readonly messageType!: string;

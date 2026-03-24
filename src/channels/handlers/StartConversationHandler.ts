@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calStartConversationRequestSchema } from '../messages';
 import type { CALStartConversationRequest, CALStartConversationResponse } from '../messages';
 import { SessionManager } from '../SessionManager';
 import { ConversationService } from '../../services/ConversationService';
@@ -15,7 +16,7 @@ import type { ConversationFailedEventData } from '../../types/conversationEvents
 /**
  * Handles start conversation requests.
  */
-@ChannelMessageHandler('start_conversation')
+@ChannelMessageHandler('start_conversation', true, calStartConversationRequestSchema)
 @injectable()
 export class StartConversationHandler implements ClientMessageHandler<CALStartConversationRequest> {
   readonly messageType!: string;

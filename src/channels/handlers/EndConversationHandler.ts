@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calEndConversationRequestSchema } from '../messages';
 import type { CALEndConversationRequest, CALEndConversationResponse } from '../messages';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
@@ -10,7 +11,7 @@ import { SessionManager } from '../SessionManager';
 /**
  * Handles end conversation requests.
  */
-@ChannelMessageHandler('end_conversation')
+@ChannelMessageHandler('end_conversation', true, calEndConversationRequestSchema)
 @injectable()
 export class EndConversationHandler implements ClientMessageHandler<CALEndConversationRequest> {
   readonly messageType!: string;

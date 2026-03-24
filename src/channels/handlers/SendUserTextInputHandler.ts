@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calSendUserTextInputRequestSchema } from '../messages';
 import type { CALSendUserTextInputRequest, CALSendUserTextInputResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles send user text input requests.
  */
-@ChannelMessageHandler('send_user_text_input')
+@ChannelMessageHandler('send_user_text_input', true, calSendUserTextInputRequestSchema)
 @injectable()
 export class SendUserTextInputHandler implements ClientMessageHandler<CALSendUserTextInputRequest> {
   readonly messageType!: string;

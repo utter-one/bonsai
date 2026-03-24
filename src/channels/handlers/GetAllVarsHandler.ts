@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calGetAllVarsRequestSchema } from '../messages';
 import type { CALGetAllVarsRequest, CALGetAllVarsResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles get all variables requests.
  */
-@ChannelMessageHandler('get_all_vars')
+@ChannelMessageHandler('get_all_vars', true, calGetAllVarsRequestSchema)
 @injectable()
 export class GetAllVarsHandler implements ClientMessageHandler<CALGetAllVarsRequest> {
   readonly messageType!: string;

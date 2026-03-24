@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calRunActionRequestSchema } from '../messages';
 import type { CALRunActionRequest, CALRunActionResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles run action requests.
  */
-@ChannelMessageHandler('run_action')
+@ChannelMessageHandler('run_action', true, calRunActionRequestSchema)
 @injectable()
 export class RunActionHandler implements ClientMessageHandler<CALRunActionRequest> {
   readonly messageType!: string;

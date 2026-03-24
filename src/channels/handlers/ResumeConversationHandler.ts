@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calResumeConversationRequestSchema } from '../messages';
 import type { CALResumeConversationRequest, CALResumeConversationResponse } from '../messages';
 import { SessionManager } from '../SessionManager';
 import { ConversationService } from '../../services/ConversationService';
@@ -12,7 +13,7 @@ import type { ConversationFailedEventData } from '../../types/conversationEvents
 /**
  * Handles resume conversation requests.
  */
-@ChannelMessageHandler('resume_conversation')
+@ChannelMessageHandler('resume_conversation', true, calResumeConversationRequestSchema)
 @injectable()
 export class ResumeConversationHandler implements ClientMessageHandler<CALResumeConversationRequest> {
   readonly messageType!: string;
