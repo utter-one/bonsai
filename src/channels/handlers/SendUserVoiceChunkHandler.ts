@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { sendUserVoiceChunkRequestSchema } from '../websocket/contracts/userInput';
 import type { SendUserVoiceChunkRequest, SendUserVoiceChunkResponse } from '../websocket/contracts/userInput';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles send user voice chunk requests.
  */
-@ChannelMessageHandler('send_user_voice_chunk')
+@ChannelMessageHandler('send_user_voice_chunk', true, sendUserVoiceChunkRequestSchema)
 @injectable()
 export class SendUserVoiceChunkHandler implements ClientMessageHandler<SendUserVoiceChunkRequest> {
   readonly messageType!: string;

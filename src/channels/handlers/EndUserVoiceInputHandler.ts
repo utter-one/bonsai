@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calEndUserVoiceInputRequestSchema } from '../messages';
 import type { CALEndUserVoiceInputRequest, CALEndUserVoiceInputResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles end user voice input requests.
  */
-@ChannelMessageHandler('end_user_voice_input')
+@ChannelMessageHandler('end_user_voice_input', true, calEndUserVoiceInputRequestSchema)
 @injectable()
 export class EndUserVoiceInputHandler implements ClientMessageHandler<CALEndUserVoiceInputRequest> {
   readonly messageType!: string;

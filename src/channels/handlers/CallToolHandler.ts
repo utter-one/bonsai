@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calCallToolRequestSchema } from '../messages';
 import type { CALCallToolRequest, CALCallToolResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry'
 /**
  * Handles call tool requests.
  */
-@ChannelMessageHandler('call_tool')
+@ChannelMessageHandler('call_tool', true, calCallToolRequestSchema)
 @injectable()
 export class CallToolHandler implements ClientMessageHandler<CALCallToolRequest> {
   readonly messageType!: string;

@@ -1,6 +1,7 @@
 import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { calGoToStageRequestSchema } from '../messages';
 import type { CALGoToStageRequest, CALGoToStageResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
@@ -9,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles go to stage requests.
  */
-@ChannelMessageHandler('go_to_stage')
+@ChannelMessageHandler('go_to_stage', true, calGoToStageRequestSchema)
 @injectable()
 export class GoToStageHandler implements ClientMessageHandler<CALGoToStageRequest> {
   readonly messageType!: string;

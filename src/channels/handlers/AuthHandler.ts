@@ -1,6 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { authRequestSchema } from '../websocket/contracts/auth';
 import type { AuthRequest, AuthResponse } from '../websocket/contracts/auth';
 import { SessionManager } from '../SessionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';
@@ -12,7 +13,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
  * Handles WebSocket authentication requests.
  * Validates API key and creates a session on successful authentication.
  */
-@ChannelMessageHandler('auth', false)
+@ChannelMessageHandler('auth', false, authRequestSchema)
 @injectable()
 export class AuthHandler implements ClientMessageHandler<AuthRequest> {
   readonly messageType!: string;
