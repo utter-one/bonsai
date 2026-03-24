@@ -661,6 +661,7 @@ export class ConversationRunner {
         const stageTransitionDurationMs = this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined;
         // For the text-only path, total turn duration is known now; for the TTS path it will be updated in setOnGenerationEnded
         const totalTurnDurationMs = !ttsProvider && this.turnData.startMs !== null ? llmEndMs - this.turnData.startMs : undefined;
+        const turnEndMs = !ttsProvider ? llmEndMs : undefined;
 
         // Save AI message event with usage info and timing metrics
         const messageEventData: MessageEventData = {
@@ -690,6 +691,7 @@ export class ConversationRunner {
             timeToFirstTokenFromTurnStartMs,
             timeToFirstAudioMs,
             totalTurnDurationMs,
+            turnEndMs,
             moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
             fillerPrompt: this.lastFillerPrompt ?? undefined,
           },
