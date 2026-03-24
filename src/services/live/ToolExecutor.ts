@@ -21,6 +21,10 @@ export const toolExecutionResultSchema = z.object({
   llmSettings: z.any().optional(),
   /** Total duration of the tool execution in milliseconds */
   durationMs: z.number().optional(),
+  /** Unix timestamp (ms) when tool execution started */
+  startMs: z.number().optional(),
+  /** Unix timestamp (ms) when tool execution completed */
+  endMs: z.number().optional(),
   /** Flow control signals emitted by script tools */
   flowControl: z.custom<ScriptFlowControl>().optional(),
   /** Whether the script tool modified stage variables */
@@ -86,11 +90,13 @@ export class ToolExecutor {
       messages.push({ role: 'user' as const, content: 'Please complete the requested task based on the system instructions.' });
 
       const result = await llmProvider.generate(messages, { outputFormat: this.getOutputFormat(tool) });
-      const durationMs = Date.now() - toolStartMs;
-      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings, durationMs };
+      const endMs = Date.now();
+      const durationMs = endMs - toolStartMs;
+      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings, durationMs, startMs: toolStartMs, endMs };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
-      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution', durationMs: Date.now() - toolStartMs };
+      const endMs = Date.now();
+      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during tool execution', durationMs: endMs - toolStartMs, startMs: toolStartMs, endMs };
     }
   }
 
@@ -139,11 +145,13 @@ export class ToolExecutor {
       response.headers.forEach((value, key) => { headersObj[key] = value; });
 
       const result = { status: response.status, statusText: response.statusText, headers: headersObj, data };
-      const durationMs = Date.now() - toolStartMs;
-      return { success: true, toolId: tool.id, parameters, result, durationMs };
+      const endMs = Date.now();
+      const durationMs = endMs - toolStartMs;
+      return { success: true, toolId: tool.id, parameters, result, durationMs, startMs: toolStartMs, endMs };
     } catch (error) {
       logger.error({ toolId: tool.id, url: tool.url, error }, `Error executing webhook tool "${tool.name}"`);
-      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during webhook execution', durationMs: Date.now() - toolStartMs };
+      const endMs = Date.now();
+      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during webhook execution', durationMs: endMs - toolStartMs, startMs: toolStartMs, endMs };
     }
   }
 
@@ -159,13 +167,16 @@ export class ToolExecutor {
     const toolStartMs = Date.now();
     try {
       const scriptResult = await this.scriptExecutor.executeScript(tool.code, context, parameters);
-      const durationMs = Date.now() - toolStartMs;
+      const endMs = Date.now();
+      const durationMs = endMs - toolStartMs;
       return {
         success: true,
         toolId: tool.id,
         parameters,
         result: scriptResult.value,
         durationMs,
+        startMs: toolStartMs,
+        endMs,
         flowControl: scriptResult.flowControl,
         hasModifiedVars: scriptResult.hasModifiedVars,
         hasModifiedUserInput: scriptResult.hasModifiedUserInput,
@@ -173,7 +184,8 @@ export class ToolExecutor {
       };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing script tool "${tool.name}"`);
-      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during script execution', durationMs: Date.now() - toolStartMs };
+      const endMs = Date.now();
+      return { success: false, toolId: tool.id, parameters, failureReason: error.message ?? 'Unknown error during script execution', durationMs: endMs - toolStartMs, startMs: toolStartMs, endMs };
     }
   }
 

@@ -514,6 +514,10 @@ export class ConversationRunner {
             const backfill: Record<string, any> = {};
             if (totalTurnDurationMs !== undefined) backfill.totalTurnDurationMs = totalTurnDurationMs;
             if (ttsDurationMs !== undefined) backfill.ttsDurationMs = ttsDurationMs;
+            if (startMs !== null) backfill.turnStartMs = startMs;
+            backfill.turnEndMs = ttsEndMs;
+            if (ttsStartMs !== null) backfill.ttsStartMs = ttsStartMs;
+            backfill.ttsEndMs = ttsEndMs;
             if (Object.keys(backfill).length > 0) {
               const updated = await this.conversationService.updateConversationEventMetadata(this.conversation.projectId, assistantMessageEventId, backfill);
               const eventUpdateMessage: CALConversationEventUpdateMessage = {
@@ -655,6 +659,11 @@ export class ConversationRunner {
             llmSettings: this.stageData.stage.llmSettings,
             outputTurnId: this.turnData.outputTurnId,
             turnIndex: this.turnData.turnIndex,
+            turnStartMs: this.turnData.startMs ?? undefined,
+            llmStartMs: this.turnData.llmStartMs ?? undefined,
+            llmEndMs,
+            firstTokenMs: this.turnData.firstTokenMs ?? undefined,
+            firstAudioMs: this.turnData.firstAudioMs ?? undefined,
             llmDurationMs,
             timeToFirstTokenMs,
             timeToFirstTokenFromTurnStartMs,
@@ -1355,6 +1364,8 @@ export class ConversationRunner {
         systemPrompt: executeResult.renderedPrompt,
         llmSettings: executeResult.llmSettings,
         durationMs: executeResult.durationMs,
+        startMs: executeResult.startMs,
+        endMs: executeResult.endMs,
       }
     };
     await this.saveAndSendEvent('tool_call', eventData);
@@ -1582,7 +1593,9 @@ export class ConversationRunner {
 
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
     this.responseGeneratedInTurn = false;
-    // Capture asrStartMs before resetting turnData so we can compute asrDurationMs
+    // Capture asrStartMs and asrEndMs before resetting turnData so we can compute asrDurationMs and persist raw timestamps
+    const savedAsrStartMs = this.turnData.asrStartMs;
+    const savedAsrEndMs = asrEndMs ?? null;
     const asrDurationMs = asrEndMs && this.turnData.asrStartMs !== null ? asrEndMs - this.turnData.asrStartMs : null;
     this.resetTurnData();
     const asrDurationMsValue = asrDurationMs && asrDurationMs > 0 ? asrDurationMs : undefined;
@@ -1606,8 +1619,10 @@ export class ConversationRunner {
     // This prevents inappropriate content from reaching provider APIs and risking account bans.
     const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
     this.turnData.moderationDurationMs = moderationResult.durationMs > 0 ? moderationResult.durationMs : null;
+    const moderationStartMs = moderationResult.durationMs > 0 ? moderationResult.startMs : null;
+    const moderationEndMs = moderationStartMs !== null ? moderationStartMs + moderationResult.durationMs : null;
     if (moderationResult.detectedCategories.length > 0) {
-      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs };
+      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs, startMs: moderationResult.startMs, endMs: moderationResult.startMs + moderationResult.durationMs };
       await this.saveAndSendEvent('moderation', moderationEventData);
     }
     if (moderationResult.flagged) {
@@ -1644,8 +1659,9 @@ export class ConversationRunner {
     this.lastFillerPrompt = null;
     const fillerStartMs = Date.now();
     const fillerSentence = await this.generateFillerSentence(userInput);
+    const fillerEndMs = Date.now();
     if (fillerSentence) {
-      this.turnData.fillerDurationMs = Date.now() - fillerStartMs;
+      this.turnData.fillerDurationMs = fillerEndMs - fillerStartMs;
       this.turnData.outputTurnId = generateId(ID_PREFIXES.OUTPUT);
       const fillerStartMessage: CALStartAiGenerationOutputMessage = {
         type: 'start_ai_generation_output',
@@ -1674,7 +1690,8 @@ export class ConversationRunner {
 
     const processingStartMs = Date.now();
     const processingResult = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
-    const processingDurationMs = Date.now() - processingStartMs;
+    const processingEndMs = Date.now();
+    const processingDurationMs = processingEndMs - processingStartMs;
     const classificationResults = processingResult.actions;
     const knowledgeRetrievalDurationMs = processingResult.knowledgeRetrievalDurationMs;
 
@@ -1746,12 +1763,15 @@ export class ConversationRunner {
     // If no actions matched and __on_fallback is defined, execute it
     let executionOutcome: ActionsExecutionOutcome;
     let actionsDurationMs: number;
+    let actionsStartMs: number;
+    let actionsEndMs: number;
     const onFallbackAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_FALLBACK];
     if (actions.length === 0 && onFallbackAction) {
       logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
-      const actionsStartMs = Date.now();
+      actionsStartMs = Date.now();
       executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
-      actionsDurationMs = Date.now() - actionsStartMs;
+      actionsEndMs = Date.now();
+      actionsDurationMs = actionsEndMs - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
 
       // Save/send tool call events from action execution
@@ -1765,9 +1785,10 @@ export class ConversationRunner {
       };
       await this.saveAndSendEvent('action', actionEventData);
     } else {
-      const actionsStartMs = Date.now();
+      actionsStartMs = Date.now();
       executionOutcome = await this.actionsExecutor.executeActions(actions, context);
-      actionsDurationMs = Date.now() - actionsStartMs;
+      actionsEndMs = Date.now();
+      actionsDurationMs = actionsEndMs - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
 
       // Save/send tool call events from action execution
@@ -1793,12 +1814,25 @@ export class ConversationRunner {
         source: context.userInputSource,
         inputTurnId: this.turnData.inputTurnId,
         turnIndex: this.turnData.turnIndex,
+        turnStartMs: this.turnData.startMs ?? undefined,
+        asrStartMs: savedAsrStartMs ?? undefined,
+        asrEndMs: savedAsrEndMs ?? undefined,
         asrDurationMs: asrDurationMsValue,
+        moderationStartMs: moderationStartMs ?? undefined,
+        moderationEndMs: moderationEndMs ?? undefined,
         moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
+        fillerStartMs: fillerSentence ? fillerStartMs : undefined,
+        fillerEndMs: fillerSentence ? fillerEndMs : undefined,
+        fillerDurationMs: this.turnData.fillerDurationMs ?? undefined,
+        processingStartMs,
+        processingEndMs,
         processingDurationMs,
+        knowledgeRetrievalStartMs: processingResult.knowledgeRetrievalStartMs,
+        knowledgeRetrievalEndMs: processingResult.knowledgeRetrievalEndMs,
         knowledgeRetrievalDurationMs,
+        actionsStartMs,
+        actionsEndMs,
         actionsDurationMs,
-        fillerDurationMs: this.turnData.fillerDurationMs,
     }, this.turnMessageVisibility);
     const messageUpdateMessage: CALConversationEventUpdateMessage = {
       type: 'conversation_event_update',
@@ -2063,6 +2097,8 @@ export class ConversationRunner {
             systemPrompt: toolCallEvent.systemPrompt,
             llmSettings: toolCallEvent.llmSettings,
             durationMs: toolCallEvent.durationMs,
+            startMs: toolCallEvent.startMs,
+            endMs: toolCallEvent.endMs,
           }
         };
         await this.saveAndSendEvent('tool_call', eventData);

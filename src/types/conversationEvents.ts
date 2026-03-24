@@ -177,6 +177,10 @@ export const moderationEventDataSchema = z.object({
   detectedCategories: z.array(z.string()),
   /** Duration of the moderation API call in milliseconds */
   durationMs: z.number(),
+  /** Unix timestamp (ms) when the moderation API call started */
+  startMs: z.number(),
+  /** Unix timestamp (ms) when the moderation API call completed */
+  endMs: z.number(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
