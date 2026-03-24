@@ -81,6 +81,10 @@ export type TurnData = {
   moderationDurationMs: number | null;
   /** Unix timestamp (ms) when ASR recognition started */
   asrStartMs: number | null;
+  /** Unix timestamp (ms) when a stage transition (goToStage) was initiated by an action outcome */
+  stageTransitionStartMs: number | null;
+  /** Unix timestamp (ms) when the stage transition completed (stage data reloaded, providers re-wired, on_enter executed) */
+  stageTransitionEndMs: number | null;
   /** Unix timestamp (ms) when the TTS WebSocket connection was initiated */
   ttsConnectStartMs: number | null;
   /** Unix timestamp (ms) when the TTS WebSocket connection was established and ready */
@@ -146,7 +150,7 @@ export class ConversationRunner {
   private outboundPendingChunk: PendingOutboundChunk | null = null;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0 };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0 };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -652,6 +656,9 @@ export class ConversationRunner {
         const timeToFirstTokenMs = this.turnData.firstTokenMs !== null && this.turnData.llmStartMs !== null ? this.turnData.firstTokenMs - this.turnData.llmStartMs : undefined;
         const timeToFirstTokenFromTurnStartMs = this.turnData.firstTokenMs !== null && this.turnData.startMs !== null ? this.turnData.firstTokenMs - this.turnData.startMs : undefined;
         const timeToFirstAudioMs = this.turnData.firstAudioMs !== null && this.turnData.startMs !== null ? this.turnData.firstAudioMs - this.turnData.startMs : undefined;
+        const ttsConnectDurationMs = this.turnData.ttsConnectStartMs !== null && this.turnData.ttsConnectEndMs !== null ? this.turnData.ttsConnectEndMs - this.turnData.ttsConnectStartMs : undefined;
+        const promptRenderDurationMs = this.turnData.promptRenderStartMs !== null && this.turnData.promptRenderEndMs !== null ? this.turnData.promptRenderEndMs - this.turnData.promptRenderStartMs : undefined;
+        const stageTransitionDurationMs = this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined;
         // For the text-only path, total turn duration is known now; for the TTS path it will be updated in setOnGenerationEnded
         const totalTurnDurationMs = !ttsProvider && this.turnData.startMs !== null ? llmEndMs - this.turnData.startMs : undefined;
 
@@ -670,8 +677,13 @@ export class ConversationRunner {
             turnStartMs: this.turnData.startMs ?? undefined,
             ttsConnectStartMs: this.turnData.ttsConnectStartMs ?? undefined,
             ttsConnectEndMs: this.turnData.ttsConnectEndMs ?? undefined,
+            ttsConnectDurationMs,
+            stageTransitionStartMs: this.turnData.stageTransitionStartMs ?? undefined,
+            stageTransitionEndMs: this.turnData.stageTransitionEndMs ?? undefined,
+            stageTransitionDurationMs,
             promptRenderStartMs: this.turnData.promptRenderStartMs ?? undefined,
             promptRenderEndMs: this.turnData.promptRenderEndMs ?? undefined,
+            promptRenderDurationMs,
             llmStartMs: this.turnData.llmStartMs ?? undefined,
             llmEndMs,
             firstTokenMs: this.turnData.firstTokenMs ?? undefined,
@@ -1422,7 +1434,9 @@ export class ConversationRunner {
     // Apply stage navigation if specified
     if (outcome.goToStageId && outcome.goToStageId !== this.stageData.id) {
       logger.info({ conversationId, currentStageId: this.stageData.id, targetStageId: outcome.goToStageId }, `Applying stage navigation`);
+      this.turnData.stageTransitionStartMs = Date.now();
       await this.goToStage(outcome.goToStageId, true);
+      this.turnData.stageTransitionEndMs = Date.now();
     }
 
     if (outcome.shouldAbortConversation) {
@@ -1600,6 +1614,8 @@ export class ConversationRunner {
       fillerDurationMs: null,
       moderationDurationMs: null,
       asrStartMs: null,
+      stageTransitionStartMs: null,
+      stageTransitionEndMs: null,
       ttsConnectStartMs: null,
       ttsConnectEndMs: null,
       ttsStartMs: null,
