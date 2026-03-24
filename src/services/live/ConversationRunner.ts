@@ -63,6 +63,10 @@ export type TurnData = {
   outputTurnId?: string;
   /** Unix timestamp (ms) when the current turn started processing */
   startMs: number | null;
+  /** Unix timestamp (ms) when prompt template rendering started */
+  promptRenderStartMs: number | null;
+  /** Unix timestamp (ms) when prompt template rendering completed */
+  promptRenderEndMs: number | null;
   /** Unix timestamp (ms) when LLM completion generation was started */
   llmStartMs: number | null;
   /** Unix timestamp (ms) when the first LLM completion token was received */
@@ -77,6 +81,10 @@ export type TurnData = {
   moderationDurationMs: number | null;
   /** Unix timestamp (ms) when ASR recognition started */
   asrStartMs: number | null;
+  /** Unix timestamp (ms) when the TTS WebSocket connection was initiated */
+  ttsConnectStartMs: number | null;
+  /** Unix timestamp (ms) when the TTS WebSocket connection was established and ready */
+  ttsConnectEndMs: number | null;
   /** Unix timestamp (ms) when the TTS provider started synthesising the first chunk */
   ttsStartMs: number | null;
   /** Sequential 1-based turn number within the conversation */
@@ -138,7 +146,7 @@ export class ConversationRunner {
   private outboundPendingChunk: PendingOutboundChunk | null = null;
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsStartMs: null, turnIndex: 0 };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0 };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -660,6 +668,10 @@ export class ConversationRunner {
             outputTurnId: this.turnData.outputTurnId,
             turnIndex: this.turnData.turnIndex,
             turnStartMs: this.turnData.startMs ?? undefined,
+            ttsConnectStartMs: this.turnData.ttsConnectStartMs ?? undefined,
+            ttsConnectEndMs: this.turnData.ttsConnectEndMs ?? undefined,
+            promptRenderStartMs: this.turnData.promptRenderStartMs ?? undefined,
+            promptRenderEndMs: this.turnData.promptRenderEndMs ?? undefined,
             llmStartMs: this.turnData.llmStartMs ?? undefined,
             llmEndMs,
             firstTokenMs: this.turnData.firstTokenMs ?? undefined,
@@ -1579,6 +1591,8 @@ export class ConversationRunner {
       inputTurnId: this.turnData.inputTurnId,
       outputTurnId: undefined,
       startMs: Date.now(),
+      promptRenderStartMs: null,
+      promptRenderEndMs: null,
       llmStartMs: null,
       firstTokenMs: null,
       firstAudioMs: null,
@@ -1586,6 +1600,8 @@ export class ConversationRunner {
       fillerDurationMs: null,
       moderationDurationMs: null,
       asrStartMs: null,
+      ttsConnectStartMs: null,
+      ttsConnectEndMs: null,
       ttsStartMs: null,
       turnIndex: this.turnData.turnIndex + 1,
     };
@@ -1872,14 +1888,18 @@ export class ConversationRunner {
         await this.channel.sendMessage(startGenerationMessage);
 
         if (this.stageData.ttsProvider) {
+          this.turnData.ttsConnectStartMs = Date.now();
           await this.stageData.ttsProvider.start();
+          this.turnData.ttsConnectEndMs = Date.now();
         }
       }
       await this.changeState('generating_response');
       if (executionOutcome.prescriptedResponse !== undefined) {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
+        this.turnData.promptRenderStartMs = Date.now();
         this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        this.turnData.promptRenderEndMs = Date.now();
         this.turnData.firstTokenMs = null;
         this.turnData.llmStartMs = Date.now();
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
