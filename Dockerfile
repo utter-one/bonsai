@@ -1,8 +1,14 @@
 # Use Node.js LTS version with security updates
 FROM node:20-slim
 
-# Install curl for health checks
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# Install curl for health checks and build tools for native addons (e.g. @discordjs/opus)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    python3 \
+    make \
+    g++ \
+    libopus-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -10,9 +16,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies, then remove build tools to keep the image lean
 # RUN npm ci --only=production
-RUN npm ci
+RUN npm ci \
+    && apt-get purge -y --auto-remove python3 make g++
 
 # Copy source code
 COPY src/ ./src/
