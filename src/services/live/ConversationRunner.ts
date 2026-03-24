@@ -678,9 +678,6 @@ export class ConversationRunner {
             ttsConnectStartMs: this.turnData.ttsConnectStartMs ?? undefined,
             ttsConnectEndMs: this.turnData.ttsConnectEndMs ?? undefined,
             ttsConnectDurationMs,
-            stageTransitionStartMs: this.turnData.stageTransitionStartMs ?? undefined,
-            stageTransitionEndMs: this.turnData.stageTransitionEndMs ?? undefined,
-            stageTransitionDurationMs,
             promptRenderStartMs: this.turnData.promptRenderStartMs ?? undefined,
             promptRenderEndMs: this.turnData.promptRenderEndMs ?? undefined,
             promptRenderDurationMs,
@@ -1865,6 +1862,9 @@ export class ConversationRunner {
         actionsStartMs,
         actionsEndMs,
         actionsDurationMs,
+        stageTransitionStartMs: this.turnData.stageTransitionStartMs ?? undefined,
+        stageTransitionEndMs: this.turnData.stageTransitionEndMs ?? undefined,
+        stageTransitionDurationMs: this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined,
     }, this.turnMessageVisibility);
     const messageUpdateMessage: CALConversationEventUpdateMessage = {
       type: 'conversation_event_update',
