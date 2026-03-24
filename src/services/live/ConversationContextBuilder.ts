@@ -90,11 +90,14 @@ export type ConversationContext = {
   /** ID of the project the conversation belongs to */
   projectId: string;
 
+  /** ID of the user associated with this conversation */
+  userId: string;
+
   /** Stage variables */
   vars: Record<string, any>;
 
   /** Full stage variables for referencing in other stages */
-  stageVars?: Record<string, Record<string, any>>; 
+  stageVars?: Record<string, Record<string, any>>;
 
   /** User profile data */
   userProfile: Record<string, any>;
@@ -204,7 +207,7 @@ export class ConversationContextBuilder {
   constructor(
     @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
     @inject(HistoryBuilder) private readonly historyBuilder: HistoryBuilder,
-  ) {}
+  ) { }
 
   /**
    * Builds a rich time context object anchored to the given IANA timezone.
@@ -281,13 +284,13 @@ export class ConversationContextBuilder {
       return addDays(date, daysAhead);
     };
 
-    const nextSunday    = nextWeekday(0);
-    const nextMonday    = nextWeekday(1);
-    const nextTuesday   = nextWeekday(2);
+    const nextSunday = nextWeekday(0);
+    const nextMonday = nextWeekday(1);
+    const nextTuesday = nextWeekday(2);
     const nextWednesday = nextWeekday(3);
-    const nextThursday  = nextWeekday(4);
-    const nextFriday    = nextWeekday(5);
-    const nextSaturday  = nextWeekday(6);
+    const nextThursday = nextWeekday(4);
+    const nextFriday = nextWeekday(5);
+    const nextSaturday = nextWeekday(6);
 
     // Upcoming 14-day calendar window
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -397,11 +400,11 @@ export class ConversationContextBuilder {
     // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId) AND condition is met
     const stageActionEntries = Object.entries(stage.actions || {})
       .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId));
-    
+
     const stageActionsPromises = stageActionEntries.map(async ([id, action]) => {
       const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
       if (!isActive) return null;
-      
+
       return {
         name: action.name,
         trigger: action.classificationTrigger,
@@ -421,7 +424,7 @@ export class ConversationContextBuilder {
       .map(async action => {
         const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
         if (!isActive) return null;
-        
+
         return {
           name: action.name,
           trigger: action.classificationTrigger,
@@ -492,6 +495,7 @@ export class ConversationContextBuilder {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       stageId: conversation.stageId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
@@ -554,6 +558,7 @@ export class ConversationContextBuilder {
     const context: ConversationContext = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -615,6 +620,7 @@ export class ConversationContextBuilder {
     const context: ConversationContext = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -634,7 +640,7 @@ export class ConversationContextBuilder {
 
     return context;
   }
-  
+
   /**
    * Builds context specifically for a classifier with filtered actions.
    * Only includes actions that are either not assigned to any classifier or assigned to the specific classifier.
@@ -666,6 +672,7 @@ export class ConversationContextBuilder {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -747,6 +754,7 @@ export class ConversationContextBuilder {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -838,6 +846,7 @@ export class ConversationContextBuilder {
     const context: ConversationContext = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: stageVars,
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -902,6 +911,7 @@ export class ConversationContextBuilder {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -954,6 +964,7 @@ export class ConversationContextBuilder {
     return {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: userProfile || {}, // Not loaded in raw context
@@ -968,22 +979,22 @@ export class ConversationContextBuilder {
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       project: projectContext,
       stage: {
-          id: conversation.stageId,
-          name: stage.name,
-          availableActions: stage.actions ? Object.entries(stage.actions).map(([_, action]) => ({
-            name: action.name,
-            trigger: action.classificationTrigger,
-            examples: action.examples || undefined,
-            parameters: action.parameters?.map(p => ({
-              name: p.name,
-              type: p.type,
-              description: p.description,
-              required: p.required,
-            })),
-          })) : [],
-          useKnowledge: stage.useKnowledge,
-          enterBehavior: stage.enterBehavior,
-          metadata: stage.metadata || undefined,          
+        id: conversation.stageId,
+        name: stage.name,
+        availableActions: stage.actions ? Object.entries(stage.actions).map(([_, action]) => ({
+          name: action.name,
+          trigger: action.classificationTrigger,
+          examples: action.examples || undefined,
+          parameters: action.parameters?.map(p => ({
+            name: p.name,
+            type: p.type,
+            description: p.description,
+            required: p.required,
+          })),
+        })) : [],
+        useKnowledge: stage.useKnowledge,
+        enterBehavior: stage.enterBehavior,
+        metadata: stage.metadata || undefined,
       }
     };
   }

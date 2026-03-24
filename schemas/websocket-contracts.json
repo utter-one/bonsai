@@ -1515,6 +1515,9 @@
         },
         {
           "$ref": "#/definitions/ChangeVisibilityEffect"
+        },
+        {
+          "$ref": "#/definitions/BanUserEffect"
         }
       ],
       "discriminator": {
@@ -1528,7 +1531,8 @@
           "modify_user_profile": "#/definitions/ModifyUserProfileEffect",
           "call_tool": "#/definitions/CallToolEffect",
           "generate_response": "#/definitions/GenerateResponseEffect",
-          "change_visibility": "#/definitions/ChangeVisibilityEffect"
+          "change_visibility": "#/definitions/ChangeVisibilityEffect",
+          "ban_user": "#/definitions/BanUserEffect"
         }
       }
     },
@@ -1813,6 +1817,25 @@
       "required": [
         "type",
         "visibility"
+      ]
+    },
+    "BanUserEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ban_user"
+          ],
+          "description": "Effect type"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for banning the user"
+        }
+      },
+      "required": [
+        "type"
       ]
     },
     "conversation-event-update": {
