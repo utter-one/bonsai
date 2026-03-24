@@ -1131,6 +1131,11 @@ export class ConversationRunner {
         }
       }
 
+      // Stage setup is complete (providers wired, on_enter executed) — mark end before response generation
+      if (this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs === null) {
+        this.turnData.stageTransitionEndMs = Date.now();
+      }
+
       if (enterOutcome?.shouldGenerateResponse) {
         // on_enter action explicitly requested a response (may include a prescripted response)
         await this.generateResponse(enterContext, enterOutcome);
@@ -1433,7 +1438,6 @@ export class ConversationRunner {
       logger.info({ conversationId, currentStageId: this.stageData.id, targetStageId: outcome.goToStageId }, `Applying stage navigation`);
       this.turnData.stageTransitionStartMs = Date.now();
       await this.goToStage(outcome.goToStageId, true);
-      this.turnData.stageTransitionEndMs = Date.now();
     }
 
     if (outcome.shouldAbortConversation) {
