@@ -13,7 +13,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class UserController {
-  constructor(@inject(UserService) private readonly userService: UserService) {}
+  constructor(@inject(UserService) private readonly userService: UserService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -232,7 +232,7 @@ export class UserController {
   private async getUserAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = userRouteParamsSchema.parse(req.params);
-    const logs = await this.userService.getUserAuditLogs(params.id);
+    const logs = await this.userService.getUserAuditLogs(params.id, params.projectId);
     res.status(200).json(logs);
   }
 }

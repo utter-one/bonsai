@@ -321,15 +321,16 @@ export class ToolService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific tool
    * @param toolId - The unique identifier of the tool
+   * @param projectId - The project ID the tool belongs to
    * @returns Array of audit log entries for the tool
    */
-  async getToolAuditLogs(toolId: string): Promise<any[]> {
-    logger.debug({ toolId }, 'Fetching audit logs for tool');
+  async getToolAuditLogs(toolId: string, projectId: string): Promise<any[]> {
+    logger.debug({ toolId, projectId }, 'Fetching audit logs for tool');
 
     try {
-      return await this.auditService.getEntityAuditLogs('tool', toolId);
+      return await this.auditService.getEntityAuditLogs('tool', toolId, projectId);
     } catch (error) {
-      logger.error({ error, toolId }, 'Failed to fetch tool audit logs');
+      logger.error({ error, toolId, projectId }, 'Failed to fetch tool audit logs');
       throw error;
     }
   }

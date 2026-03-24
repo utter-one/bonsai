@@ -347,15 +347,16 @@ export class StageService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific stage
    * @param id - The unique identifier of the stage
+   * @param projectId - The project ID the stage belongs to
    * @returns Array of audit log entries for the stage
    */
-  async getStageAuditLogs(id: string): Promise<any[]> {
-    logger.debug({ id }, 'Fetching audit logs for stage');
+  async getStageAuditLogs(id: string, projectId: string): Promise<any[]> {
+    logger.debug({ id, projectId }, 'Fetching audit logs for stage');
 
     try {
-      return await this.auditService.getEntityAuditLogs('stage', id);
+      return await this.auditService.getEntityAuditLogs('stage', id, projectId);
     } catch (error) {
-      logger.error({ error, id }, 'Failed to fetch stage audit logs');
+      logger.error({ error, id, projectId }, 'Failed to fetch stage audit logs');
       throw error;
     }
   }

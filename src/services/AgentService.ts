@@ -272,15 +272,16 @@ export class AgentService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific agent
    * @param agentId - The unique identifier of the agent
+   * @param projectId - The project ID the agent belongs to
    * @returns Array of audit log entries for the agent
    */
-  async getAgentAuditLogs(agentId: string): Promise<any[]> {
-    logger.debug({ agentId }, 'Fetching audit logs for agent');
+  async getAgentAuditLogs(agentId: string, projectId: string): Promise<any[]> {
+    logger.debug({ agentId, projectId }, 'Fetching audit logs for agent');
 
     try {
-      return await this.auditService.getEntityAuditLogs('agent', agentId);
+      return await this.auditService.getEntityAuditLogs('agent', agentId, projectId);
     } catch (error) {
-      logger.error({ error, agentId }, 'Failed to fetch agent audit logs');
+      logger.error({ error, agentId, projectId }, 'Failed to fetch agent audit logs');
       throw error;
     }
   }

@@ -15,7 +15,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class StageController {
-  constructor(@inject(StageService) private readonly stageService: StageService) {}
+  constructor(@inject(StageService) private readonly stageService: StageService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -272,7 +272,7 @@ export class StageController {
   private async getStageAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = stageRouteParamsSchema.parse(req.params);
-    const logs = await this.stageService.getStageAuditLogs(params.id);
+    const logs = await this.stageService.getStageAuditLogs(params.id, params.projectId);
     res.status(200).json(logs);
   }
 
