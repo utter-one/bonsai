@@ -1507,8 +1507,14 @@ export class ConversationRunner {
     this.outboundConverter = await AudioConverterFactory.create(ttsNativeFormat, clientFormat);
 
     this.outboundConverter.on('data', async (audioData: Buffer) => {
-      // Last-chunk-buffer: send the previously buffered chunk as non-final before buffering the new one
+      // Last-chunk-buffer: buffer the new chunk immediately (synchronously, before any await) so that
+      // the 'end' handler always sees the most recent chunk even if this handler suspends at the sendMessage await.
       const pending = this.outboundPendingChunk;
+      this.outboundPendingChunk = {
+        chunkId: generateId(ID_PREFIXES.CHUNK),
+        ordinal: this.outboundOrdinalCounter++,
+        audio: audioData,
+      };
       if (pending) {
         const msg: CALSendAiVoiceChunkMessage = {
           type: 'send_ai_voice_chunk',
@@ -1523,11 +1529,6 @@ export class ConversationRunner {
         await this.channel.sendMessage(msg);
         logger.debug({ conversationId, chunkId: pending.chunkId, ordinal: pending.ordinal }, `Outbound converter chunk sent for conversation ${conversationId}`);
       }
-      this.outboundPendingChunk = {
-        chunkId: generateId(ID_PREFIXES.CHUNK),
-        ordinal: this.outboundOrdinalCounter++,
-        audio: audioData,
-      };
     });
 
     this.outboundConverter.on('end', async () => {
@@ -1846,31 +1847,31 @@ export class ConversationRunner {
 
     // Update message event with moderation and processing results, which may be needed for response generation and should be sent to client for UI updates
     const updated = await this.conversationService.updateMessageEvent(this.conversation.projectId, userMessageEventId, context.userInput, {
-        source: context.userInputSource,
-        inputTurnId: this.turnData.inputTurnId,
-        turnIndex: this.turnData.turnIndex,
-        turnStartMs: this.turnData.startMs ?? undefined,
-        asrStartMs: savedAsrStartMs ?? undefined,
-        asrEndMs: savedAsrEndMs ?? undefined,
-        asrDurationMs: asrDurationMsValue,
-        moderationStartMs: moderationStartMs ?? undefined,
-        moderationEndMs: moderationEndMs ?? undefined,
-        moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
-        fillerStartMs: fillerSentence ? fillerStartMs : undefined,
-        fillerEndMs: fillerSentence ? fillerEndMs : undefined,
-        fillerDurationMs: this.turnData.fillerDurationMs ?? undefined,
-        processingStartMs,
-        processingEndMs,
-        processingDurationMs,
-        knowledgeRetrievalStartMs: processingResult.knowledgeRetrievalStartMs,
-        knowledgeRetrievalEndMs: processingResult.knowledgeRetrievalEndMs,
-        knowledgeRetrievalDurationMs,
-        actionsStartMs,
-        actionsEndMs,
-        actionsDurationMs,
-        stageTransitionStartMs: this.turnData.stageTransitionStartMs ?? undefined,
-        stageTransitionEndMs: this.turnData.stageTransitionEndMs ?? undefined,
-        stageTransitionDurationMs: this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined,
+      source: context.userInputSource,
+      inputTurnId: this.turnData.inputTurnId,
+      turnIndex: this.turnData.turnIndex,
+      turnStartMs: this.turnData.startMs ?? undefined,
+      asrStartMs: savedAsrStartMs ?? undefined,
+      asrEndMs: savedAsrEndMs ?? undefined,
+      asrDurationMs: asrDurationMsValue,
+      moderationStartMs: moderationStartMs ?? undefined,
+      moderationEndMs: moderationEndMs ?? undefined,
+      moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
+      fillerStartMs: fillerSentence ? fillerStartMs : undefined,
+      fillerEndMs: fillerSentence ? fillerEndMs : undefined,
+      fillerDurationMs: this.turnData.fillerDurationMs ?? undefined,
+      processingStartMs,
+      processingEndMs,
+      processingDurationMs,
+      knowledgeRetrievalStartMs: processingResult.knowledgeRetrievalStartMs,
+      knowledgeRetrievalEndMs: processingResult.knowledgeRetrievalEndMs,
+      knowledgeRetrievalDurationMs,
+      actionsStartMs,
+      actionsEndMs,
+      actionsDurationMs,
+      stageTransitionStartMs: this.turnData.stageTransitionStartMs ?? undefined,
+      stageTransitionEndMs: this.turnData.stageTransitionEndMs ?? undefined,
+      stageTransitionDurationMs: this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined,
     }, this.turnMessageVisibility);
     const messageUpdateMessage: CALConversationEventUpdateMessage = {
       type: 'conversation_event_update',
