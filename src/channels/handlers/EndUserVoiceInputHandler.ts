@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles end user voice input requests.
  */
-@ChannelMessageHandler('end_user_voice_input', true, calEndUserVoiceInputRequestSchema)
+@ChannelMessageHandler('end_user_voice_input', true, calEndUserVoiceInputRequestSchema, 'voice_input')
 @injectable()
 export class EndUserVoiceInputHandler implements ClientMessageHandler<CALEndUserVoiceInputRequest> {
   readonly messageType!: string;

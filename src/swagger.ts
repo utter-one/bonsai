@@ -22,7 +22,7 @@ import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchem
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, moderationProvidersResponseSchema, moderationProviderInfoSchema, moderationModelInfoSchema, moderationCategoryInfoSchema } from './http/contracts/providerCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema } from './http/contracts/analytics';
-import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
+import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema, apiKeySettingsSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { asrConfigSchema } from './http/contracts/project';
 import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, changeVisibilityEffectSchema, banUserEffectSchema } from './types/actions';
@@ -281,6 +281,7 @@ export function getOpenAPISpec(): any {
   registry.register('LlmProviderInfo', llmProviderInfoSchema);
   registry.register('AuditLogResponse', auditLogResponseSchema);
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
+  registry.register('ApiKeySettings', apiKeySettingsSchema);
   registry.register('CreateApiKeyRequest', createApiKeySchema);
   registry.register('UpdateApiKeyRequest', updateApiKeySchema);
   registry.register('DeleteApiKeyRequest', deleteApiKeyBodySchema);

@@ -11,6 +11,8 @@ import { logger } from '../../utils/logger';
  * sends them directly to the associated WebSocket client. Also handles connection closure and session cleanup.
  */
 export class WebSocketConnection implements IClientConnection {
+  readonly connectionType = 'websocket' as const;
+
   private session: Session;
 
   constructor(

@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles run action requests.
  */
-@ChannelMessageHandler('run_action', true, calRunActionRequestSchema)
+@ChannelMessageHandler('run_action', true, calRunActionRequestSchema, 'run_action')
 @injectable()
 export class RunActionHandler implements ClientMessageHandler<CALRunActionRequest> {
   readonly messageType!: string;

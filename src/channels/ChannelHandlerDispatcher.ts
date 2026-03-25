@@ -6,6 +6,8 @@ import { ClientMessageHandlerRegistry } from './ClientMessageHandlerRegistry';
 import type { ClientMessageHandler } from './ClientMessageHandler';
 import type { ClientMessageHandlerContext } from './ClientMessageHandlerContext';
 import type { ZodTypeAny } from 'zod';
+import type { ApiKeyFeature } from '../apiKeyFeatures';
+import { isFeatureAllowed } from './SessionManager';
 
 // Import handlers module to trigger decorator registration
 import './handlers';
@@ -17,7 +19,7 @@ import './handlers';
  */
 @singleton()
 export class ChannelHandlerDispatcher {
-  private handlers = new Map<string, { instance: ClientMessageHandler; requiresAuth: boolean; schema: ZodTypeAny }>();
+  private handlers = new Map<string, { instance: ClientMessageHandler; requiresAuth: boolean; schema: ZodTypeAny; requiredFeature?: ApiKeyFeature }>();
 
   constructor() {
     this.registerHandlers();
@@ -34,8 +36,8 @@ export class ChannelHandlerDispatcher {
       const registryItem = registryItems.get(messageType);
       const handler = registryItem.handlerFactory();
       if (handler) {
-        this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth, schema: registryItem.schema });
-        logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth }, 'Registered message handler');
+        this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth, schema: registryItem.schema, requiredFeature: registryItem.requiredFeature });
+        logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth, requiredFeature: registryItem.requiredFeature }, 'Registered message handler');
       }
     }
 
@@ -72,6 +74,15 @@ export class ChannelHandlerDispatcher {
       if (handler.requiresAuth && (!context.session || !context.session.id)) {
         context.sendError('Authentication required', message.correlationId);
         return;
+      }
+
+      // Check if handler requires a specific API key feature
+      if (handler.requiredFeature && context.session) {
+        if (!isFeatureAllowed(context.session, handler.requiredFeature)) {
+          logger.warn({ messageType: message.type, correlationId: message.correlationId, requiredFeature: handler.requiredFeature }, 'Message rejected: required feature not permitted by API key');
+          context.sendError(`Feature '${handler.requiredFeature}' is not permitted by this API key`, message.correlationId);
+          return;
+        }
       }
 
       await handler.instance.handle(context, message as any);

@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles go to stage requests.
  */
-@ChannelMessageHandler('go_to_stage', true, calGoToStageRequestSchema)
+@ChannelMessageHandler('go_to_stage', true, calGoToStageRequestSchema, 'stage_control')
 @injectable()
 export class GoToStageHandler implements ClientMessageHandler<CALGoToStageRequest> {
   readonly messageType!: string;

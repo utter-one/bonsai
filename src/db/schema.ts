@@ -9,6 +9,7 @@ import { TtsProviderConfig, TtsSettings } from '../services/providers/tts/TtsPro
 import { StorageProviderConfig } from '../http/contracts/provider';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 import { FillerSettings } from '../http/contracts/agent';
+import type { ApiKeySettings } from '../http/contracts/apiKey';
 
 
 export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig;
@@ -378,6 +379,7 @@ export const apiKeys = pgTable('api_keys', {
   lastUsedAt: timestamp('last_used_at'),
   isActive: boolean('is_active').notNull().default(true),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
+  keySettings: jsonb('key_settings').$type<ApiKeySettings>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

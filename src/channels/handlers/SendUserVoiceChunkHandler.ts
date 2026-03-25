@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles send user voice chunk requests.
  */
-@ChannelMessageHandler('send_user_voice_chunk', true, sendUserVoiceChunkRequestSchema)
+@ChannelMessageHandler('send_user_voice_chunk', true, sendUserVoiceChunkRequestSchema, 'voice_input')
 @injectable()
 export class SendUserVoiceChunkHandler implements ClientMessageHandler<SendUserVoiceChunkRequest> {
   readonly messageType!: string;

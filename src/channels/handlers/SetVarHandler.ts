@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles set variable requests.
  */
-@ChannelMessageHandler('set_var', true, calSetVarRequestSchema)
+@ChannelMessageHandler('set_var', true, calSetVarRequestSchema, 'vars_access')
 @injectable()
 export class SetVarHandler implements ClientMessageHandler<CALSetVarRequest> {
   readonly messageType!: string;

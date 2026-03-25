@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles send user text input requests.
  */
-@ChannelMessageHandler('send_user_text_input', true, calSendUserTextInputRequestSchema)
+@ChannelMessageHandler('send_user_text_input', true, calSendUserTextInputRequestSchema, 'text_input')
 @injectable()
 export class SendUserTextInputHandler implements ClientMessageHandler<CALSendUserTextInputRequest> {
   readonly messageType!: string;
