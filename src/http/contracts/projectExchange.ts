@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { llmSettingsSchema, ttsSettingsSchema } from './common';
 import { asrSettingsSchema } from './project';
+import { serverVadConfigSchema } from './vad';
 import { effectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, filterDeprecatedEffects } from '../../types/actions';
 import { fieldDescriptorSchema, parameterValueSchema } from '../../types/parameters';
 
@@ -41,6 +42,7 @@ export const asrConfigExchangeV1Schema = z.object({
   settings: asrSettingsSchema.optional().describe('ASR-specific settings including model, language preferences, etc.'),
   unintelligiblePlaceholder: z.string().optional().describe('Placeholder text to use when speech is unintelligible or cannot be transcribed'),
   voiceActivityDetection: z.boolean().optional().describe('Whether to enable voice activity detection'),
+  serverVad: serverVadConfigSchema.optional().describe('Server-side VAD configuration'),
 }).openapi('AsrConfigExchangeV1').optional().describe('ASR configuration with provider hint instead of provider UUID');
 
 /** ASR config for the exchange format */

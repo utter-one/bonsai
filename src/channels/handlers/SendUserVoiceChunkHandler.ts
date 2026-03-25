@@ -40,7 +40,7 @@ export class SendUserVoiceChunkHandler implements ClientMessageHandler<SendUserV
       }
 
       const audioBuffer = Buffer.from(message.audioData, 'base64');
-      await context.session.runner.receiveUserVoiceData(message.inputTurnId, audioBuffer);
+      await context.session.runner.receiveUserVoiceData(message.inputTurnId ?? '', audioBuffer);
 
       const response: SendUserVoiceChunkResponse = { 
         type: 'send_user_voice_chunk', 

@@ -114,6 +114,7 @@ export class ProjectExchangeService extends BaseService {
       settings: project.asrConfig.settings as any,
       unintelligiblePlaceholder: project.asrConfig.unintelligiblePlaceholder,
       voiceActivityDetection: project.asrConfig.voiceActivityDetection,
+      serverVad: project.asrConfig.serverVad,
     } : undefined;
 
     // Transform storageConfig
@@ -362,6 +363,7 @@ export class ProjectExchangeService extends BaseService {
           settings: p.asrConfig.settings,
           unintelligiblePlaceholder: p.asrConfig.unintelligiblePlaceholder,
           voiceActivityDetection: p.asrConfig.voiceActivityDetection,
+          serverVad: p.asrConfig.serverVad,
         } : null,
         acceptVoice: p.acceptVoice ?? true,
         generateVoice: p.generateVoice ?? true,
