@@ -774,23 +774,17 @@ export class ConversationRunner {
     const onConversationStartAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_START);
     if (onConversationStartAction) {
       logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_start lifecycle action');
+      const actionEventData: ActionEventData = { actionName: onConversationStartAction.name || '', stageId: this.stageData.id, effects: onConversationStartAction.effects };
+      await this.saveAndSendEvent('action', actionEventData);
       const startOutcome = await this.actionsExecutor.executeActions([onConversationStartAction], context, 'conversation_start');
       await this.applyActionOutcome(context, startOutcome);
       await this.saveAndSendOutcomeEvents(startOutcome);
-      const actionEventData: ActionEventData = { actionName: onConversationStartAction.name || '', stageId: this.stageData.id, effects: onConversationStartAction.effects };
-      await this.saveAndSendEvent('action', actionEventData);
     }
 
     // Execute __on_enter lifecycle action if defined
     let enterOutcome: ActionsExecutionOutcome | null = null;
     const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
     if (onEnterAction) {
-      enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
-      await this.applyActionOutcome(context, enterOutcome);
-
-      // Save/send tool call events from action execution
-      await this.saveAndSendOutcomeEvents(enterOutcome);
-
       // Register action event
       const actionEventData: ActionEventData = {
         actionName: onEnterAction.name || '',
@@ -798,6 +792,11 @@ export class ConversationRunner {
         effects: onEnterAction.effects,
       };
       await this.saveAndSendEvent('action', actionEventData);
+      enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], context, 'on_enter');
+      await this.applyActionOutcome(context, enterOutcome);
+
+      // Save/send tool call events from action execution
+      await this.saveAndSendOutcomeEvents(enterOutcome);
 
       // If on_enter ended or aborted conversation, don't proceed
       if (enterOutcome.shouldEndConversation || enterOutcome.shouldAbortConversation) {
@@ -843,11 +842,11 @@ export class ConversationRunner {
     if (onConversationResumeAction) {
       logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_resume lifecycle action');
       const resumeContext = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+      const actionEventData: ActionEventData = { actionName: onConversationResumeAction.name || '', stageId: this.stageData.id, effects: onConversationResumeAction.effects };
+      await this.saveAndSendEvent('action', actionEventData);
       const resumeOutcome = await this.actionsExecutor.executeActions([onConversationResumeAction], resumeContext, 'conversation_resume');
       await this.applyActionOutcome(resumeContext, resumeOutcome);
       await this.saveAndSendOutcomeEvents(resumeOutcome);
-      const actionEventData: ActionEventData = { actionName: onConversationResumeAction.name || '', stageId: this.stageData.id, effects: onConversationResumeAction.effects };
-      await this.saveAndSendEvent('action', actionEventData);
     }
 
     // Resume to awaiting user input state to allow the user to continue
@@ -864,11 +863,11 @@ export class ConversationRunner {
     if (!onConversationEndAction) return;
     logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action (client command)');
     const endContext = await this.contextBuilder.buildContextForConversationStart(this.conversation);
+    const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
+    await this.saveAndSendEvent('action', actionEventData);
     const endOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], endContext, 'conversation_end');
     await this.applyActionOutcome(endContext, endOutcome);
     await this.saveAndSendOutcomeEvents(endOutcome);
-    const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
-    await this.saveAndSendEvent('action', actionEventData);
   }
 
   async receiveUserTextInput(userInput: string): Promise<string> {
@@ -1061,12 +1060,6 @@ export class ConversationRunner {
       if (onLeaveAction) {
         logger.debug({ conversationId: this.conversation.id, stageId: fromStageId }, 'Executing __on_leave lifecycle action');
         const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, [/** TODO */], '-', '-');
-        const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
-
-        await this.applyActionOutcome(context, leaveOutcome);
-
-        // Save/send tool call events from action execution
-        await this.saveAndSendOutcomeEvents(leaveOutcome);
 
         // Register action event
         const actionEventData: ActionEventData = {
@@ -1075,6 +1068,12 @@ export class ConversationRunner {
           effects: onLeaveAction.effects,
         };
         await this.saveAndSendEvent('action', actionEventData);
+        const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, 'on_leave');
+
+        await this.applyActionOutcome(context, leaveOutcome);
+
+        // Save/send tool call events from action execution
+        await this.saveAndSendOutcomeEvents(leaveOutcome);
 
         // If on_leave ended or aborted conversation, don't proceed
         if (leaveOutcome.shouldEndConversation || leaveOutcome.shouldAbortConversation) {
@@ -1112,12 +1111,6 @@ export class ConversationRunner {
       const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
       if (onEnterAction) {
         logger.debug({ conversationId: this.conversation.id, stageId }, 'Executing __on_enter lifecycle action');
-        enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], enterContext, 'on_enter');
-
-        await this.applyActionOutcome(enterContext, enterOutcome);
-
-        // Save/send tool call events from action execution
-        await this.saveAndSendOutcomeEvents(enterOutcome);
 
         // Register action event
         const actionEventData: ActionEventData = {
@@ -1126,6 +1119,12 @@ export class ConversationRunner {
           effects: onEnterAction.effects,
         };
         await this.saveAndSendEvent('action', actionEventData);
+        enterOutcome = await this.actionsExecutor.executeActions([onEnterAction], enterContext, 'on_enter');
+
+        await this.applyActionOutcome(enterContext, enterOutcome);
+
+        // Save/send tool call events from action execution
+        await this.saveAndSendOutcomeEvents(enterOutcome);
 
         // If on_enter ended or aborted conversation, don't proceed
         if (enterOutcome.shouldEndConversation || enterOutcome.shouldAbortConversation) {
@@ -1331,10 +1330,6 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
     const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionName, actionToExecute, parameters);
     logger.debug({ conversationId: this.conversation.id, actionName }, `Built context for action ${actionName}`);
-    const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
-
-    // Save/send tool call events from action execution
-    await this.saveAndSendOutcomeEvents(outcome);
 
     // Register action event
     const actionEventData: ActionEventData = {
@@ -1343,6 +1338,10 @@ export class ConversationRunner {
       effects: actionToExecute.effects,
     };
     await this.saveAndSendEvent('action', actionEventData);
+    const outcome = await this.actionsExecutor.executeActions([actionToExecute], context);
+
+    // Save/send tool call events from action execution
+    await this.saveAndSendOutcomeEvents(outcome);
 
     if (await this.applyActionOutcome(context, outcome)) {
       // TODO: this needs more thought
@@ -1571,10 +1570,10 @@ export class ConversationRunner {
       try {
         logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_failed lifecycle action');
         const failedContext = await this.contextBuilder.buildContextForConversationStart(this.conversation);
-        const failedOutcome = await this.actionsExecutor.executeActions([onConversationFailedAction], failedContext, 'conversation_failed');
-        await this.saveAndSendOutcomeEvents(failedOutcome);
         const actionEventData: ActionEventData = { actionName: onConversationFailedAction.name || '', stageId: this.stageData.id, effects: onConversationFailedAction.effects };
         await this.saveAndSendEvent('action', actionEventData);
+        const failedOutcome = await this.actionsExecutor.executeActions([onConversationFailedAction], failedContext, 'conversation_failed');
+        await this.saveAndSendOutcomeEvents(failedOutcome);
       } catch (lifecycleError) {
         logger.error({ conversationId: this.conversation.id, error: lifecycleError instanceof Error ? lifecycleError.message : String(lifecycleError) }, 'Failed to execute __conversation_failed lifecycle action');
       }
@@ -1668,6 +1667,8 @@ export class ConversationRunner {
       const moderationBlockedAction = this.stageData.globalActions.find(ga => ga.id === '__moderation_blocked');
       if (moderationBlockedAction) {
         const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
+        const actionEventData: ActionEventData = { actionName: moderationBlockedAction.name || '', stageId: this.stageData.id, effects: moderationBlockedAction.effects };
+        await this.saveAndSendEvent('action', actionEventData);
         const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context);
         await this.applyActionOutcome(context, executionOutcome);
         const messageEventData: MessageEventData = {
@@ -1679,8 +1680,6 @@ export class ConversationRunner {
         };
         await this.saveAndSendEvent('message', messageEventData);
         await this.saveAndSendOutcomeEvents(executionOutcome);
-        const actionEventData: ActionEventData = { actionName: moderationBlockedAction.name || '', stageId: this.stageData.id, effects: moderationBlockedAction.effects };
-        await this.saveAndSendEvent('action', actionEventData);
         await this.generateResponse(context, executionOutcome);
         return;
       }
@@ -1803,14 +1802,6 @@ export class ConversationRunner {
     const onFallbackAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_FALLBACK];
     if (actions.length === 0 && onFallbackAction) {
       logger.debug({ conversationId: this.conversation.id }, 'No actions matched - executing __on_fallback lifecycle action');
-      actionsStartMs = Date.now();
-      executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
-      actionsEndMs = Date.now();
-      actionsDurationMs = actionsEndMs - actionsStartMs;
-      await this.applyActionOutcome(context, executionOutcome);
-
-      // Save/send tool call events from action execution
-      await this.saveAndSendOutcomeEvents(executionOutcome);
 
       // Register action event for __on_fallback
       const actionEventData: ActionEventData = {
@@ -1819,7 +1810,24 @@ export class ConversationRunner {
         effects: onFallbackAction.effects,
       };
       await this.saveAndSendEvent('action', actionEventData);
+      actionsStartMs = Date.now();
+      executionOutcome = await this.actionsExecutor.executeActions([onFallbackAction], context, 'on_fallback');
+      actionsEndMs = Date.now();
+      actionsDurationMs = actionsEndMs - actionsStartMs;
+      await this.applyActionOutcome(context, executionOutcome);
+
+      // Save/send tool call events from action execution
+      await this.saveAndSendOutcomeEvents(executionOutcome);
     } else {
+      // Register action events before execution
+      for (const action of actions) {
+        const actionEventData: ActionEventData = {
+          actionName: action.name || '',
+          stageId: this.stageData.id,
+          effects: action.effects,
+        };
+        await this.saveAndSendEvent('action', actionEventData);
+      }
       actionsStartMs = Date.now();
       executionOutcome = await this.actionsExecutor.executeActions(actions, context);
       actionsEndMs = Date.now();
@@ -1828,16 +1836,6 @@ export class ConversationRunner {
 
       // Save/send tool call events from action execution
       await this.saveAndSendOutcomeEvents(executionOutcome);
-    }
-
-    // Register action events after execution
-    for (const action of actions) {
-      const actionEventData: ActionEventData = {
-        actionName: action.name || '',
-        stageId: this.stageData.id,
-        effects: action.effects,
-      };
-      await this.saveAndSendEvent('action', actionEventData);
     }
 
     if (executionOutcome.turnVisibility) {
@@ -1934,11 +1932,11 @@ export class ConversationRunner {
         const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
         if (onConversationEndAction) {
           logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action');
+          const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
+          await this.saveAndSendEvent('action', actionEventData);
           const endLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], context, 'conversation_end');
           await this.applyActionOutcome(context, endLifecycleOutcome);
           await this.saveAndSendOutcomeEvents(endLifecycleOutcome);
-          const actionEventData: ActionEventData = { actionName: onConversationEndAction.name || '', stageId: this.stageData.id, effects: onConversationEndAction.effects };
-          await this.saveAndSendEvent('action', actionEventData);
         }
 
         const eventData: ConversationEndEventData = {
@@ -1960,11 +1958,11 @@ export class ConversationRunner {
       const onConversationAbortAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_ABORT);
       if (onConversationAbortAction) {
         logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_abort lifecycle action');
+        const actionEventData: ActionEventData = { actionName: onConversationAbortAction.name || '', stageId: this.stageData.id, effects: onConversationAbortAction.effects };
+        await this.saveAndSendEvent('action', actionEventData);
         const abortLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationAbortAction], context, 'conversation_abort');
         await this.applyActionOutcome(context, abortLifecycleOutcome);
         await this.saveAndSendOutcomeEvents(abortLifecycleOutcome);
-        const actionEventData: ActionEventData = { actionName: onConversationAbortAction.name || '', stageId: this.stageData.id, effects: onConversationAbortAction.effects };
-        await this.saveAndSendEvent('action', actionEventData);
       }
       // Abort conversation without generating response
       const eventData: ConversationAbortedEventData = {
