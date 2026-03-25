@@ -32,6 +32,11 @@ export const conversationEventTypeSchema = z.enum([
   'conversation_failed',
   'jump_to_stage',
   'moderation',
+  'variables_updated',
+  'user_profile_updated',
+  'user_input_modified',
+  'user_banned',
+  'visibility_changed',
 ]);
 
 export type ConversationEventType = z.infer<typeof conversationEventTypeSchema>;
@@ -109,6 +114,8 @@ export const toolCallEventDataSchema = z.object({
   success: z.boolean(),
   result: z.unknown().optional(),
   error: z.string().optional(),
+  /** Name of the action that triggered this tool call, if triggered by an action effect */
+  sourceActionName: z.string().optional().describe('Name of the action that triggered this tool call, if triggered by an action effect'),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -125,6 +132,8 @@ export type ConversationStartEventData = z.infer<typeof conversationStartEventDa
 export const jumpToStageEventDataSchema = z.object({
   fromStageId: z.string(),
   toStageId: z.string(),
+  /** Name of the action that triggered this stage jump, if triggered by an action effect */
+  sourceActionName: z.string().optional().describe('Name of the action that triggered this stage jump, if triggered by an action effect'),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -141,6 +150,8 @@ export type ConversationResumeEventData = z.infer<typeof conversationResumeEvent
 export const conversationEndEventDataSchema = z.object({
   reason: z.string().optional(),
   stageId: z.string(),
+  /** Name of the action that triggered conversation end, if triggered by an action effect */
+  sourceActionName: z.string().optional().describe('Name of the action that triggered conversation end, if triggered by an action effect'),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -149,6 +160,8 @@ export type ConversationEndEventData = z.infer<typeof conversationEndEventDataSc
 export const conversationAbortedEventDataSchema = z.object({
   reason: z.string(),
   stageId: z.string(),
+  /** Name of the action that triggered conversation abort, if triggered by an action effect */
+  sourceActionName: z.string().optional().describe('Name of the action that triggered conversation abort, if triggered by an action effect'),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -186,6 +199,76 @@ export const moderationEventDataSchema = z.object({
 
 export type ModerationEventData = z.infer<typeof moderationEventDataSchema>;
 
+/**
+ * Schema for variables updated event data.
+ * Emitted when an action's modify_variables effect updates conversation variables.
+ */
+export const variablesUpdatedEventDataSchema = z.object({
+  /** Name of the action that triggered this variable update */
+  sourceActionName: z.string().describe('Name of the action that triggered this variable update'),
+  /** Snapshot of all conversation variables after the update */
+  variables: z.record(z.string(), parameterValueSchema).describe('Snapshot of all conversation variables after the update'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type VariablesUpdatedEventData = z.infer<typeof variablesUpdatedEventDataSchema>;
+
+/**
+ * Schema for user profile updated event data.
+ * Emitted when an action's modify_user_profile effect updates the user's profile.
+ */
+export const userProfileUpdatedEventDataSchema = z.object({
+  /** Name of the action that triggered this profile update */
+  sourceActionName: z.string().describe('Name of the action that triggered this profile update'),
+  /** Updated user profile data */
+  profile: z.record(z.string(), parameterValueSchema).describe('Updated user profile data'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type UserProfileUpdatedEventData = z.infer<typeof userProfileUpdatedEventDataSchema>;
+
+/**
+ * Schema for user input modified event data.
+ * Emitted when an action's modify_user_input effect transforms the user's input.
+ */
+export const userInputModifiedEventDataSchema = z.object({
+  /** Name of the action that triggered this input modification */
+  sourceActionName: z.string().describe('Name of the action that triggered this input modification'),
+  /** The modified user input after template rendering */
+  modifiedInput: z.string().describe('The modified user input after template rendering'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type UserInputModifiedEventData = z.infer<typeof userInputModifiedEventDataSchema>;
+
+/**
+ * Schema for user banned event data.
+ * Emitted when an action's ban_user effect bans the current user.
+ */
+export const userBannedEventDataSchema = z.object({
+  /** Name of the action that triggered the ban */
+  sourceActionName: z.string().describe('Name of the action that triggered the ban'),
+  /** Optional reason for the ban */
+  reason: z.string().optional().describe('Optional reason for the ban'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type UserBannedEventData = z.infer<typeof userBannedEventDataSchema>;
+
+/**
+ * Schema for visibility changed event data.
+ * Emitted when an action's change_visibility effect updates the message visibility for the current turn.
+ */
+export const visibilityChangedEventDataSchema = z.object({
+  /** Name of the action that triggered this visibility change */
+  sourceActionName: z.string().describe('Name of the action that triggered this visibility change'),
+  /** The new visibility settings for current turn messages */
+  visibility: messageVisibilitySchema.describe('The new visibility settings for current turn messages'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type VisibilityChangedEventData = z.infer<typeof visibilityChangedEventDataSchema>;
+
 export const conversationEventDataSchema = z.union([
   messageEventDataSchema,
   classificationEventDataSchema,
@@ -200,6 +283,11 @@ export const conversationEventDataSchema = z.union([
   conversationFailedEventDataSchema,
   jumpToStageEventDataSchema,
   moderationEventDataSchema,
+  variablesUpdatedEventDataSchema,
+  userProfileUpdatedEventDataSchema,
+  userInputModifiedEventDataSchema,
+  userBannedEventDataSchema,
+  visibilityChangedEventDataSchema,
 ]);
 
 export type ConversationEventData = z.infer<typeof conversationEventDataSchema>;

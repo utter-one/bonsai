@@ -66,6 +66,14 @@ import {
   sendAiAudioOutputMessageSchema,
 } from '../channels/websocket/contracts/aiResponse';
 
+import {
+  variablesUpdatedEventDataSchema,
+  userProfileUpdatedEventDataSchema,
+  userInputModifiedEventDataSchema,
+  userBannedEventDataSchema,
+  visibilityChangedEventDataSchema,
+} from '../types/conversationEvents';
+
 /**
  * Generates a single JSON Schema file for all WebSocket contracts.
  * This allows clients in any language to validate messages and generate types.
@@ -125,6 +133,11 @@ function generateWebSocketSchemas(): void {
   registry.register('ai-transcribed-chunk', aiTranscribedChunkMessageSchema);
   registry.register('send-ai-image-output', sendAiImageOutputMessageSchema);
   registry.register('send-ai-audio-output', sendAiAudioOutputMessageSchema);
+  registry.register('variables-updated-event', variablesUpdatedEventDataSchema);
+  registry.register('user-profile-updated-event', userProfileUpdatedEventDataSchema);
+  registry.register('user-input-modified-event', userInputModifiedEventDataSchema);
+  registry.register('user-banned-event', userBannedEventDataSchema);
+  registry.register('visibility-changed-event', visibilityChangedEventDataSchema);
 
   // Generate all schemas from the registry
   const generator = new OpenApiGeneratorV3(registry.definitions);

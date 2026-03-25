@@ -1040,7 +1040,12 @@
             "conversation_aborted",
             "conversation_failed",
             "jump_to_stage",
-            "moderation"
+            "moderation",
+            "variables_updated",
+            "user_profile_updated",
+            "user_input_modified",
+            "user_banned",
+            "visibility_changed"
           ],
           "description": "Type of the conversation event"
         },
@@ -1278,6 +1283,10 @@
                 "error": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1355,6 +1364,10 @@
                 "stageId": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation end, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1374,6 +1387,10 @@
                 },
                 "stageId": {
                   "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation abort, if triggered by an action effect"
                 },
                 "metadata": {
                   "type": "object",
@@ -1415,6 +1432,10 @@
                 },
                 "toStageId": {
                   "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this stage jump, if triggered by an action effect"
                 },
                 "metadata": {
                   "type": "object",
@@ -1473,6 +1494,145 @@
                 "durationMs",
                 "startMs",
                 "endMs"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this variable update"
+                },
+                "variables": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Snapshot of all conversation variables after the update"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "variables"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this profile update"
+                },
+                "profile": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Updated user profile data"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "profile"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this input modification"
+                },
+                "modifiedInput": {
+                  "type": "string",
+                  "description": "The modified user input after template rendering"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "modifiedInput"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered the ban"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Optional reason for the ban"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this visibility change"
+                },
+                "visibility": {
+                  "type": "object",
+                  "properties": {
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "always",
+                        "stage",
+                        "never",
+                        "conditional"
+                      ],
+                      "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Condition for visibility, evaluated against conversation variables"
+                    }
+                  },
+                  "required": [
+                    "visibility"
+                  ],
+                  "description": "The new visibility settings for current turn messages"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "visibility"
               ]
             }
           ],
@@ -1882,7 +2042,12 @@
             "conversation_aborted",
             "conversation_failed",
             "jump_to_stage",
-            "moderation"
+            "moderation",
+            "variables_updated",
+            "user_profile_updated",
+            "user_input_modified",
+            "user_banned",
+            "visibility_changed"
           ],
           "description": "Type of the conversation event"
         },
@@ -2120,6 +2285,10 @@
                 "error": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -2197,6 +2366,10 @@
                 "stageId": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation end, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -2216,6 +2389,10 @@
                 },
                 "stageId": {
                   "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation abort, if triggered by an action effect"
                 },
                 "metadata": {
                   "type": "object",
@@ -2257,6 +2434,10 @@
                 },
                 "toStageId": {
                   "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this stage jump, if triggered by an action effect"
                 },
                 "metadata": {
                   "type": "object",
@@ -2315,6 +2496,145 @@
                 "durationMs",
                 "startMs",
                 "endMs"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this variable update"
+                },
+                "variables": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Snapshot of all conversation variables after the update"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "variables"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this profile update"
+                },
+                "profile": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Updated user profile data"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "profile"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this input modification"
+                },
+                "modifiedInput": {
+                  "type": "string",
+                  "description": "The modified user input after template rendering"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "modifiedInput"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered the ban"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Optional reason for the ban"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this visibility change"
+                },
+                "visibility": {
+                  "type": "object",
+                  "properties": {
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "always",
+                        "stage",
+                        "never",
+                        "conditional"
+                      ],
+                      "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Condition for visibility, evaluated against conversation variables"
+                    }
+                  },
+                  "required": [
+                    "visibility"
+                  ],
+                  "description": "The new visibility settings for current turn messages"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "visibility"
               ]
             }
           ],
@@ -3800,6 +4120,145 @@
         "mimeType",
         "sequenceNumber",
         "sessionId"
+      ]
+    },
+    "variables-updated-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this variable update"
+        },
+        "variables": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ParameterValue"
+          },
+          "description": "Snapshot of all conversation variables after the update"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "variables"
+      ]
+    },
+    "user-profile-updated-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this profile update"
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ParameterValue"
+          },
+          "description": "Updated user profile data"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "profile"
+      ]
+    },
+    "user-input-modified-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this input modification"
+        },
+        "modifiedInput": {
+          "type": "string",
+          "description": "The modified user input after template rendering"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "modifiedInput"
+      ]
+    },
+    "user-banned-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered the ban"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for the ban"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName"
+      ]
+    },
+    "visibility-changed-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this visibility change"
+        },
+        "visibility": {
+          "type": "object",
+          "properties": {
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "always",
+                "stage",
+                "never",
+                "conditional"
+              ],
+              "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+            },
+            "condition": {
+              "type": "string",
+              "description": "Condition for visibility, evaluated against conversation variables"
+            }
+          },
+          "required": [
+            "visibility"
+          ],
+          "description": "The new visibility settings for current turn messages"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "visibility"
       ]
     }
   }

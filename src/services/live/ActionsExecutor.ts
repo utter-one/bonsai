@@ -7,13 +7,16 @@ import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
 import { UserService } from '../UserService';
 import type { AbortConversationEffect, BanUserEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
-import type { MessageVisibility } from '../../types/conversationEvents';
+import type { MessageVisibility, ConversationEventType, ConversationEventData } from '../../types/conversationEvents';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
 import type { ToolType } from '../../db/schema';
 import { ConversationContext, ConversationContextBuilder } from './ConversationContextBuilder';
 import { NotFoundError } from '../../errors';
 import { ParameterValue } from '../../types/parameters';
+
+/** Callback type for emitting conversation events from within effect handlers */
+export type EffectEventCallback = (type: ConversationEventType, data: ConversationEventData) => Promise<void>;
 
 /**
  * Execution result for an action
@@ -30,23 +33,15 @@ export type ActionsExecutionOutcome = {
   hasModifiedUserInput: boolean;
   hasModifiedUserProfile: boolean;
   goToStageId?: string;
+  /** Name of the action that triggered go_to_stage, if applicable */
+  goToStageSourceAction?: string;
+  /** Name of the action that triggered end_conversation, if applicable */
+  endConversationSourceAction?: string;
+  /** Name of the action that triggered abort_conversation, if applicable */
+  abortConversationSourceAction?: string;
   error?: string;
   /** Pending visibility override to apply to the current turn's messages, produced by change_visibility effects */
   turnVisibility?: MessageVisibility;
-  toolCallEvents?: Array<{
-    toolId: string;
-    toolName: string;
-    toolType?: ToolType;
-    parameters: Record<string, any>;
-    success: boolean;
-    result?: any;
-    error?: string;
-    systemPrompt?: string;
-    llmSettings?: any;
-    durationMs?: number;
-    startMs?: number;
-    endMs?: number;
-  }>;
 };
 
 /**
@@ -65,20 +60,6 @@ export type EffectOutcome = {
   newStageId?: string;
   /** Pending visibility override for the current turn's messages */
   turnVisibility?: MessageVisibility;
-  toolCallEvent?: {
-    toolId: string;
-    toolName: string;
-    toolType?: ToolType;
-    parameters: Record<string, any>;
-    success: boolean;
-    result?: any;
-    error?: string;
-    systemPrompt?: string;
-    llmSettings?: any;
-    durationMs?: number;
-    startMs?: number;
-    endMs?: number;
-  };
 };
 
 /**
@@ -248,13 +229,15 @@ export class ActionsExecutor {
    * Gathers all effects from all actions, sorts by priority, resolves conflicts, and executes in order
    * @param actions - Array of actions to execute (can be stage actions or global actions)
    * @param context - Execution context
-   * @param lifecycleContext - Optional lifecycle context for effect filtering (on_enter, on_leave, on_fallback)
+   * @param lifecycleContext - Lifecycle context for effect filtering (on_enter, on_leave, on_fallback), or null
+   * @param emitEvent - Callback to emit conversation events inline as effects are applied
    * @returns Array of execution results for each action
    */
   async executeActions(
     actions: (StageAction | GlobalAction | Guardrail)[],
     context: ConversationContext,
-    lifecycleContext: LifecycleContext = null
+    lifecycleContext: LifecycleContext,
+    emitEvent: EffectEventCallback
   ): Promise<ActionsExecutionOutcome> {
     logger.info({ conversationId: context.conversationId, actionCount: actions.length, lifecycleContext }, `Executing ${actions.length} action(s)`);
 
@@ -332,7 +315,6 @@ export class ActionsExecutor {
       hasModifiedVars: false,
       hasModifiedUserInput: false,
       hasModifiedUserProfile: false,
-      toolCallEvents: [],
     };
 
     let currentContext = context;
@@ -348,7 +330,7 @@ export class ActionsExecutor {
       logger.debug({ conversationId: context.conversationId, actionName, effectType: effect.type }, `Executing effect: ${effect.type} from action: ${actionName}`);
 
       try {
-        const effectResult = await this.executeEffect(effect, currentContext, actionName);
+        const effectResult = await this.executeEffect(effect, currentContext, actionName, emitEvent);
 
         // Update context with modified user input if applicable
         if (effectResult.hasModifiedUserInput) {
@@ -365,14 +347,10 @@ export class ActionsExecutor {
           outcome.hasModifiedUserProfile = true;
         }
 
-        // Add tool call event if present
-        if (effectResult.toolCallEvent) {
-          outcome.toolCallEvents.push(effectResult.toolCallEvent);
-        }
-
         // Check if effect resulted in stage change
         if (effectResult.newStageId) {
           outcome.goToStageId = effectResult.newStageId;
+          outcome.goToStageSourceAction = actionName;
         }
 
         // Propagate visibility override from change_visibility effect
@@ -382,9 +360,9 @@ export class ActionsExecutor {
 
         // Check if effect resulted in conversation termination
         if (effectResult.shouldEndConversation) {
-
           outcome.shouldEndConversation = true;
           outcome.endReason = effectResult.endReason;
+          outcome.endConversationSourceAction = actionName;
           shouldStop = true;
           logger.info({ conversationId: context.conversationId, actionName, endReason: effectResult.endReason }, `Conversation will end gracefully - skipping remaining effects`);
         }
@@ -400,6 +378,7 @@ export class ActionsExecutor {
         if (effectResult.shouldAbortConversation) {
           outcome.shouldAbortConversation = true;
           outcome.abortReason = effectResult.abortReason;
+          outcome.abortConversationSourceAction = actionName;
           shouldStop = true;
           logger.info({ conversationId: context.conversationId, actionName, abortReason: effectResult.abortReason }, `Conversation will abort immediately - skipping remaining effects`);
         }
@@ -418,14 +397,16 @@ export class ActionsExecutor {
   /**
    * Executes a single effect based on its type
    * @param effect - The effect to execute
-   * @param runner - The conversation runner instance
    * @param context - Execution context
+   * @param actionName - Name of the action that triggered this effect
+   * @param emitEvent - Callback to emit conversation events inline
    * @returns Result indicating if conversation should end/abort and any modified user input
    */
   private async executeEffect(
     effect: Effect,
     context: ConversationContext,
     actionName: string,
+    emitEvent: EffectEventCallback,
   ): Promise<EffectOutcome> {
     switch (effect.type) {
       case 'end_conversation':
@@ -438,25 +419,31 @@ export class ActionsExecutor {
         return await this.executeGoToStage(effect, context);
 
       case 'modify_user_input':
-        return await this.executeModifyUserInput(effect, context);
+        return await this.executeModifyUserInput(effect, context, actionName, emitEvent);
 
-      case 'modify_variables':
-        return await this.modifyVariablesExecutor.execute(effect, context);
+      case 'modify_variables': {
+        const result = await this.modifyVariablesExecutor.execute(effect, context);
+        await emitEvent('variables_updated', { sourceActionName: actionName, variables: context.vars as any });
+        return result;
+      }
 
-      case 'modify_user_profile':
-        return await this.modifyUserProfileExecutor.execute(effect, context);
+      case 'modify_user_profile': {
+        const result = await this.modifyUserProfileExecutor.execute(effect, context);
+        await emitEvent('user_profile_updated', { sourceActionName: actionName, profile: context.userProfile as any });
+        return result;
+      }
 
       case 'call_tool':
-        return await this.executeCallTool(effect, context);
+        return await this.executeCallTool(effect, context, actionName, emitEvent);
 
       case 'generate_response':
         return await this.executeGenerateResponse(effect, context, actionName);
 
       case 'change_visibility':
-        return this.executeChangeVisibility(effect);
+        return await this.executeChangeVisibility(effect, actionName, emitEvent);
 
       case 'ban_user':
-        return await this.executeBanUser(effect, context);
+        return await this.executeBanUser(effect, context, actionName, emitEvent);
 
       default:
         throw new Error(`Unknown effect`);
@@ -521,6 +508,8 @@ export class ActionsExecutor {
   private async executeModifyUserInput(
     effect: ModifyUserInputEffect,
     context: ConversationContext,
+    actionName: string,
+    emitEvent: EffectEventCallback,
   ): Promise<EffectOutcome> {
     logger.info({ conversationId: context.conversationId, originalInput: context.userInput, template: effect.template }, `Modifying user input`);
 
@@ -530,6 +519,8 @@ export class ActionsExecutor {
 
       logger.info({ conversationId: context.conversationId, originalInput: context.userInput, modifiedInput }, `User input modified`);
       context.userInput = modifiedInput;
+
+      await emitEvent('user_input_modified', { sourceActionName: actionName, modifiedInput });
 
       return {
         shouldEndConversation: false,
@@ -658,6 +649,8 @@ export class ActionsExecutor {
   private async executeCallTool(
     effect: CallToolEffect,
     context: ConversationContext,
+    actionName: string,
+    emitEvent: EffectEventCallback,
   ): Promise<EffectOutcome> {
     logger.info({ toolId: effect.toolId, parameterCount: Object.keys(effect.parameters).length }, `Calling tool: ${effect.toolId}`);
 
@@ -723,6 +716,25 @@ export class ActionsExecutor {
 
       logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, toolType: tool.type }, `Tool called successfully and result stored: ${tool.name}`);
 
+      // Emit tool_call event inline now that the effect has been applied
+      await emitEvent('tool_call', {
+        toolId: tool.id,
+        toolName: tool.name,
+        toolType: tool.type,
+        parameters: resolvedParameters,
+        success: executionResult.success,
+        result: executionResult.result,
+        error: executionResult.failureReason,
+        sourceActionName: actionName,
+        metadata: {
+          systemPrompt: executionResult.renderedPrompt,
+          llmSettings: executionResult.llmSettings,
+          durationMs: executionResult.durationMs,
+          startMs: executionResult.startMs,
+          endMs: executionResult.endMs,
+        },
+      });
+
       // For script tools, propagate flow control and mutable-state change flags onto the outcome
       const flowControl = executionResult.flowControl ?? {};
       return {
@@ -736,20 +748,6 @@ export class ActionsExecutor {
         hasModifiedVars: executionResult.hasModifiedVars ?? false,
         hasModifiedUserInput: executionResult.hasModifiedUserInput ?? false,
         hasModifiedUserProfile: executionResult.hasModifiedUserProfile ?? false,
-        toolCallEvent: {
-          toolId: tool.id,
-          toolName: tool.name,
-          toolType: tool.type,
-          parameters: resolvedParameters,
-          success: executionResult.success,
-          result: executionResult.result,
-          error: executionResult.failureReason,
-          systemPrompt: executionResult.renderedPrompt,
-          llmSettings: executionResult.llmSettings,
-          durationMs: executionResult.durationMs,
-          startMs: executionResult.startMs,
-          endMs: executionResult.endMs,
-        }
       };
     } catch (error) {
       logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
@@ -816,12 +814,14 @@ export class ActionsExecutor {
    * Executes change_visibility effect.
    * Produces a visibility override that the caller (ConversationRunner) applies to current-turn message events before saving.
    */
-  private executeChangeVisibility(effect: ChangeVisibilityEffect): EffectOutcome {
-    logger.info({ visibility: effect.visibility }, `Setting turn visibility override: ${effect.visibility}`);
+  private async executeChangeVisibility(effect: ChangeVisibilityEffect, actionName: string, emitEvent: EffectEventCallback): Promise<EffectOutcome> {
+    const visibility: MessageVisibility = { visibility: effect.visibility, condition: effect.condition };
+    logger.info({ visibility }, `Setting turn visibility override: ${effect.visibility}`);
+    await emitEvent('visibility_changed', { sourceActionName: actionName, visibility });
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,
-      turnVisibility: { visibility: effect.visibility, condition: effect.condition },
+      turnVisibility: visibility,
     };
   }
 
@@ -832,10 +832,13 @@ export class ActionsExecutor {
   private async executeBanUser(
     effect: BanUserEffect,
     context: ConversationContext,
+    actionName: string,
+    emitEvent: EffectEventCallback,
   ): Promise<EffectOutcome> {
     logger.info({ conversationId: context.conversationId, userId: context.userId, reason: effect.reason }, `Banning user`);
     await this.userService.banUser(context.projectId, context.userId, effect.reason);
     logger.info({ conversationId: context.conversationId, userId: context.userId }, `User banned successfully`);
+    await emitEvent('user_banned', { sourceActionName: actionName, reason: effect.reason });
     return {
       shouldEndConversation: false,
       shouldAbortConversation: false,
