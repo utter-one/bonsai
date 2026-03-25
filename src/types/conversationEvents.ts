@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { classificationResultWithClassifierSchema } from "./classification";
-import { effectSchema } from "./actions";
+import { effectSchema, lifecycleContextSchema } from "./actions";
 import { parameterValueSchema } from './parameters';
 
 // Conversation State Schema
@@ -22,6 +22,8 @@ export const conversationEventTypeSchema = z.enum([
   'message',
   'classification',
   'transformation',
+  'execution_plan',
+  /** @deprecated Use 'execution_plan' instead. Retained for backwards compatibility with already-stored events. */
   'action',
   'command',
   'tool_call',
@@ -85,6 +87,42 @@ export const transformationEventDataSchema = z.object({
 
 export type TransformationEventData = z.infer<typeof transformationEventDataSchema>;
 
+/**
+ * Schema for a single effect entry in the execution plan, including its source action name.
+ */
+export const executionPlanEffectSchema = z.object({
+  /** Name of the action this effect originates from */
+  actionName: z.string().describe('Name of the action this effect originates from'),
+  /** The effect to be executed */
+  effect: effectSchema.describe('The effect to be executed'),
+});
+
+export type ExecutionPlanEffect = z.infer<typeof executionPlanEffectSchema>;
+
+/**
+ * Schema for the execution plan event data.
+ * Emitted once per executeActions() call BEFORE any effects run, capturing the
+ * final priority-sorted, lifecycle-filtered, conflict-resolved list of effects
+ * across all matched actions.
+ */
+export const actionsExecutionPlanEventDataSchema = z.object({
+  /** ID of the stage where execution is taking place */
+  stageId: z.string().describe('ID of the stage where execution is taking place'),
+  /** Names of all matched actions in original order */
+  actions: z.array(z.string()).describe('Names of all matched actions in original order'),
+  /** Final ordered list of effects after filtering, sorting, and conflict resolution */
+  effects: z.array(executionPlanEffectSchema).describe('Final ordered list of effects after filtering, sorting, and conflict resolution'),
+  /** Lifecycle context in which execution is taking place; null for user-input-triggered executions */
+  lifecycleContext: lifecycleContextSchema.describe('Lifecycle context in which execution is taking place; null for user-input-triggered executions'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type ActionsExecutionPlanEventData = z.infer<typeof actionsExecutionPlanEventDataSchema>;
+
+/**
+ * @deprecated Use actionsExecutionPlanEventDataSchema instead.
+ * Retained for backwards compatibility with already-stored 'action' events.
+ */
 export const actionEventDataSchema = z.object({
   actionName: z.string(),
   stageId: z.string(),
@@ -92,6 +130,7 @@ export const actionEventDataSchema = z.object({
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
+/** @deprecated Use ActionsExecutionPlanEventData instead. */
 export type ActionEventData = z.infer<typeof actionEventDataSchema>;
 
 export const commandTypeSchema = z.enum(['go_to_stage', 'set_var', 'get_var', 'get_all_vars', 'run_action', 'call_tool']);
@@ -273,6 +312,7 @@ export const conversationEventDataSchema = z.union([
   messageEventDataSchema,
   classificationEventDataSchema,
   transformationEventDataSchema,
+  actionsExecutionPlanEventDataSchema,
   actionEventDataSchema,
   commandEventDataSchema,
   toolCallEventDataSchema,

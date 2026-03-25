@@ -1031,6 +1031,7 @@
             "message",
             "classification",
             "transformation",
+            "execution_plan",
             "action",
             "command",
             "tool_call",
@@ -1190,6 +1191,70 @@
                 "transformerId",
                 "input",
                 "appliedFields"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "stageId": {
+                  "type": "string",
+                  "description": "ID of the stage where execution is taking place"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of all matched actions in original order"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "actionName": {
+                        "type": "string",
+                        "description": "Name of the action this effect originates from"
+                      },
+                      "effect": {
+                        "$ref": "#/definitions/Effect"
+                      }
+                    },
+                    "required": [
+                      "actionName",
+                      "effect"
+                    ]
+                  },
+                  "description": "Final ordered list of effects after filtering, sorting, and conflict resolution"
+                },
+                "lifecycleContext": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "on_enter",
+                    "on_leave",
+                    "on_fallback",
+                    "conversation_start",
+                    "conversation_resume",
+                    "conversation_end",
+                    "conversation_abort",
+                    "conversation_failed",
+                    null
+                  ],
+                  "description": "Lifecycle context in which execution is taking place; null for user-input-triggered executions"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "stageId",
+                "actions",
+                "effects",
+                "lifecycleContext"
               ]
             },
             {
@@ -1702,7 +1767,8 @@
           "change_visibility": "#/definitions/ChangeVisibilityEffect",
           "ban_user": "#/definitions/BanUserEffect"
         }
-      }
+      },
+      "description": "The effect to be executed"
     },
     "EndConversationEffect": {
       "type": "object",
@@ -2033,6 +2099,7 @@
             "message",
             "classification",
             "transformation",
+            "execution_plan",
             "action",
             "command",
             "tool_call",
@@ -2192,6 +2259,70 @@
                 "transformerId",
                 "input",
                 "appliedFields"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "stageId": {
+                  "type": "string",
+                  "description": "ID of the stage where execution is taking place"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of all matched actions in original order"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "actionName": {
+                        "type": "string",
+                        "description": "Name of the action this effect originates from"
+                      },
+                      "effect": {
+                        "$ref": "#/definitions/Effect"
+                      }
+                    },
+                    "required": [
+                      "actionName",
+                      "effect"
+                    ]
+                  },
+                  "description": "Final ordered list of effects after filtering, sorting, and conflict resolution"
+                },
+                "lifecycleContext": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "on_enter",
+                    "on_leave",
+                    "on_fallback",
+                    "conversation_start",
+                    "conversation_resume",
+                    "conversation_end",
+                    "conversation_abort",
+                    "conversation_failed",
+                    null
+                  ],
+                  "description": "Lifecycle context in which execution is taking place; null for user-input-triggered executions"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "stageId",
+                "actions",
+                "effects",
+                "lifecycleContext"
               ]
             },
             {

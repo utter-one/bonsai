@@ -244,9 +244,22 @@ export const CONVERSATION_LIFECYCLE_ACTION_IDS = {
 } as const;
 
 /**
- * Type for lifecycle action context - indicates which lifecycle hook is being executed
+ * Schema for lifecycle action context - indicates which lifecycle hook is being executed.
+ * Null when triggered by regular user-input classification.
  */
-export type LifecycleContext = 'on_enter' | 'on_leave' | 'on_fallback' | 'conversation_start' | 'conversation_resume' | 'conversation_end' | 'conversation_abort' | 'conversation_failed' | null;
+export const lifecycleContextSchema = z.enum([
+  'on_enter',
+  'on_leave',
+  'on_fallback',
+  'conversation_start',
+  'conversation_resume',
+  'conversation_end',
+  'conversation_abort',
+  'conversation_failed',
+]).nullable();
+
+/** Type for lifecycle action context - indicates which lifecycle hook is being executed */
+export type LifecycleContext = z.infer<typeof lifecycleContextSchema>;
 
 /**
  * Mapping of lifecycle contexts to effects that should be ignored

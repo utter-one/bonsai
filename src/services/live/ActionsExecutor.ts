@@ -7,7 +7,7 @@ import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
 import { UserService } from '../UserService';
 import type { AbortConversationEffect, BanUserEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
-import type { MessageVisibility, ConversationEventType, ConversationEventData } from '../../types/conversationEvents';
+import type { MessageVisibility, ConversationEventType, ConversationEventData, ActionsExecutionPlanEventData } from '../../types/conversationEvents';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
 import type { ToolType } from '../../db/schema';
@@ -229,6 +229,7 @@ export class ActionsExecutor {
    * Gathers all effects from all actions, sorts by priority, resolves conflicts, and executes in order
    * @param actions - Array of actions to execute (can be stage actions or global actions)
    * @param context - Execution context
+   * @param stageId - ID of the stage where execution is taking place
    * @param lifecycleContext - Lifecycle context for effect filtering (on_enter, on_leave, on_fallback), or null
    * @param emitEvent - Callback to emit conversation events inline as effects are applied
    * @returns Array of execution results for each action
@@ -236,6 +237,7 @@ export class ActionsExecutor {
   async executeActions(
     actions: (StageAction | GlobalAction | Guardrail)[],
     context: ConversationContext,
+    stageId: string,
     lifecycleContext: LifecycleContext,
     emitEvent: EffectEventCallback
   ): Promise<ActionsExecutionOutcome> {
@@ -305,6 +307,15 @@ export class ActionsExecutor {
     sortedEffects = this.resolveEffectConflicts(sortedEffects);
 
     logger.debug({ conversationId: context.conversationId, effectOrder: sortedEffects.map(op => ({ type: op.effect.type, action: op.actionName })) }, `Executing effects in global priority order after conflict resolution`);
+
+    // Emit execution plan event BEFORE any effects are executed
+    const executionPlanEventData: ActionsExecutionPlanEventData = {
+      stageId,
+      actions: actions.map(a => this.getActionName(a)),
+      effects: sortedEffects.map(({ effect, actionName }) => ({ actionName, effect })),
+      lifecycleContext,
+    };
+    await emitEvent('execution_plan', executionPlanEventData);
 
     // Track results
     const outcome: ActionsExecutionOutcome = {
