@@ -16,7 +16,7 @@ import type { ConversationFailedEventData } from '../../types/conversationEvents
 /**
  * Handles start conversation requests.
  */
-@ChannelMessageHandler('start_conversation', true, calStartConversationRequestSchema)
+@ChannelMessageHandler('start_conversation', true, calStartConversationRequestSchema, 'conversation_control')
 @injectable()
 export class StartConversationHandler implements ClientMessageHandler<CALStartConversationRequest> {
   readonly messageType!: string;

@@ -13,7 +13,7 @@ import type { ConversationFailedEventData } from '../../types/conversationEvents
 /**
  * Handles resume conversation requests.
  */
-@ChannelMessageHandler('resume_conversation', true, calResumeConversationRequestSchema)
+@ChannelMessageHandler('resume_conversation', true, calResumeConversationRequestSchema, 'conversation_control')
 @injectable()
 export class ResumeConversationHandler implements ClientMessageHandler<CALResumeConversationRequest> {
   readonly messageType!: string;

@@ -26,6 +26,8 @@ function encodeAudioFrame(turnId: string, audioData: Buffer): Buffer {
  * [2 bytes: outputTurnId length as uint16 LE] [N bytes: outputTurnId as UTF-8] [remaining: raw audio]
  */
 export class WebRTCConnection implements IClientConnection {
+  readonly connectionType = 'webrtc' as const;
+
   private session: Session;
 
   constructor(

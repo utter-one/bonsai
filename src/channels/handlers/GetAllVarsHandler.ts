@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 /**
  * Handles get all variables requests.
  */
-@ChannelMessageHandler('get_all_vars', true, calGetAllVarsRequestSchema)
+@ChannelMessageHandler('get_all_vars', true, calGetAllVarsRequestSchema, 'vars_access')
 @injectable()
 export class GetAllVarsHandler implements ClientMessageHandler<CALGetAllVarsRequest> {
   readonly messageType!: string;

@@ -3,6 +3,7 @@ import type { ConversationRunner } from "../services/live/ConversationRunner";
 import type { IClientConnection } from './IClientConnection';
 import { SessionSettings } from "./websocket/contracts/auth";
 import { logger } from "../utils/logger";
+import type { ApiKeyChannel, ApiKeyFeature, ApiKeySettings } from '../apiKeyFeatures';
 
 /** Data associated with an active WebSocket session. */
 export type Session = {
@@ -18,7 +19,29 @@ export type Session = {
   clientConnection: IClientConnection;
   /** Session settings configured during authentication. */
   sessionSettings: SessionSettings;
+  /** API key security settings controlling permitted channels and features. Null means all permitted. */
+  keySettings: ApiKeySettings | null;
 };
+
+/**
+ * Returns true if the given channel type is permitted by the session's API key settings.
+ * @param session - The session to check.
+ * @param channel - The channel type to verify.
+ */
+export function isChannelAllowed(session: Session, channel: ApiKeyChannel): boolean {
+  if (!session.keySettings?.allowedChannels) return true;
+  return session.keySettings.allowedChannels.includes(channel);
+}
+
+/**
+ * Returns true if the given feature is permitted by the session's API key settings.
+ * @param session - The session to check.
+ * @param feature - The feature to verify.
+ */
+export function isFeatureAllowed(session: Session, feature: ApiKeyFeature): boolean {
+  if (!session.keySettings?.allowedFeatures) return true;
+  return session.keySettings.allowedFeatures.includes(feature);
+}
 
 /**
  * Manages WebSocket sessions and their associated conversations.
@@ -47,6 +70,7 @@ export class SessionManager {
       runner: null,
       clientConnection,
       sessionSettings: { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true, sendAudioFormat: 'pcm_16000' as const, receiveAudioFormat: 'pcm_16000' as const },
+      keySettings: null,
     };
 
     this.clientMap.set(clientConnection, session);
@@ -57,12 +81,13 @@ export class SessionManager {
   }
 
   /**
-   * Updates the project ID and session settings for an existing session.
+   * Updates the project ID, session settings, and API key security settings for an existing session.
    * @param sessionId - The session ID to update.
    * @param projectId - The new project ID to associate with the session.
    * @param sessionSettings - The new session settings to apply.
+   * @param keySettings - The API key security settings to enforce for this session.
    */
-  setSessionProjectAndSettings(sessionId: string, projectId: string, sessionSettings: SessionSettings): void {
+  setSessionProjectAndSettings(sessionId: string, projectId: string, sessionSettings: SessionSettings, keySettings: ApiKeySettings | null): void {
     const session = this.idMap.get(sessionId);
     if (!session) {
       throw new Error('Session not found');
@@ -70,6 +95,7 @@ export class SessionManager {
 
     session.projectId = projectId;
     session.sessionSettings = sessionSettings;
+    session.keySettings = keySettings;
     this.idMap.set(sessionId, session);
   }
 

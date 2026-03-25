@@ -10,7 +10,7 @@ import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry'
 /**
  * Handles call tool requests.
  */
-@ChannelMessageHandler('call_tool', true, calCallToolRequestSchema)
+@ChannelMessageHandler('call_tool', true, calCallToolRequestSchema, 'call_tool')
 @injectable()
 export class CallToolHandler implements ClientMessageHandler<CALCallToolRequest> {
   readonly messageType!: string;

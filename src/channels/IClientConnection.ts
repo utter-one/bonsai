@@ -1,4 +1,5 @@
 import type { CALOutputMessage } from './messages';
+import type { ApiKeyChannel } from '../apiKeyFeatures';
 
 /**
  * Abstract interface for a client connection channel.
@@ -9,6 +10,9 @@ import type { CALOutputMessage } from './messages';
  * responding to client messages.
  */
 export interface IClientConnection {
+  /** Identifies the transport type of this connection. Used for channel-level permission checks. */
+  readonly connectionType: ApiKeyChannel;
+
   /**
    * Sends a message through the communication channel.
    * @param response The message to be sent.

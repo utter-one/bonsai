@@ -2,11 +2,13 @@ import { container } from 'tsyringe';
 import logger from '../utils/logger';
 import type { ClientMessageHandler } from './ClientMessageHandler';
 import type { ZodTypeAny } from 'zod';
+import type { ApiKeyFeature } from '../apiKeyFeatures';
 
 type RegistryItem = {
   handlerFactory: () => ClientMessageHandler;
   requiresAuth: boolean;
   schema: ZodTypeAny;
+  requiredFeature?: ApiKeyFeature;
 }
 
 /**
@@ -20,11 +22,11 @@ export class ClientMessageHandlerRegistry {
    * @param messageType - The message type this handler processes.
    * @param handlerFactory - The handler class factory function.
    */
-  static register(messageType: string, handlerFactory: () => ClientMessageHandler, requiresAuth: boolean, schema: ZodTypeAny): void {
+  static register(messageType: string, handlerFactory: () => ClientMessageHandler, requiresAuth: boolean, schema: ZodTypeAny, requiredFeature?: ApiKeyFeature): void {
     if (this.handlers.has(messageType)) {
       throw new Error(`Handler for message type "${messageType}" is already registered`);
     }
-    this.handlers.set(messageType, { handlerFactory, requiresAuth, schema });
+    this.handlers.set(messageType, { handlerFactory, requiresAuth, schema, requiredFeature });
   }
 
   /**
@@ -62,12 +64,10 @@ export class ClientMessageHandlerRegistry {
  * }
  * ```
  */
-export function ChannelMessageHandler(messageType: string, requiresAuth: boolean, schema: ZodTypeAny) {
+export function ChannelMessageHandler(messageType: string, requiresAuth: boolean, schema: ZodTypeAny, requiredFeature?: ApiKeyFeature) {
   return function <T extends new (...args: any[]) => ClientMessageHandler>(constructor: T): T {
-    logger.debug({ messageType, requiresAuth }, `Registering message handler for type "${messageType}"`);
-    // Register the handler class
-    ClientMessageHandlerRegistry.register(messageType, () => container.resolve(constructor), requiresAuth, schema);
-
-    return constructor;  
+    logger.debug({ messageType, requiresAuth, requiredFeature }, `Registering message handler for type "${messageType}"`);
+    ClientMessageHandlerRegistry.register(messageType, () => container.resolve(constructor), requiresAuth, schema, requiredFeature);
+    return constructor;
   };
 }

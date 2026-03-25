@@ -11,7 +11,7 @@ import { SessionManager } from '../SessionManager';
 /**
  * Handles end conversation requests.
  */
-@ChannelMessageHandler('end_conversation', true, calEndConversationRequestSchema)
+@ChannelMessageHandler('end_conversation', true, calEndConversationRequestSchema, 'conversation_control')
 @injectable()
 export class EndConversationHandler implements ClientMessageHandler<CALEndConversationRequest> {
   readonly messageType!: string;
