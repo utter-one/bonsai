@@ -63,6 +63,9 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
   /** Promise chain to ensure sequential chunk delivery */
   private requestQueue: Promise<void> = Promise.resolve();
 
+  /** Last-chunk buffer: held until the next chunk arrives or end() is called, so isFinal can be set correctly on the terminal chunk */
+  private pendingChunk: GeneratedAudioChunk | null = null;
+
   constructor(config: OpenAiTtsProviderConfig, settings: OpenAiTtsSettings) {
     super(config);
     this.settings = settings;
@@ -92,6 +95,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
     this.inNoSpeechSection = undefined;
     this.isStarted = true;
     this.textBuffer = '';
+    this.pendingChunk = null;
 
     // Set default values
     const effectiveModel = this.settings.model ?? 'gpt-4o-mini-tts';
@@ -144,6 +148,12 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
 
     // Wait for all in-flight requests to complete
     await this.requestQueue;
+
+    // Flush the last buffered chunk with isFinal: true
+    if (this.pendingChunk) {
+      await this.handleSpeechGenerating({ ...this.pendingChunk, isFinal: true });
+      this.pendingChunk = null;
+    }
 
     this.isStarted = false;
     this.handleGenerationEnded();
@@ -284,7 +294,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
       offset += chunk.length;
     }
 
-    // Create and emit audio chunk
+    // Apply last-chunk-buffer pattern: emit the previously held chunk as non-final, then hold the new one
     const generatedChunk: GeneratedAudioChunk = {
       chunkId: this.generateChunkId(),
       ordinal: this.getNextOrdinal(),
@@ -294,7 +304,10 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
       isFinal: false,
     };
 
-    await this.handleSpeechGenerating(generatedChunk);
+    if (this.pendingChunk) {
+      await this.handleSpeechGenerating(this.pendingChunk);
+    }
+    this.pendingChunk = generatedChunk;
   }
 
   /**
@@ -412,6 +425,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
     this.inNoSpeechSection = undefined;
     this.isStarted = false;
     this.textBuffer = '';
+    this.pendingChunk = null;
 
     await super.cleanup();
   }
