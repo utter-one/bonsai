@@ -244,7 +244,7 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
 
     if (this.isRecognizing && this.client) {
       // Send audio data to Speechmatics using SDK
-      this.client.sendAudio(audio);
+      this.client.sendAudio(audio.buffer as ArrayBuffer);
       logger.debug(`[Speechmatics ASR] Sent audio chunk (${audio.length} bytes)`);
     } else {
       // Buffer audio until connection is established
@@ -384,7 +384,7 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
     if (this.audioBuffer.length > 0 && this.client && this.isRecognizing) {
       logger.info(`[Speechmatics ASR] Flushing ${this.audioBuffer.length} buffered audio chunks`);
       for (const buffer of this.audioBuffer) {
-        this.client.sendAudio(buffer);
+        this.client.sendAudio(buffer.buffer as ArrayBuffer);
       }
       this.audioBuffer = [];
     }

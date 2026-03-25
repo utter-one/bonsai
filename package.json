@@ -71,6 +71,7 @@
     "@types/pg": "^8.16.0",
     "@types/qs": "^6.14.0",
     "@types/ws": "^8.18.1",
-    "drizzle-kit": "^0.31.8"
+    "drizzle-kit": "^0.31.8",
+    "typescript": "^6.0.2"
   }
 }

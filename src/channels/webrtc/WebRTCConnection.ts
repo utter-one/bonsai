@@ -32,7 +32,7 @@ export class WebRTCConnection implements IClientConnection {
     private readonly controlChannel: RTCDataChannel,
     private readonly audioChannel: RTCDataChannel,
     private readonly sessionManager: SessionManager,
-  ) {}
+  ) { }
 
   /**
    * Attaches the session to this connection.
@@ -225,7 +225,7 @@ export class WebRTCConnection implements IClientConnection {
   private sendAudioFrame(turnId: string, audioData: Buffer): void {
     try {
       const frame = encodeAudioFrame(turnId, audioData);
-      this.audioChannel.send(frame);
+      this.audioChannel.send(frame.buffer as ArrayBuffer);
     } catch (error) {
       logger.error({ error, conversationId: this.session?.conversationId, sessionId: this.session?.id }, 'WebRTCConnection failed to send audio frame');
     }
