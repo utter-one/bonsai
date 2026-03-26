@@ -470,6 +470,9 @@ export class ConversationRunner {
             const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [/** TODO */], fullText, fullText);
             context.userInputSource = 'voice';
             await this.processUserInput(fullText, 'voice', asrEndMs);
+          } else if (this.isVadMode) {
+            logger.warn({ conversationId }, `No text recognized in VAD mode for conversation ${conversationId}, ignoring unintelligible audio`);
+            await this.changeState('awaiting_user_input');
           } else {
             logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
             await this.processUserInput(this.stageData.project.asrConfig.unintelligiblePlaceholder ?? '**inaudible**', 'voice', asrEndMs);
@@ -1508,34 +1511,60 @@ export class ConversationRunner {
     this.vadProcessor = new VadProcessor(sampleRate as 8000 | 16000 | 32000 | 48000, serverVadConfig);
     await this.vadProcessor.init();
 
-    this.vadProcessor.on('speech_start', () => { void this.handleVadSpeechStart(); });
-    this.vadProcessor.on('data', async (audio: Buffer) => { await this.forwardToAsr(audio); });
-    this.vadProcessor.on('end_of_utterance', () => { void this.handleVadEndOfUtterance(); });
+    // Serialize all VAD event handlers via a promise chain. This prevents the race where
+    // 'data' and 'end_of_utterance' fire synchronously before 'speech_start' has finished
+    // starting the ASR provider, which would cause audio to be forwarded to an inactive ASR
+    // and 'end_of_utterance' to return early (stuck in receiving_user_voice).
+    let vadEventQueue: Promise<void> = Promise.resolve();
+    const enqueueVadEvent = (fn: () => Promise<void>) => {
+      vadEventQueue = vadEventQueue.then(fn).catch(err => {
+        logger.error({ conversationId, error: err instanceof Error ? err.message : String(err) }, `VAD event handler error for conversation ${conversationId}`);
+      });
+    };
+
+    this.vadProcessor.on('speech_start', () => enqueueVadEvent(() => this.handleVadSpeechStart()));
+    this.vadProcessor.on('data', (audio: Buffer) => enqueueVadEvent(() => this.handleVadData(audio)));
+    this.vadProcessor.on('end_of_utterance', () => enqueueVadEvent(() => this.handleVadEndOfUtterance()));
 
     logger.info({ conversationId, asrFormat, sampleRate, mode: serverVadConfig.mode ?? 2 }, `Server VAD processor initialized for conversation ${conversationId}`);
   }
 
   /**
-   * Handles VAD speech start: generates a server-side inputTurnId, starts the ASR session,
-   * and transitions to receiving_user_voice. Only acts when in awaiting_user_input state.
+   * Handles VAD speech start: generates a server-side inputTurnId and transitions to
+   * receiving_user_voice. ASR is NOT started here — it is started in handleVadData right before
+   * the batch audio is sent, to avoid a silence gap that would trigger Azure's session timeout.
+   * Only acts when in awaiting_user_input state.
    */
   private async handleVadSpeechStart(): Promise<void> {
     if (this.conversation.status !== 'awaiting_user_input') return;
 
+    this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
+    await this.changeState('receiving_user_voice');
+    logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, `VAD speech detected for conversation ${this.stageData.conversation.id}`);
+  }
+
+  /**
+   * Handles VAD data: starts the ASR session and immediately sends the complete utterance audio.
+   * Starting ASR here (rather than at speech_start) ensures there is no silence gap between
+   * session start and audio delivery, preventing provider timeout on the push stream.
+   * Only acts when in receiving_user_voice state.
+   */
+  private async handleVadData(audio: Buffer): Promise<void> {
+    if (this.conversation.status !== 'receiving_user_voice') return;
+
     if (!this.stageData.asrProvider) {
-      logger.warn({ conversationId: this.stageData.conversation.id }, 'VAD speech_start: no ASR provider available');
+      logger.warn({ conversationId: this.stageData.conversation.id }, 'VAD data: no ASR provider available');
       return;
     }
 
     try {
-      this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
       await this.stageData.asrProvider.start();
-      await this.changeState('receiving_user_voice');
-      logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, `VAD speech detected, started ASR session for conversation ${this.stageData.conversation.id}`);
+      await this.forwardToAsr(audio);
+      logger.info({ conversationId: this.stageData.conversation.id }, `VAD started ASR and sent utterance audio for conversation ${this.stageData.conversation.id}`);
     } catch (error) {
-      const errorMessage = `VAD speech_start: failed to start ASR: ${error instanceof Error ? error.message : String(error)}`;
+      const errorMessage = `VAD data: failed to start ASR or send audio: ${error instanceof Error ? error.message : String(error)}`;
       await this.markAsFailed(errorMessage);
-      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `VAD failed to start ASR session for conversation ${this.stageData.conversation.id}`);
+      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `VAD failed to send audio to ASR for conversation ${this.stageData.conversation.id}`);
     }
   }
 
@@ -1551,7 +1580,6 @@ export class ConversationRunner {
 
     try {
       await this.stageData.asrProvider.stop();
-      await this.changeState('processing_user_input');
       logger.info({ conversationId: this.stageData.conversation.id }, `VAD end-of-utterance, stopped ASR session for conversation ${this.stageData.conversation.id}`);
     } catch (error) {
       const errorMessage = `VAD end_of_utterance: failed to stop ASR: ${error instanceof Error ? error.message : String(error)}`;
