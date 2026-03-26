@@ -55,6 +55,7 @@ import { elevenLabsAsrSettingsSchema } from './services/providers/asr/ElevenLabs
 import { deepgramAsrSettingsSchema } from './services/providers/asr/DeepgramAsrProvider';
 import { assemblyAiAsrSettingsSchema } from './services/providers/asr/AssemblyAiAsrProvider';
 import { speechmaticsAsrSettingsSchema } from './services/providers/asr/SpeechmaticsAsrProvider';
+import { serverVadConfigSchema } from './http/contracts/vad';
 import { OperatorController } from './http/controllers/OperatorController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -130,6 +131,7 @@ export function getOpenAPISpec(): any {
   registry.register('AmazonPollyTtsSettings', amazonPollyTtsSettingsSchema);
 
   // Voice and ASR configuration schemas
+  registry.register('ServerVadConfig', serverVadConfigSchema);
   registry.register('AsrConfig', asrConfigSchema);
   registry.register('ModerationConfig', moderationConfigSchema);
   registry.register('FillerSettings', fillerSettingsSchema);

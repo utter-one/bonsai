@@ -87,6 +87,12 @@ export const projects = pgTable('projects', {
     settings?: unknown;
     unintelligiblePlaceholder?: string;
     voiceActivityDetection?: boolean;
+    serverVad?: {
+      mode?: number;
+      frameDurationMs?: 10 | 20 | 30;
+      silencePaddingMs?: number;
+      autoEndSilenceDurationMs?: number;
+    };
   }>(),
   acceptVoice: boolean('accept_voice').notNull().default(true),
   generateVoice: boolean('generate_voice').notNull().default(true),

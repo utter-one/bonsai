@@ -389,6 +389,9 @@
                 "voiceActivityDetection": {
                   "type": "boolean",
                   "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence"
+                },
+                "serverVad": {
+                  "$ref": "#/definitions/ServerVadConfig"
                 }
               },
               "description": "ASR configuration settings with full ASR settings"
@@ -732,6 +735,53 @@
       },
       "description": "Speechmatics speech-to-text settings"
     },
+    "ServerVadConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "VAD aggressiveness level (0–3). Higher values are more aggressive at filtering non-speech. Default: 2."
+        },
+        "frameDurationMs": {
+          "anyOf": [
+            {
+              "type": "number",
+              "enum": [
+                10
+              ]
+            },
+            {
+              "type": "number",
+              "enum": [
+                20
+              ]
+            },
+            {
+              "type": "number",
+              "enum": [
+                30
+              ]
+            }
+          ],
+          "description": "Duration of each VAD processing frame in milliseconds. Must be 10, 20, or 30. Default: 20."
+        },
+        "silencePaddingMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Amount of silence (in ms) to prepend before the detected speech start as a pre-roll buffer. Default: 300."
+        },
+        "autoEndSilenceDurationMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 5000,
+          "description": "Duration of silence (in ms) after speech that triggers end-of-utterance detection. Default: 800."
+        }
+      },
+      "description": "Server-side VAD configuration. When set, the server autonomously detects speech boundaries — clients send continuous audio without calling start/end_user_voice_input."
+    },
     "project-settings": {
       "type": "object",
       "properties": {
@@ -782,6 +832,9 @@
             "voiceActivityDetection": {
               "type": "boolean",
               "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence"
+            },
+            "serverVad": {
+              "$ref": "#/definitions/ServerVadConfig"
             }
           },
           "description": "ASR configuration settings with full ASR settings"
@@ -2890,7 +2943,7 @@
         },
         "inputTurnId": {
           "type": "string",
-          "description": "Unique identifier for the input turn"
+          "description": "Unique identifier for the input turn. Optional in server VAD mode where the turn ID is managed server-side."
         }
       },
       "required": [
@@ -2899,8 +2952,7 @@
         "sessionId",
         "conversationId",
         "audioData",
-        "ordinal",
-        "inputTurnId"
+        "ordinal"
       ]
     },
     "send-user-voice-chunk-response": {
@@ -2937,8 +2989,7 @@
       "required": [
         "type",
         "sessionId",
-        "success",
-        "inputTurnId"
+        "success"
       ]
     },
     "end-user-voice-input-request": {

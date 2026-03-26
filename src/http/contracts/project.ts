@@ -11,6 +11,7 @@ import { deepgramAsrSettingsSchema } from '../../services/providers/asr/Deepgram
 import { assemblyAiAsrSettingsSchema } from '../../services/providers/asr/AssemblyAiAsrProvider';
 import { speechmaticsAsrSettingsSchema } from '../../services/providers/asr/SpeechmaticsAsrProvider';
 import { listParamsSchema } from './common';
+import { serverVadConfigSchema } from './vad';
 
 extendZodWithOpenApi(z);
 
@@ -73,6 +74,7 @@ export const asrConfigSchema = z.object({
   settings: asrSettingsSchema.optional().describe('ASR-specific settings including model, language preferences, etc.'),
   unintelligiblePlaceholder: z.string().optional().describe('Placeholder text to use when speech is unintelligible or cannot be transcribed'),
   voiceActivityDetection: z.boolean().optional().describe('Whether to enable voice activity detection to automatically start/stop recording based on speech presence'),
+  serverVad: serverVadConfigSchema.optional().describe('Server-side VAD configuration. When set, the server autonomously detects speech boundaries — clients send continuous audio without calling start/end_user_voice_input.'),
 }).openapi('AsrConfig').optional().describe('ASR configuration settings');
 
 export type AsrConfig = z.infer<typeof asrConfigSchema>;

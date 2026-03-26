@@ -103,6 +103,13 @@ export interface IAsrProvider {
   getAllTextChunks(): TextChunk[];
 
   /**
+   * Resets per-turn state (recognized text chunks, chunk ID) without stopping or restarting the
+   * recognition session. Called when a pre-warmed session is claimed by a new VAD turn so that
+   * residual state from the idle period is cleared before audio starts flowing.
+   */
+  resetForNewTurn(): void;
+
+  /**
    * Releases all resources held by the provider.
    * Must be called when the provider is no longer needed (e.g. on client disconnect).
    */

@@ -151,7 +151,19 @@ DELETE /api/projects/:id
 | `asrProviderId` | `string` | No | ASR provider ID |
 | `settings` | `object` | No | ASR-specific settings (varies by provider: Azure, ElevenLabs, Deepgram) |
 | `unintelligiblePlaceholder` | `string` | No | Placeholder text for unintelligible speech |
-| `voiceActivityDetection` | `boolean` | No | Enable voice activity detection |
+| `voiceActivityDetection` | `boolean` | No | Client-side VAD hint. When `true`, the client should apply local VAD before sending audio. Has no effect on the server. |
+| `serverVad` | [`ServerVadConfig`](#server-vad-config) | No | Server-side VAD configuration. When set, the server manages the turn lifecycle automatically — see [Server-Side VAD](#server-vad-config). |
+
+## Server VAD Config
+
+When `serverVad` is present in `asrConfig`, the server continuously monitors incoming audio for speech and manages the ASR turn lifecycle autonomously. Clients do not need to call `start_user_voice_input` or `end_user_voice_input` — they simply send audio via `send_user_voice_chunk` and let the server detect utterance boundaries.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mode` | `integer` (0–3) | No | VAD aggressiveness. Higher values reduce false positives at the cost of cutting off soft speech. Default: `2`. |
+| `frameDurationMs` | `10` \| `20` \| `30` | No | Duration of each VAD analysis frame in milliseconds. Default: `20`. |
+| `silencePaddingMs` | `integer` (0–1000) | No | Milliseconds of audio to include before the detected speech start (pre-roll). Default: `300`. |
+| `autoEndSilenceDurationMs` | `integer` (100–5000) | No | Milliseconds of silence after speech that triggers end-of-utterance detection. Default: `800`. |
 
 ## Storage Config
 

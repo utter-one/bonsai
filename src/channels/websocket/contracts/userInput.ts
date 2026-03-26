@@ -28,7 +28,7 @@ export const sendUserVoiceChunkRequestSchema = sessionInputMessageSchema.extend(
   conversationId: z.string().describe('Unique identifier of the conversation'),
   audioData: z.string().describe('Base64-encoded audio chunk data'),
   ordinal: z.number().describe('Sequential order of this chunk in the voice input sequence'),
-  inputTurnId: z.string().describe('Unique identifier for the input turn'),
+  inputTurnId: z.string().optional().describe('Unique identifier for the input turn. Optional in server VAD mode where the turn ID is managed server-side.'),
 });
 export type SendUserVoiceChunkRequest = z.infer<typeof sendUserVoiceChunkRequestSchema>;
 
@@ -40,7 +40,7 @@ export const sendUserVoiceChunkResponseSchema = sessionOutputMessageSchema.exten
   type: z.literal('send_user_voice_chunk').describe('Message type for send user voice chunk response'),
   success: z.boolean().describe('Whether voice chunk was successfully received'),
   error: z.string().optional().describe('Error message if voice chunk processing failed'),
-  inputTurnId: z.string().describe('Unique identifier for the input turn'),
+  inputTurnId: z.string().optional().describe('Unique identifier for the input turn'),
 });
 export type SendUserVoiceChunkResponse = z.infer<typeof sendUserVoiceChunkResponseSchema>;
 
