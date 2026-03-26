@@ -267,6 +267,15 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
   }
 
   /**
+   * Resets per-turn state without stopping the session. Overrides base to also reset chunkId.
+   */
+  override resetForNewTurn(): void {
+    super.resetForNewTurn();
+    this.chunkId = generateId(ID_PREFIXES.CHUNK);
+    this.bufferArray = [];
+  }
+
+  /**
    * Cleans up Azure Speech resources
    */
   async cleanup(): Promise<void> {

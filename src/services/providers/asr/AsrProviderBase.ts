@@ -121,6 +121,14 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   }
 
   /**
+   * Resets per-turn state without stopping the session. Used when a pre-warmed ASR session is
+   * claimed by an incoming VAD turn so stale state from the idle period is cleared.
+   */
+  resetForNewTurn(): void {
+    this.textChunks = [];
+  }
+
+  /**
    * Helper method to handle recognizing events (partial results)
    * Called by subclasses when partial recognition results are available
    * @param chunkId Unique identifier for the text chunk

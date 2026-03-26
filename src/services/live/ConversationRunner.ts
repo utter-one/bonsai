@@ -151,6 +151,12 @@ export class ConversationRunner {
   private outboundPendingChunk: PendingOutboundChunk | null = null;
   /** Server-side VAD processor; non-null when the project is configured with serverVad and the ASR format is PCM. */
   private vadProcessor: VadProcessor | null = null;
+  /**
+   * Tracks an in-flight pre-warm of the ASR session. Set when transitioning to awaiting_user_input
+   * in VAD mode so the next turn does not pay the full ASR connection cost. Null when no pre-warm
+   * is in progress or after it has been consumed by handleVadSpeechStart.
+   */
+  private asrPreWarmPromise: Promise<void> | null = null;
 
   /** True when server-side VAD is active for this session. VAD owns the turn lifecycle when active. */
   private get isVadMode(): boolean {
@@ -458,6 +464,16 @@ export class ConversationRunner {
 
         asrProvider.setOnRecognitionStopped(async () => {
           const asrEndMs = Date.now();
+
+          // If recognition stopped while we are NOT in an active voice turn (e.g. a pre-warmed
+          // session timed out during silence), discard the event and clear the pre-warm promise
+          // so the next speech_start will do a fresh start().
+          if (this.conversation.status !== 'receiving_user_voice') {
+            this.asrPreWarmPromise = null;
+            logger.info({ conversationId }, `ASR session ended during pre-warm (no active turn) for conversation ${conversationId}`);
+            return;
+          }
+
           logger.info({ conversationId }, `ASR recognition stopped for conversation ${conversationId}`);
 
           isRecognizing = false;
@@ -916,7 +932,11 @@ export class ConversationRunner {
       if (this.inboundConverter) {
         this.inboundConverter.push(voiceData);
       } else if (this.vadProcessor) {
+        // No converter: feed VAD directly and stream to ASR when speech is active.
         this.vadProcessor.push(voiceData);
+        if (this.conversation.status === 'receiving_user_voice') {
+          await this.forwardToAsr(voiceData);
+        }
       }
       return;
     }
@@ -1469,7 +1489,11 @@ export class ConversationRunner {
 
     this.inboundConverter.on('data', async (chunk: Buffer) => {
       if (this.isVadMode && this.vadProcessor) {
+        // Always feed VAD for speech detection; additionally stream to ASR when speech is active.
         this.vadProcessor.push(chunk);
+        if (this.conversation.status === 'receiving_user_voice') {
+          await this.forwardToAsr(chunk);
+        }
       } else {
         await this.forwardToAsr(chunk);
       }
@@ -1523,55 +1547,55 @@ export class ConversationRunner {
     };
 
     this.vadProcessor.on('speech_start', () => enqueueVadEvent(() => this.handleVadSpeechStart()));
-    this.vadProcessor.on('data', (audio: Buffer) => enqueueVadEvent(() => this.handleVadData(audio)));
+    // 'data' (batch utterance audio) is intentionally not wired: audio is streamed live to ASR
+    // via the inbound converter / receiveUserVoiceData path while state === 'receiving_user_voice'.
     this.vadProcessor.on('end_of_utterance', () => enqueueVadEvent(() => this.handleVadEndOfUtterance()));
 
     logger.info({ conversationId, asrFormat, sampleRate, mode: serverVadConfig.mode ?? 2 }, `Server VAD processor initialized for conversation ${conversationId}`);
   }
 
   /**
-   * Handles VAD speech start: generates a server-side inputTurnId and transitions to
-   * receiving_user_voice. ASR is NOT started here — it is started in handleVadData right before
-   * the batch audio is sent, to avoid a silence gap that would trigger Azure's session timeout.
-   * Only acts when in awaiting_user_input state.
+   * Handles VAD speech start: generates a server-side inputTurnId, starts the ASR session,
+   * and transitions to receiving_user_voice. From this point, every incoming audio chunk is
+   * forwarded to ASR live (streaming mode). Only acts when in awaiting_user_input state.
    */
   private async handleVadSpeechStart(): Promise<void> {
     if (this.conversation.status !== 'awaiting_user_input') return;
 
-    this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
-    await this.changeState('receiving_user_voice');
-    logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, `VAD speech detected for conversation ${this.stageData.conversation.id}`);
-  }
-
-  /**
-   * Handles VAD data: starts the ASR session and immediately sends the complete utterance audio.
-   * Starting ASR here (rather than at speech_start) ensures there is no silence gap between
-   * session start and audio delivery, preventing provider timeout on the push stream.
-   * Only acts when in receiving_user_voice state.
-   */
-  private async handleVadData(audio: Buffer): Promise<void> {
-    if (this.conversation.status !== 'receiving_user_voice') return;
-
     if (!this.stageData.asrProvider) {
-      logger.warn({ conversationId: this.stageData.conversation.id }, 'VAD data: no ASR provider available');
+      logger.warn({ conversationId: this.stageData.conversation.id }, 'VAD speech_start: no ASR provider available');
       return;
     }
 
     try {
-      await this.stageData.asrProvider.start();
-      await this.forwardToAsr(audio);
-      logger.info({ conversationId: this.stageData.conversation.id }, `VAD started ASR and sent utterance audio for conversation ${this.stageData.conversation.id}`);
+      this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
+      // Transition to receiving_user_voice BEFORE awaiting asrProvider.start() so that audio
+      // chunks arriving during ASR session startup are forwarded to sendAudio() and buffered
+      // there (bufferArray), then flushed to the push stream once recognition is ready.
+      // If start() is awaited first, those chunks are silently dropped (state guard fails).
+      await this.changeState('receiving_user_voice');
+      if (this.asrPreWarmPromise) {
+        // A pre-warm is in flight or already completed: wait for it, then reuse the session.
+        await this.asrPreWarmPromise;
+        this.asrPreWarmPromise = null;
+        // Reset per-turn state (text chunks, chunk ID) accumulated during the idle period.
+        this.stageData.asrProvider.resetForNewTurn();
+        logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, `VAD speech detected, reusing pre-warmed ASR session for conversation ${this.stageData.conversation.id}`);
+      } else {
+        await this.stageData.asrProvider.start();
+        logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, `VAD speech detected, started ASR session for conversation ${this.stageData.conversation.id}`);
+      }
     } catch (error) {
-      const errorMessage = `VAD data: failed to start ASR or send audio: ${error instanceof Error ? error.message : String(error)}`;
+      const errorMessage = `VAD speech_start: failed to start ASR: ${error instanceof Error ? error.message : String(error)}`;
       await this.markAsFailed(errorMessage);
-      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `VAD failed to send audio to ASR for conversation ${this.stageData.conversation.id}`);
+      logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `VAD failed to start ASR session for conversation ${this.stageData.conversation.id}`);
     }
   }
 
   /**
-   * Handles VAD end-of-utterance: stops the ASR session and transitions to processing_user_input.
-   * The setOnRecognitionStopped callback drives processUserInput onward. Only acts when in
-   * receiving_user_voice state.
+   * Handles VAD end-of-utterance: stops the ASR session (signals EOF to the push stream so the
+   * provider finalizes pending recognition). The setOnRecognitionStopped callback drives
+   * processUserInput onward. Only acts when in receiving_user_voice state.
    */
   private async handleVadEndOfUtterance(): Promise<void> {
     if (this.conversation.status !== 'receiving_user_voice') return;
@@ -2154,6 +2178,17 @@ export class ConversationRunner {
     await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, newState);
     if (newState === 'awaiting_user_input' && this.isVadMode && this.vadProcessor) {
       this.vadProcessor.reset();
+      // Pre-warm the next ASR session immediately so it is ready before VAD fires speech_start.
+      // Audio only flows once state transitions to receiving_user_voice, so silence never reaches
+      // the provider. If the session times out before the user speaks, setOnRecognitionStopped
+      // detects the idle state and clears asrPreWarmPromise; handleVadSpeechStart then falls
+      // back to a fresh start().
+      if (this.stageData?.asrProvider) {
+        this.asrPreWarmPromise = this.stageData.asrProvider.start().catch(err => {
+          this.asrPreWarmPromise = null;
+          logger.warn({ conversationId: this.conversation.id, error: err instanceof Error ? err.message : String(err) }, `ASR pre-warm failed for conversation ${this.conversation.id}`);
+        });
+      }
     }
   }
 
