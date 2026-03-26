@@ -908,11 +908,11 @@ export class ConversationRunner {
 
   async receiveUserVoiceData(inputTurnId: string, voiceData: Buffer) {
     if (this.isVadMode) {
-      // In VAD mode, accept audio in both awaiting and receiving states; ignore client-provided inputTurnId.
+      // In VAD mode, silently drop audio received in any state other than awaiting or receiving.
+      // This is expected: the client streams continuously and the server may be processing or
+      // generating a response. No error is thrown to avoid noisy logs and client-side failures.
       const validStates = ['awaiting_user_input', 'receiving_user_voice'];
-      if (!validStates.includes(this.conversation.status)) {
-        throw new Error(`Cannot receive user voice data in current state: ${this.conversation.status}`);
-      }
+      if (!validStates.includes(this.conversation.status)) return;
       if (this.inboundConverter) {
         this.inboundConverter.push(voiceData);
       } else if (this.vadProcessor) {
