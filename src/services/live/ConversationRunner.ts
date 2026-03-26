@@ -117,6 +117,14 @@ export type StageRuntimeData = {
   faq: FaqItem[];
 }
 
+/**
+ * Deferred terminal action to execute after response delivery (including TTS audio) is complete.
+ * Used to ensure end/abort lifecycle events are sent only after the client has received all audio.
+ */
+type PendingPostResponseAction =
+  | { name: string, type: 'end_conversation'; endReason: string; context: ConversationContext }
+  | { name: string, type: 'abort_conversation'; abortReason: string; context: ConversationContext };
+
 /** 
  * Manages the lifecycle and state of a conversation. Runners are hosted by the SessionManager.
  */
@@ -140,6 +148,8 @@ export class ConversationRunner {
   private conversationLifecycleActions: Map<string, GlobalAction> = new Map();
   /** Visibility override for the current turn's messages, set by change_visibility effects */
   private turnMessageVisibility: MessageVisibility | undefined = undefined;
+  /** Terminal action (end or abort) deferred until after the current turn's response has been fully delivered to the client */
+  private pendingPostResponseAction: PendingPostResponseAction | null = null;
 
   /** Session-scoped inbound converter: client audio format → ASR input format. Null when no conversion is needed. */
   private inboundConverter: IAudioConverter | null = null;
@@ -583,7 +593,7 @@ export class ConversationRunner {
           };
           await this.channel.sendMessage(endMessage);
 
-          await this.changeState('awaiting_user_input'); // TODO: handle end/aborted/failed states appropriately
+          await this.handlePostResponseAction();
         });
 
         ttsProvider.setOnSpeechGenerating(async (chunk) => {
@@ -736,8 +746,6 @@ export class ConversationRunner {
             fullText: textContent,
           };
           await this.channel.sendMessage(endGenerationMessage);
-
-          await this.changeState('awaiting_user_input'); // In case of no TTS provider, change state to awaiting user input
         } else {
           await ttsProvider.end(); // Signal TTS provider that generation is complete so it can finalize audio output and notify client
         }
@@ -1367,13 +1375,45 @@ export class ConversationRunner {
     logger.debug({ conversationId: this.conversation.id, actionName }, `Built context for action ${actionName}`);
     const outcome = await this.actionsExecutor.executeActions([actionToExecute], context, this.stageData.id, null, this.saveAndSendEvent.bind(this));
 
-    if (await this.applyActionOutcome(context, outcome)) {
-      // TODO: this needs more thought
+    const shouldContinue = await this.applyActionOutcome(context, outcome);
+    const isTerminalWithoutResponse = !outcome.shouldGenerateResponse &&
+      (outcome.shouldAbortConversation || outcome.shouldEndConversation);
+    if (isTerminalWithoutResponse) {
+      // Defer the terminal event: set pendingPostResponseAction but do NOT execute it here.
+      // RunActionHandler will call executePendingTerminalAction() after sending the run_action
+      // response to guarantee conversation_aborted / conversation_end arrives after the acknowledgement.
+      if (outcome.shouldAbortConversation) {
+        this.pendingPostResponseAction = {
+          name: outcome.abortConversationSourceAction,
+          type: 'abort_conversation',
+          abortReason: outcome.abortReason || 'Conversation aborted by action',
+          context,
+        };
+      } else {
+        this.pendingPostResponseAction = {
+          name: outcome.endConversationSourceAction,
+          type: 'end_conversation',
+          endReason: outcome.endReason || 'Action execution completed conversation',
+          context,
+        };
+      }
+    } else if (shouldContinue || outcome.shouldAbortConversation || outcome.shouldEndConversation) {
       await this.generateResponse(context, outcome);
     }
 
     logger.info({ conversationId: this.conversation.id, actionName }, `Action ${actionName} executed`);
     return { status: 'completed', message: 'Action execution not yet implemented' };
+  }
+
+  /**
+   * Executes any terminal action (end or abort) that was deferred by the most recent runAction() call.
+   * Must be called by the handler AFTER the run_action response has been sent to the client so that
+   * conversation_aborted / conversation_end events are always delivered after the acknowledgement.
+   */
+  async executePendingTerminalAction(): Promise<void> {
+    if (this.pendingPostResponseAction) {
+      await this.handlePostResponseAction();
+    }
   }
 
   /**
@@ -1740,6 +1780,7 @@ export class ConversationRunner {
    */
   private resetTurnData(): void {
     this.turnMessageVisibility = undefined;
+    this.pendingPostResponseAction = null;
     this.turnData = {
       inputTurnId: this.turnData.inputTurnId,
       outputTurnId: undefined,
@@ -1995,7 +2036,10 @@ export class ConversationRunner {
   }
 
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
-    const shouldGenerateResponse = executionOutcome.success && !executionOutcome.shouldAbortConversation && executionOutcome.shouldGenerateResponse;
+    // Generate a response when the action succeeded and a generate_response effect is set.
+    // Note: shouldAbortConversation no longer suppresses generation — the abort is deferred
+    // until after response delivery via pendingPostResponseAction.
+    const shouldGenerateResponse = executionOutcome.success && executionOutcome.shouldGenerateResponse;
     if (shouldGenerateResponse) {
       if (this.responseGeneratedInTurn) {
         logger.warn({ conversationId: this.conversation.id }, 'Response already generated/scheduled for this turn — skipping duplicate response generation');
@@ -2038,56 +2082,88 @@ export class ConversationRunner {
       this.lastFillerSentence = null;
       this.lastFillerPrompt = null;
 
+      // Schedule what happens after response delivery (including TTS audio) is complete.
+      // For TTS paths this is executed by handlePostResponseAction() called from onGenerationEnded;
+      // for non-TTS paths it is executed immediately below.
       if (executionOutcome.shouldEndConversation) {
-        // Execute __conversation_end global lifecycle action if defined
-        const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
-        if (onConversationEndAction) {
-          logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action');
-          const endLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], context, this.stageData.id, 'conversation_end', this.saveAndSendEvent.bind(this));
-          await this.applyActionOutcome(context, endLifecycleOutcome);
-        }
-
-        const eventData: ConversationEndEventData = {
-          stageId: this.stageData.id,
-          reason: executionOutcome.endReason || 'Action execution completed conversation',
-          sourceActionName: executionOutcome.endConversationSourceAction,
-        };
-        await this.saveAndSendEvent('conversation_end', eventData);
-        await this.changeTerminalState('finished');
+        this.pendingPostResponseAction = { name: executionOutcome.endConversationSourceAction, type: 'end_conversation', endReason: executionOutcome.endReason || 'Action execution completed conversation', context };
+      } else if (executionOutcome.shouldAbortConversation) {
+        this.pendingPostResponseAction = { name: executionOutcome.abortConversationSourceAction, type: 'abort_conversation', abortReason: executionOutcome.abortReason || 'Conversation aborted by action', context };
       }
+
+      if (!this.stageData.ttsProvider) {
+        // No TTS: response was fully delivered synchronously — execute the terminal action now.
+        await this.handlePostResponseAction();
+      }
+      // With TTS: audio is still streaming; handlePostResponseAction will be invoked from
+      // ttsProvider.setOnGenerationEnded once all audio has been delivered to the client.
     } else if (executionOutcome.shouldAbortConversation) {
-      // Close the filler turn if it was opened but no response follows
+      // No response to generate — close filler turn if open, then abort immediately.
       if (this.responseOutputTurnStarted) {
         this.responseOutputTurnStarted = false;
         if (this.stageData.ttsProvider) {
           await this.stageData.ttsProvider.end();
         }
       }
-      // Execute __conversation_abort global lifecycle action if defined
+      this.pendingPostResponseAction = { name: executionOutcome.abortConversationSourceAction, type: 'abort_conversation', abortReason: executionOutcome.abortReason || 'Conversation aborted by action', context };
+      await this.handlePostResponseAction();
+    } else {
+      // No response, no terminal action — close filler turn if open and return to idle.
+      if (this.responseOutputTurnStarted) {
+        this.responseOutputTurnStarted = false;
+        if (this.stageData.ttsProvider) {
+          await this.stageData.ttsProvider.end();
+        }
+      }
+      await this.changeState('awaiting_user_input');
+    }
+  }
+
+  /**
+   * Executes any terminal action (end or abort) that was deferred until after the current
+   * turn's response — including TTS audio — has been fully delivered to the client.
+   * If no action is pending, transitions the conversation back to awaiting user input.
+   * This method is idempotent: a second call after the action has already been consumed
+   * is safe and will not overwrite a terminal state.
+   */
+  private async handlePostResponseAction(): Promise<void> {
+    const action = this.pendingPostResponseAction;
+    this.pendingPostResponseAction = null;
+
+    if (!action) {
+      // Guard against overwriting a terminal state (e.g. when onGenerationEnded fires
+      // after a synchronous TTS provider already completed inline).
+      if (this.conversation.status !== 'finished' && this.conversation.status !== 'failed') {
+        await this.changeState('awaiting_user_input');
+      }
+      return;
+    }
+
+    if (action.type === 'end_conversation') {
+      const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
+      if (onConversationEndAction) {
+        logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action');
+        const endLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], action.context, this.stageData.id, 'conversation_end', this.saveAndSendEvent.bind(this));
+        await this.applyActionOutcome(action.context, endLifecycleOutcome);
+      }
+      const eventData: ConversationEndEventData = { stageId: this.stageData.id, reason: action.endReason };
+      await this.saveAndSendEvent('conversation_end', eventData);
+      await this.changeTerminalState('finished');
+    } else {
       const onConversationAbortAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_ABORT);
       if (onConversationAbortAction) {
         logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_abort lifecycle action');
-        const abortLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationAbortAction], context, this.stageData.id, 'conversation_abort', this.saveAndSendEvent.bind(this));
-        await this.applyActionOutcome(context, abortLifecycleOutcome);
+        const abortLifecycleOutcome = await this.actionsExecutor.executeActions([onConversationAbortAction], action.context, this.stageData.id, 'conversation_abort', this.saveAndSendEvent.bind(this));
+        await this.applyActionOutcome(action.context, abortLifecycleOutcome);
       }
       // Abort conversation without generating response
       const eventData: ConversationAbortedEventData = {
         stageId: this.stageData.id,
-        reason: executionOutcome.abortReason || 'Conversation aborted by action',
-        sourceActionName: executionOutcome.abortConversationSourceAction,
+        reason: action.abortReason || 'Conversation aborted by action',
+        sourceActionName: action.name,
       };
       await this.saveAndSendEvent('conversation_aborted', eventData);
       await this.changeTerminalState('finished');
-    } else {
-      // Close the filler turn if it was opened but no response follows
-      if (this.responseOutputTurnStarted) {
-        this.responseOutputTurnStarted = false;
-        if (this.stageData.ttsProvider) {
-          await this.stageData.ttsProvider.end();
-        }
-      }
-      // If no response generation, go back to awaiting user input
-      await this.changeState('awaiting_user_input');
     }
   }
 
@@ -2167,7 +2243,6 @@ export class ConversationRunner {
         fullText: text,
       };
       await this.channel.sendMessage(prescriptedEndMessage);
-      await this.changeState('awaiting_user_input');
     } else {
       await ttsProvider.end();
     }
