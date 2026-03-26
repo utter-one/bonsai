@@ -941,6 +941,15 @@ export class ConversationRunner {
       return;
     }
 
+    if (this.conversation.status === 'awaiting_user_input') {
+      // Audio can arrive before startUserVoiceInput is called (e.g. WebRTC unordered channel
+      // delivering an audio frame before the control-channel start signal, or a client that
+      // streams briefly before acknowledging our state). Silently drop so the conversation is not
+      // disrupted; the client will receive no transcription and should retry once it sends the
+      // start signal and hears back that state is receiving_user_voice.
+      return;
+    }
+
     if (this.conversation.status !== 'receiving_user_voice') {
       throw new Error(`Cannot receive user voice data in current state: ${this.conversation.status}`);
     }
@@ -993,8 +1002,13 @@ export class ConversationRunner {
     try {
       // Signal end of input to the inbound converter so it can flush any buffered data to ASR
       this.inboundConverter?.end();
+      // Do NOT change state here: ASR providers close the stream/socket and return immediately,
+      // firing onRecognitionStopped asynchronously (e.g. Azure sessionStopped, Deepgram close
+      // event). Changing state to processing_user_input before that callback fires causes its
+      // guard (status !== 'receiving_user_voice') to bail out early, swallowing the transcript.
+      // processUserInput() — called from onRecognitionStopped — is the correct place to
+      // transition to processing_user_input, mirroring how handleVadEndOfUtterance works.
       await this.stageData.asrProvider.stop();
-      await this.changeState('processing_user_input');
 
       logger.info({ conversationId: this.stageData.conversation.id }, `Stopped voice input for conversation ${this.stageData.conversation.id}`);
     } catch (error) {
