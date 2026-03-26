@@ -287,6 +287,27 @@ export const knowledgeItems = pgTable('knowledge_items', {
   foreignKey({ columns: [table.projectId, table.categoryId], foreignColumns: [knowledgeCategories.projectId, knowledgeCategories.id] }),
 ]);
 
+export type SamplingMethod = 'random' | 'round_robin';
+
+// SampleCopy table
+export const sampleCopies = pgTable('sample_copies', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  stages: jsonb('stages').$type<string[]>(),
+  agents: jsonb('agents').$type<string[]>(),
+  promptTrigger: text('prompt_trigger').notNull(),
+  classifierOverrideId: text('classifier_override_id'),
+  content: jsonb('content').notNull().default([]).$type<string[]>(),
+  amount: integer('amount').notNull().default(1),
+  samplingMethod: text('sampling_method').notNull().default('random').$type<SamplingMethod>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+]);
+
 // GlobalAction table
 export const globalActions = pgTable('global_actions', {
   id: text('id').notNull(),
@@ -477,6 +498,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   guardrails: many(guardrails),
   issues: many(issues),
   apiKeys: many(apiKeys),
+  sampleCopies: many(sampleCopies),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -529,6 +551,13 @@ export const globalActionsRelations = relations(globalActions, ({ one }) => ({
 export const guardrailsRelations = relations(guardrails, ({ one }) => ({
   project: one(projects, {
     fields: [guardrails.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const sampleCopiesRelations = relations(sampleCopies, ({ one }) => ({
+  project: one(projects, {
+    fields: [sampleCopies.projectId],
     references: [projects.id],
   }),
 }));

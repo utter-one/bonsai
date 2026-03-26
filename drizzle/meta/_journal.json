@@ -267,6 +267,13 @@
       "when": 1774454689735,
       "tag": "0037_cooing_sheva_callister",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1774555233924,
+      "tag": "0038_normal_princess_powerful",
+      "breakpoints": true
     }
   ]
 }
