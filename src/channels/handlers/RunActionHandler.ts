@@ -38,8 +38,12 @@ export class RunActionHandler implements ClientMessageHandler<CALRunActionReques
       await context.session.runner.saveCommandEvent('run_action', { actionName: message.actionName, parameters: message.parameters });
       const result = await context.session.runner.runAction(message.actionName, message.parameters);
 
+      // Send the run_action response BEFORE executing any deferred terminal action (e.g. abort/end)
+      // so the client receives the acknowledgement before the conversation closure event.
       const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: true, result };
       context.send(response);
+
+      await context.session.runner.executePendingTerminalAction();
 
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
     } catch (error) {

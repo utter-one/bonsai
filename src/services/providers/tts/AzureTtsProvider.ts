@@ -69,6 +69,9 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
   /** Whether synthesis is currently in progress */
   private isProcessing: boolean = false;
 
+  /** Promise tracking the currently running processQueue call, used by end() to await completion */
+  private processingQueuePromise: Promise<void> | null = null;
+
   constructor(config: AzureTtsProviderConfig, settings: AzureTtsSettings) {
     super(config);
     this.settings = settings;
@@ -124,6 +127,7 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
     this.textBuffer = '';
     this.synthesisQueue = [];
     this.isProcessing = false;
+    this.processingQueuePromise = null;
 
     // Initialize sentence splitter with callback to synthesize complete sentences (if enabled)
     const useSentenceSplitter = this.settings.useSentenceSplitter ?? true;
@@ -170,7 +174,9 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
     logger.info(`[Azure TTS] Ending speech generation`);
 
     // Ensure all queued synthesis is processed before ending
-    await this.processQueue();
+    if (this.processingQueuePromise) {
+      await this.processingQueuePromise;
+    }
 
     this.isStarted = false;
     this.handleGenerationEnded();
@@ -232,7 +238,9 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
 
     // Add to queue and start processing if not already running
     this.synthesisQueue.push(text);
-    this.processQueue();
+    if (!this.isProcessing) {
+      this.processingQueuePromise = this.processQueue();
+    }
   }
 
   /**
