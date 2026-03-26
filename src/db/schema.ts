@@ -289,6 +289,19 @@ export const knowledgeItems = pgTable('knowledge_items', {
 
 export type SamplingMethod = 'random' | 'round_robin';
 
+// CopyDecorator table
+export const copyDecorators = pgTable('copy_decorators', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  template: text('template').notNull(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+]);
+
 // SampleCopy table
 export const sampleCopies = pgTable('sample_copies', {
   id: text('id').notNull(),
@@ -301,11 +314,13 @@ export const sampleCopies = pgTable('sample_copies', {
   content: jsonb('content').notNull().default([]).$type<string[]>(),
   amount: integer('amount').notNull().default(1),
   samplingMethod: text('sampling_method').notNull().default('random').$type<SamplingMethod>(),
+  decoratorId: text('decorator_id'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
+  foreignKey({ columns: [table.projectId, table.decoratorId], foreignColumns: [copyDecorators.projectId, copyDecorators.id] }),
 ]);
 
 // GlobalAction table
@@ -499,6 +514,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   issues: many(issues),
   apiKeys: many(apiKeys),
   sampleCopies: many(sampleCopies),
+  copyDecorators: many(copyDecorators),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -555,10 +571,22 @@ export const guardrailsRelations = relations(guardrails, ({ one }) => ({
   }),
 }));
 
+export const copyDecoratorsRelations = relations(copyDecorators, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [copyDecorators.projectId],
+    references: [projects.id],
+  }),
+  sampleCopies: many(sampleCopies),
+}));
+
 export const sampleCopiesRelations = relations(sampleCopies, ({ one }) => ({
   project: one(projects, {
     fields: [sampleCopies.projectId],
     references: [projects.id],
+  }),
+  decorator: one(copyDecorators, {
+    fields: [sampleCopies.projectId, sampleCopies.decoratorId],
+    references: [copyDecorators.projectId, copyDecorators.id],
   }),
 }));
 

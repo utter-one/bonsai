@@ -17,6 +17,7 @@ import { createContextTransformerSchema, updateContextTransformerBodySchema, del
 import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createSampleCopySchema, updateSampleCopyBodySchema, deleteSampleCopyBodySchema, sampleCopyResponseSchema, sampleCopyListResponseSchema } from './http/contracts/sampleCopy';
+import { createCopyDecoratorSchema, updateCopyDecoratorBodySchema, deleteCopyDecoratorBodySchema, copyDecoratorResponseSchema, copyDecoratorListResponseSchema } from './http/contracts/copyDecorator';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
@@ -73,6 +74,7 @@ import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { GuardrailController } from './http/controllers/GuardrailController';
 import { SampleCopyController } from './http/controllers/SampleCopyController';
+import { CopyDecoratorController } from './http/controllers/CopyDecoratorController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -393,6 +395,17 @@ export function getOpenAPISpec(): any {
   registry.register('SampleCopyListResponse', sampleCopyListResponseSchema);
   const sampleCopyPaths = SampleCopyController.getOpenAPIPaths();
   for (const path of sampleCopyPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register CopyDecorator schemas and routes from CopyDecoratorController
+  registry.register('CreateCopyDecoratorRequest', createCopyDecoratorSchema);
+  registry.register('UpdateCopyDecoratorRequest', updateCopyDecoratorBodySchema);
+  registry.register('DeleteCopyDecoratorRequest', deleteCopyDecoratorBodySchema);
+  registry.register('CopyDecoratorResponse', copyDecoratorResponseSchema);
+  registry.register('CopyDecoratorListResponse', copyDecoratorListResponseSchema);
+  const copyDecoratorPaths = CopyDecoratorController.getOpenAPIPaths();
+  for (const path of copyDecoratorPaths) {
     registry.registerPath(path);
   }
 

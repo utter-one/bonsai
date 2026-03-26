@@ -21,6 +21,7 @@ import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { GuardrailController } from './http/controllers/GuardrailController';
 import { SampleCopyController } from './http/controllers/SampleCopyController';
+import { CopyDecoratorController } from './http/controllers/CopyDecoratorController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
@@ -161,6 +162,9 @@ export function createApp(): express.Application {
 
   const sampleCopyController = container.resolve(SampleCopyController);
   sampleCopyController.registerRoutes(app);
+
+  const copyDecoratorController = container.resolve(CopyDecoratorController);
+  copyDecoratorController.registerRoutes(app);
 
   const guardrailController = container.resolve(GuardrailController);
   guardrailController.registerRoutes(app);
