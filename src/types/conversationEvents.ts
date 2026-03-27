@@ -39,6 +39,7 @@ export const conversationEventTypeSchema = z.enum([
   'user_input_modified',
   'user_banned',
   'visibility_changed',
+  'sample_copy_selection',
 ]);
 
 export type ConversationEventType = z.infer<typeof conversationEventTypeSchema>;
@@ -308,6 +309,22 @@ export const visibilityChangedEventDataSchema = z.object({
 
 export type VisibilityChangedEventData = z.infer<typeof visibilityChangedEventDataSchema>;
 
+/**
+ * Schema for sample copy selection event data.
+ * Emitted when the sample copy classifier selects a sample copy for the current turn.
+ */
+export const sampleCopySelectionEventDataSchema = z.object({
+  /** ID of the classifier that performed the selection */
+  classifierId: z.string().describe('ID of the classifier that performed the selection'),
+  /** The user input that triggered the selection */
+  input: z.string().describe('The user input that triggered the selection'),
+  /** ID of the selected sample copy, or null if none was selected */
+  sampleCopyId: z.string().nullable().describe('ID of the selected sample copy, or null if none was selected'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type SampleCopySelectionEventData = z.infer<typeof sampleCopySelectionEventDataSchema>;
+
 export const conversationEventDataSchema = z.union([
   messageEventDataSchema,
   classificationEventDataSchema,
@@ -328,6 +345,7 @@ export const conversationEventDataSchema = z.union([
   userInputModifiedEventDataSchema,
   userBannedEventDataSchema,
   visibilityChangedEventDataSchema,
+  sampleCopySelectionEventDataSchema,
 ]);
 
 export type ConversationEventData = z.infer<typeof conversationEventDataSchema>;

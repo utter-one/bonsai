@@ -28,6 +28,14 @@ export class SampleCopyDistributor {
     }
 
     /**
+     * Returns true if a sample copy with the given ID is known to this distributor.
+     * @param sampleCopyId The ID to check
+     */
+    hasId(sampleCopyId: string): boolean {
+        return sampleCopyId in this.copyStates;
+    }
+
+    /**
      * Distributes copies for a given sample copy ID based on its sampling method and amount.
      * @param sampleCopyId The ID of the sample copy to distribute copies for
      * @returns An array of copies to be used for the current turn

@@ -1966,7 +1966,7 @@ export class ConversationRunner {
     );
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
     const guardrailActionsMap = new Map(this.stageData.guardrails.map(ga => [ga.name, ga]));
-    const sampleCopies = processingResult.sampleCopyResult?.sampleCopyId 
+    const sampleCopies = processingResult.sampleCopyResult?.sampleCopyId && this.sampleCopyDistributor.hasId(processingResult.sampleCopyResult.sampleCopyId)
       ? this.sampleCopyDistributor.distributeCopies(processingResult.sampleCopyResult.sampleCopyId)
       : [];
     const copy = sampleCopies.length > 0 ? sampleCopies.join('\n') : '';

@@ -6,7 +6,7 @@ import { ConversationContext, ConversationContextBuilder } from "./ConversationC
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
 import { KnowledgeService } from "../KnowledgeService";
-import { ClassificationEventData } from "../../types/conversationEvents";
+import { ClassificationEventData, SampleCopySelectionEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ActionClassificationResultWithClassifier, SampleCopyClassificationResult, sampleCopyClassificationResultSchema } from "../../types/classification";
 import { Conversation, GlobalAction, Guardrail } from "../../types/models";
@@ -162,15 +162,14 @@ export class UserInputProcessor {
         await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
-      // Register classification event for sample copy classifier
+      // Register sample copy selection event
       if (sampleCopyResult) {
-        const eventData: ClassificationEventData = {
-          classifierId: sampleCopyResult.classifierId,
+        const eventData: SampleCopySelectionEventData = {
+          classifierId: sampleCopyClassifier!.classifier.id,
           input: userInput || '',
-          actions: [sampleCopyResult],
+          sampleCopyId: sampleCopyResult.sampleCopyId,
           metadata: {
-            classifierName: sampleCopyResult.classifierName,
-            actionCount: sampleCopyResult.actions.length,
+            classifierName: sampleCopyClassifier!.classifier.name,
             systemPrompt: sampleCopyResult.renderedPrompt,
             llmSettings: sampleCopyClassifier?.classifier.llmSettings,
             currentVariables: conversation?.stageVars[stage.id] || {},
@@ -179,8 +178,8 @@ export class UserInputProcessor {
             endMs: sampleCopyResult.endMs,
           },
         };
-        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
-        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'sample_copy_selection', eventData);
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'sample_copy_selection', eventData });
       }
 
       const allActions = [

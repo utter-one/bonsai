@@ -67,6 +67,12 @@ export type FaqItem = {
   answer: string;
 };
 
+export type SampleCopyItem = {
+  name: string;
+  trigger: string;
+  content: string[];
+}
+
 /**
  * A single conversation event entry exposed to the script sandbox.
  * Contains all event types in chronological order, including messages.
@@ -143,6 +149,9 @@ export type ConversationContext = {
 
   /** FAQ items gathered from knowledge base categories triggered during this conversation turn */
   faq?: FaqItem[];
+
+  /** All sample copy entities for the project */
+  sampleCopy?: SampleCopyItem[];
 
   /**
    * Pseudo-JSON schema descriptions of context variables, populated for transformer contexts.
@@ -723,15 +732,18 @@ export class ConversationContextBuilder {
    */
   async buildContextForGuardrailClassifier(conversation: Conversation, stage: Stage, guardrails: Guardrail[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     // Load user data
-    const user = await db.query.users.findFirst({
-      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
-    });
-
-    // Load project constants
-    const project = await db.query.projects.findFirst({
-      where: eq(projects.id, conversation.projectId),
-      columns: { constants: true, timezone: true, languageCode: true },
-    });
+    const [user, project, projectSampleCopies] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+      db.query.sampleCopies.findMany({
+        where: (table, { eq }) => eq(table.projectId, conversation.projectId),
+      }),
+    ]);
 
     // Build raw context for condition evaluation
     const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
@@ -761,6 +773,11 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
+      sampleCopy: projectSampleCopies.map(sc => ({
+        name: sc.name,
+        trigger: sc.promptTrigger,
+        content: sc.content,
+      })),
       history: [],
       events: [],
       actions: {},
@@ -919,16 +936,19 @@ export class ConversationContextBuilder {
     copyContent: string,
     faq?: FaqItem[],
   ): Promise<ConversationContext> {
-    // Load user data
-    const user = await db.query.users.findFirst({
-      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
-    });
-
-    // Load project constants
-    const project = await db.query.projects.findFirst({
-      where: eq(projects.id, conversation.projectId),
-      columns: { constants: true, timezone: true, languageCode: true },
-    });
+    // Load user data, project constants, and all project sample copies in parallel
+    const [user, project, projectSampleCopies] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+      db.query.sampleCopies.findMany({
+        where: (table, { eq }) => eq(table.projectId, conversation.projectId),
+      }),
+    ]);
 
     const context = {
       conversationId: conversation.id,
@@ -942,8 +962,12 @@ export class ConversationContextBuilder {
       copy: {
         toString() { return copy; },
         content: copyContent,
-        // TODO: spread all project sample copies here
       },
+      sampleCopy: projectSampleCopies.map(sc => ({
+        name: sc.name,
+        trigger: sc.promptTrigger,
+        content: sc.content,
+      })),
       history: [],
       events: [],
       actions: actions.reduce((acc, action) => {
