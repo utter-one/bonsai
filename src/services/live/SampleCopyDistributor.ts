@@ -15,7 +15,7 @@ export class SampleCopyDistributor {
 
     constructor(private originalCopies: SampleCopy[]) {
         this.copyStates = originalCopies.reduce((acc, copy) => {
-            acc[copy.id] = { currentIndex: 0, sampleCopy: copy };
+            acc[copy.name] = { currentIndex: 0, sampleCopy: copy };
             return acc;
         }, {} as Record<string, SampleCopyDistributionState>);
     }
@@ -28,11 +28,11 @@ export class SampleCopyDistributor {
     }
 
     /**
-     * Returns true if a sample copy with the given ID is known to this distributor.
-     * @param sampleCopyId The ID to check
+     * Returns true if a sample copy with the given name is known to this distributor.
+     * @param sampleCopyName The name to check
      */
-    hasId(sampleCopyId: string): boolean {
-        return sampleCopyId in this.copyStates;
+    hasName(sampleCopyName: string): boolean {
+        return sampleCopyName in this.copyStates;
     }
 
     /**

@@ -153,6 +153,12 @@ export type ConversationContext = {
   /** All sample copy entities for the project */
   sampleCopy?: SampleCopyItem[];
 
+  /** Rendered selected sample copy content */
+  copy?: string;
+ 
+  /** Raw content of the selected sample copies */
+  copyContent?: string;
+
   /**
    * Pseudo-JSON schema descriptions of context variables, populated for transformer contexts.
    */
@@ -959,10 +965,8 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
-      copy: {
-        toString() { return copy; },
-        content: copyContent,
-      },
+      copy,
+      copyContent,
       sampleCopy: projectSampleCopies.map(sc => ({
         name: sc.name,
         trigger: sc.promptTrigger,
