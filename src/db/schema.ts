@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations, isNull, isNotNull } from 'drizzle-orm';
 import { StageAction, Effect, ToolParameter, StageActionParameter } from '../types/actions';
 import { FieldDescriptor } from '../types/parameters';
@@ -324,6 +324,7 @@ export const sampleCopies = pgTable('sample_copies', {
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
   foreignKey({ columns: [table.projectId, table.decoratorId], foreignColumns: [copyDecorators.projectId, copyDecorators.id] }),
+  uniqueIndex('sample_copies_project_id_name_unique').on(table.projectId, table.name),
 ]);
 
 // GlobalAction table
