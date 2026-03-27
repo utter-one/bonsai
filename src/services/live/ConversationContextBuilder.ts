@@ -939,6 +939,11 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
+      copy: {
+        toString() { return copy; },
+        content: copyContent,
+        // TODO: spread all project sample copies here
+      },
       history: [],
       events: [],
       actions: actions.reduce((acc, action) => {
