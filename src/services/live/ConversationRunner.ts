@@ -390,13 +390,15 @@ export class ConversationRunner {
     }
 
     // Load sample copies and sampleCopyClassifier if {{copy}} tag is used in the stage prompt
-    if (stage.prompt.includes('{{copy}}')) {
+    const hasCopyTag = stage.prompt.includes('{{copy}}') || stage.prompt.includes('{{copy.');
+    if (hasCopyTag) {
       const allProjectSampleCopies = await db.query.sampleCopies.findMany({
         where: (sc, { eq }) => eq(sc.projectId, conversation.projectId),
       });
-      // Include copies scoped to this stage or applicable to all stages (null/empty stages array)
+      // Include copies scoped to this stage and agent (or null/empty stages/agents array)
       stageData.sampleCopies = allProjectSampleCopies.filter(copy =>
-        !copy.stages || (copy.stages as string[]).length === 0 || (copy.stages as string[]).includes(stage.id)
+        (!copy.stages || (copy.stages as string[]).length === 0 || (copy.stages as string[]).includes(stage.id))
+        && (copy.agents === null || (copy.agents as string[]).length === 0 || (copy.agents as string[]).includes(stage.agentId))
       );
 
       const sampleCopyClassifierId = project.sampleCopyConfig?.defaultClassifierId;
@@ -413,6 +415,8 @@ export class ConversationRunner {
         } else {
           logger.warn({ projectId: project.id, classifierId: sampleCopyClassifierId }, 'Sample copy classifier not found, sample copy classification will be skipped');
         }
+      } else {
+        logger.warn({ projectId: project.id }, 'No default sample copy classifier configured, sample copy classification will be skipped');
       }
     }
 
