@@ -281,6 +281,13 @@
       "when": 1774555836868,
       "tag": "0039_flaky_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1774604211765,
+      "tag": "0040_sweet_pet_avengers",
+      "breakpoints": true
     }
   ]
 }

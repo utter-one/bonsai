@@ -2,7 +2,7 @@ import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
 import { Session } from "../../channels/SessionManager";
 import { inject, singleton } from "tsyringe";
-import { Conversation, GlobalAction, Guardrail, Stage } from "../../types/models";
+import { Conversation, GlobalAction, Guardrail, SampleCopy, Stage } from "../../types/models";
 import { FieldDescriptor } from "../../types/parameters";
 import { StageAction } from "../../types/actions";
 import { ConversationEventData } from "../../types/conversationEvents";
@@ -796,6 +796,18 @@ export class ConversationContextBuilder {
     context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
+  }
+
+  /**
+   * Builds context specifically for a sample copy classifier.
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity with agent relation
+   * @param sampleCopies - Array of sample copies for the stage
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   */
+  async buildContextForSampleCopyClassifier(conversation: Conversation, stage: Stage, sampleCopies: SampleCopy[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+    return this.buildContextForGuardrailClassifier(conversation, stage, [] as Guardrail[], userInput, originalUserInput);
   }
 
   /**

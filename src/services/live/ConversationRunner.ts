@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, Stage, Tool } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, SampleCopy, Stage, Tool } from "../../types/models";
 import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS } from "../../types/actions";
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
-import { conversations, users } from "../../db/schema";
+import { conversations, users, sampleCopies } from "../../db/schema";
 import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
@@ -109,6 +109,8 @@ export type StageRuntimeData = {
   globalActions: GlobalAction[];
   guardrails: Guardrail[];
   guardrailClassifier?: ClassifierRuntimeData;
+  sampleCopies: SampleCopy[];
+  sampleCopyClassifier?: ClassifierRuntimeData;
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   shouldEndConversation: boolean;
@@ -254,6 +256,8 @@ export class ConversationRunner {
       globalActions: [],
       guardrails: [],
       guardrailClassifier: undefined,
+      sampleCopies: [],
+      sampleCopyClassifier: undefined,
       asrProvider: undefined,
       ttsProvider: undefined,
       shouldEndConversation: false,
@@ -382,6 +386,33 @@ export class ConversationRunner {
         };
       } else {
         logger.warn({ projectId: project.id, classifierId: project.defaultGuardrailClassifierId }, 'Guardrail classifier not found, guardrails will be skipped');
+      }
+    }
+
+    // Load sample copies and sampleCopyClassifier if {{copy}} tag is used in the stage prompt
+    if (stage.prompt.includes('{{copy}}')) {
+      const allProjectSampleCopies = await db.query.sampleCopies.findMany({
+        where: (sc, { eq }) => eq(sc.projectId, conversation.projectId),
+      });
+      // Include copies scoped to this stage or applicable to all stages (null/empty stages array)
+      stageData.sampleCopies = allProjectSampleCopies.filter(copy =>
+        !copy.stages || (copy.stages as string[]).length === 0 || (copy.stages as string[]).includes(stage.id)
+      );
+
+      const sampleCopyClassifierId = project.sampleCopyConfig?.defaultClassifierId;
+      if (sampleCopyClassifierId) {
+        const sampleCopyClassifierEntity = await db.query.classifiers.findFirst({
+          where: (classifiers, { and, eq }) => and(eq(classifiers.projectId, conversation.projectId), eq(classifiers.id, sampleCopyClassifierId)),
+        });
+        if (sampleCopyClassifierEntity) {
+          const sampleCopyLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, sampleCopyClassifierEntity.llmProviderId) });
+          stageData.sampleCopyClassifier = {
+            classifier: sampleCopyClassifierEntity,
+            llmProvider: this.llmProviderFactory.createProvider(sampleCopyLlmProviderEntity, sampleCopyClassifierEntity.llmSettings),
+          };
+        } else {
+          logger.warn({ projectId: project.id, classifierId: sampleCopyClassifierId }, 'Sample copy classifier not found, sample copy classification will be skipped');
+        }
       }
     }
 

@@ -24,6 +24,8 @@ export type ProcessTextInputResult = {
   knowledgeRetrievalStartMs?: number;
   /** Unix timestamp (ms) when knowledge retrieval completed; undefined when knowledge is not used */
   knowledgeRetrievalEndMs?: number;
+  /** Result of the sample copy classification; undefined when sample copy is not configured for this stage */
+  sampleCopyResult?: ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number };
 };
 
 /**
@@ -57,6 +59,8 @@ export class UserInputProcessor {
       const globalActions = session.runner.getRuntimeData().globalActions.filter(ga => !ga.id.startsWith('__'));
       const guardrails = session.runner.getRuntimeData().guardrails;
       const guardrailClassifier = session.runner.getRuntimeData().guardrailClassifier;
+      const sampleCopies = session.runner.getRuntimeData().sampleCopies;
+      const sampleCopyClassifier = session.runner.getRuntimeData().sampleCopyClassifier;
 
       // Fetch knowledge categories for the default classifier when knowledge is enabled
       let knowledgeCategories: KnowledgeCategoryResponse[] = [];
@@ -99,10 +103,19 @@ export class UserInputProcessor {
         })()
         : Promise.resolve(null);
 
-      // Run all classifiers, guardrail classifier, and context transformers in parallel
-      const [classificationResultsWithClassifiers, guardrailResult, transformerTriggeredActions] = await Promise.all([
+      // Build sample copy classification promise if a classifier is configured and there are applicable sample copies for this stage
+      const sampleCopyPromise = sampleCopyClassifier && sampleCopies.length > 0
+        ? (async () => {
+          const sampleCopyContext = await this.contextBuilder.buildContextForSampleCopyClassifier(conversation, stage, sampleCopies, userInput, originalUserInput);
+          return this.classifyTextInput(session, sampleCopyClassifier, sampleCopyContext);
+        })()
+        : Promise.resolve(null);
+
+      // Run all classifiers, guardrail classifier, sample copy classifier, and context transformers in parallel
+      const [classificationResultsWithClassifiers, guardrailResult, sampleCopyResult, transformerTriggeredActions] = await Promise.all([
         Promise.all(actionPromises),
         guardrailPromise,
+        sampleCopyPromise,
         this.transformerExecutor.executeTransformers(session, userInput, originalUserInput),
       ]);
 
@@ -149,6 +162,27 @@ export class UserInputProcessor {
         await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
+      // Register classification event for sample copy classifier
+      if (sampleCopyResult) {
+        const eventData: ClassificationEventData = {
+          classifierId: sampleCopyResult.classifierId,
+          input: userInput || '',
+          actions: [sampleCopyResult],
+          metadata: {
+            classifierName: sampleCopyResult.classifierName,
+            actionCount: sampleCopyResult.actions.length,
+            systemPrompt: sampleCopyResult.renderedPrompt,
+            llmSettings: sampleCopyClassifier?.classifier.llmSettings,
+            currentVariables: conversation?.stageVars[stage.id] || {},
+            durationMs: sampleCopyResult.durationMs,
+            startMs: sampleCopyResult.startMs,
+            endMs: sampleCopyResult.endMs,
+          },
+        };
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
+      }
+
       const allActions = [
         ...classificationResultsWithClassifiers.map(x => x.actions).flat(),
         ...(guardrailResult?.actions ?? []),
@@ -185,7 +219,7 @@ export class UserInputProcessor {
         return true;
       });
 
-      return { actions: filteredActions, knowledgeRetrievalDurationMs, knowledgeRetrievalStartMs, knowledgeRetrievalEndMs };
+      return { actions: filteredActions, knowledgeRetrievalDurationMs, knowledgeRetrievalStartMs, knowledgeRetrievalEndMs, sampleCopyResult: sampleCopyResult ?? undefined };
     } catch (error) {
       logger.error({ error, sessionId: session.id }, 'Error processing text input using classifiers');
       throw error;

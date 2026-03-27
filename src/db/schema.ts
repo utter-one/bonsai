@@ -112,6 +112,9 @@ export const projects = pgTable('projects', {
   autoCreateUsers: boolean('auto_create_users').notNull().default(false),
   userProfileVariableDescriptors: jsonb('user_profile_variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
   defaultGuardrailClassifierId: text('default_guardrail_classifier_id'),
+  sampleCopyConfig: jsonb('sample_copy_config').$type<{
+    defaultClassifierId?: string;
+  }>(),
   conversationTimeoutSeconds: integer('conversation_timeout_seconds'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
