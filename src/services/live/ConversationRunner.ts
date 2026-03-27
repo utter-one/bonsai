@@ -38,6 +38,7 @@ import type { IAudioConverter } from '../audio/IAudioConverter';
 import type { AudioFormat } from '../../types/audio';
 import { AudioConverterFactory } from '../audio/AudioConverterFactory';
 import { VadProcessor } from '../audio/VadProcessor';
+import { SampleCopyDistributor } from "./SampleCopyDistributor";
 
 /** Buffer holding the last converted audio chunk, used by the last-chunk-buffer pattern. */
 type PendingOutboundChunk = { chunkId: string; ordinal: number; audio: Buffer };
@@ -152,7 +153,8 @@ export class ConversationRunner {
   private turnMessageVisibility: MessageVisibility | undefined = undefined;
   /** Terminal action (end or abort) deferred until after the current turn's response has been fully delivered to the client */
   private pendingPostResponseAction: PendingPostResponseAction | null = null;
-
+  /** Sample copy distributor */
+  private sampleCopyDistributor: SampleCopyDistributor | null = null;
   /** Session-scoped inbound converter: client audio format → ASR input format. Null when no conversion is needed. */
   private inboundConverter: IAudioConverter | null = null;
   /** Session-scoped outbound converter: TTS native format → client preferred format. Null when no conversion is needed. */
@@ -214,6 +216,13 @@ export class ConversationRunner {
     if (this.conversation.status === 'finished' || this.conversation.status === 'failed' || this.conversation.status === 'aborted') {
       throw new Error(`Conversation with ID ${conversationId} is not active`);
     }
+
+    // Load sample copy data
+    const allSampleCopies = await db.query.sampleCopies.findMany({
+      where: (sampleCopies, { eq }) => eq(sampleCopies.projectId, session.projectId),
+    });
+    this.sampleCopyDistributor = new SampleCopyDistributor(allSampleCopies);
+
 
     this.stageData = await this.buildStageData(this.conversation);
 

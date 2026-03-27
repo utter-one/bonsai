@@ -8,7 +8,7 @@ import { ConversationService } from "../ConversationService";
 import { KnowledgeService } from "../KnowledgeService";
 import { ClassificationEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
-import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
+import { classificationResultSchema, ActionClassificationResult, ActionClassificationResultWithClassifier, SampleCopyClassificationResult, sampleCopyClassificationResultSchema } from "../../types/classification";
 import { Conversation, GlobalAction, Guardrail } from "../../types/models";
 import { extractTextFromContent } from "../../utils/llm";
 import { StageAction } from "../../types/actions";
@@ -25,7 +25,7 @@ export type ProcessTextInputResult = {
   /** Unix timestamp (ms) when knowledge retrieval completed; undefined when knowledge is not used */
   knowledgeRetrievalEndMs?: number;
   /** Result of the sample copy classification; undefined when sample copy is not configured for this stage */
-  sampleCopyResult?: ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number };
+  sampleCopyResult?: SampleCopyClassificationResult;
 };
 
 /**
@@ -107,7 +107,7 @@ export class UserInputProcessor {
       const sampleCopyPromise = sampleCopyClassifier && sampleCopies.length > 0
         ? (async () => {
           const sampleCopyContext = await this.contextBuilder.buildContextForSampleCopyClassifier(conversation, stage, sampleCopies, userInput, originalUserInput);
-          return this.classifyTextInput(session, sampleCopyClassifier, sampleCopyContext);
+          return this.classifyCopyForInput(session, sampleCopyContext);
         })()
         : Promise.resolve(null);
 
@@ -226,7 +226,59 @@ export class UserInputProcessor {
     }
   }
 
-  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number }> {
+  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number }> {
+    const classifyStartMs = Date.now();
+    try {
+      const classifierData = session.runner.getRuntimeData().sampleCopyClassifier;
+      if (!classifierData) {
+        throw new Error('No sample copy classifier configured for this stage');
+      }
+      logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying sample copy for text input using sample copy classifier');
+      const llmProvider = classifierData.llmProvider;
+      const classifier = classifierData.classifier;
+      const text = context.userInput || '';
+      const renderedPrompt = await this.templatingEngine.render(classifier.prompt, context);
+
+      const messages = [
+        {
+          role: 'system' as const,
+          content: renderedPrompt
+        },
+        {
+          role: 'user' as const,
+          content: text
+        }
+      ];
+
+      const result = await llmProvider.generate(messages);
+      const textContent = extractTextFromContent(result.content);
+
+      logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received sample copy classification result from LLM provider: ${textContent}`);
+      const classificationResult = sampleCopyClassificationResultSchema.parse(parseJsonFromMarkdown(textContent));
+
+      const endMs = Date.now();
+      return {
+        ...classificationResult,
+        renderedPrompt,
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
+      };
+    } catch (error) {
+      logger.error({ error, sessionId: session.id }, 'Error classifying sample copy for text input');
+      const endMs = Date.now();
+      return {
+        sampleCopyId: null,
+        sampleCopyName: null,
+        renderedPrompt: null,
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
+      };
+    }
+  }
+
+  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ActionClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { classificationResultWithClassifierSchema } from "./classification";
+import { actionClassificationResultWithClassifierSchema } from "./classification";
 import { effectSchema, lifecycleContextSchema } from "./actions";
 import { parameterValueSchema } from './parameters';
 
@@ -64,7 +64,7 @@ export type MessageEventData = z.infer<typeof messageEventDataSchema>;
 export const classificationEventDataSchema = z.object({
   classifierId: z.string(),
   input: z.string(),
-  actions: z.array(classificationResultWithClassifierSchema),
+  actions: z.array(actionClassificationResultWithClassifierSchema),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 

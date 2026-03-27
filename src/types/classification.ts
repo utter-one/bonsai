@@ -12,10 +12,17 @@ export const actionClassificationResultSchema = z.object({
 
 export type ActionClassificationResult = z.infer<typeof actionClassificationResultSchema>;
 
-export const classificationResultWithClassifierSchema = z.object({
+export const actionClassificationResultWithClassifierSchema = z.object({
   classifierId: z.string(),
   classifierName: z.string(),
   actions: z.array(actionClassificationResultSchema),
 });
 
-export type ClassificationResultWithClassifier = z.infer<typeof classificationResultWithClassifierSchema>;
+export type ActionClassificationResultWithClassifier = z.infer<typeof actionClassificationResultWithClassifierSchema>;
+
+export const sampleCopyClassificationResultSchema = z.object({
+  sampleCopyId: z.string(),
+  sampleCopyName: z.string(),
+});
+
+export type SampleCopyClassificationResult = z.infer<typeof sampleCopyClassificationResultSchema>;
