@@ -269,7 +269,6 @@ export class UserInputProcessor {
       const endMs = Date.now();
       return {
         sampleCopyId: null,
-        sampleCopyName: null,
         renderedPrompt: null,
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,

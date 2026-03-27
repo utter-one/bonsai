@@ -12,6 +12,7 @@ import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import type { TimeContext, CalendarDay } from "../../types/TimeContext";
+import { SampleCopyDistributor } from "./SampleCopyDistributor";
 
 /**
  * Recursively converts a single FieldDescriptor into a pseudo-JSON value.
@@ -908,7 +909,16 @@ export class ConversationContextBuilder {
    * @param faq - Optional FAQ items from knowledge base to include in the context
    * @returns ConversationContext with all relevant data for processing user input and generating responses, including all actions that can be triggered by user input.
    */
-  async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string, faq?: FaqItem[]): Promise<ConversationContext> {
+  async buildContextForUserInput(conversation: Conversation, 
+    stage: Stage, 
+    actions: ActionClassificationResult[], 
+    userInput: string, 
+    originalUserInput: string, 
+    sampleCopies: SampleCopy[],
+    copy: string,
+    copyContent: string,
+    faq?: FaqItem[],
+  ): Promise<ConversationContext> {
     // Load user data
     const user = await db.query.users.findFirst({
       where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
