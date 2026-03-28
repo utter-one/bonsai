@@ -291,6 +291,7 @@ export const knowledgeItems = pgTable('knowledge_items', {
 ]);
 
 export type SamplingMethod = 'random' | 'round_robin';
+export type SampleCopyMode = 'regular' | 'forced';
 
 // CopyDecorator table
 export const copyDecorators = pgTable('copy_decorators', {
@@ -317,6 +318,7 @@ export const sampleCopies = pgTable('sample_copies', {
   content: jsonb('content').notNull().default([]).$type<string[]>(),
   amount: integer('amount').notNull().default(1),
   samplingMethod: text('sampling_method').notNull().default('random').$type<SamplingMethod>(),
+  mode: text('mode').notNull().default('regular').$type<SampleCopyMode>(),
   decoratorId: text('decorator_id'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

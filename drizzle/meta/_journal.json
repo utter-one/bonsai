@@ -295,6 +295,13 @@
       "when": 1774646955286,
       "tag": "0041_gorgeous_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1774705250874,
+      "tag": "0042_daily_harpoon",
+      "breakpoints": true
     }
   ]
 }

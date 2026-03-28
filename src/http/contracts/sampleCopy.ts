@@ -10,6 +10,9 @@ export { listParamsSchema, type ListParams };
 /** Supported sampling methods for selecting content variants */
 export type SamplingMethod = 'random' | 'round_robin';
 
+/** Mode of the sample copy: regular works as normal, forced enforces the prescripted response (ignores other response-related effects) */
+export type SampleCopyMode = 'regular' | 'forced';
+
 export const sampleCopyRouteParamsSchema = z.object({
   projectId: z.string().min(1).describe('Project ID'),
   id: z.string().describe('Sample Copy ID'),
@@ -30,6 +33,7 @@ export const createSampleCopySchema = z.object({
   content: z.array(z.string().min(1)).min(1).describe('Array of variant answers to select from'),
   amount: z.number().int().min(1).optional().default(1).describe('Number of samples to select from the content array'),
   samplingMethod: z.enum(['random', 'round_robin']).optional().default('random').describe('Method used to select samples: random selection or sequential round-robin'),
+  mode: z.enum(['regular', 'forced']).optional().default('regular').describe('Mode of the sample copy: regular works as normal, forced enforces the prescripted response and ignores other response-related effects'),
   decoratorId: z.string().nullable().optional().describe('ID of the copy decorator to apply to selected content; if not set no decoration is applied'),
 });
 
@@ -46,6 +50,7 @@ export const updateSampleCopyBodySchema = z.object({
   content: z.array(z.string().min(1)).min(1).optional().describe('Updated array of variant answers'),
   amount: z.number().int().min(1).optional().describe('Updated number of samples to select'),
   samplingMethod: z.enum(['random', 'round_robin']).optional().describe('Updated sampling method'),
+  mode: z.enum(['regular', 'forced']).optional().describe('Updated mode: regular works as normal, forced enforces the prescripted response and ignores other response-related effects'),
   decoratorId: z.string().nullable().optional().describe('Updated copy decorator ID; set to null to remove the decorator'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
@@ -82,6 +87,7 @@ export const sampleCopyResponseSchema = z.object({
   content: z.array(z.string()).describe('Array of variant answers'),
   amount: z.number().int().describe('Number of samples to select'),
   samplingMethod: z.enum(['random', 'round_robin']).describe('Method used to select samples'),
+  mode: z.enum(['regular', 'forced']).describe('Mode of the sample copy: regular works as normal, forced enforces the prescripted response and ignores other response-related effects'),
   decoratorId: z.string().nullable().describe('ID of the copy decorator applied to selected content, or null if none'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the sample copy was created'),

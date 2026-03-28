@@ -41,7 +41,7 @@ export class SampleCopyService extends BaseService {
     logger.info({ sampleCopyId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating sample copy');
 
     try {
-      const result = await db.insert(sampleCopies).values({ id: sampleCopyId, projectId, name: input.name, stages: input.stages ?? null, agents: input.agents ?? null, promptTrigger: input.promptTrigger, classifierOverrideId: input.classifierOverrideId ?? null, content: input.content, amount: input.amount ?? 1, samplingMethod: input.samplingMethod ?? 'random', decoratorId: input.decoratorId ?? null, version: 1 }).returning();
+      const result = await db.insert(sampleCopies).values({ id: sampleCopyId, projectId, name: input.name, stages: input.stages ?? null, agents: input.agents ?? null, promptTrigger: input.promptTrigger, classifierOverrideId: input.classifierOverrideId ?? null, content: input.content, amount: input.amount ?? 1, samplingMethod: input.samplingMethod ?? 'random', mode: input.mode ?? 'regular', decoratorId: input.decoratorId ?? null, version: 1 }).returning();
 
       const created = result[0];
 
@@ -181,6 +181,7 @@ export class SampleCopyService extends BaseService {
       if (updateData.content !== undefined) updatePayload.content = updateData.content;
       if (updateData.amount !== undefined) updatePayload.amount = updateData.amount;
       if (updateData.samplingMethod !== undefined) updatePayload.samplingMethod = updateData.samplingMethod;
+      if (updateData.mode !== undefined) updatePayload.mode = updateData.mode;
       if (updateData.decoratorId !== undefined) updatePayload.decoratorId = updateData.decoratorId;
 
       const updated = await db.update(sampleCopies).set(updatePayload).where(and(eq(sampleCopies.projectId, projectId), eq(sampleCopies.id, id), eq(sampleCopies.version, expectedVersion))).returning();
@@ -263,7 +264,7 @@ export class SampleCopyService extends BaseService {
         throw new NotFoundError(`Sample copy with id ${id} not found`);
       }
 
-      return await this.createSampleCopy(projectId, { id: input.id, name: input.name ?? `${existing.name} (Clone)`, stages: existing.stages as string[] ?? undefined, agents: existing.agents as string[] ?? undefined, promptTrigger: existing.promptTrigger, classifierOverrideId: existing.classifierOverrideId ?? undefined, content: existing.content as string[], amount: existing.amount, samplingMethod: existing.samplingMethod as 'random' | 'round_robin', decoratorId: existing.decoratorId ?? undefined }, context);
+      return await this.createSampleCopy(projectId, { id: input.id, name: input.name ?? `${existing.name} (Clone)`, stages: existing.stages as string[] ?? undefined, agents: existing.agents as string[] ?? undefined, promptTrigger: existing.promptTrigger, classifierOverrideId: existing.classifierOverrideId ?? undefined, content: existing.content as string[], amount: existing.amount, samplingMethod: existing.samplingMethod as 'random' | 'round_robin', mode: existing.mode as 'regular' | 'forced', decoratorId: existing.decoratorId ?? undefined }, context);
     } catch (error) {
       logger.error({ error, sampleCopyId: id }, 'Failed to clone sample copy');
       throw error;
