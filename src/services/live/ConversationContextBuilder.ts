@@ -2,7 +2,7 @@ import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
 import { Session } from "../../channels/SessionManager";
 import { inject, singleton } from "tsyringe";
-import { Conversation, GlobalAction, Guardrail, Stage } from "../../types/models";
+import { Conversation, GlobalAction, Guardrail, SampleCopy, Stage } from "../../types/models";
 import { FieldDescriptor } from "../../types/parameters";
 import { StageAction } from "../../types/actions";
 import { ConversationEventData } from "../../types/conversationEvents";
@@ -12,6 +12,7 @@ import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import type { TimeContext, CalendarDay } from "../../types/TimeContext";
+import { SampleCopyDistributor } from "./SampleCopyDistributor";
 
 /**
  * Recursively converts a single FieldDescriptor into a pseudo-JSON value.
@@ -65,6 +66,12 @@ export type FaqItem = {
   question: string;
   answer: string;
 };
+
+export type SampleCopyItem = {
+  name: string;
+  trigger: string;
+  content: string[];
+}
 
 /**
  * A single conversation event entry exposed to the script sandbox.
@@ -142,6 +149,15 @@ export type ConversationContext = {
 
   /** FAQ items gathered from knowledge base categories triggered during this conversation turn */
   faq?: FaqItem[];
+
+  /** All sample copy entities for the project */
+  sampleCopy?: SampleCopyItem[];
+
+  /** Rendered selected sample copy content */
+  copy?: string;
+ 
+  /** Raw content of the selected sample copies */
+  copyContent?: string;
 
   /**
    * Pseudo-JSON schema descriptions of context variables, populated for transformer contexts.
@@ -722,15 +738,18 @@ export class ConversationContextBuilder {
    */
   async buildContextForGuardrailClassifier(conversation: Conversation, stage: Stage, guardrails: Guardrail[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     // Load user data
-    const user = await db.query.users.findFirst({
-      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
-    });
-
-    // Load project constants
-    const project = await db.query.projects.findFirst({
-      where: eq(projects.id, conversation.projectId),
-      columns: { constants: true, timezone: true, languageCode: true },
-    });
+    const [user, project, projectSampleCopies] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+      db.query.sampleCopies.findMany({
+        where: (table, { eq }) => eq(table.projectId, conversation.projectId),
+      }),
+    ]);
 
     // Build raw context for condition evaluation
     const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
@@ -760,6 +779,11 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
+      sampleCopy: projectSampleCopies.map(sc => ({
+        name: sc.name,
+        trigger: sc.promptTrigger,
+        content: sc.content,
+      })),
       history: [],
       events: [],
       actions: {},
@@ -796,6 +820,18 @@ export class ConversationContextBuilder {
     context.history = await this.historyBuilder.buildHistory(context.events, context);
 
     return context;
+  }
+
+  /**
+   * Builds context specifically for a sample copy classifier.
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity with agent relation
+   * @param sampleCopies - Array of sample copies for the stage
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   */
+  async buildContextForSampleCopyClassifier(conversation: Conversation, stage: Stage, sampleCopies: SampleCopy[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+    return this.buildContextForGuardrailClassifier(conversation, stage, [] as Guardrail[], userInput, originalUserInput);
   }
 
   /**
@@ -896,17 +932,29 @@ export class ConversationContextBuilder {
    * @param faq - Optional FAQ items from knowledge base to include in the context
    * @returns ConversationContext with all relevant data for processing user input and generating responses, including all actions that can be triggered by user input.
    */
-  async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string, faq?: FaqItem[]): Promise<ConversationContext> {
-    // Load user data
-    const user = await db.query.users.findFirst({
-      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
-    });
-
-    // Load project constants
-    const project = await db.query.projects.findFirst({
-      where: eq(projects.id, conversation.projectId),
-      columns: { constants: true, timezone: true, languageCode: true },
-    });
+  async buildContextForUserInput(conversation: Conversation, 
+    stage: Stage, 
+    actions: ActionClassificationResult[], 
+    userInput: string, 
+    originalUserInput: string, 
+    sampleCopies: SampleCopy[],
+    copy: string,
+    copyContent: string,
+    faq?: FaqItem[],
+  ): Promise<ConversationContext> {
+    // Load user data, project constants, and all project sample copies in parallel
+    const [user, project, projectSampleCopies] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+      db.query.sampleCopies.findMany({
+        where: (table, { eq }) => eq(table.projectId, conversation.projectId),
+      }),
+    ]);
 
     const context = {
       conversationId: conversation.id,
@@ -917,6 +965,13 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
+      copy,
+      copyContent,
+      sampleCopy: projectSampleCopies.map(sc => ({
+        name: sc.name,
+        trigger: sc.promptTrigger,
+        content: sc.content,
+      })),
       history: [],
       events: [],
       actions: actions.reduce((acc, action) => {

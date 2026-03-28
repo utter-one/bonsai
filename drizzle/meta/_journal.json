@@ -267,6 +267,41 @@
       "when": 1774454689735,
       "tag": "0037_cooing_sheva_callister",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1774555233924,
+      "tag": "0038_normal_princess_powerful",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1774555836868,
+      "tag": "0039_flaky_energizer",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1774604211765,
+      "tag": "0040_sweet_pet_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1774646955286,
+      "tag": "0041_gorgeous_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1774705250874,
+      "tag": "0042_daily_harpoon",
+      "breakpoints": true
     }
   ]
 }

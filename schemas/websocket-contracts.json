@@ -1099,7 +1099,8 @@
             "user_profile_updated",
             "user_input_modified",
             "user_banned",
-            "visibility_changed"
+            "visibility_changed",
+            "sample_copy_selection"
           ],
           "description": "Type of the conversation event"
         },
@@ -1751,6 +1752,35 @@
               "required": [
                 "sourceActionName",
                 "visibility"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "classifierId": {
+                  "type": "string",
+                  "description": "ID of the classifier that performed the selection"
+                },
+                "input": {
+                  "type": "string",
+                  "description": "The user input that triggered the selection"
+                },
+                "sampleCopy": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Identifier of selected sample copy, or null if none was selected"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "classifierId",
+                "input",
+                "sampleCopy"
               ]
             }
           ],
@@ -2167,7 +2197,8 @@
             "user_profile_updated",
             "user_input_modified",
             "user_banned",
-            "visibility_changed"
+            "visibility_changed",
+            "sample_copy_selection"
           ],
           "description": "Type of the conversation event"
         },
@@ -2819,6 +2850,35 @@
               "required": [
                 "sourceActionName",
                 "visibility"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "classifierId": {
+                  "type": "string",
+                  "description": "ID of the classifier that performed the selection"
+                },
+                "input": {
+                  "type": "string",
+                  "description": "The user input that triggered the selection"
+                },
+                "sampleCopy": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Identifier of selected sample copy, or null if none was selected"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "classifierId",
+                "input",
+                "sampleCopy"
               ]
             }
           ],

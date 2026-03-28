@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, Stage, Tool } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, SampleCopy, Stage, Tool } from "../../types/models";
 import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS } from "../../types/actions";
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
-import { conversations, users } from "../../db/schema";
+import { conversations, users, sampleCopies } from "../../db/schema";
 import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
@@ -38,6 +38,7 @@ import type { IAudioConverter } from '../audio/IAudioConverter';
 import type { AudioFormat } from '../../types/audio';
 import { AudioConverterFactory } from '../audio/AudioConverterFactory';
 import { VadProcessor } from '../audio/VadProcessor';
+import { SampleCopyDistributor } from "./SampleCopyDistributor";
 
 /** Buffer holding the last converted audio chunk, used by the last-chunk-buffer pattern. */
 type PendingOutboundChunk = { chunkId: string; ordinal: number; audio: Buffer };
@@ -109,6 +110,8 @@ export type StageRuntimeData = {
   globalActions: GlobalAction[];
   guardrails: Guardrail[];
   guardrailClassifier?: ClassifierRuntimeData;
+  sampleCopies: SampleCopy[];
+  sampleCopyClassifier?: ClassifierRuntimeData;
   asrProvider?: IAsrProvider;
   ttsProvider?: ITtsProvider;
   shouldEndConversation: boolean;
@@ -150,7 +153,8 @@ export class ConversationRunner {
   private turnMessageVisibility: MessageVisibility | undefined = undefined;
   /** Terminal action (end or abort) deferred until after the current turn's response has been fully delivered to the client */
   private pendingPostResponseAction: PendingPostResponseAction | null = null;
-
+  /** Sample copy distributor */
+  private sampleCopyDistributor: SampleCopyDistributor | null = null;
   /** Session-scoped inbound converter: client audio format → ASR input format. Null when no conversion is needed. */
   private inboundConverter: IAudioConverter | null = null;
   /** Session-scoped outbound converter: TTS native format → client preferred format. Null when no conversion is needed. */
@@ -213,6 +217,13 @@ export class ConversationRunner {
       throw new Error(`Conversation with ID ${conversationId} is not active`);
     }
 
+    // Load sample copy data
+    const allSampleCopies = await db.query.sampleCopies.findMany({
+      where: (sampleCopies, { eq }) => eq(sampleCopies.projectId, session.projectId),
+    });
+    this.sampleCopyDistributor = new SampleCopyDistributor(allSampleCopies);
+
+
     this.stageData = await this.buildStageData(this.conversation);
 
     // Load conversation lifecycle global actions (by reserved ID) once — they are project-level and
@@ -254,6 +265,8 @@ export class ConversationRunner {
       globalActions: [],
       guardrails: [],
       guardrailClassifier: undefined,
+      sampleCopies: [],
+      sampleCopyClassifier: undefined,
       asrProvider: undefined,
       ttsProvider: undefined,
       shouldEndConversation: false,
@@ -385,6 +398,37 @@ export class ConversationRunner {
       }
     }
 
+    // Load sample copies and sampleCopyClassifier if {{copy}} tag is used in the stage prompt
+    const hasCopyTag = stage.prompt.includes('{{copy}}') || stage.prompt.includes('{{copy.');
+    if (hasCopyTag) {
+      const allProjectSampleCopies = await db.query.sampleCopies.findMany({
+        where: (sc, { eq }) => eq(sc.projectId, conversation.projectId),
+      });
+      // Include copies scoped to this stage and agent (or null/empty stages/agents array)
+      stageData.sampleCopies = allProjectSampleCopies.filter(copy =>
+        (!copy.stages || (copy.stages as string[]).length === 0 || (copy.stages as string[]).includes(stage.id))
+        && (copy.agents === null || (copy.agents as string[]).length === 0 || (copy.agents as string[]).includes(stage.agentId))
+      );
+
+      const sampleCopyClassifierId = project.sampleCopyConfig?.defaultClassifierId;
+      if (sampleCopyClassifierId) {
+        const sampleCopyClassifierEntity = await db.query.classifiers.findFirst({
+          where: (classifiers, { and, eq }) => and(eq(classifiers.projectId, conversation.projectId), eq(classifiers.id, sampleCopyClassifierId)),
+        });
+        if (sampleCopyClassifierEntity) {
+          const sampleCopyLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, sampleCopyClassifierEntity.llmProviderId) });
+          stageData.sampleCopyClassifier = {
+            classifier: sampleCopyClassifierEntity,
+            llmProvider: this.llmProviderFactory.createProvider(sampleCopyLlmProviderEntity, sampleCopyClassifierEntity.llmSettings),
+          };
+        } else {
+          logger.warn({ projectId: project.id, classifierId: sampleCopyClassifierId }, 'Sample copy classifier not found, sample copy classification will be skipped');
+        }
+      } else {
+        logger.warn({ projectId: project.id }, 'No default sample copy classifier configured, sample copy classification will be skipped');
+      }
+    }
+
     // Initialize TTS provider if configured and client wants voice output
     const agent = await this.agentService.getAgentById(stageData.project.id, stageData.stage.agentId);
     if (!agent) {
@@ -493,8 +537,6 @@ export class ConversationRunner {
 
           if (fullText) {
             logger.debug({ conversationId, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}`);
-            const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [/** TODO */], fullText, fullText);
-            context.userInputSource = 'voice';
             await this.processUserInput(fullText, 'voice', asrEndMs);
           } else if (this.isVadMode) {
             logger.warn({ conversationId }, `No text recognized in VAD mode for conversation ${conversationId}, ignoring unintelligible audio`);
@@ -1123,7 +1165,7 @@ export class ConversationRunner {
       const onLeaveAction = oldStageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_LEAVE];
       if (onLeaveAction) {
         logger.debug({ conversationId: this.conversation.id, stageId: fromStageId }, 'Executing __on_leave lifecycle action');
-        const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, [/** TODO */], '-', '-');
+        const context = await this.contextBuilder.buildContextForUserInput(oldStageData.conversation, oldStageData.stage, [/** TODO */], '-', '-', this.sampleCopyDistributor.getOriginalCopies(), '', '', this.stageData.faq);
         const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, oldStageData.id, 'on_leave', this.saveAndSendEvent.bind(this));
 
         await this.applyActionOutcome(context, leaveOutcome);
@@ -1160,7 +1202,7 @@ export class ConversationRunner {
       await this.saveAndSendEvent('jump_to_stage', eventData);
 
       // Execute __on_enter lifecycle action if defined on new stage
-      const enterContext = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */], '-', '-');
+      const enterContext = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [ /** TODO */], '-', '-', this.sampleCopyDistributor.getOriginalCopies(), '', '', this.stageData.faq);
       let enterOutcome: ActionsExecutionOutcome | null = null;
       const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
       if (onEnterAction) {
@@ -1437,7 +1479,8 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, toolId, toolName: tool.name }, `Executing tool ${tool.name}`);
 
     // Build conversation context for tool execution
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], '', '');
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], '', '',
+      this.sampleCopyDistributor.getOriginalCopies(), '', '');
 
     // Execute the tool
     const executeResult = await this.toolExecutor.executeTool(tool, context, parameters);
@@ -1844,7 +1887,7 @@ export class ConversationRunner {
       logger.info({ globalActions: this.stageData.globalActions }, 'Checking for __moderation_blocked global action');
       const moderationBlockedAction = this.stageData.globalActions.find(ga => ga.id === '__moderation_blocked');
       if (moderationBlockedAction) {
-        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.stageData.faq);
+        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), '', '', this.stageData.faq);
         const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context, this.stageData.id, null, this.saveAndSendEvent.bind(this));
         await this.applyActionOutcome(context, executionOutcome);
         const messageEventData: MessageEventData = {
@@ -1923,7 +1966,38 @@ export class ConversationRunner {
     );
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
     const guardrailActionsMap = new Map(this.stageData.guardrails.map(ga => [ga.name, ga]));
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.stageData.faq);
+    const selectedSampleCopyName = processingResult.sampleCopyResult?.sampleCopy ?? null;
+    const sampleCopies = selectedSampleCopyName && this.sampleCopyDistributor.hasName(selectedSampleCopyName)
+      ? this.sampleCopyDistributor.distributeCopies(selectedSampleCopyName)
+      : [];
+    const copyContent = sampleCopies.length > 0 ? sampleCopies.join('\n') : '';
+    let copy = copyContent;
+    if (copyContent.length > 0) {
+      const sampleCopy = this.sampleCopyDistributor.getOriginalCopies().find(c => c.name === selectedSampleCopyName);
+      if (sampleCopy) {
+        // find decorator with matching projectId and sampleCopy.name
+        const decorator = sampleCopy.decoratorId ?await db.query.copyDecorators.findFirst({
+          where: (copyDecorators, { and, eq }) => and(
+            eq(copyDecorators.projectId, this.conversation.projectId),
+            eq(copyDecorators.id, sampleCopy.decoratorId)
+          )
+        }) : null;
+        if (decorator) {
+          const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, 
+            this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), 
+            copy, copyContent, this.stageData.faq);
+          copy = await this.templatingEngine.render(decorator.template, context);
+        }
+      }
+    }
+    const selectedSampleCopy = selectedSampleCopyName
+      ? (this.sampleCopyDistributor.getOriginalCopies().find(c => c.name === selectedSampleCopyName) ?? null)
+      : null;
+    // When mode is 'forced', the distributed copy becomes a prescripted response — the LLM is bypassed
+    // and response-related effects from actions are ignored.
+    const forcedCopyResponse = sampleCopies.length > 0 && selectedSampleCopy?.mode === 'forced' ? copy : null;
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource,  
+      this.sampleCopyDistributor.getOriginalCopies(), copy, copyContent, this.stageData.faq);
     const stageActionMap = new Map(Object.values(stageActions).map(sa => [sa.name, sa]));
 
     // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
@@ -1988,6 +2062,12 @@ export class ConversationRunner {
       actionsEndMs = Date.now();
       actionsDurationMs = actionsEndMs - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
+    }
+
+    if (forcedCopyResponse !== null) {
+      logger.debug({ conversationId: this.conversation.id, sampleCopyName: selectedSampleCopyName }, 'Sample copy forced mode: overriding response with prescripted copy content, ignoring response-related effects');
+      executionOutcome.prescriptedResponse = forcedCopyResponse;
+      executionOutcome.shouldGenerateResponse = true;
     }
 
     if (executionOutcome.turnVisibility) {

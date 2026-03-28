@@ -46,6 +46,7 @@ This guide covers:
 | [Context Transformers](./context-transformers) | LLM-powered variable population: data extraction, prompt fragments, flow control |
 | [Tools](./tools) | LLM-powered callable tools |
 | [Knowledge Base](./knowledge) | FAQ categories and items |
+| [Sample Copies](./sample-copies) | Pre-written scripted responses with variant selection and classifier-driven matching |
 | [Global Actions](./global-actions) | Reusable cross-stage action definitions |
 | [Guardrails](./guardrails) | Content safety classifiers and moderation |
 | [Providers](./providers) | LLM, TTS, ASR, and Storage provider integrations |

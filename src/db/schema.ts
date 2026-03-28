@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations, isNull, isNotNull } from 'drizzle-orm';
 import { StageAction, Effect, ToolParameter, StageActionParameter } from '../types/actions';
 import { FieldDescriptor } from '../types/parameters';
@@ -112,6 +112,9 @@ export const projects = pgTable('projects', {
   autoCreateUsers: boolean('auto_create_users').notNull().default(false),
   userProfileVariableDescriptors: jsonb('user_profile_variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
   defaultGuardrailClassifierId: text('default_guardrail_classifier_id'),
+  sampleCopyConfig: jsonb('sample_copy_config').$type<{
+    defaultClassifierId?: string;
+  }>(),
   conversationTimeoutSeconds: integer('conversation_timeout_seconds'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -285,6 +288,45 @@ export const knowledgeItems = pgTable('knowledge_items', {
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
   foreignKey({ columns: [table.projectId, table.categoryId], foreignColumns: [knowledgeCategories.projectId, knowledgeCategories.id] }),
+]);
+
+export type SamplingMethod = 'random' | 'round_robin';
+export type SampleCopyMode = 'regular' | 'forced';
+
+// CopyDecorator table
+export const copyDecorators = pgTable('copy_decorators', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  template: text('template').notNull(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+]);
+
+// SampleCopy table
+export const sampleCopies = pgTable('sample_copies', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  stages: jsonb('stages').$type<string[]>(),
+  agents: jsonb('agents').$type<string[]>(),
+  promptTrigger: text('prompt_trigger').notNull(),
+  classifierOverrideId: text('classifier_override_id'),
+  content: jsonb('content').notNull().default([]).$type<string[]>(),
+  amount: integer('amount').notNull().default(1),
+  samplingMethod: text('sampling_method').notNull().default('random').$type<SamplingMethod>(),
+  mode: text('mode').notNull().default('regular').$type<SampleCopyMode>(),
+  decoratorId: text('decorator_id'),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+  foreignKey({ columns: [table.projectId, table.decoratorId], foreignColumns: [copyDecorators.projectId, copyDecorators.id] }),
+  uniqueIndex('sample_copies_project_id_name_unique').on(table.projectId, table.name),
 ]);
 
 // GlobalAction table
@@ -477,6 +519,8 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   guardrails: many(guardrails),
   issues: many(issues),
   apiKeys: many(apiKeys),
+  sampleCopies: many(sampleCopies),
+  copyDecorators: many(copyDecorators),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -530,6 +574,25 @@ export const guardrailsRelations = relations(guardrails, ({ one }) => ({
   project: one(projects, {
     fields: [guardrails.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const copyDecoratorsRelations = relations(copyDecorators, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [copyDecorators.projectId],
+    references: [projects.id],
+  }),
+  sampleCopies: many(sampleCopies),
+}));
+
+export const sampleCopiesRelations = relations(sampleCopies, ({ one }) => ({
+  project: one(projects, {
+    fields: [sampleCopies.projectId],
+    references: [projects.id],
+  }),
+  decorator: one(copyDecorators, {
+    fields: [sampleCopies.projectId, sampleCopies.decoratorId],
+    references: [copyDecorators.projectId, copyDecorators.id],
   }),
 }));
 

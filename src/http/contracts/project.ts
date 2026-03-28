@@ -59,6 +59,15 @@ export const moderationConfigSchema = z.object({
 export type ModerationConfig = z.infer<typeof moderationConfigSchema>;
 
 /**
+ * Schema for sample copy configuration
+ */
+export const sampleCopyConfigSchema = z.object({
+  defaultClassifierId: z.string().optional().describe('ID of the classifier used to evaluate sample copy prompt triggers for all stages in this project. Individual sample copies can override this with classifierOverrideId.'),
+}).openapi('SampleCopyConfig').optional().describe('Sample copy configuration settings');
+
+export type SampleCopyConfig = z.infer<typeof sampleCopyConfigSchema>;
+
+/**
  * Schema for ASR provider settings (union of all ASR provider settings)
  */
 export const asrSettingsSchema = z.union([
@@ -98,6 +107,7 @@ export const createProjectSchema = z.object({
   autoCreateUsers: z.boolean().optional().default(false).describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().default([]).describe('Descriptors defining the data schema for user profile variables in this project'),
   defaultGuardrailClassifierId: z.string().nullable().optional().describe('ID of the classifier used to evaluate guardrails for all conversations in this project. When set, all project guardrails are evaluated against this classifier on every user input turn.'),
+  sampleCopyConfig: sampleCopyConfigSchema.describe('Sample copy configuration including the default classifier used to evaluate prompt triggers.'),
   conversationTimeoutSeconds: z.number().int().min(0).optional().describe('Timeout in seconds for active conversations with no activity. Set to 0 or omit to disable. Conversations that have been inactive for longer than this value will be automatically aborted.'),
 });
 
@@ -123,6 +133,7 @@ export const updateProjectSchema = z.object({
   autoCreateUsers: z.boolean().optional().describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().describe('Updated descriptors defining the data schema for user profile variables in this project'),
   defaultGuardrailClassifierId: z.string().nullable().optional().describe('Updated ID of the classifier used to evaluate guardrails. Set to null to disable guardrail classification.'),
+  sampleCopyConfig: sampleCopyConfigSchema.nullable().describe('Updated sample copy configuration. Set to null to clear.'),
   conversationTimeoutSeconds: z.number().int().min(0).nullable().optional().describe('Timeout in seconds for active conversations with no activity. Set to 0 or null to disable. Conversations that have been inactive for longer than this value will be automatically aborted.'),
   version: z.number().describe('The current version number for optimistic locking'),
 });
@@ -148,6 +159,7 @@ export const projectResponseSchema = z.object({
   autoCreateUsers: z.boolean().describe('When enabled, users are automatically created on first WebSocket connection if they do not exist, using the provided user ID and an empty profile'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).describe('Descriptors defining the data schema for user profile variables in this project'),
   defaultGuardrailClassifierId: z.string().nullable().describe('ID of the classifier used to evaluate guardrails for all conversations in this project'),
+  sampleCopyConfig: sampleCopyConfigSchema.nullable().describe('Sample copy configuration including the default classifier used to evaluate prompt triggers.'),
   conversationTimeoutSeconds: z.number().int().nullable().describe('Timeout in seconds for active conversations with no activity. Null or 0 means no timeout.'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),
