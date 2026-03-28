@@ -319,7 +319,7 @@ export const sampleCopySelectionEventDataSchema = z.object({
   /** The user input that triggered the selection */
   input: z.string().describe('The user input that triggered the selection'),
   /** ID of the selected sample copy, or null if none was selected */
-  sampleCopyId: z.string().nullable().describe('ID of the selected sample copy, or null if none was selected'),
+  sampleCopy: z.string().nullable().describe('Identifier of selected sample copy, or null if none was selected'),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 

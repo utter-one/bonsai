@@ -21,7 +21,7 @@ export const actionClassificationResultWithClassifierSchema = z.object({
 export type ActionClassificationResultWithClassifier = z.infer<typeof actionClassificationResultWithClassifierSchema>;
 
 export const sampleCopyClassificationResultSchema = z.object({
-  sampleCopyId: z.string()
+  sampleCopy: z.string()
 });
 
 export type SampleCopyClassificationResult = z.infer<typeof sampleCopyClassificationResultSchema>;

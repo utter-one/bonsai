@@ -167,10 +167,11 @@ export class UserInputProcessor {
         const eventData: SampleCopySelectionEventData = {
           classifierId: sampleCopyClassifier!.classifier.id,
           input: userInput || '',
-          sampleCopyId: sampleCopyResult.sampleCopyId,
+          sampleCopy: sampleCopyResult.sampleCopy,
           metadata: {
             classifierName: sampleCopyClassifier!.classifier.name,
             systemPrompt: sampleCopyResult.renderedPrompt,
+            result: sampleCopyResult.result,
             llmSettings: sampleCopyClassifier?.classifier.llmSettings,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: sampleCopyResult.durationMs,
@@ -225,7 +226,7 @@ export class UserInputProcessor {
     }
   }
 
-  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number }> {
+  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; result: string; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       const classifierData = session.runner.getRuntimeData().sampleCopyClassifier;
@@ -259,6 +260,7 @@ export class UserInputProcessor {
       return {
         ...classificationResult,
         renderedPrompt,
+        result: textContent,
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,
@@ -267,8 +269,9 @@ export class UserInputProcessor {
       logger.error({ error, sessionId: session.id }, 'Error classifying sample copy for text input');
       const endMs = Date.now();
       return {
-        sampleCopyId: null,
+        sampleCopy: null,
         renderedPrompt: null,
+        result: null,
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,
