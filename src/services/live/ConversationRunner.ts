@@ -1970,8 +1970,26 @@ export class ConversationRunner {
     const sampleCopies = selectedSampleCopyName && this.sampleCopyDistributor.hasName(selectedSampleCopyName)
       ? this.sampleCopyDistributor.distributeCopies(selectedSampleCopyName)
       : [];
-    const copy = sampleCopies.length > 0 ? sampleCopies.join('\n') : '';
-    const copyContent = copy;
+    const copyContent = sampleCopies.length > 0 ? sampleCopies.join('\n') : '';
+    let copy = copyContent;
+    if (copyContent.length > 0) {
+      const sampleCopy = this.sampleCopyDistributor.getOriginalCopies().find(c => c.name === selectedSampleCopyName);
+      if (sampleCopy) {
+        // find decorator with matching projectId and sampleCopy.name
+        const decorator = sampleCopy.decoratorId ?await db.query.copyDecorators.findFirst({
+          where: (copyDecorators, { and, eq }) => and(
+            eq(copyDecorators.projectId, this.conversation.projectId),
+            eq(copyDecorators.id, sampleCopy.decoratorId)
+          )
+        }) : null;
+        if (decorator) {
+          const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, 
+            this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), 
+            copy, copyContent, this.stageData.faq);
+          copy = await this.templatingEngine.render(decorator.template, context);
+        }
+      }
+    }
     const selectedSampleCopy = selectedSampleCopyName
       ? (this.sampleCopyDistributor.getOriginalCopies().find(c => c.name === selectedSampleCopyName) ?? null)
       : null;
