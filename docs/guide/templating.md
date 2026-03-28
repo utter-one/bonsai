@@ -18,6 +18,9 @@ Templates have access to these data contexts:
 | `project` | Project-level settings: `timezone`, `languageCode`, and `language` (see [Project Context](#project-context)) |
 | `agent` | The agent's personality `prompt` text — **must be explicitly placed** in the template (see [Agent & Knowledge Variables](#agent--knowledge-variables)) |
 | `faq` | Array of `{ question, answer }` objects from knowledge classification — stage system prompts only, **must be explicitly placed** (see [Agent & Knowledge Variables](#agent--knowledge-variables)) |
+| `copy` | Selected sample copy content joined by newlines and rendered using selected decorator, **must be explicitly placed** (see [Sample Copy Variables](#sample-copy-variables)) |
+| `copyContent` | Same as `copy` — the raw selected content before any copy decorator is applied |
+| `sampleCopy` | Array of all sample copies active for the current stage: `{ name, trigger, content[] }` |
 
 
 ## Basic Syntax
@@ -185,6 +188,47 @@ Q: {{this.question}}
 A: {{this.answer}}
 {{/each}}
 {{/hasItems}}
+```
+
+---
+
+## Sample Copy Variables
+
+### `copy`
+
+Expands to the content items selected by the sample copy distributor for the current turn, joined by newlines with applied decorator. Only populated when the sample copy classifier matched a copy on this turn; otherwise an empty string.
+
+> **Important:** <code v-pre>{{copy}}</code> is **not auto-injected** and is the activation signal for sample copy processing — if the stage prompt does not contain <code v-pre>{{copy}}</code> or <code v-pre>{{copy.</code>, the entire sample copy pipeline (classification, sampling) is skipped for that stage.
+
+Use <code v-pre>{{#if copy}}</code> to guard against the empty case:
+
+```handlebars
+{{#if copy}}
+Use the following prescribed answer verbatim:
+{{copy}}
+{{/if}}
+```
+
+### `copyContent`
+
+Similar to `copy`. Exposes the raw selected content string, which is the same value that `copy` holds (the content after sampling but before any copy decorator template is applied).
+
+### `sampleCopy`
+
+Array of all sample copies active for the current stage, regardless of whether any was selected this turn. Each item has:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Sample copy name (used as match identifier) |
+| `trigger` | `string` | The `promptTrigger` string used by the classifier |
+| `content` | `string[]` | The full array of variant answers |
+
+Primarily useful in classifier and transformer prompts that need to enumerate available copies:
+
+```handlebars
+{{#each sampleCopy}}
+- {{this.name}}: {{this.trigger}}
+{{/each}}
 ```
 
 ---

@@ -9,9 +9,7 @@ import { KnowledgeService } from "../KnowledgeService";
 import { ClassificationEventData, SampleCopySelectionEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ActionClassificationResultWithClassifier, SampleCopyClassificationResult, sampleCopyClassificationResultSchema } from "../../types/classification";
-import { Conversation, GlobalAction, Guardrail } from "../../types/models";
 import { extractTextFromContent } from "../../utils/llm";
-import { StageAction } from "../../types/actions";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
 

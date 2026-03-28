@@ -47,6 +47,8 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 
 ### Data & Content
 - [Knowledge](./knowledge) — Knowledge base categories and items
+- [Sample Copies](./sample-copies) — Pre-written variant answers with classifier-driven selection
+- [Copy Decorators](./copy-decorators) — Templates that wrap selected sample copy content
 - [Conversations](./conversations) — Conversation history and events
 - [Users](./users) — End-user management
 - [Issues](./issues) — Issue tracking
