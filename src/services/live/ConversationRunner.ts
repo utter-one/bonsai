@@ -1966,11 +1966,18 @@ export class ConversationRunner {
     );
     const globalActionsMap = new Map(this.stageData.globalActions.map(ga => [ga.name, ga]));
     const guardrailActionsMap = new Map(this.stageData.guardrails.map(ga => [ga.name, ga]));
-    const sampleCopies = processingResult.sampleCopyResult?.sampleCopyId && this.sampleCopyDistributor.hasName(processingResult.sampleCopyResult.sampleCopyId)
-      ? this.sampleCopyDistributor.distributeCopies(processingResult.sampleCopyResult.sampleCopyId)
+    const selectedSampleCopyName = processingResult.sampleCopyResult?.sampleCopyId ?? null;
+    const sampleCopies = selectedSampleCopyName && this.sampleCopyDistributor.hasName(selectedSampleCopyName)
+      ? this.sampleCopyDistributor.distributeCopies(selectedSampleCopyName)
       : [];
     const copy = sampleCopies.length > 0 ? sampleCopies.join('\n') : '';
     const copyContent = copy;
+    const selectedSampleCopy = selectedSampleCopyName
+      ? (this.sampleCopyDistributor.getOriginalCopies().find(c => c.name === selectedSampleCopyName) ?? null)
+      : null;
+    // When mode is 'forced', the distributed copy becomes a prescripted response — the LLM is bypassed
+    // and response-related effects from actions are ignored.
+    const forcedCopyResponse = sampleCopies.length > 0 && selectedSampleCopy?.mode === 'forced' ? copy : null;
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource,  
       this.sampleCopyDistributor.getOriginalCopies(), copy, copyContent, this.stageData.faq);
     const stageActionMap = new Map(Object.values(stageActions).map(sa => [sa.name, sa]));
@@ -2037,6 +2044,12 @@ export class ConversationRunner {
       actionsEndMs = Date.now();
       actionsDurationMs = actionsEndMs - actionsStartMs;
       await this.applyActionOutcome(context, executionOutcome);
+    }
+
+    if (forcedCopyResponse !== null) {
+      logger.debug({ conversationId: this.conversation.id, sampleCopyName: selectedSampleCopyName }, 'Sample copy forced mode: overriding response with prescripted copy content, ignoring response-related effects');
+      executionOutcome.prescriptedResponse = forcedCopyResponse;
+      executionOutcome.shouldGenerateResponse = true;
     }
 
     if (executionOutcome.turnVisibility) {
