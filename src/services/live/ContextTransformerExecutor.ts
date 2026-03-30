@@ -6,6 +6,7 @@ import logger from '../../utils/logger';
 import { extractTextFromContent } from '../../utils/llm';
 import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
+import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
 import { Session } from '../../channels/SessionManager';
 import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
@@ -37,6 +38,8 @@ type TransformerExecutionResult = {
   rawResponse: string;
   /** Error message if the transformer failed, undefined otherwise */
   error?: string;
+  /** Token usage from the LLM call, if available */
+  llmUsage?: LlmUsageMetadata;
   /** Total duration of the transformer execution in milliseconds, including LLM call */
   durationMs: number;
   /** Unix timestamp (ms) when transformer execution started */
@@ -129,7 +132,7 @@ export class ContextTransformerExecutor {
           transformerName: result.transformerName,
           systemPrompt: result.renderedPrompt,
           rawResponse: result.rawResponse,
-          llmSettings: transformerData?.transformer.llmSettings,
+          llmUsage: result.llmUsage,
           updatedVariables: stageVars,
           durationMs: result.durationMs,
           startMs: result.startMs,
@@ -274,7 +277,7 @@ export class ContextTransformerExecutor {
       }
 
       const endMs = Date.now();
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, durationMs: endMs - startMs, startMs, endMs };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, llmUsage: buildLlmUsage(result.usage, transformerData.llmProviderInfo, transformerData.transformer.llmSettings?.model), durationMs: endMs - startMs, startMs, endMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id, transformerId: transformer.id }, 'Error executing context transformer');
       const endMs = Date.now();

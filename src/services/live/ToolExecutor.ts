@@ -5,6 +5,7 @@ import { Tool } from "../../types/models";
 import { db } from "../../db";
 import { NotFoundError } from "../../errors";
 import { llmContentSchema, LlmGenerationOptions, LlmMessage, MessageContent } from "../providers/llm/ILlmProvider";
+import { buildLlmUsage, llmUsageMetadataSchema } from '../../utils/llmUsage';
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
@@ -18,7 +19,8 @@ export const toolExecutionResultSchema = z.object({
   parameters: z.record(z.string(), parameterValueSchema).describe('Parameters that were passed to the tool during execution'),
   result: z.unknown().optional().describe('Optional field for tool output'),
   renderedPrompt: z.string().optional(),
-  llmSettings: z.any().optional(),
+  /** Token usage from the LLM call, if available */
+  llmUsage: llmUsageMetadataSchema.optional(),
   /** Total duration of the tool execution in milliseconds */
   durationMs: z.number().optional(),
   /** Unix timestamp (ms) when tool execution started */
@@ -92,7 +94,7 @@ export class ToolExecutor {
       const result = await llmProvider.generate(messages, { outputFormat: this.getOutputFormat(tool) });
       const endMs = Date.now();
       const durationMs = endMs - toolStartMs;
-      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmSettings: tool.llmSettings, durationMs, startMs: toolStartMs, endMs };
+      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmUsage: buildLlmUsage(result.usage, llmProviderEntity, tool.llmSettings?.model), durationMs, startMs: toolStartMs, endMs };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
       const endMs = Date.now();

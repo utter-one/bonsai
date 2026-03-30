@@ -739,7 +739,7 @@ export class ActionsExecutor {
         sourceActionName: actionName,
         metadata: {
           systemPrompt: executionResult.renderedPrompt,
-          llmSettings: executionResult.llmSettings,
+          llmUsage: executionResult.llmUsage,
           durationMs: executionResult.durationMs,
           startMs: executionResult.startMs,
           endMs: executionResult.endMs,

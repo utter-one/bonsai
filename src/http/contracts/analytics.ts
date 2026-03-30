@@ -221,3 +221,75 @@ export const conversationTimelineResponseSchema = z.object({
 
 /** Inferred type for the conversation timeline response */
 export type ConversationTimelineResponse = z.infer<typeof conversationTimelineResponseSchema>;
+
+// ==================
+// Response: Token Usage Stats
+// ==================
+
+/**
+ * Schema for token usage aggregated by event type.
+ */
+export const tokenUsageByEventTypeSchema = z.object({
+  eventType: z.string().describe('Event type (message, classification, transformation, tool_call)'),
+  eventCount: z.number().int().describe('Number of events with token usage data'),
+  totalPromptTokens: z.number().int().describe('Total prompt (input) tokens'),
+  totalCompletionTokens: z.number().int().describe('Total completion (output) tokens'),
+  totalTokens: z.number().int().describe('Total tokens (prompt + completion)'),
+}).openapi('TokenUsageByEventType');
+
+/** Inferred type for token usage by event type */
+export type TokenUsageByEventType = z.infer<typeof tokenUsageByEventTypeSchema>;
+
+/**
+ * Schema for the aggregated token usage response.
+ * Includes both totals and per-event-type breakdowns.
+ */
+export const tokenUsageStatsResponseSchema = z.object({
+  totalEvents: z.number().int().describe('Total number of events with token usage data'),
+  totalPromptTokens: z.number().int().describe('Total prompt (input) tokens across all event types'),
+  totalCompletionTokens: z.number().int().describe('Total completion (output) tokens across all event types'),
+  totalTokens: z.number().int().describe('Total tokens across all event types'),
+  byEventType: z.array(tokenUsageByEventTypeSchema).describe('Token usage breakdown by event type'),
+}).openapi('TokenUsageStatsResponse');
+
+/** Inferred type for the token usage stats response */
+export type TokenUsageStatsResponse = z.infer<typeof tokenUsageStatsResponseSchema>;
+
+// ==================
+// Response: Token Usage Trend
+// ==================
+
+/**
+ * Schema for a single data point in a token usage trend time series.
+ */
+export const tokenUsageTrendPointSchema = z.object({
+  bucket: z.string().describe('Time bucket start (ISO 8601)'),
+  eventCount: z.number().int().describe('Number of events with token usage data in this bucket'),
+  totalPromptTokens: z.number().int().describe('Total prompt tokens in this bucket'),
+  totalCompletionTokens: z.number().int().describe('Total completion tokens in this bucket'),
+  totalTokens: z.number().int().describe('Total tokens in this bucket'),
+}).openapi('TokenUsageTrendPoint');
+
+/** Inferred type for a token usage trend data point */
+export type TokenUsageTrendPoint = z.infer<typeof tokenUsageTrendPointSchema>;
+
+/**
+ * Schema for the token usage trend query, extending the base analytics query with a time bucket interval.
+ */
+export const tokenUsageTrendQuerySchema = analyticsQuerySchema.extend({
+  interval: z.enum(['hour', 'day', 'week']).default('day').describe('Time bucket interval for the trend (hour, day, or week)'),
+}).openapi('TokenUsageTrendQuery');
+
+/** Inferred type for the token usage trend query */
+export type TokenUsageTrendQuery = z.infer<typeof tokenUsageTrendQuerySchema>;
+
+/**
+ * Schema for the token usage trend response — a time series of token consumption data.
+ */
+export const tokenUsageTrendResponseSchema = z.object({
+  interval: z.string().describe('Aggregation interval used (hour, day, or week)'),
+  points: z.array(tokenUsageTrendPointSchema).describe('Time-bucketed data points'),
+}).openapi('TokenUsageTrendResponse');
+
+/** Inferred type for the token usage trend response */
+export type TokenUsageTrendResponse = z.infer<typeof tokenUsageTrendResponseSchema>;

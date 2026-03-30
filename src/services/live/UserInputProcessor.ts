@@ -12,6 +12,7 @@ import { classificationResultSchema, ActionClassificationResult, ActionClassific
 import { extractTextFromContent } from "../../utils/llm";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
+import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
 
 /** Result of processing user input, including actions and timing metadata */
 export type ProcessTextInputResult = {
@@ -128,7 +129,7 @@ export class UserInputProcessor {
             classifierName: result.classifierName,
             actionCount: result.actions.length,
             systemPrompt: result.renderedPrompt,
-            llmSettings: classifier?.classifier.llmSettings,
+            llmUsage: result.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: result.durationMs,
             startMs: result.startMs,
@@ -149,7 +150,7 @@ export class UserInputProcessor {
             classifierName: guardrailResult.classifierName,
             actionCount: guardrailResult.actions.length,
             systemPrompt: guardrailResult.renderedPrompt,
-            llmSettings: guardrailClassifier?.classifier.llmSettings,
+            llmUsage: guardrailResult.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: guardrailResult.durationMs,
             startMs: guardrailResult.startMs,
@@ -170,7 +171,7 @@ export class UserInputProcessor {
             classifierName: sampleCopyClassifier!.classifier.name,
             systemPrompt: sampleCopyResult.renderedPrompt,
             result: sampleCopyResult.result,
-            llmSettings: sampleCopyClassifier?.classifier.llmSettings,
+            llmUsage: sampleCopyResult.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: sampleCopyResult.durationMs,
             startMs: sampleCopyResult.startMs,
@@ -224,7 +225,7 @@ export class UserInputProcessor {
     }
   }
 
-  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; result: string; durationMs: number; startMs: number; endMs: number }> {
+  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; result: string; llmUsage?: LlmUsageMetadata; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       const classifierData = session.runner.getRuntimeData().sampleCopyClassifier;
@@ -259,6 +260,7 @@ export class UserInputProcessor {
         ...classificationResult,
         renderedPrompt,
         result: textContent,
+        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model),
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,
@@ -277,7 +279,7 @@ export class UserInputProcessor {
     }
   }
 
-  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ActionClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number }> {
+  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ActionClassificationResultWithClassifier & { renderedPrompt: string; llmUsage?: LlmUsageMetadata; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
@@ -315,6 +317,7 @@ export class UserInputProcessor {
         classifierName: classifier.name,
         actions,
         renderedPrompt,
+        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model),
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,

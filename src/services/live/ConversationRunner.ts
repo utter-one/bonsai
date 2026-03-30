@@ -14,6 +14,7 @@ import type { Session } from "../../channels/SessionManager";
 import type { IClientConnection } from '../../channels/IClientConnection';
 import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
+import { buildLlmUsage, LlmProviderInfo, LlmUsageMetadata } from '../../utils/llmUsage';
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
@@ -46,11 +47,13 @@ type PendingOutboundChunk = { chunkId: string; ordinal: number; audio: Buffer };
 export type ClassifierRuntimeData = {
   classifier: Classifier;
   llmProvider: ILlmProvider;
+  llmProviderInfo: LlmProviderInfo;
 }
 
 export type TransformerRuntimeData = {
   transformer: ContextTransformer;
   llmProvider: ILlmProvider;
+  llmProviderInfo: LlmProviderInfo;
 }
 
 /**
@@ -79,6 +82,8 @@ export type TurnData = {
   assistantMessageEventId: string | null;
   /** Duration of the filler sentence LLM call in milliseconds; null when no filler was generated */
   fillerDurationMs: number | null;
+  /** Token usage from the filler LLM call; null when no filler was generated */
+  fillerLlmUsage: LlmUsageMetadata | null;
   /** Duration of the moderation API call in milliseconds; null when moderation was not performed */
   moderationDurationMs: number | null;
   /** Unix timestamp (ms) when ASR recognition started */
@@ -107,6 +112,7 @@ export type StageRuntimeData = {
   project: Project;
   stage: Stage;
   completionLlmProvider?: ILlmProvider;
+  completionLlmProviderInfo?: LlmProviderInfo;
   lastCompletionResult?: LlmGenerationResult;
   lastCompletionPrompt?: string;
   classifiers: ClassifierRuntimeData[];
@@ -121,6 +127,7 @@ export type StageRuntimeData = {
   shouldEndConversation: boolean;
   agent: AgentResponse;
   fillerLlmProvider?: ILlmProvider;
+  fillerLlmProviderInfo?: LlmProviderInfo;
   faq: FaqItem[];
 }
 
@@ -182,7 +189,7 @@ export class ConversationRunner {
   }
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -263,6 +270,7 @@ export class ConversationRunner {
       project: project,
       conversation: conversation,
       completionLlmProvider: undefined,
+      completionLlmProviderInfo: undefined,
       lastCompletionResult: null,
       classifiers: [],
       transformers: [],
@@ -283,6 +291,7 @@ export class ConversationRunner {
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, stage.llmProviderId) });
       if (llmProviderEntity) {
         stageData.completionLlmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, stage.llmSettings);
+        stageData.completionLlmProviderInfo = { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType };
       }
     }
 
@@ -319,7 +328,7 @@ export class ConversationRunner {
       }
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, classifier.llmProviderId) });
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, classifier.llmSettings);
-      stageData.classifiers.push({ classifier, llmProvider });
+      stageData.classifiers.push({ classifier, llmProvider, llmProviderInfo: { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType } });
     }
 
     // Load transformers for the stage
@@ -332,7 +341,7 @@ export class ConversationRunner {
       }
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, transformer.llmProviderId) });
       const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, transformer.llmSettings);
-      stageData.transformers.push({ transformer, llmProvider });
+      stageData.transformers.push({ transformer, llmProvider, llmProviderInfo: { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType } });
     }
 
     // Load global actions for the stage.
@@ -396,6 +405,7 @@ export class ConversationRunner {
         stageData.guardrailClassifier = {
           classifier: guardrailClassifierEntity,
           llmProvider: this.llmProviderFactory.createProvider(guardrailLlmProviderEntity, guardrailClassifierEntity.llmSettings),
+          llmProviderInfo: { id: guardrailLlmProviderEntity.id, apiType: guardrailLlmProviderEntity.apiType },
         };
       } else {
         logger.warn({ projectId: project.id, classifierId: project.defaultGuardrailClassifierId }, 'Guardrail classifier not found, guardrails will be skipped');
@@ -424,6 +434,7 @@ export class ConversationRunner {
           stageData.sampleCopyClassifier = {
             classifier: sampleCopyClassifierEntity,
             llmProvider: this.llmProviderFactory.createProvider(sampleCopyLlmProviderEntity, sampleCopyClassifierEntity.llmSettings),
+            llmProviderInfo: { id: sampleCopyLlmProviderEntity.id, apiType: sampleCopyLlmProviderEntity.apiType },
           };
         } else {
           logger.warn({ projectId: project.id, classifierId: sampleCopyClassifierId }, 'Sample copy classifier not found, sample copy classification will be skipped');
@@ -445,6 +456,7 @@ export class ConversationRunner {
       const fillerLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.fillerSettings.llmProviderId) });
       if (fillerLlmProviderEntity) {
         stageData.fillerLlmProvider = this.llmProviderFactory.createProvider(fillerLlmProviderEntity, agent.fillerSettings.llmSettings);
+        stageData.fillerLlmProviderInfo = { id: fillerLlmProviderEntity.id, apiType: fillerLlmProviderEntity.apiType };
       } else {
         logger.warn({ agentId: agent.id, llmProviderId: agent.fillerSettings.llmProviderId }, 'Filler LLM provider not found, filler responses will be skipped');
       }
@@ -760,9 +772,9 @@ export class ConversationRunner {
           originalText: fullResponseText,
           visibility: this.turnMessageVisibility,
           metadata: {
-            llmUsage: result.usage || {},
+            llmUsage: buildLlmUsage(result.usage, this.stageData.completionLlmProviderInfo, this.stageData.stage.llmSettings?.model),
+            fillerLlmUsage: this.turnData.fillerLlmUsage ?? undefined,
             systemPrompt: this.stageData.lastCompletionPrompt,
-            llmSettings: this.stageData.stage.llmSettings,
             outputTurnId: this.turnData.outputTurnId,
             turnIndex: this.turnData.turnIndex,
             turnStartMs: this.turnData.startMs ?? undefined,
@@ -1506,7 +1518,7 @@ export class ConversationRunner {
       error: executeResult.failureReason,
       metadata: {
         systemPrompt: executeResult.renderedPrompt,
-        llmSettings: executeResult.llmSettings,
+        llmUsage: executeResult.llmUsage,
         durationMs: executeResult.durationMs,
         startMs: executeResult.startMs,
         endMs: executeResult.endMs,
@@ -1845,6 +1857,7 @@ export class ConversationRunner {
       firstAudioMs: null,
       assistantMessageEventId: null,
       fillerDurationMs: null,
+      fillerLlmUsage: null,
       moderationDurationMs: null,
       asrStartMs: null,
       stageTransitionStartMs: null,
@@ -2280,6 +2293,7 @@ export class ConversationRunner {
       const text = extractTextFromContent(result.content).trim();
       if (text.length > 0) {
         this.lastFillerPrompt = renderedPrompt;
+        this.turnData.fillerLlmUsage = buildLlmUsage(result.usage, this.stageData.fillerLlmProviderInfo, this.stageData.agent?.fillerSettings?.llmSettings?.model) ?? null;
         return text;
       }
       return null;

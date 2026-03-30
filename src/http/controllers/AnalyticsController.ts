@@ -3,7 +3,7 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { AnalyticsService } from '../../services/AnalyticsService';
-import { analyticsQuerySchema, analyticsRouteParamsSchema, analyticsConversationRouteParamsSchema, latencyTrendQuerySchema, latencyStatsResponseSchema, latencyPercentilesResponseSchema, latencyTrendResponseSchema, conversationTimelineResponseSchema } from '../contracts/analytics';
+import { analyticsQuerySchema, analyticsRouteParamsSchema, analyticsConversationRouteParamsSchema, latencyTrendQuerySchema, latencyStatsResponseSchema, latencyPercentilesResponseSchema, latencyTrendResponseSchema, conversationTimelineResponseSchema, tokenUsageStatsResponseSchema, tokenUsageTrendQuerySchema, tokenUsageTrendResponseSchema } from '../contracts/analytics';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -70,6 +70,32 @@ export class AnalyticsController {
           404: { description: 'Conversation not found' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/analytics/usage',
+        tags: ['Analytics'],
+        summary: 'Get aggregated token usage statistics',
+        description: 'Returns aggregated LLM token usage statistics broken down by event type (message, classification, transformation, tool_call). Includes total prompt tokens, completion tokens, and combined totals.',
+        request: { query: analyticsQuerySchema },
+        responses: {
+          200: { description: 'Aggregated token usage statistics', content: { 'application/json': { schema: tokenUsageStatsResponseSchema } } },
+          400: { description: 'Invalid query parameters' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/analytics/usage/trend',
+        tags: ['Analytics'],
+        summary: 'Get token usage trend over time',
+        description: 'Returns a time-series of token consumption bucketed by the specified interval (hour, day, or week). Useful for tracking LLM usage growth and optimizing prompt costs.',
+        request: { query: tokenUsageTrendQuerySchema },
+        responses: {
+          200: { description: 'Token usage trend time series', content: { 'application/json': { schema: tokenUsageTrendResponseSchema } } },
+          400: { description: 'Invalid query parameters' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
     ];
   }
 
@@ -78,6 +104,8 @@ export class AnalyticsController {
     router.get('/api/projects/:projectId/analytics/latency/percentiles', asyncHandler(this.getLatencyPercentiles.bind(this)));
     router.get('/api/projects/:projectId/analytics/latency/trend', asyncHandler(this.getLatencyTrend.bind(this)));
     router.get('/api/projects/:projectId/analytics/latency', asyncHandler(this.getLatencyStats.bind(this)));
+    router.get('/api/projects/:projectId/analytics/usage/trend', asyncHandler(this.getTokenUsageTrend.bind(this)));
+    router.get('/api/projects/:projectId/analytics/usage', asyncHandler(this.getTokenUsageStats.bind(this)));
     router.get('/api/projects/:projectId/analytics/conversations/:conversationId/timeline', asyncHandler(this.getConversationTimeline.bind(this)));
   }
 
@@ -125,6 +153,30 @@ export class AnalyticsController {
     checkPermissions(req, [PERMISSIONS.ANALYTICS_READ]);
     const { projectId, conversationId } = analyticsConversationRouteParamsSchema.parse(req.params);
     const result = await this.analyticsService.getConversationTimeline(projectId, conversationId, req.context);
+    res.status(200).json(result);
+  }
+
+  /**
+   * GET /api/projects/:projectId/analytics/usage
+   * Returns aggregated token usage statistics broken down by event type
+   */
+  private async getTokenUsageStats(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ANALYTICS_READ]);
+    const { projectId } = analyticsRouteParamsSchema.parse(req.params);
+    const query = analyticsQuerySchema.parse(req.query);
+    const result = await this.analyticsService.getTokenUsageStats(projectId, query, req.context);
+    res.status(200).json(result);
+  }
+
+  /**
+   * GET /api/projects/:projectId/analytics/usage/trend
+   * Returns a time-series trend of token usage
+   */
+  private async getTokenUsageTrend(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ANALYTICS_READ]);
+    const { projectId } = analyticsRouteParamsSchema.parse(req.params);
+    const query = tokenUsageTrendQuerySchema.parse(req.query);
+    const result = await this.analyticsService.getTokenUsageTrend(projectId, query, req.context);
     res.status(200).json(result);
   }
 }
