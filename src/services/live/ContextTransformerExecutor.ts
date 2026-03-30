@@ -134,6 +134,7 @@ export class ContextTransformerExecutor {
           rawResponse: result.rawResponse,
           llmUsage: result.llmUsage,
           updatedVariables: stageVars,
+          stageName: stage.name,
           durationMs: result.durationMs,
           startMs: result.startMs,
           endMs: result.endMs,

@@ -2413,6 +2413,7 @@ export class ConversationRunner {
       eventData.metadata = {};
     }
     eventData.metadata['currentVariables'] = this.conversation.stageVars?.[this.stageData.id] || {};
+    eventData.metadata['stageName'] = this.stageData.stage.name;
 
     const eventId = await this.conversationService.saveConversationEvent(this.conversation.projectId, this.conversation.id, eventType, eventData, this.stageData.id);
     const eventMessage: CALConversationEventMessage = {
