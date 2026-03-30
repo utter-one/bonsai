@@ -113,6 +113,7 @@ export default defineConfig({
             { text: 'Migration', link: '/api/migration' },
             { text: 'Audit Logs', link: '/api/audit-logs' },
             { text: 'Analytics', link: '/api/analytics' },
+            { text: 'Analytics Query Engine', link: '/api/analytics-query' },
           ],
         },
         {
