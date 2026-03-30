@@ -73,38 +73,6 @@ const conversationIdDimension: DimensionDef = {
   requiresUserJoin: false,
 };
 
-const conversationStatusJoinDimension: DimensionDef = {
-  id: 'conversation.status',
-  label: 'Conversation Status',
-  sqlExpr: 'c.status',
-  requiresConversationJoin: true,
-  requiresUserJoin: false,
-  values: ['initialized', 'awaiting_user_input', 'receiving_user_voice', 'processing_user_input', 'generating_response', 'finished', 'aborted', 'failed'],
-};
-
-const conversationStartingStageJoinDimension: DimensionDef = {
-  id: 'conversation.startingStageId',
-  label: 'Conversation Starting Stage',
-  sqlExpr: 'c.starting_stage_id',
-  requiresConversationJoin: true,
-  requiresUserJoin: false,
-};
-
-const conversationEndingStageJoinDimension: DimensionDef = {
-  id: 'conversation.endingStageId',
-  label: 'Conversation Ending Stage',
-  sqlExpr: 'c.ending_stage_id',
-  requiresConversationJoin: true,
-  requiresUserJoin: false,
-};
-
-/** Dimensions available via conversation JOIN on all event-based sources */
-const conversationJoinDimensions: DimensionDef[] = [
-  conversationStatusJoinDimension,
-  conversationStartingStageJoinDimension,
-  conversationEndingStageJoinDimension,
-];
-
 // ==================
 // Token metrics (reused across LLM-bearing event types)
 // ==================
@@ -151,7 +119,6 @@ const turnsSource: SourceDef = {
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'prescripted', label: 'Prescripted Response', sqlExpr: `ce.event_data->'metadata'->>'prescripted'`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
-    ...conversationJoinDimensions,
   ],
   metrics: [
     { id: 'totalTurnDurationMs', label: 'Total Turn Duration', sqlExpr: `(ce.event_data->'metadata'->>'totalTurnDurationMs')::numeric`, unit: 'ms' },
@@ -185,7 +152,6 @@ const toolCallsSource: SourceDef = {
     { id: 'toolType', label: 'Tool Type', sqlExpr: `ce.event_data->>'toolType'`, requiresConversationJoin: false, requiresUserJoin: false, values: ['smart_function', 'webhook', 'script'] },
     { id: 'success', label: 'Success', sqlExpr: `(ce.event_data->>'success')`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
     { id: 'sourceActionName', label: 'Source Action', sqlExpr: `ce.event_data->>'sourceActionName'`, requiresConversationJoin: false, requiresUserJoin: false },
-    ...conversationJoinDimensions,
   ],
   metrics: [
     { id: 'durationMs', label: 'Execution Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms' },
@@ -206,7 +172,6 @@ const classificationsSource: SourceDef = {
     { id: 'classifierName', label: 'Classifier Name', sqlExpr: `ce.event_data->'metadata'->>'classifierName'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
-    ...conversationJoinDimensions,
   ],
   metrics: [
     { id: 'durationMs', label: 'Classification Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms' },
@@ -227,7 +192,6 @@ const transformationsSource: SourceDef = {
     { id: 'transformerName', label: 'Transformer Name', sqlExpr: `ce.event_data->'metadata'->>'transformerName'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
-    ...conversationJoinDimensions,
   ],
   metrics: [
     { id: 'durationMs', label: 'Transformation Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms' },
@@ -245,7 +209,6 @@ const moderationSource: SourceDef = {
   dimensions: [
     conversationIdDimension,
     { id: 'flagged', label: 'Flagged', sqlExpr: `(ce.event_data->>'flagged')`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
-    ...conversationJoinDimensions,
   ],
   metrics: [
     { id: 'durationMs', label: 'Moderation Duration', sqlExpr: `(ce.event_data->>'durationMs')::numeric`, unit: 'ms' },
@@ -265,7 +228,6 @@ const eventsSource: SourceDef = {
       requiresConversationJoin: false, requiresUserJoin: false,
       values: ['message', 'classification', 'transformation', 'execution_plan', 'command', 'tool_call', 'conversation_start', 'conversation_resume', 'conversation_end', 'conversation_aborted', 'conversation_failed', 'jump_to_stage', 'moderation', 'variables_updated', 'user_profile_updated', 'user_input_modified', 'user_banned', 'visibility_changed', 'sample_copy_selection'],
     },
-    ...conversationJoinDimensions,
   ],
   metrics: [],
 };
@@ -281,13 +243,6 @@ const stageVisitsSource: SourceDef = {
   dimensions: [
     { id: 'conversationId', label: 'Conversation ID', sqlExpr: 'sv.conversation_id', requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'stageId', label: 'Stage ID', sqlExpr: 'sv.stage_id', requiresConversationJoin: false, requiresUserJoin: false },
-    {
-      id: 'conversation.status', label: 'Conversation Status', sqlExpr: 'c.status',
-      requiresConversationJoin: true, requiresUserJoin: false,
-      values: ['initialized', 'awaiting_user_input', 'receiving_user_voice', 'processing_user_input', 'generating_response', 'finished', 'aborted', 'failed'],
-    },
-    { id: 'conversation.startingStageId', label: 'Conversation Starting Stage', sqlExpr: 'c.starting_stage_id', requiresConversationJoin: true, requiresUserJoin: false },
-    { id: 'conversation.endingStageId', label: 'Conversation Ending Stage', sqlExpr: 'c.ending_stage_id', requiresConversationJoin: true, requiresUserJoin: false },
   ],
   metrics: [
     { id: 'timeOnStageMs', label: 'Time on Stage', sqlExpr: `EXTRACT(EPOCH FROM (sv.next_ts - sv.timestamp)) * 1000`, unit: 'ms' },

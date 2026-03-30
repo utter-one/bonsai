@@ -52,15 +52,7 @@ Metrics are requested as strings in the format <code v-pre>{aggFn}:{metricId}</c
 
 ### Dimensions
 
-Dimensions are categorical fields used for grouping and filtering. Each source has its own set of **native dimensions** (directly on the rows) and **join dimensions** inherited from the conversations table:
-
-**Join dimensions** (available on all event-based sources):
-
-| Dimension | Description |
-|-----------|-------------|
-| `conversation.status` | Conversation status at time of query |
-| `conversation.startingStageId` | Stage the conversation started in |
-| `conversation.endingStageId` | Stage the conversation ended in |
+Dimensions are categorical fields used for grouping and filtering. Each source has its own set of dimensions directly on the rows.
 
 ::: tip
 Use the `GET /analytics/sources` endpoint to discover all available dimensions and metrics for each source at runtime.
@@ -126,8 +118,7 @@ curl "http://localhost:3000/api/projects/my-project/analytics/sources" \
         { "id": "conversationId", "label": "Conversation ID" },
         { "id": "source", "label": "Input Source", "values": ["text", "voice"] },
         { "id": "model", "label": "LLM Model" },
-        { "id": "provider", "label": "LLM Provider" },
-        { "id": "conversation.status", "label": "Conversation Status", "values": ["finished", "aborted", "failed", "..."] }
+        { "id": "provider", "label": "LLM Provider" }
       ],
       "metrics": [
         { "id": "totalTurnDurationMs", "label": "Total Turn Duration", "unit": "ms" },
@@ -395,40 +386,40 @@ metrics[]=sum:totalTokens" \
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `eventType`, `conversation.status`, `conversation.startingStageId`, `conversation.endingStageId` | *(none — use `count`)* |
+| `conversationId`, `eventType` | *(none — use `count`)* |
 
 ### turns
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `source`, `model`, `provider`, `prescripted`, `conversation.status`, `conversation.startingStageId`, `conversation.endingStageId` | `totalTurnDurationMs`, `timeToFirstTokenMs`, `timeToFirstTokenFromTurnStartMs`, `timeToFirstAudioMs`, `llmDurationMs`, `ttsDurationMs`, `ttsConnectDurationMs`, `promptRenderDurationMs`, `moderationDurationMs`, `stageTransitionDurationMs`, `processingDurationMs`, `actionsDurationMs`, `asrDurationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `source`, `model`, `provider`, `prescripted` | `totalTurnDurationMs`, `timeToFirstTokenMs`, `timeToFirstTokenFromTurnStartMs`, `timeToFirstAudioMs`, `llmDurationMs`, `ttsDurationMs`, `ttsConnectDurationMs`, `promptRenderDurationMs`, `moderationDurationMs`, `stageTransitionDurationMs`, `processingDurationMs`, `actionsDurationMs`, `asrDurationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### tool_calls
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `toolId`, `toolName`, `toolType`, `success`, `sourceActionName`, `conversation.status`, `conversation.startingStageId`, `conversation.endingStageId` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `toolId`, `toolName`, `toolType`, `success`, `sourceActionName` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### classifications
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `classifierId`, `classifierName`, `model`, `provider`, `conversation.status`, `conversation.startingStageId`, `conversation.endingStageId` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `classifierId`, `classifierName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### transformations
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `transformerId`, `transformerName`, `model`, `provider`, `conversation.status`, `conversation.startingStageId`, `conversation.endingStageId` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `transformerId`, `transformerName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### moderation
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `flagged`, `conversation.status`, `conversation.startingStageId`, `conversation.endingStageId` | `durationMs` |
+| `conversationId`, `flagged` | `durationMs` |
 
 ### stage_visits
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId`, `conversation.status`, `conversation.startingStageId`, `conversation.endingStageId` | `timeOnStageMs` |
+| `conversationId`, `stageId` | `timeOnStageMs` |
