@@ -13,7 +13,7 @@ import { AgentService } from "../AgentService";
 import type { Session } from "../../channels/SessionManager";
 import type { IClientConnection } from '../../channels/IClientConnection';
 import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage } from '../../channels/messages';
-import { ILlmProvider, LlmChunk, LlmGenerationResult } from "../providers/llm/ILlmProvider";
+import { ILlmProvider, LlmChunk, LlmGenerationResult, TokenUsage } from "../providers/llm/ILlmProvider";
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
@@ -79,6 +79,8 @@ export type TurnData = {
   assistantMessageEventId: string | null;
   /** Duration of the filler sentence LLM call in milliseconds; null when no filler was generated */
   fillerDurationMs: number | null;
+  /** Token usage from the filler LLM call; null when no filler was generated */
+  fillerLlmUsage: TokenUsage | null;
   /** Duration of the moderation API call in milliseconds; null when moderation was not performed */
   moderationDurationMs: number | null;
   /** Unix timestamp (ms) when ASR recognition started */
@@ -178,7 +180,7 @@ export class ConversationRunner {
   }
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0 };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0 };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -752,6 +754,7 @@ export class ConversationRunner {
           visibility: this.turnMessageVisibility,
           metadata: {
             llmUsage: result.usage || {},
+            fillerLlmUsage: this.turnData.fillerLlmUsage ?? undefined,
             systemPrompt: this.stageData.lastCompletionPrompt,
             llmSettings: this.stageData.stage.llmSettings,
             outputTurnId: this.turnData.outputTurnId,
@@ -1835,6 +1838,7 @@ export class ConversationRunner {
       firstAudioMs: null,
       assistantMessageEventId: null,
       fillerDurationMs: null,
+      fillerLlmUsage: null,
       moderationDurationMs: null,
       asrStartMs: null,
       stageTransitionStartMs: null,
@@ -2267,6 +2271,7 @@ export class ConversationRunner {
       const text = extractTextFromContent(result.content).trim();
       if (text.length > 0) {
         this.lastFillerPrompt = renderedPrompt;
+        this.turnData.fillerLlmUsage = result.usage ?? null;
         return text;
       }
       return null;

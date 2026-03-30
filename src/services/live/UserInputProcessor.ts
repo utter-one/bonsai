@@ -12,6 +12,7 @@ import { classificationResultSchema, ActionClassificationResult, ActionClassific
 import { extractTextFromContent } from "../../utils/llm";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
+import type { TokenUsage } from "../providers/llm/ILlmProvider";
 
 /** Result of processing user input, including actions and timing metadata */
 export type ProcessTextInputResult = {
@@ -129,6 +130,7 @@ export class UserInputProcessor {
             actionCount: result.actions.length,
             systemPrompt: result.renderedPrompt,
             llmSettings: classifier?.classifier.llmSettings,
+            llmUsage: result.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: result.durationMs,
             startMs: result.startMs,
@@ -150,6 +152,7 @@ export class UserInputProcessor {
             actionCount: guardrailResult.actions.length,
             systemPrompt: guardrailResult.renderedPrompt,
             llmSettings: guardrailClassifier?.classifier.llmSettings,
+            llmUsage: guardrailResult.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: guardrailResult.durationMs,
             startMs: guardrailResult.startMs,
@@ -171,6 +174,7 @@ export class UserInputProcessor {
             systemPrompt: sampleCopyResult.renderedPrompt,
             result: sampleCopyResult.result,
             llmSettings: sampleCopyClassifier?.classifier.llmSettings,
+            llmUsage: sampleCopyResult.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
             durationMs: sampleCopyResult.durationMs,
             startMs: sampleCopyResult.startMs,
@@ -224,7 +228,7 @@ export class UserInputProcessor {
     }
   }
 
-  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; result: string; durationMs: number; startMs: number; endMs: number }> {
+  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; result: string; llmUsage?: TokenUsage; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       const classifierData = session.runner.getRuntimeData().sampleCopyClassifier;
@@ -259,6 +263,7 @@ export class UserInputProcessor {
         ...classificationResult,
         renderedPrompt,
         result: textContent,
+        llmUsage: result.usage,
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,
@@ -277,7 +282,7 @@ export class UserInputProcessor {
     }
   }
 
-  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ActionClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number; startMs: number; endMs: number }> {
+  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ActionClassificationResultWithClassifier & { renderedPrompt: string; llmUsage?: TokenUsage; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
@@ -315,6 +320,7 @@ export class UserInputProcessor {
         classifierName: classifier.name,
         actions,
         renderedPrompt,
+        llmUsage: result.usage,
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,

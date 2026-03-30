@@ -52,6 +52,12 @@ export const messageVisibilitySchema = z.object({
 export type MessageVisibility = z.infer<typeof messageVisibilitySchema>;
 
 // Event Data Schemas
+
+/**
+ * Schema for message event data.
+ * For assistant messages, metadata may include `llmUsage` (token usage from the main LLM call)
+ * and `fillerLlmUsage` (token usage from the filler sentence LLM call, if applicable).
+ */
 export const messageEventDataSchema = z.object({
   role: z.enum(['user', 'assistant']),
   text: z.string(),
@@ -62,6 +68,10 @@ export const messageEventDataSchema = z.object({
 
 export type MessageEventData = z.infer<typeof messageEventDataSchema>;
 
+/**
+ * Schema for classification event data.
+ * Metadata includes `llmUsage` with token usage from the classifier LLM call.
+ */
 export const classificationEventDataSchema = z.object({
   classifierId: z.string(),
   input: z.string(),
@@ -74,6 +84,7 @@ export type ClassificationEventData = z.infer<typeof classificationEventDataSche
 /**
  * Schema for context transformer execution event data.
  * Recorded once per transformer after it runs and writes fields to stage variables.
+ * Metadata includes `llmUsage` with token usage from the transformer LLM call.
  */
 export const transformationEventDataSchema = z.object({
   /** ID of the context transformer that was executed */
@@ -146,6 +157,10 @@ export const commandEventDataSchema = z.object({
 
 export type CommandEventData = z.infer<typeof commandEventDataSchema>;
 
+/**
+ * Schema for tool call event data.
+ * For smart_function tools, metadata includes `llmUsage` with token usage from the tool LLM call.
+ */
 export const toolCallEventDataSchema = z.object({
   toolId: z.string(),
   toolName: z.string(),

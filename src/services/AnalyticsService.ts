@@ -4,7 +4,7 @@ import { db } from '../db/index';
 import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
-import type { AnalyticsQuery, LatencyStatsResponse, LatencyPercentilesResponse, LatencyMetric, PercentileSet, LatencyTrendQuery, LatencyTrendResponse, ConversationTimelineResponse, ConversationTimelineTurn } from '../http/contracts/analytics';
+import type { AnalyticsQuery, LatencyStatsResponse, LatencyPercentilesResponse, LatencyMetric, PercentileSet, LatencyTrendQuery, LatencyTrendResponse, ConversationTimelineResponse, ConversationTimelineTurn, TokenUsageStatsResponse, TokenUsageByEventType, TokenUsageTrendQuery, TokenUsageTrendResponse } from '../http/contracts/analytics';
 
 /**
  * Service for computing analytics and aggregations over conversation timing data.
@@ -385,5 +385,109 @@ export class AnalyticsService extends BaseService {
   /** Escapes a string parameter for safe inline SQL (prevents SQL injection) */
   private escapeParam(value: string): string {
     return value.replace(/'/g, "''");
+  }
+
+  /**
+   * Returns aggregated token usage statistics broken down by event type.
+   * Queries the llmUsage field from event metadata across message, classification,
+   * transformation, and tool_call events.
+   * @param projectId - Project to query
+   * @param query - Date range and optional filters
+   * @param context - Request context for authorization
+   */
+  async getTokenUsageStats(projectId: string, query: AnalyticsQuery, context: RequestContext): Promise<TokenUsageStatsResponse> {
+    this.requirePermission(context, PERMISSIONS.ANALYTICS_READ);
+
+    const conditions = this.buildTokenUsageConditions(projectId, query);
+
+    const result = await db.execute(sql.raw(`
+      SELECT
+        ce.event_type,
+        count(*)::int AS event_count,
+        coalesce(sum((ce.event_data->'metadata'->'llmUsage'->>'promptTokens')::int), 0)::int AS total_prompt_tokens,
+        coalesce(sum((ce.event_data->'metadata'->'llmUsage'->>'completionTokens')::int), 0)::int AS total_completion_tokens,
+        coalesce(sum((ce.event_data->'metadata'->'llmUsage'->>'totalTokens')::int), 0)::int AS total_tokens
+      FROM conversation_events ce
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY ce.event_type
+      ORDER BY total_tokens DESC
+    `));
+
+    const byEventType: TokenUsageByEventType[] = result.rows.map((row: any) => ({
+      eventType: row.event_type,
+      eventCount: row.event_count,
+      totalPromptTokens: row.total_prompt_tokens,
+      totalCompletionTokens: row.total_completion_tokens,
+      totalTokens: row.total_tokens,
+    }));
+
+    return {
+      totalEvents: byEventType.reduce((sum, r) => sum + r.eventCount, 0),
+      totalPromptTokens: byEventType.reduce((sum, r) => sum + r.totalPromptTokens, 0),
+      totalCompletionTokens: byEventType.reduce((sum, r) => sum + r.totalCompletionTokens, 0),
+      totalTokens: byEventType.reduce((sum, r) => sum + r.totalTokens, 0),
+      byEventType,
+    };
+  }
+
+  /**
+   * Returns a time-series of token usage bucketed by the specified interval.
+   * @param projectId - Project to query
+   * @param query - Date range, optional filters, and bucket interval
+   * @param context - Request context for authorization
+   */
+  async getTokenUsageTrend(projectId: string, query: TokenUsageTrendQuery, context: RequestContext): Promise<TokenUsageTrendResponse> {
+    this.requirePermission(context, PERMISSIONS.ANALYTICS_READ);
+
+    const conditions = this.buildTokenUsageConditions(projectId, query);
+    const truncUnit = query.interval === 'hour' ? 'hour' : query.interval === 'week' ? 'week' : 'day';
+
+    const result = await db.execute(sql.raw(`
+      SELECT
+        date_trunc('${truncUnit}', ce.timestamp) AS bucket,
+        count(*)::int AS event_count,
+        coalesce(sum((ce.event_data->'metadata'->'llmUsage'->>'promptTokens')::int), 0)::int AS total_prompt_tokens,
+        coalesce(sum((ce.event_data->'metadata'->'llmUsage'->>'completionTokens')::int), 0)::int AS total_completion_tokens,
+        coalesce(sum((ce.event_data->'metadata'->'llmUsage'->>'totalTokens')::int), 0)::int AS total_tokens
+      FROM conversation_events ce
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `));
+
+    return {
+      interval: query.interval,
+      points: result.rows.map((row: any) => ({
+        bucket: new Date(row.bucket).toISOString(),
+        eventCount: row.event_count,
+        totalPromptTokens: row.total_prompt_tokens,
+        totalCompletionTokens: row.total_completion_tokens,
+        totalTokens: row.total_tokens,
+      })),
+    };
+  }
+
+  /**
+   * Builds WHERE conditions for token usage queries.
+   * Filters to events that have llmUsage metadata with a non-null totalTokens value.
+   */
+  private buildTokenUsageConditions(projectId: string, query: AnalyticsQuery): string[] {
+    const conditions: string[] = [
+      `ce.project_id = '${this.escapeParam(projectId)}'`,
+      `ce.event_data->'metadata'->'llmUsage' IS NOT NULL`,
+      `ce.event_data->'metadata'->'llmUsage'->>'totalTokens' IS NOT NULL`,
+    ];
+
+    if (query.from) {
+      conditions.push(`ce.timestamp >= '${query.from.toISOString()}'`);
+    }
+    if (query.to) {
+      conditions.push(`ce.timestamp <= '${query.to.toISOString()}'`);
+    }
+    if (query.stageId) {
+      conditions.push(`ce.conversation_id IN (SELECT id FROM conversations WHERE project_id = '${this.escapeParam(projectId)}' AND stage_id = '${this.escapeParam(query.stageId)}')`);
+    }
+
+    return conditions;
   }
 }
