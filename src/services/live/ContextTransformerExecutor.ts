@@ -140,7 +140,7 @@ export class ContextTransformerExecutor {
           ...(result.error ? { error: result.error } : {}),
         },
       };
-      await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData);
+      await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData, stage.id);
       await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'transformation', eventData });
     }
 

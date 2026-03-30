@@ -2414,7 +2414,7 @@ export class ConversationRunner {
     }
     eventData.metadata['currentVariables'] = this.conversation.stageVars?.[this.stageData.id] || {};
 
-    const eventId = await this.conversationService.saveConversationEvent(this.conversation.projectId, this.conversation.id, eventType, eventData);
+    const eventId = await this.conversationService.saveConversationEvent(this.conversation.projectId, this.conversation.id, eventType, eventData, this.stageData.id);
     const eventMessage: CALConversationEventMessage = {
       type: 'conversation_event',
       conversationId: this.conversation.id,

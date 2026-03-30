@@ -1,0 +1,3 @@
+ALTER TABLE "conversation_events" ADD COLUMN "stage_id" text;--> statement-breakpoint
+UPDATE "conversation_events" SET "stage_id" = "event_data"->>'stageId' WHERE "event_type" IN ('execution_plan', 'action', 'conversation_start', 'conversation_resume', 'conversation_end', 'conversation_aborted', 'conversation_failed') AND "event_data"->>'stageId' IS NOT NULL;--> statement-breakpoint
+UPDATE "conversation_events" SET "stage_id" = "event_data"->>'toStageId' WHERE "event_type" = 'jump_to_stage' AND "event_data"->>'toStageId' IS NOT NULL;

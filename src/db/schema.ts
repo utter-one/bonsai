@@ -56,6 +56,7 @@ export const conversationEvents = pgTable('conversation_events', {
   conversationId: text('conversation_id').notNull(),
   eventType: text('event_type').notNull().$type<ConversationEventType>(),
   eventData: jsonb('event_data').notNull().$type<ConversationEventData>(),
+  stageId: text('stage_id'),
   timestamp: timestamp('timestamp').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
 }, (table) => [

@@ -99,7 +99,7 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
         const failedEventData: ConversationFailedEventData = { reason: errorMessage, stageId: message.stageId };
         try {
           await this.conversationService.failConversation(context.session!.projectId, conversationId, errorMessage);
-          await this.conversationService.saveConversationEvent(context.session!.projectId, conversationId, 'conversation_failed', failedEventData);
+          await this.conversationService.saveConversationEvent(context.session!.projectId, conversationId, 'conversation_failed', failedEventData, message.stageId);
           await context.session!.clientConnection?.sendMessage({ type: 'conversation_event', conversationId, eventType: 'conversation_failed', eventData: failedEventData });
         } catch (cleanupError) {
           logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId }, 'Failed to save conversation_failed event during cleanup');

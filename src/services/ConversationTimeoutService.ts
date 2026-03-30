@@ -82,7 +82,7 @@ export class ConversationTimeoutService {
       await this.conversationService.abortConversation(projectId, id, TIMEOUT_REASON);
 
       const eventData: ConversationAbortedEventData = { stageId, reason: TIMEOUT_REASON };
-      await this.conversationService.saveConversationEvent(projectId, id, 'conversation_aborted', eventData);
+      await this.conversationService.saveConversationEvent(projectId, id, 'conversation_aborted', eventData, stageId);
 
       for (const session of this.sessionManager.getSessionsForConversation(id)) {
         await session.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: session.conversationId, eventType: 'conversation_aborted', eventData });

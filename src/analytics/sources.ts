@@ -73,6 +73,15 @@ const conversationIdDimension: DimensionDef = {
   requiresUserJoin: false,
 };
 
+const stageIdDimension: DimensionDef = {
+  id: 'stageId',
+  label: 'Stage ID',
+  sqlExpr: 'ce.stage_id',
+  requiresConversationJoin: false,
+  requiresUserJoin: false,
+};
+
+
 // ==================
 // Token metrics (reused across LLM-bearing event types)
 // ==================
@@ -115,6 +124,7 @@ const turnsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
+    stageIdDimension,
     { id: 'source', label: 'Input Source', sqlExpr: `ue.event_data->'metadata'->>'source'`, requiresConversationJoin: false, requiresUserJoin: true, values: ['text', 'voice'] },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
@@ -147,6 +157,7 @@ const toolCallsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
+    stageIdDimension,
     { id: 'toolId', label: 'Tool ID', sqlExpr: `ce.event_data->>'toolId'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'toolName', label: 'Tool Name', sqlExpr: `ce.event_data->>'toolName'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'toolType', label: 'Tool Type', sqlExpr: `ce.event_data->>'toolType'`, requiresConversationJoin: false, requiresUserJoin: false, values: ['smart_function', 'webhook', 'script'] },
@@ -168,6 +179,7 @@ const classificationsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
+    stageIdDimension,
     { id: 'classifierId', label: 'Classifier ID', sqlExpr: `ce.event_data->>'classifierId'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'classifierName', label: 'Classifier Name', sqlExpr: `ce.event_data->'metadata'->>'classifierName'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
@@ -188,6 +200,7 @@ const transformationsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
+    stageIdDimension,
     { id: 'transformerId', label: 'Transformer ID', sqlExpr: `ce.event_data->>'transformerId'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'transformerName', label: 'Transformer Name', sqlExpr: `ce.event_data->'metadata'->>'transformerName'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
@@ -208,6 +221,7 @@ const moderationSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
+    stageIdDimension,
     { id: 'flagged', label: 'Flagged', sqlExpr: `(ce.event_data->>'flagged')`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
   ],
   metrics: [
@@ -223,6 +237,7 @@ const eventsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
+    stageIdDimension,
     {
       id: 'eventType', label: 'Event Type', sqlExpr: 'ce.event_type',
       requiresConversationJoin: false, requiresUserJoin: false,

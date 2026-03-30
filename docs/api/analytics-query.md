@@ -386,37 +386,37 @@ metrics[]=sum:totalTokens" \
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `eventType` | *(none — use `count`)* |
+| `conversationId`, `stageId`, `eventType` | *(none — use `count`)* |
 
 ### turns
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `source`, `model`, `provider`, `prescripted` | `totalTurnDurationMs`, `timeToFirstTokenMs`, `timeToFirstTokenFromTurnStartMs`, `timeToFirstAudioMs`, `llmDurationMs`, `ttsDurationMs`, `ttsConnectDurationMs`, `promptRenderDurationMs`, `moderationDurationMs`, `stageTransitionDurationMs`, `processingDurationMs`, `actionsDurationMs`, `asrDurationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageId`, `source`, `model`, `provider`, `prescripted` | `totalTurnDurationMs`, `timeToFirstTokenMs`, `timeToFirstTokenFromTurnStartMs`, `timeToFirstAudioMs`, `llmDurationMs`, `ttsDurationMs`, `ttsConnectDurationMs`, `promptRenderDurationMs`, `moderationDurationMs`, `stageTransitionDurationMs`, `processingDurationMs`, `actionsDurationMs`, `asrDurationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### tool_calls
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `toolId`, `toolName`, `toolType`, `success`, `sourceActionName` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageId`, `toolId`, `toolName`, `toolType`, `success`, `sourceActionName` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### classifications
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `classifierId`, `classifierName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageId`, `classifierId`, `classifierName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### transformations
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `transformerId`, `transformerName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageId`, `transformerId`, `transformerName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### moderation
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `flagged` | `durationMs` |
+| `conversationId`, `stageId`, `flagged` | `durationMs` |
 
 ### stage_visits
 

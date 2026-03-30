@@ -39,7 +39,7 @@ export class EndConversationHandler implements ClientMessageHandler<CALEndConver
 
       // Save event and send WebSocket message BEFORE detaching conversation
       const eventData = { reason: '', stageId, metadata: { currentVariables: conversation?.stageVars?.[stageId] || {} } };
-      await this.conversationService.saveConversationEvent(projectId, message.conversationId, 'conversation_end', eventData);
+      await this.conversationService.saveConversationEvent(projectId, message.conversationId, 'conversation_end', eventData, stageId);
       await context.session?.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_end', eventData });
       
       // Now detach and finish the conversation
