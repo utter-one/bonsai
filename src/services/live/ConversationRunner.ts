@@ -100,6 +100,10 @@ export type TurnData = {
   ttsStartMs: number | null;
   /** Sequential 1-based turn number within the conversation */
   turnIndex: number;
+  /** Filler sentence text delivered to the client and TTS at the start of the current turn; null when no filler was generated */
+  fillerSentence: string | null;
+  /** Prescripted response text (sample copy in forced mode) delivered in the current turn; null for LLM-generated responses */
+  prescriptedText: string | null;
 };
 
 export type StageRuntimeData = {
@@ -185,7 +189,7 @@ export class ConversationRunner {
   }
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0 };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -609,7 +613,7 @@ export class ConversationRunner {
           isGenerating = false;
 
           // Snapshot turn data before any awaits to avoid reading mutated values
-          const { startMs, assistantMessageEventId, outputTurnId, ttsStartMs } = this.turnData;
+          const { startMs, assistantMessageEventId, outputTurnId, ttsStartMs, fillerSentence: snapshotFillerSentence, prescriptedText: snapshotPrescriptedText } = this.turnData;
           const ttsEndMs = Date.now();
 
           // Record total turn duration and TTS duration now that all audio has been sent
@@ -639,11 +643,14 @@ export class ConversationRunner {
 
           // Send AI response end notification to client through channel
           // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
+          const llmText = extractTextFromContent(this.stageData.lastCompletionResult?.content ?? []);
+          const baseText = snapshotPrescriptedText ?? llmText;
+          const ttsEndFillerPrefix = snapshotFillerSentence ? `${snapshotFillerSentence} ` : '';
           const endMessage: CALEndAiGenerationOutputMessage = {
             type: 'end_ai_generation_output',
             conversationId,
             outputTurnId,
-            fullText: extractTextFromContent(this.stageData.lastCompletionResult?.content ?? []),
+            fullText: `${ttsEndFillerPrefix}${baseText}`.trim(),
           };
           await this.channel.sendMessage(endMessage);
 
@@ -738,6 +745,8 @@ export class ConversationRunner {
 
       completionLlmProvider.setOnGenerationCompleted(async (result) => {
         const textContent = extractTextFromContent(result.content);
+        const fillerPrefix = this.turnData.fillerSentence ? `${this.turnData.fillerSentence} ` : '';
+        const fullResponseText = `${fillerPrefix}${textContent}`.trim();
         const contentSize = getContentSize(result.content);
         const llmEndMs = Date.now();
 
@@ -758,9 +767,9 @@ export class ConversationRunner {
 
         // Save AI message event with usage info and timing metrics
         const messageEventData: MessageEventData = {
-          text: textContent,
+          text: fullResponseText,
           role: 'assistant',
-          originalText: textContent,
+          originalText: fullResponseText,
           visibility: this.turnMessageVisibility,
           metadata: {
             llmUsage: buildLlmUsage(result.usage, this.stageData.completionLlmProviderInfo, this.stageData.stage.llmSettings?.model),
@@ -787,6 +796,7 @@ export class ConversationRunner {
             turnEndMs,
             moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
             fillerPrompt: this.lastFillerPrompt ?? undefined,
+            fillerSentence: this.turnData.fillerSentence ?? undefined,
           },
         };
         this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
@@ -797,7 +807,7 @@ export class ConversationRunner {
             type: 'end_ai_generation_output',
             conversationId,
             outputTurnId: this.turnData.outputTurnId,
-            fullText: textContent,
+            fullText: fullResponseText,
           };
           await this.channel.sendMessage(endGenerationMessage);
         } else {
@@ -1856,6 +1866,8 @@ export class ConversationRunner {
       ttsConnectEndMs: null,
       ttsStartMs: null,
       turnIndex: this.turnData.turnIndex + 1,
+      fillerSentence: null,
+      prescriptedText: null,
     };
   }
 
@@ -1951,6 +1963,7 @@ export class ConversationRunner {
       await this.channel.sendMessage(fillerChunkMessage);
       this.responseOutputTurnStarted = true;
       this.lastFillerSentence = fillerSentence;
+      this.turnData.fillerSentence = fillerSentence;
     }
 
     const processingStartMs = Date.now();
@@ -1989,15 +2002,15 @@ export class ConversationRunner {
       const sampleCopy = this.sampleCopyDistributor.getOriginalCopies().find(c => c.name === selectedSampleCopyName);
       if (sampleCopy) {
         // find decorator with matching projectId and sampleCopy.name
-        const decorator = sampleCopy.decoratorId ?await db.query.copyDecorators.findFirst({
+        const decorator = sampleCopy.decoratorId ? await db.query.copyDecorators.findFirst({
           where: (copyDecorators, { and, eq }) => and(
             eq(copyDecorators.projectId, this.conversation.projectId),
             eq(copyDecorators.id, sampleCopy.decoratorId)
           )
         }) : null;
         if (decorator) {
-          const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, 
-            this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), 
+          const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation,
+            this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(),
             copy, copyContent, this.stageData.faq);
           copy = await this.templatingEngine.render(decorator.template, context);
         }
@@ -2009,7 +2022,7 @@ export class ConversationRunner {
     // When mode is 'forced', the distributed copy becomes a prescripted response — the LLM is bypassed
     // and response-related effects from actions are ignored.
     const forcedCopyResponse = sampleCopies.length > 0 && selectedSampleCopy?.mode === 'forced' ? copy : null;
-    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource,  
+    const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource,
       this.sampleCopyDistributor.getOriginalCopies(), copy, copyContent, this.stageData.faq);
     const stageActionMap = new Map(Object.values(stageActions).map(sa => [sa.name, sa]));
 
@@ -2303,6 +2316,10 @@ export class ConversationRunner {
 
     logger.info({ conversationId, responseLength: text.length }, `Delivering prescripted response for conversation ${conversationId}`);
 
+    this.turnData.prescriptedText = text;
+    const fillerPrefix = this.turnData.fillerSentence ? `${this.turnData.fillerSentence} ` : '';
+    const eventText = `${fillerPrefix}${text}`.trim();
+
     if (ttsProvider) {
       await ttsProvider.sendText(text);
     }
@@ -2319,22 +2336,23 @@ export class ConversationRunner {
     await this.channel.sendMessage(prescriptedChunkMessage);
 
     const messageEventData: MessageEventData = {
-      text,
+      text: eventText,
       role: 'assistant',
-      originalText: text,
+      originalText: eventText,
       visibility: this.turnMessageVisibility,
       metadata: {
         prescripted: true,
+        fillerSentence: this.turnData.fillerSentence ?? undefined,
       },
     };
-    await this.saveAndSendEvent('message', messageEventData);
+    this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
 
     if (!ttsProvider) {
       const prescriptedEndMessage: CALEndAiGenerationOutputMessage = {
         type: 'end_ai_generation_output',
         conversationId,
         outputTurnId: this.turnData.outputTurnId,
-        fullText: text,
+        fullText: eventText,
       };
       await this.channel.sendMessage(prescriptedEndMessage);
     } else {
