@@ -74,12 +74,11 @@ export class SampleCopyDistributor {
      * @returns An array of copies selected in a round-robin manner
      */
     private getRoundRobinSample(copyState: SampleCopyDistributionState, targetLength: number): string[] {
-        const { sampleCopy, currentIndex } = copyState;
-        const copies = sampleCopy.content;
+        const copies = copyState.sampleCopy.content;
         const result: string[] = [];
 
         for (let i = 0; i < targetLength; i++) {
-            result.push(copies[currentIndex]);
+            result.push(copies[copyState.currentIndex]);
             copyState.currentIndex = (copyState.currentIndex + 1) % copies.length;
         }
 
