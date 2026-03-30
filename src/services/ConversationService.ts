@@ -141,7 +141,7 @@ export class ConversationService extends BaseService {
    * @param eventData - The data associated with the event
    * @returns The generated event ID
    */
-  async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<string> {
+  async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, stageId?: string): Promise<string> {
     logger.debug({ conversationId, eventType }, 'Saving conversation event');
 
     await this.requireProjectNotArchived(projectId);
@@ -154,6 +154,7 @@ export class ConversationService extends BaseService {
         conversationId,
         eventType,
         eventData,
+        stageId: stageId ?? null,
         timestamp: new Date(),
         metadata: null
       };

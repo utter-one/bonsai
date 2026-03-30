@@ -134,13 +134,14 @@ export class ContextTransformerExecutor {
           rawResponse: result.rawResponse,
           llmUsage: result.llmUsage,
           updatedVariables: stageVars,
+          stageName: stage.name,
           durationMs: result.durationMs,
           startMs: result.startMs,
           endMs: result.endMs,
           ...(result.error ? { error: result.error } : {}),
         },
       };
-      await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData);
+      await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData, stage.id);
       await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'transformation', eventData });
     }
 

@@ -131,12 +131,13 @@ export class UserInputProcessor {
             systemPrompt: result.renderedPrompt,
             llmUsage: result.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
+            stageName: stage.name,
             durationMs: result.durationMs,
             startMs: result.startMs,
             endMs: result.endMs,
           },
         };
-        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData, stage.id);
         await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
@@ -152,12 +153,13 @@ export class UserInputProcessor {
             systemPrompt: guardrailResult.renderedPrompt,
             llmUsage: guardrailResult.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
+            stageName: stage.name,
             durationMs: guardrailResult.durationMs,
             startMs: guardrailResult.startMs,
             endMs: guardrailResult.endMs,
           },
         };
-        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData, stage.id);
         await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
@@ -173,12 +175,13 @@ export class UserInputProcessor {
             result: sampleCopyResult.result,
             llmUsage: sampleCopyResult.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
+            stageName: stage.name,
             durationMs: sampleCopyResult.durationMs,
             startMs: sampleCopyResult.startMs,
             endMs: sampleCopyResult.endMs,
           },
         };
-        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'sample_copy_selection', eventData);
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'sample_copy_selection', eventData, stage.id);
         await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'sample_copy_selection', eventData });
       }
 

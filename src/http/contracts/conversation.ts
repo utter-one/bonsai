@@ -76,6 +76,7 @@ export const conversationEventResponseSchema = z.object({
   conversationId: z.string().describe('Identifier of the conversation this event belongs to'),
   eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
   eventData: conversationEventDataSchema.describe('Event data payload'),
+  stageId: z.string().nullable().describe('ID of the stage that was active when the event occurred'),
   timestamp: z.coerce.date().describe('Timestamp when the event occurred'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata associated with the event'),
 });

@@ -302,6 +302,13 @@
       "when": 1774705250874,
       "tag": "0042_daily_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1774896781633,
+      "tag": "0043_goofy_yellowjacket",
+      "breakpoints": true
     }
   ]
 }

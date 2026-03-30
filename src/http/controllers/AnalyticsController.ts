@@ -3,7 +3,10 @@ import type { Request, Response, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { AnalyticsService } from '../../services/AnalyticsService';
+import { SliceAnalyticsService } from '../../services/SliceAnalyticsService';
 import { analyticsQuerySchema, analyticsRouteParamsSchema, analyticsConversationRouteParamsSchema, latencyTrendQuerySchema, latencyStatsResponseSchema, latencyPercentilesResponseSchema, latencyTrendResponseSchema, conversationTimelineResponseSchema, tokenUsageStatsResponseSchema, tokenUsageTrendQuerySchema, tokenUsageTrendResponseSchema } from '../contracts/analytics';
+import { sliceQuerySchema, sourceCatalogResponseSchema, sliceQueryResponseSchema } from '../contracts/sliceAnalytics';
+import type { SliceQuery } from '../contracts/sliceAnalytics';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -14,7 +17,10 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class AnalyticsController {
-  constructor(@inject(AnalyticsService) private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    @inject(AnalyticsService) private readonly analyticsService: AnalyticsService,
+    @inject(SliceAnalyticsService) private readonly sliceAnalyticsService: SliceAnalyticsService,
+  ) {}
 
   /** OpenAPI path definitions for all analytics endpoints */
   static getOpenAPIPaths(): RouteConfig[] {
@@ -96,6 +102,30 @@ export class AnalyticsController {
           403: { description: 'Insufficient permissions' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/analytics/sources',
+        tags: ['Analytics'],
+        summary: 'Get analytics source catalog',
+        description: 'Returns the available analytics sources with their queryable dimensions and metrics. Use this to discover what can be queried via the /analytics/query endpoint.',
+        responses: {
+          200: { description: 'Analytics source catalog', content: { 'application/json': { schema: sourceCatalogResponseSchema } } },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/analytics/query',
+        tags: ['Analytics'],
+        summary: 'Slice-and-dice analytics query',
+        description: 'Generic analytics query engine. Specify a source, metrics to aggregate, optional groupBy dimensions, time interval for bucketing, and filters. Returns flat rows with dimension values and computed metrics. Use GET /analytics/sources to discover available sources, dimensions, and metrics.',
+        request: { query: sliceQuerySchema },
+        responses: {
+          200: { description: 'Slice-and-dice query results', content: { 'application/json': { schema: sliceQueryResponseSchema } } },
+          400: { description: 'Invalid query parameters, unknown dimension or metric' },
+          403: { description: 'Insufficient permissions' },
+        },
+      },
     ];
   }
 
@@ -107,6 +137,8 @@ export class AnalyticsController {
     router.get('/api/projects/:projectId/analytics/usage/trend', asyncHandler(this.getTokenUsageTrend.bind(this)));
     router.get('/api/projects/:projectId/analytics/usage', asyncHandler(this.getTokenUsageStats.bind(this)));
     router.get('/api/projects/:projectId/analytics/conversations/:conversationId/timeline', asyncHandler(this.getConversationTimeline.bind(this)));
+    router.get('/api/projects/:projectId/analytics/sources', asyncHandler(this.getSourceCatalog.bind(this)));
+    router.get('/api/projects/:projectId/analytics/query', asyncHandler(this.querySlice.bind(this)));
   }
 
   /**
@@ -177,6 +209,28 @@ export class AnalyticsController {
     const { projectId } = analyticsRouteParamsSchema.parse(req.params);
     const query = tokenUsageTrendQuerySchema.parse(req.query);
     const result = await this.analyticsService.getTokenUsageTrend(projectId, query, req.context);
+    res.status(200).json(result);
+  }
+
+  /**
+   * GET /api/projects/:projectId/analytics/sources
+   * Returns the available analytics sources with their dimensions and metrics
+   */
+  private async getSourceCatalog(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ANALYTICS_READ]);
+    const result = this.sliceAnalyticsService.getCatalog();
+    res.status(200).json(result);
+  }
+
+  /**
+   * GET /api/projects/:projectId/analytics/query
+   * Executes a slice-and-dice analytics query against the specified source
+   */
+  private async querySlice(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.ANALYTICS_READ]);
+    const { projectId } = analyticsRouteParamsSchema.parse(req.params);
+    const params = sliceQuerySchema.parse(req.query) as SliceQuery;
+    const result = await this.sliceAnalyticsService.query(projectId, params, req.context);
     res.status(200).json(result);
   }
 }

@@ -64,7 +64,7 @@ export class ResumeConversationHandler implements ClientMessageHandler<CALResume
       const failedEventData: ConversationFailedEventData = { reason: errorMessage, stageId: conversation.stageId };
       try {
         await this.conversationService.failConversation(context.session!.projectId, message.conversationId, errorMessage);
-        await this.conversationService.saveConversationEvent(context.session!.projectId, message.conversationId, 'conversation_failed', failedEventData);
+        await this.conversationService.saveConversationEvent(context.session!.projectId, message.conversationId, 'conversation_failed', failedEventData, conversation.stageId);
         await context.session!.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_failed', eventData: failedEventData });
       } catch (cleanupError) {
         logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId: message.conversationId }, 'Failed to save conversation_failed event during cleanup');
