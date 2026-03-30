@@ -779,11 +779,16 @@ export class ConversationContextBuilder {
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
-      sampleCopy: projectSampleCopies.map(sc => ({
-        name: sc.name,
-        trigger: sc.promptTrigger,
-        content: sc.content,
-      })),
+      sampleCopy: projectSampleCopies
+        .filter(sc =>
+          (!sc.stages || (sc.stages as string[]).length === 0 || (sc.stages as string[]).includes(stage.id))
+          && (sc.agents === null || (sc.agents as string[]).length === 0 || (sc.agents as string[]).includes(stage.agentId))
+        )
+        .map(sc => ({
+          name: sc.name,
+          trigger: sc.promptTrigger,
+          content: sc.content,
+        })),
       history: [],
       events: [],
       actions: {},
@@ -824,14 +829,70 @@ export class ConversationContextBuilder {
 
   /**
    * Builds context specifically for a sample copy classifier.
+   * Only includes sample copies that are already filtered by the current agent and stage.
    * @param conversation - Conversation entity
    * @param stage - Stage entity with agent relation
-   * @param sampleCopies - Array of sample copies for the stage
+   * @param sampleCopies - Array of sample copies pre-filtered for the current agent and stage
    * @param userInput - The user input text
    * @param originalUserInput - The original user input before any transformations
    */
   async buildContextForSampleCopyClassifier(conversation: Conversation, stage: Stage, sampleCopies: SampleCopy[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
-    return this.buildContextForGuardrailClassifier(conversation, stage, [] as Guardrail[], userInput, originalUserInput);
+    const [user, project] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+    ]);
+
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
+    rawContext.userInput = userInput;
+    rawContext.originalUserInput = originalUserInput;
+
+    const context = {
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      userId: conversation.userId,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
+      userProfile: user?.profile || {},
+      consts: project?.constants || {},
+      agent: (stage as any).agent?.prompt,
+      sampleCopy: sampleCopies.map(sc => ({
+        name: sc.name,
+        trigger: sc.promptTrigger,
+        content: sc.content,
+      })),
+      history: [],
+      events: [],
+      actions: {},
+      userInput,
+      originalUserInput,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
+      stage: await this.buildStageContext(stage, rawContext),
+    };
+
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
+      orderBy: asc(conversationEvents.timestamp),
+    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
+
+    return context;
   }
 
   /**
