@@ -16,6 +16,7 @@ type ParsedMetric = {
 export class SliceQueryBuilder {
   private readonly resolvedDimensions: DimensionDef[];
   private readonly parsedMetrics: ParsedMetric[];
+  private readonly resolvedNormalizeDimension: DimensionDef | null;
   private readonly needsConversationJoin: boolean;
   private readonly needsUserJoin: boolean;
 
@@ -25,6 +26,7 @@ export class SliceQueryBuilder {
       groupBy: string[];
       interval?: string;
       metrics: string[];
+      normalizeBy?: string;
       from?: Date;
       to?: Date;
       conversationId?: string;
@@ -41,16 +43,32 @@ export class SliceQueryBuilder {
 
     this.parsedMetrics = params.metrics.map((spec) => this.parseMetricSpec(spec));
 
+    if (params.normalizeBy) {
+      const normDim = source.dimensions.find((d) => d.id === params.normalizeBy);
+      if (!normDim) throw new Error(`Unknown normalizeBy dimension '${params.normalizeBy}' for source '${source.id}'`);
+      if (params.groupBy.includes(params.normalizeBy)) throw new Error(`normalizeBy dimension '${params.normalizeBy}' must not also appear in groupBy`);
+      if (this.parsedMetrics.some((m) => m.spec === 'count')) throw new Error(`The bare 'count' metric cannot be used with normalizeBy. Use 'count' without normalizeBy, or use a named metric with an aggregation function.`);
+      this.resolvedNormalizeDimension = normDim;
+    } else {
+      this.resolvedNormalizeDimension = null;
+    }
+
     this.needsConversationJoin = this.resolvedDimensions.some((d) => d.requiresConversationJoin)
-      || this.resolveFilterDimensions().some((d) => d.requiresConversationJoin);
+      || this.resolveFilterDimensions().some((d) => d.requiresConversationJoin)
+      || (this.resolvedNormalizeDimension?.requiresConversationJoin ?? false);
 
     this.needsUserJoin = this.resolvedDimensions.some((d) => d.requiresUserJoin)
       || this.parsedMetrics.some((m) => m.metricDef?.requiresUserJoin)
-      || this.resolveFilterDimensions().some((d) => d.requiresUserJoin);
+      || this.resolveFilterDimensions().some((d) => d.requiresUserJoin)
+      || (this.resolvedNormalizeDimension?.requiresUserJoin ?? false);
   }
 
   /** Builds the final SQL query string */
   build(): string {
+    if (this.resolvedNormalizeDimension) {
+      return this.buildNestedQuery();
+    }
+
     const parts: string[] = [];
 
     if (this.source.requiresCte) {
@@ -75,6 +93,101 @@ export class SliceQueryBuilder {
     parts.push(`LIMIT ${this.params.limit}`);
 
     return parts.join('\n');
+  }
+
+  /**
+   * Builds a two-phase nested SQL query for normalizeBy aggregation.
+   * Inner query pre-aggregates metrics (SUM) within each (groupBy + normalizeBy) group.
+   * Outer query applies the requested aggregation function across those sums.
+   */
+  private buildNestedQuery(): string {
+    const parts: string[] = [];
+    const normDim = this.resolvedNormalizeDimension!;
+
+    if (this.source.requiresCte) {
+      parts.push(this.buildCte());
+    }
+
+    // Inner SELECT: bucket + groupBy dims + _normalizeBy + SUM per metric
+    const innerCols: string[] = [];
+    if (this.params.interval) {
+      innerCols.push(`date_trunc('${this.params.interval}', ${this.source.timeColumn}) AS bucket`);
+    }
+    for (const dim of this.resolvedDimensions) {
+      innerCols.push(`${dim.sqlExpr} AS "${dim.id}"`);
+    }
+    innerCols.push(`${normDim.sqlExpr} AS "_normalizeBy"`);
+    for (const m of this.parsedMetrics) {
+      innerCols.push(`SUM(${m.metricDef!.sqlExpr}) AS "${m.spec}"`);
+    }
+
+    const innerGroupByCols: string[] = [];
+    if (this.params.interval) {
+      innerGroupByCols.push('bucket');
+    }
+    for (const dim of this.resolvedDimensions) {
+      innerGroupByCols.push(`"${dim.id}"`);
+    }
+    innerGroupByCols.push('"_normalizeBy"');
+
+    const innerParts: string[] = ['SELECT', innerCols.join(',\n  '), this.buildFrom(), `WHERE ${this.buildWhere()}`, `GROUP BY ${innerGroupByCols.join(', ')}` ];
+
+    // Outer SELECT: bucket + groupBy dim aliases + outer aggregation per metric
+    const outerCols: string[] = [];
+    if (this.params.interval) {
+      outerCols.push('_inner.bucket');
+    }
+    for (const dim of this.resolvedDimensions) {
+      outerCols.push(`_inner."${dim.id}"`);
+    }
+    for (const m of this.parsedMetrics) {
+      outerCols.push(`${this.buildOuterAggExpr(m)} AS "${m.spec}"`);
+    }
+
+    const outerGroupByCols: string[] = [];
+    const outerOrderByCols: string[] = [];
+    if (this.params.interval) {
+      outerGroupByCols.push('_inner.bucket');
+      outerOrderByCols.push('_inner.bucket ASC');
+    }
+    for (const dim of this.resolvedDimensions) {
+      outerGroupByCols.push(`_inner."${dim.id}"`);
+      outerOrderByCols.push(`_inner."${dim.id}" ASC NULLS LAST`);
+    }
+
+    parts.push('SELECT');
+    parts.push(outerCols.join(',\n  '));
+    parts.push('FROM (');
+    parts.push(innerParts.join('\n'));
+    parts.push(') _inner');
+
+    if (outerGroupByCols.length > 0) {
+      parts.push(`GROUP BY ${outerGroupByCols.join(', ')}`);
+    }
+    if (outerOrderByCols.length > 0) {
+      parts.push(`ORDER BY ${outerOrderByCols.join(', ')}`);
+    }
+    parts.push(`LIMIT ${this.params.limit}`);
+
+    return parts.join('\n');
+  }
+
+  /** Builds a single outer aggregation SQL expression over pre-summed inner aliases */
+  private buildOuterAggExpr(m: ParsedMetric): string {
+    const innerRef = `_inner."${m.spec}"`;
+    switch (m.aggFn) {
+      case 'sum': return `COALESCE(SUM(${innerRef}), 0)`;
+      case 'avg': return `AVG(${innerRef})`;
+      case 'min': return `MIN(${innerRef})`;
+      case 'max': return `MAX(${innerRef})`;
+      case 'p50': return `PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY ${innerRef})`;
+      case 'p75': return `PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY ${innerRef})`;
+      case 'p90': return `PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY ${innerRef})`;
+      case 'p95': return `PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ${innerRef})`;
+      case 'p99': return `PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY ${innerRef})`;
+      case 'count': throw new Error(`The 'count' metric cannot be used with normalizeBy`);
+      default: throw new Error(`Unsupported aggregation function '${m.aggFn}'`);
+    }
   }
 
   /** Builds stage_visits CTE */

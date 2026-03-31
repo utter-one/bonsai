@@ -77,7 +77,17 @@ export class SliceAnalyticsService extends BaseService {
 
     let builder: SliceQueryBuilder;
     try {
-      builder = new SliceQueryBuilder(source, resolvedParams, projectId);
+      builder = new SliceQueryBuilder(source, {
+        groupBy: resolvedParams.groupBy,
+        interval: resolvedParams.interval,
+        metrics: resolvedParams.metrics,
+        normalizeBy: resolvedParams.normalizeBy,
+        from: resolvedParams.from,
+        to: resolvedParams.to,
+        conversationId: resolvedParams.conversationId,
+        filters: resolvedParams.filters,
+        limit: resolvedParams.limit,
+      }, projectId);
     } catch (err: any) {
       throw new InvalidOperationError(err.message);
     }
@@ -109,6 +119,7 @@ export class SliceAnalyticsService extends BaseService {
       source: params.source,
       ...(params.interval ? { interval: params.interval } : {}),
       groupBy: params.groupBy,
+      ...(params.normalizeBy ? { normalizeBy: params.normalizeBy } : {}),
       metrics: params.metrics,
       rows,
     };
