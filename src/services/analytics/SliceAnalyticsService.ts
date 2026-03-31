@@ -1,14 +1,14 @@
 import { singleton } from 'tsyringe';
 import { sql } from 'drizzle-orm';
-import { db } from '../db/index';
-import { BaseService } from './BaseService';
-import type { RequestContext } from './RequestContext';
-import { PERMISSIONS } from '../permissions';
-import { SOURCES } from '../analytics/sources';
-import type { SourceId } from '../analytics/sources';
-import { SliceQueryBuilder } from '../analytics/SliceQueryBuilder';
-import type { SourceCatalogResponse, SliceQuery, SliceQueryResponse } from '../http/contracts/sliceAnalytics';
-import { InvalidOperationError } from '../errors';
+import { db } from '../../db/index';
+import { BaseService } from '../BaseService';
+import type { RequestContext } from '../RequestContext';
+import { PERMISSIONS } from '../../permissions';
+import { SOURCES } from './sources';
+import type { SourceId } from './sources';
+import { SliceQueryBuilder } from './SliceQueryBuilder';
+import type { SourceCatalogResponse, SliceQuery, SliceQueryResponse } from '../../http/contracts/sliceAnalytics';
+import { InvalidOperationError } from '../../errors';
 
 /**
  * Service for the slice-and-dice analytics query engine.

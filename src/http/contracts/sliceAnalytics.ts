@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { SOURCE_IDS } from '../../analytics/sources';
+import { SOURCE_IDS } from '../../services/analytics/sources';
 
 extendZodWithOpenApi(z);
 
