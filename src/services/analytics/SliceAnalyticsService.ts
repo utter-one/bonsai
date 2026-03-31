@@ -1,14 +1,28 @@
 import { singleton } from 'tsyringe';
 import { sql } from 'drizzle-orm';
-import { db } from '../db/index';
-import { BaseService } from './BaseService';
-import type { RequestContext } from './RequestContext';
-import { PERMISSIONS } from '../permissions';
-import { SOURCES } from '../analytics/sources';
-import type { SourceId } from '../analytics/sources';
-import { SliceQueryBuilder } from '../analytics/SliceQueryBuilder';
-import type { SourceCatalogResponse, SliceQuery, SliceQueryResponse } from '../http/contracts/sliceAnalytics';
-import { InvalidOperationError } from '../errors';
+import { db } from '../../db/index';
+import { BaseService } from '../BaseService';
+import type { RequestContext } from '../RequestContext';
+import { PERMISSIONS } from '../../permissions';
+import { SOURCES } from './sources';
+import type { SourceId } from './sources';
+import { SliceQueryBuilder } from './SliceQueryBuilder';
+import type { SourceCatalogResponse, SliceQuery, SliceQueryResponse } from '../../http/contracts/sliceAnalytics';
+import type { RelativeTime } from '../../http/contracts/sliceAnalytics';
+import { InvalidOperationError } from '../../errors';
+
+/** Maps a relative time range to a concrete { from, to } date pair anchored to now */
+function resolveRelativeTime(relativeTime: RelativeTime): { from: Date; to: Date } {
+  const to = new Date();
+  const from = new Date(to);
+  switch (relativeTime.unit) {
+    case 'hours':  from.setHours(from.getHours() - relativeTime.amount); break;
+    case 'days':   from.setDate(from.getDate() - relativeTime.amount); break;
+    case 'weeks':  from.setDate(from.getDate() - relativeTime.amount * 7); break;
+    case 'months': from.setMonth(from.getMonth() - relativeTime.amount); break;
+  }
+  return { from, to };
+}
 
 /**
  * Service for the slice-and-dice analytics query engine.
@@ -56,9 +70,14 @@ export class SliceAnalyticsService extends BaseService {
       throw new InvalidOperationError(`Unknown analytics source '${params.source}'`);
     }
 
+    // Resolve relativeTime to concrete from/to before building the query
+    const resolvedParams: SliceQuery = params.relativeTime
+      ? { ...params, ...resolveRelativeTime(params.relativeTime) }
+      : params;
+
     let builder: SliceQueryBuilder;
     try {
-      builder = new SliceQueryBuilder(source, params, projectId);
+      builder = new SliceQueryBuilder(source, resolvedParams, projectId);
     } catch (err: any) {
       throw new InvalidOperationError(err.message);
     }

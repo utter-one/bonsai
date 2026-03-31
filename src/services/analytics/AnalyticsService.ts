@@ -1,10 +1,10 @@
 import { singleton } from 'tsyringe';
 import { sql } from 'drizzle-orm';
-import { db } from '../db/index';
-import { BaseService } from './BaseService';
-import type { RequestContext } from './RequestContext';
-import { PERMISSIONS } from '../permissions';
-import type { AnalyticsQuery, LatencyStatsResponse, LatencyPercentilesResponse, LatencyMetric, PercentileSet, LatencyTrendQuery, LatencyTrendResponse, ConversationTimelineResponse, ConversationTimelineTurn, TokenUsageStatsResponse, TokenUsageByEventType, TokenUsageTrendQuery, TokenUsageTrendResponse } from '../http/contracts/analytics';
+import { db } from '../../db/index';
+import { BaseService } from '../BaseService';
+import type { RequestContext } from '../RequestContext';
+import { PERMISSIONS } from '../../permissions';
+import type { AnalyticsQuery, LatencyStatsResponse, LatencyPercentilesResponse, LatencyMetric, PercentileSet, LatencyTrendQuery, LatencyTrendResponse, ConversationTimelineResponse, ConversationTimelineTurn, TokenUsageStatsResponse, TokenUsageByEventType, TokenUsageTrendQuery, TokenUsageTrendResponse } from '../../http/contracts/analytics';
 
 /**
  * Service for computing analytics and aggregations over conversation timing data.

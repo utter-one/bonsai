@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { SOURCE_IDS } from '../../analytics/sources';
+import { SOURCE_IDS } from '../../services/analytics/sources';
 
 extendZodWithOpenApi(z);
 
@@ -43,14 +43,24 @@ export type SourceCatalogResponse = z.infer<typeof sourceCatalogResponseSchema>;
 // Slice Query Request
 // ==================
 
+/** Schema for an arbitrary relative time range (e.g. last 5 days, last 30 hours) */
+export const relativeTimeSchema = z.object({
+  amount: z.number().int().min(1).max(100000).describe('Number of units to look back'),
+  unit: z.enum(['hours', 'days', 'weeks', 'months']).describe('Time unit'),
+}).openapi('RelativeTime');
+
+/** Relative time range type */
+export type RelativeTime = z.infer<typeof relativeTimeSchema>;
+
 /** Schema for the slice-and-dice analytics query parameters */
 export const sliceQuerySchema = z.object({
   source: z.enum(SOURCE_IDS as [string, ...string[]]).describe('Analytics source to query'),
   groupBy: z.preprocess((val) => (typeof val === 'string' ? [val] : val), z.array(z.string()).max(5).default([])).describe('Dimension IDs to group results by (max 5)'),
   interval: z.enum(['hour', 'day', 'week', 'month']).optional().describe('Time bucket interval for time-series aggregation'),
   metrics: z.preprocess((val) => (typeof val === 'string' ? [val] : val), z.array(z.string()).min(1).max(10)).describe('Metric specifications: "count" or "{aggFn}:{metricId}" (e.g. "avg:durationMs", "p95:totalTurnDurationMs")'),
-  from: z.coerce.date().optional().describe('Start of the date range (inclusive). ISO 8601 format.'),
-  to: z.coerce.date().optional().describe('End of the date range (inclusive). ISO 8601 format.'),
+  relativeTime: relativeTimeSchema.optional().describe('Relative time range (e.g. { amount: 7, unit: "days" }). Mutually exclusive with from/to — takes precedence if all three are provided.'),
+  from: z.coerce.date().optional().describe('Start of the date range (inclusive). ISO 8601 format. Ignored when relativeTime is set.'),
+  to: z.coerce.date().optional().describe('End of the date range (inclusive). ISO 8601 format. Ignored when relativeTime is set.'),
   conversationId: z.string().optional().describe('Filter to a single conversation'),
   filters: z.record(z.string(), z.string()).optional().describe('Additional equality filters: key = dimension ID, value = exact match value'),
   limit: z.coerce.number().int().min(1).max(10000).default(1000).describe('Maximum number of rows to return (default 1000, max 10000)'),
@@ -62,6 +72,7 @@ export type SliceQuery = {
   groupBy: string[];
   interval?: 'hour' | 'day' | 'week' | 'month';
   metrics: string[];
+  relativeTime?: RelativeTime;
   from?: Date;
   to?: Date;
   conversationId?: string;

@@ -118,3 +118,13 @@ export class UserBannedError extends Error {
     this.name = 'UserBannedError';
   }
 }
+
+/**
+ * Error thrown when a resource with the same unique identifier already exists
+ */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
