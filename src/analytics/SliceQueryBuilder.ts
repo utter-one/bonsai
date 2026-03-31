@@ -183,6 +183,10 @@ export class SliceQueryBuilder {
       if (this.source.eventRoleFilter) {
         conditions.push(`ce.event_data->>'role' = '${this.escapeParam(this.source.eventRoleFilter)}'`);
       }
+
+      if (this.source.additionalFilter) {
+        conditions.push(this.source.additionalFilter);
+      }
     }
 
     // Date range
