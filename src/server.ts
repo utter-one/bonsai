@@ -27,6 +27,7 @@ import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
+import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { MigrationController } from './http/controllers/MigrationController';
@@ -144,6 +145,9 @@ export function createApp(): express.Application {
 
   const analyticsController = container.resolve(AnalyticsController);
   analyticsController.registerRoutes(app);
+
+  const savedSliceQueryController = container.resolve(SavedSliceQueryController);
+  savedSliceQueryController.registerRoutes(app);
 
   const classifierController = container.resolve(ClassifierController);
   classifierController.registerRoutes(app);

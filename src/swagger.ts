@@ -81,6 +81,8 @@ import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
+import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
+import { savedSliceQueryResponseSchema } from './http/contracts/savedSliceQuery';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
@@ -336,8 +338,15 @@ export function getOpenAPISpec(): any {
   registry.register('SourceMetric', sourceMetricSchema);
   registry.register('SourceEntry', sourceEntrySchema);
   registry.register('SliceQueryRow', sliceQueryRowSchema);
+  registry.register('SavedSliceQuery', savedSliceQueryResponseSchema);
   const analyticsPaths = AnalyticsController.getOpenAPIPaths();
   for (const path of analyticsPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register SavedSliceQuery routes from SavedSliceQueryController
+  const savedSliceQueryPaths = SavedSliceQueryController.getOpenAPIPaths();
+  for (const path of savedSliceQueryPaths) {
     registry.registerPath(path);
   }
 
