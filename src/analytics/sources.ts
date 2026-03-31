@@ -11,10 +11,10 @@ export const AGGREGATION_FUNCTIONS = ['count', 'sum', 'avg', 'min', 'max', 'p50'
 export type AggregationFn = (typeof AGGREGATION_FUNCTIONS)[number];
 
 /** Identifier for an analytics source */
-export type SourceId = 'conversations' | 'events' | 'turns' | 'tool_calls' | 'classifications' | 'transformations' | 'moderation' | 'stage_visits';
+export type SourceId = 'conversations' | 'events' | 'turns' | 'tool_calls' | 'classifications' | 'transformations' | 'moderation' | 'stage_visits' | 'llm_calls';
 
 /** All valid source IDs */
-export const SOURCE_IDS: SourceId[] = ['conversations', 'events', 'turns', 'tool_calls', 'classifications', 'transformations', 'moderation', 'stage_visits'];
+export const SOURCE_IDS: SourceId[] = ['conversations', 'events', 'turns', 'tool_calls', 'classifications', 'transformations', 'moderation', 'stage_visits', 'llm_calls'];
 
 /** Definition of a dimension (categorical field) available for groupBy and filtering */
 export type DimensionDef = {
@@ -53,6 +53,8 @@ export type SourceDef = {
   eventTypeFilter?: string | string[];
   /** Filter to a specific role — undefined unless source is message-based */
   eventRoleFilter?: string;
+  /** Hardcoded SQL predicate appended to the WHERE clause — never derived from user input */
+  additionalFilter?: string;
   /** SQL expression for the time column used in date_trunc bucketing */
   timeColumn: string;
   /** Whether this source needs a CTE wrapping */
@@ -278,6 +280,28 @@ const stageVisitsSource: SourceDef = {
   ],
 };
 
+const llmCallsSource: SourceDef = {
+  id: 'llm_calls',
+  label: 'LLM Calls',
+  description: 'All LLM invocations across turns, classifications, transformations, and smart function tool calls. Filtered to events that contain llmUsage. One row per LLM call regardless of event type.',
+  table: 'conversation_events',
+  eventTypeFilter: ['message', 'classification', 'transformation', 'tool_call'],
+  additionalFilter: `ce.event_data->'metadata'->'llmUsage' IS NOT NULL`,
+  timeColumn: 'ce.timestamp',
+  dimensions: [
+    conversationIdDimension,
+    stageIdDimension,
+    stageNameDimension,
+    { id: 'eventType', label: 'Event Type', sqlExpr: 'ce.event_type', requiresConversationJoin: false, requiresUserJoin: false, values: ['message', 'classification', 'transformation', 'tool_call'] },
+    { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
+    { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
+  ],
+  metrics: [
+    { id: 'durationMs', label: 'LLM Duration', sqlExpr: `COALESCE((ce.event_data->'metadata'->>'llmDurationMs')::numeric, (ce.event_data->'metadata'->>'durationMs')::numeric)`, unit: 'ms' },
+    ...tokenMetrics(`ce.event_data->'metadata'->'llmUsage'`),
+  ],
+};
+
 /** Map of all analytics sources keyed by SourceId */
 export const SOURCES: Record<SourceId, SourceDef> = {
   conversations: conversationsSource,
@@ -288,4 +312,5 @@ export const SOURCES: Record<SourceId, SourceDef> = {
   transformations: transformationsSource,
   moderation: moderationSource,
   stage_visits: stageVisitsSource,
+  llm_calls: llmCallsSource,
 };
