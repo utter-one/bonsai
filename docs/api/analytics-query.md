@@ -161,6 +161,7 @@ Executes a slice-and-dice query against the specified source. Returns flat rows 
 | `source` | `string` | **Yes** | — | Source to query (see source catalog) |
 | `metrics[]` | `string[]` | **Yes** | — | Metric specs to compute (min 1, max 10) |
 | `groupBy[]` | `string[]` | No | `[]` | Dimension IDs to group by (max 5) |
+| `normalizeBy` | `string` | No | — | Dimension ID for two-phase aggregation (see below) |
 | `interval` | `string` | No | — | Time bucket interval: `hour`, `day`, `week`, `month` |
 | `from` | `string` (ISO 8601) | No | — | Start of the date range (inclusive) |
 | `to` | `string` (ISO 8601) | No | — | End of the date range (inclusive) |
@@ -175,6 +176,7 @@ Executes a slice-and-dice query against the specified source. Returns flat rows 
 | `source` | `string` | Source that was queried |
 | `interval` | `string` (optional) | Time bucket interval used |
 | `groupBy` | `string[]` | Dimensions that results are grouped by |
+| `normalizeBy` | `string` (optional) | Inner aggregation dimension used, if two-phase aggregation was applied |
 | `metrics` | `string[]` | Metric specifications that were computed |
 | `rows` | `SliceQueryRow[]` | Result rows |
 
@@ -194,7 +196,82 @@ Metric response keys exactly match the spec strings from your request. For examp
 When a dimension value is absent (e.g. no LLM model recorded), it appears as `null` in the dimensions map. This is useful for identifying "unknown" groups.
 :::
 
+### Two-phase Aggregation
+
+By default, all metrics are aggregated in a single SQL `GROUP BY` pass over raw event rows. This works well for most queries but makes it impossible to express "average X per conversation" — because the concept of *per-conversation* doesn’t exist in the flat result set.
+
+The `normalizeBy` parameter introduces a second aggregation phase:
+
+1. **Inner phase**: Metrics are **summed** within each unique `(groupBy... + normalizeBy)` group. This collapses all raw rows in that unit (e.g. all rows for one `conversationId`) into a single pre-aggregated value.
+2. **Outer phase**: The requested aggregation function (`avg`, `max`, `p95`, etc.) is applied **across** those sums, producing the final result.
+
+**Example**: average total prompt tokens per conversation, broken down by stage
+
+```
+normalizeBy=conversationId  +  groupBy[]=stageId  +  metrics[]=avg:promptTokens
+```
+
+Inner: sum prompt tokens per `(stageId, conversationId)` → one row per conversation per stage  
+Outer: average those sums per `stageId` → "avg tokens a conversation spends on each stage"
+
+::: warning Limitations
+- The bare `count` metric is **not supported** with `normalizeBy`. Use a named metric with an aggregation function instead.
+- `normalizeBy` must not be the same dimension as any value in `groupBy[]`.
+:::
+
 ### Examples
+
+#### Average tokens per conversation
+
+```bash
+curl "http://localhost:3000/api/projects/my-project/analytics/query?\
+source=turns&\
+metrics[]=avg:promptTokens&\
+metrics[]=avg:totalTokens&\
+normalizeBy=conversationId" \
+  -H "Authorization: Bearer eyJhbG..."
+```
+
+```json
+{
+  "source": "turns",
+  "groupBy": [],
+  "normalizeBy": "conversationId",
+  "metrics": ["avg:promptTokens", "avg:totalTokens"],
+  "rows": [
+    {
+      "bucket": null,
+      "dimensions": {},
+      "metrics": { "avg:promptTokens": 1240.5, "avg:totalTokens": 1890.2 }
+    }
+  ]
+}
+```
+
+#### Average tokens per conversation by stage
+
+```bash
+curl "http://localhost:3000/api/projects/my-project/analytics/query?\
+source=turns&\
+groupBy[]=stageId&\
+metrics[]=avg:totalTokens&\
+normalizeBy=conversationId" \
+  -H "Authorization: Bearer eyJhbG..."
+```
+
+```json
+{
+  "source": "turns",
+  "groupBy": ["stageId"],
+  "normalizeBy": "conversationId",
+  "metrics": ["avg:totalTokens"],
+  "rows": [
+    { "bucket": null, "dimensions": { "stageId": "stg_greeting" }, "metrics": { "avg:totalTokens": 420.0 } },
+    { "bucket": null, "dimensions": { "stageId": "stg_booking" }, "metrics": { "avg:totalTokens": 3120.5 } },
+    { "bucket": null, "dimensions": { "stageId": "stg_farewell" }, "metrics": { "avg:totalTokens": 310.1 } }
+  ]
+}
+```
 
 #### Daily turn counts
 

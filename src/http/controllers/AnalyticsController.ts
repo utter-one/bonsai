@@ -118,7 +118,7 @@ export class AnalyticsController {
         path: '/api/projects/{projectId}/analytics/query',
         tags: ['Analytics'],
         summary: 'Slice-and-dice analytics query',
-        description: 'Generic analytics query engine. Specify a source, metrics to aggregate, optional groupBy dimensions, time interval for bucketing, and filters. Returns flat rows with dimension values and computed metrics. Use GET /analytics/sources to discover available sources, dimensions, and metrics.',
+        description: 'Generic analytics query engine. Specify a source, metrics to aggregate, optional groupBy dimensions, time interval for bucketing, and filters. Use normalizeBy to enable two-phase aggregation: metrics are first summed within each unit of that dimension (e.g. conversationId), then the requested aggregation function is applied across those sums — enabling queries like "average total tokens per conversation". Returns flat rows with dimension values and computed metrics. Use GET /analytics/sources to discover available sources, dimensions, and metrics.',
         request: { query: sliceQuerySchema },
         responses: {
           200: { description: 'Slice-and-dice query results', content: { 'application/json': { schema: sliceQueryResponseSchema } } },

@@ -58,6 +58,7 @@ export const sliceQuerySchema = z.object({
   groupBy: z.preprocess((val) => (typeof val === 'string' ? [val] : val), z.array(z.string()).max(5).default([])).describe('Dimension IDs to group results by (max 5)'),
   interval: z.enum(['hour', 'day', 'week', 'month']).optional().describe('Time bucket interval for time-series aggregation'),
   metrics: z.preprocess((val) => (typeof val === 'string' ? [val] : val), z.array(z.string()).min(1).max(10)).describe('Metric specifications: "count" or "{aggFn}:{metricId}" (e.g. "avg:durationMs", "p95:totalTurnDurationMs")'),
+  normalizeBy: z.string().optional().describe('Dimension ID to use as the inner aggregation unit for two-phase aggregation. When set, metrics are first summed within each (groupBy + normalizeBy) group, then the requested aggregation function is applied across those sums. Example: normalizeBy=conversationId with avg:promptTokens gives the average total prompt tokens per conversation. Not compatible with the bare "count" metric.'),
   relativeTime: relativeTimeSchema.optional().describe('Relative time range (e.g. { amount: 7, unit: "days" }). Mutually exclusive with from/to — takes precedence if all three are provided.'),
   from: z.coerce.date().optional().describe('Start of the date range (inclusive). ISO 8601 format. Ignored when relativeTime is set.'),
   to: z.coerce.date().optional().describe('End of the date range (inclusive). ISO 8601 format. Ignored when relativeTime is set.'),
@@ -72,6 +73,7 @@ export type SliceQuery = {
   groupBy: string[];
   interval?: 'hour' | 'day' | 'week' | 'month';
   metrics: string[];
+  normalizeBy?: string;
   relativeTime?: RelativeTime;
   from?: Date;
   to?: Date;
@@ -96,6 +98,7 @@ export const sliceQueryResponseSchema = z.object({
   source: z.string().describe('Source that was queried'),
   interval: z.string().optional().describe('Time bucket interval used, if any'),
   groupBy: z.array(z.string()).describe('Dimensions that results are grouped by'),
+  normalizeBy: z.string().optional().describe('Dimension used as the inner aggregation unit, if two-phase aggregation was applied'),
   metrics: z.array(z.string()).describe('Metric specifications that were computed'),
   rows: z.array(sliceQueryRowSchema).describe('Result rows'),
 }).openapi('SliceQueryResponse');
