@@ -45,7 +45,7 @@ export type SourceCatalogResponse = z.infer<typeof sourceCatalogResponseSchema>;
 
 /** Schema for an arbitrary relative time range (e.g. last 5 days, last 30 hours) */
 export const relativeTimeSchema = z.object({
-  amount: z.number().int().min(1).max(100000).describe('Number of units to look back'),
+  amount: z.coerce.number().int().min(1).max(100000).describe('Number of units to look back'),
   unit: z.enum(['hours', 'days', 'weeks', 'months']).describe('Time unit'),
 }).openapi('RelativeTime');
 
