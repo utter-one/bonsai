@@ -11,6 +11,9 @@ import { ConversationContext, ConversationContextBuilder } from "./ConversationC
 import logger from "../../utils/logger";
 import { ImageParameterValue, ParameterValue, parameterValueSchema } from "../../types/parameters";
 import { IsolatedScriptExecutor, ScriptFlowControl } from "./IsolatedScriptExecutor";
+import type { CostManagementConfig } from '../../http/contracts/costManagement';
+import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
+import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
 
 export const toolExecutionResultSchema = z.object({
   success: z.boolean(),
@@ -55,21 +58,21 @@ export class ToolExecutor {
    * @param parameters The resolved parameters to pass to the tool.
    * @returns A promise that resolves to the result of the tool execution.
    */
-  async executeTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
+  async executeTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>, costManagementConfig?: CostManagementConfig | null): Promise<ToolExecutionResult> {
     if (tool.type === 'webhook') {
       return this.executeWebhookTool(tool, context, parameters);
     }
     if (tool.type === 'script') {
       return this.executeScriptTool(tool, context, parameters);
     }
-    return this.executeSmartFunctionTool(tool, context, parameters);
+    return this.executeSmartFunctionTool(tool, context, parameters, costManagementConfig);
   }
 
   /**
    * Executes a smart_function tool by invoking its LLM provider with the rendered prompt.
    * @throws NotFoundError if the associated LLM provider is not found.
    */
-  private async executeSmartFunctionTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
+  private async executeSmartFunctionTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>, costManagementConfig?: CostManagementConfig | null): Promise<ToolExecutionResult> {
     if (!tool.llmProviderId) {
       throw new Error(`Tool "${tool.name}" does not have an associated LLM provider`);
     }
@@ -91,10 +94,16 @@ export class ToolExecutor {
       messages.push(...imageMessages);
       messages.push({ role: 'user' as const, content: 'Please complete the requested task based on the system instructions.' });
 
-      const result = await llmProvider.generate(messages, { outputFormat: this.getOutputFormat(tool) });
+      const toolModel = tool.llmSettings?.model;
+      const toolLimits = resolveProviderModelLimits(costManagementConfig, llmProviderEntity.id, toolModel);
+      const toolMaxTokens = resolveOutputCap((tool.llmSettings as any)?.defaultMaxTokens, toolLimits, 'tool');
+      const toolInputCap = toolLimits?.inputTokensLimits?.tool;
+      const { messages: truncatedToolMessages, ...toolTruncation } = truncateMessagesToTokenBudget(messages, toolInputCap, toolModel);
+      const toolOptions = { outputFormat: this.getOutputFormat(tool), ...(toolMaxTokens !== undefined ? { maxTokens: toolMaxTokens } : {}) };
+      const result = await llmProvider.generate(truncatedToolMessages, toolOptions);
       const endMs = Date.now();
       const durationMs = endMs - toolStartMs;
-      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmUsage: buildLlmUsage(result.usage, llmProviderEntity, tool.llmSettings?.model), durationMs, startMs: toolStartMs, endMs };
+      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmUsage: buildLlmUsage(result.usage, llmProviderEntity, tool.llmSettings?.model, toolTruncation), durationMs, startMs: toolStartMs, endMs };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
       const endMs = Date.now();

@@ -35,6 +35,9 @@ import { KnowledgeService } from "../KnowledgeService";
 import { ModerationService } from "../ModerationService";
 import type { FaqItem } from "./ConversationContextBuilder";
 import type { AgentResponse } from "../../http/contracts/agent";
+import type { CostManagementConfig } from "../../http/contracts/costManagement";
+import { resolveProviderModelLimits, resolveOutputCap } from "../../utils/costManagement";
+import { truncateMessagesToTokenBudget, type TruncationInfo } from "../../utils/contextTruncation";
 import type { IAudioConverter } from '../audio/IAudioConverter';
 import type { AudioFormat } from '../../types/audio';
 import { AudioConverterFactory } from '../audio/AudioConverterFactory';
@@ -104,6 +107,8 @@ export type TurnData = {
   fillerSentence: string | null;
   /** Prescripted response text (sample copy in forced mode) delivered in the current turn; null for LLM-generated responses */
   prescriptedText: string | null;
+  /** Truncation info from the completion context window preparation; null before first completion in the turn */
+  completionTruncationInfo: TruncationInfo | null;
 };
 
 export type StageRuntimeData = {
@@ -129,6 +134,7 @@ export type StageRuntimeData = {
   fillerLlmProvider?: ILlmProvider;
   fillerLlmProviderInfo?: LlmProviderInfo;
   faq: FaqItem[];
+  costManagementConfig: CostManagementConfig | null;
 }
 
 /**
@@ -189,7 +195,7 @@ export class ConversationRunner {
   }
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null, completionTruncationInfo: null };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -284,6 +290,7 @@ export class ConversationRunner {
       shouldEndConversation: false,
       agent: null as any, // populated below after agentService.getAgentById
       faq: [],
+      costManagementConfig: project?.costManagementConfig ?? null,
     };
 
     // Load completion LLM provider for the stage
@@ -772,7 +779,7 @@ export class ConversationRunner {
           originalText: fullResponseText,
           visibility: this.turnMessageVisibility,
           metadata: {
-            llmUsage: buildLlmUsage(result.usage, this.stageData.completionLlmProviderInfo, this.stageData.stage.llmSettings?.model),
+            llmUsage: buildLlmUsage(result.usage, this.stageData.completionLlmProviderInfo, this.stageData.stage.llmSettings?.model, this.turnData.completionTruncationInfo ?? undefined),
             fillerLlmUsage: this.turnData.fillerLlmUsage ?? undefined,
             systemPrompt: this.stageData.lastCompletionPrompt,
             outputTurnId: this.turnData.outputTurnId,
@@ -1505,7 +1512,7 @@ export class ConversationRunner {
       this.sampleCopyDistributor.getOriginalCopies(), '', '');
 
     // Execute the tool
-    const executeResult = await this.toolExecutor.executeTool(tool, context, parameters);
+    const executeResult = await this.toolExecutor.executeTool(tool, context, parameters, this.stageData.costManagementConfig);
 
     // Save tool call event
     const eventData: ToolCallEventData = {
@@ -1868,6 +1875,7 @@ export class ConversationRunner {
       turnIndex: this.turnData.turnIndex + 1,
       fillerSentence: null,
       prescriptedText: null,
+      completionTruncationInfo: null,
     };
   }
 
@@ -2183,7 +2191,10 @@ export class ConversationRunner {
         this.turnData.promptRenderEndMs = Date.now();
         this.turnData.firstTokenMs = null;
         this.turnData.llmStartMs = Date.now();
-        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined);
+        const completionLimits = resolveProviderModelLimits(this.stageData.costManagementConfig, this.stageData.completionLlmProviderInfo?.id ?? '', this.stageData.stage.llmSettings?.model);
+        const completionMaxTokens = resolveOutputCap((this.stageData.stage.llmSettings as any)?.defaultMaxTokens, completionLimits, 'completion');
+        const completionInputCap = completionLimits?.inputTokensLimits?.completion;
+        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined, completionMaxTokens, completionInputCap, this.stageData.stage.llmSettings?.model, (info) => { this.turnData.completionTruncationInfo = info; });
       }
       this.lastFillerSentence = null;
       this.lastFillerPrompt = null;
@@ -2287,13 +2298,20 @@ export class ConversationRunner {
     try {
       const context = await this.contextBuilder.buildContextForFillerSentence(this.conversation, this.stageData.stage, userInput);
       const renderedPrompt = await this.templatingEngine.render(fillerSettings.prompt, context);
-      const result = await fillerLlmProvider.generate([
-        { role: 'system', content: renderedPrompt },
-        { role: 'user', content: userInput }]);
+      const fillerMessages = [
+        { role: 'system' as const, content: renderedPrompt },
+        { role: 'user' as const, content: userInput },
+      ];
+      const fillerModel = this.stageData.agent?.fillerSettings?.llmSettings?.model;
+      const fillerLimits = resolveProviderModelLimits(this.stageData.costManagementConfig, this.stageData.fillerLlmProviderInfo?.id ?? '', fillerModel);
+      const fillerMaxTokens = resolveOutputCap((this.stageData.agent?.fillerSettings?.llmSettings as any)?.defaultMaxTokens, fillerLimits, 'filler');
+      const fillerInputCap = fillerLimits?.inputTokensLimits?.filler;
+      const { messages: truncatedFillerMessages, ...fillerTruncation } = truncateMessagesToTokenBudget(fillerMessages, fillerInputCap, fillerModel);
+      const result = await fillerLlmProvider.generate(truncatedFillerMessages, fillerMaxTokens !== undefined ? { maxTokens: fillerMaxTokens } : undefined);
       const text = extractTextFromContent(result.content).trim();
       if (text.length > 0) {
         this.lastFillerPrompt = renderedPrompt;
-        this.turnData.fillerLlmUsage = buildLlmUsage(result.usage, this.stageData.fillerLlmProviderInfo, this.stageData.agent?.fillerSettings?.llmSettings?.model) ?? null;
+        this.turnData.fillerLlmUsage = buildLlmUsage(result.usage, this.stageData.fillerLlmProviderInfo, this.stageData.agent?.fillerSettings?.llmSettings?.model, fillerTruncation) ?? null;
         return text;
       }
       return null;

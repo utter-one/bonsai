@@ -15,6 +15,8 @@ import { TransformerRuntimeData } from './ConversationRunner';
 import { TemplatingEngine } from './TemplatingEngine';
 import type { ActionClassificationResult } from '../../types/classification';
 import { StageAction } from '../../types/actions';
+import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
+import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
 
 /**
  * Map of variable names to their change event type after a transformer run.
@@ -255,7 +257,12 @@ export class ContextTransformerExecutor {
         { role: 'user' as const, content: text },
       ];
 
-      const result = await llmProvider.generate(messages);
+      const transformerModel = transformerData.transformer.llmSettings?.model;
+      const transformerLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, transformerData.llmProviderInfo.id, transformerModel);
+      const transformerMaxTokens = resolveOutputCap((transformerData.transformer.llmSettings as any)?.defaultMaxTokens, transformerLimits, 'transformation');
+      const transformerInputCap = transformerLimits?.inputTokensLimits?.transformation;
+      const { messages: truncatedTransformerMessages, ...transformerTruncation } = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);
+      const result = await llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
       rawResponse = JSON.stringify(result, null, 2);
 
@@ -278,7 +285,7 @@ export class ContextTransformerExecutor {
       }
 
       const endMs = Date.now();
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, llmUsage: buildLlmUsage(result.usage, transformerData.llmProviderInfo, transformerData.transformer.llmSettings?.model), durationMs: endMs - startMs, startMs, endMs };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, llmUsage: buildLlmUsage(result.usage, transformerData.llmProviderInfo, transformerData.transformer.llmSettings?.model, transformerTruncation), durationMs: endMs - startMs, startMs, endMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id, transformerId: transformer.id }, 'Error executing context transformer');
       const endMs = Date.now();

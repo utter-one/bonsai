@@ -5,6 +5,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createOperatorSchema, updateOperatorBodySchema, deleteOperatorBodySchema, operatorResponseSchema, operatorListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/operator';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
 import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema, archiveProjectSchema, listProjectsQuerySchema, moderationConfigSchema, sampleCopyConfigSchema } from './http/contracts/project';
+import { requestTypeLimitsSchema, providerModelLimitsSchema, costManagementConfigSchema } from './http/contracts/costManagement';
 import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema, fillerSettingsSchema } from './http/contracts/agent';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
 import { initialOperatorSetupSchema, setupStatusResponseSchema, initialOperatorSetupResponseSchema } from './http/contracts/setup';
@@ -143,6 +144,9 @@ export function getOpenAPISpec(): any {
   registry.register('ModerationConfig', moderationConfigSchema);
   registry.register('SampleCopyConfig', sampleCopyConfigSchema);
   registry.register('FillerSettings', fillerSettingsSchema);
+  registry.register('RequestTypeLimits', requestTypeLimitsSchema);
+  registry.register('ProviderModelLimits', providerModelLimitsSchema);
+  registry.register('CostManagementConfig', costManagementConfigSchema);
 
   // ASR provider settings schemas
   registry.register('AzureAsrSettings', azureAsrSettingsSchema);

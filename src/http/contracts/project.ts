@@ -12,6 +12,7 @@ import { assemblyAiAsrSettingsSchema } from '../../services/providers/asr/Assemb
 import { speechmaticsAsrSettingsSchema } from '../../services/providers/asr/SpeechmaticsAsrProvider';
 import { listParamsSchema } from './common';
 import { serverVadConfigSchema } from './vad';
+import { costManagementConfigSchema } from './costManagement';
 
 extendZodWithOpenApi(z);
 
@@ -100,6 +101,7 @@ export const createProjectSchema = z.object({
   generateVoice: z.boolean().optional().default(true).describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.optional().describe('Optional storage configuration for conversation artifacts'),
   moderationConfig: moderationConfigSchema.optional().describe('Optional content moderation configuration'),
+  costManagementConfig: costManagementConfigSchema.optional().describe('Optional project-level LLM token cost management configuration'),
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata for the project'),
   timezone: z.string().nullable().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Defaults to UTC when not set.'),
@@ -126,6 +128,7 @@ export const updateProjectSchema = z.object({
   generateVoice: z.boolean().optional().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.optional().nullable().describe('Updated storage configuration settings'),
   moderationConfig: moderationConfigSchema.optional().nullable().describe('Updated content moderation configuration'),
+  costManagementConfig: costManagementConfigSchema.optional().nullable().describe('Updated project-level LLM token cost management configuration. Set to null to remove.'),
   constants: z.record(z.string(), parameterValueSchema).optional().describe('Updated constants key-value store'),
   metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata for the project'),
   timezone: z.string().nullable().optional().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Set to null to clear. Defaults to UTC when not set.'),
@@ -152,6 +155,7 @@ export const projectResponseSchema = z.object({
   generateVoice: z.boolean().describe('Whether conversations generate voice responses (requires ttsConfig fully populated in Stages)'),
   storageConfig: storageConfigSchema.nullable().describe('Storage configuration for conversation artifacts'),
   moderationConfig: moderationConfigSchema.nullable().describe('Content moderation configuration'),
+  costManagementConfig: costManagementConfigSchema.nullable().describe('Project-level LLM token cost management configuration'),
   constants: z.record(z.string(), parameterValueSchema).nullable().describe('Key-value store of constants used in templating and conversation logic'),
   metadata: z.record(z.string(), z.any()).nullable().describe('Additional metadata for the project'),
   timezone: z.string().nullable().describe('IANA timezone identifier used as the default for conversations in this project, e.g. Europe/Warsaw or America/New_York. Null means UTC.'),
