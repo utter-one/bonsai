@@ -15,6 +15,8 @@ import { TransformerRuntimeData } from './ConversationRunner';
 import { TemplatingEngine } from './TemplatingEngine';
 import type { ActionClassificationResult } from '../../types/classification';
 import { StageAction } from '../../types/actions';
+import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
+import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
 
 /**
  * Map of variable names to their change event type after a transformer run.
@@ -255,7 +257,12 @@ export class ContextTransformerExecutor {
         { role: 'user' as const, content: text },
       ];
 
-      const result = await llmProvider.generate(messages);
+      const transformerModel = transformerData.transformer.llmSettings?.model;
+      const transformerLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, transformerData.llmProviderInfo.apiType, transformerModel);
+      const transformerMaxTokens = resolveOutputCap((transformerData.transformer.llmSettings as any)?.defaultMaxTokens, transformerLimits, 'transformation');
+      const transformerInputCap = transformerLimits?.inputTokensLimits?.transformation;
+      const truncatedTransformerMessages = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);
+      const result = await llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
       rawResponse = JSON.stringify(result, null, 2);
 

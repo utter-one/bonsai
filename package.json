@@ -60,6 +60,7 @@
     "reflect-metadata": "^0.2.2",
     "speex-resampler": "^3.0.1",
     "swagger-ui-express": "^5.0.1",
+    "tokenx": "^1.3.0",
     "tsx": "^4.21.0",
     "tsyringe": "^4.10.0",
     "uuid": "^13.0.0",

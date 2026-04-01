@@ -13,6 +13,8 @@ import { extractTextFromContent } from "../../utils/llm";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
 import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
+import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
+import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
 
 /** Result of processing user input, including actions and timing metadata */
 export type ProcessTextInputResult = {
@@ -252,7 +254,12 @@ export class UserInputProcessor {
         }
       ];
 
-      const result = await llmProvider.generate(messages);
+      const copyModel = classifierData.classifier.llmSettings?.model;
+      const copyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.apiType, copyModel);
+      const copyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, copyLimits, 'classification');
+      const copyInputCap = copyLimits?.inputTokensLimits?.classification;
+      const truncatedCopyMessages = truncateMessagesToTokenBudget(messages, copyInputCap, copyModel);
+      const result = await llmProvider.generate(truncatedCopyMessages, copyMaxTokens !== undefined ? { maxTokens: copyMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
 
       logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received sample copy classification result from LLM provider: ${textContent}`);
@@ -302,7 +309,12 @@ export class UserInputProcessor {
         }
       ];
 
-      const result = await llmProvider.generate(messages);
+      const classifyModel = classifierData.classifier.llmSettings?.model;
+      const classifyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.apiType, classifyModel);
+      const classifyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, classifyLimits, 'classification');
+      const classifyInputCap = classifyLimits?.inputTokensLimits?.classification;
+      const truncatedClassifyMessages = truncateMessagesToTokenBudget(messages, classifyInputCap, classifyModel);
+      const result = await llmProvider.generate(truncatedClassifyMessages, classifyMaxTokens !== undefined ? { maxTokens: classifyMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
 
       logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received classification result from LLM provider: ${textContent}`);

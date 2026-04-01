@@ -106,6 +106,12 @@ export const projects = pgTable('projects', {
     llmProviderId: string;
     blockedCategories?: string[];
   }>(),
+  costManagementConfig: jsonb('cost_management_config').$type<{
+    limits: Record<string, Record<string, {
+      outputTokensLimits?: { completion?: number; classification?: number; tool?: number; transformation?: number; filler?: number };
+      inputTokensLimits?: { completion?: number; classification?: number; tool?: number; transformation?: number; filler?: number };
+    }>>;
+  }>(),
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   timezone: text('timezone'),
