@@ -9,18 +9,18 @@ export type RequestType = 'completion' | 'classification' | 'tool' | 'transforma
  * Resolves the most specific token limits for a given provider+model combination.
  *
  * Lookup order (most specific wins, no merging):
- * 1. `[providerApiType][model]` — exact match
- * 2. `[providerApiType]["*"]` — any model for the given provider
+ * 1. `[providerId][model]` — exact match
+ * 2. `[providerId]["*"]` — any model for the given provider
  * 3. `["*"]["*"]` — global fallback
  *
  * @param config - The project cost management config, or null/undefined if not set
- * @param providerApiType - The provider API type (e.g. "openai", "anthropic")
+ * @param providerId - The provider entity ID (database primary key)
  * @param model - The model name (e.g. "gpt-4o"), or undefined if unknown
  * @returns The most specific matching limits, or undefined if no match
  */
-export function resolveProviderModelLimits(config: CostManagementConfig | null | undefined, providerApiType: string, model: string | undefined): ProviderModelLimits | undefined {
+export function resolveProviderModelLimits(config: CostManagementConfig | null | undefined, providerId: string, model: string | undefined): ProviderModelLimits | undefined {
   if (!config?.limits) return undefined;
-  const providerLimits = config.limits[providerApiType];
+  const providerLimits = config.limits[providerId];
   if (providerLimits) {
     if (model && providerLimits[model] !== undefined) return providerLimits[model];
     if (providerLimits['*'] !== undefined) return providerLimits['*'];

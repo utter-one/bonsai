@@ -255,7 +255,7 @@ export class UserInputProcessor {
       ];
 
       const copyModel = classifierData.classifier.llmSettings?.model;
-      const copyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.apiType, copyModel);
+      const copyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, copyModel);
       const copyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, copyLimits, 'classification');
       const copyInputCap = copyLimits?.inputTokensLimits?.classification;
       const truncatedCopyMessages = truncateMessagesToTokenBudget(messages, copyInputCap, copyModel);
@@ -310,7 +310,7 @@ export class UserInputProcessor {
       ];
 
       const classifyModel = classifierData.classifier.llmSettings?.model;
-      const classifyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.apiType, classifyModel);
+      const classifyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, classifyModel);
       const classifyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, classifyLimits, 'classification');
       const classifyInputCap = classifyLimits?.inputTokensLimits?.classification;
       const truncatedClassifyMessages = truncateMessagesToTokenBudget(messages, classifyInputCap, classifyModel);

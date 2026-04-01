@@ -77,7 +77,7 @@ export class VersionService {
     if (environment !== 'production') { 
       suffix = environment ? `${environment}-` : '';
       if (!commitHash) {
-        suffix += `${Date.now()}+local`;
+        suffix += `dev+local`;
       } else {
         suffix += `${commitHash.slice(0, 7)}`;
       }

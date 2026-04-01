@@ -258,7 +258,7 @@ export class ContextTransformerExecutor {
       ];
 
       const transformerModel = transformerData.transformer.llmSettings?.model;
-      const transformerLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, transformerData.llmProviderInfo.apiType, transformerModel);
+      const transformerLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, transformerData.llmProviderInfo.id, transformerModel);
       const transformerMaxTokens = resolveOutputCap((transformerData.transformer.llmSettings as any)?.defaultMaxTokens, transformerLimits, 'transformation');
       const transformerInputCap = transformerLimits?.inputTokensLimits?.transformation;
       const truncatedTransformerMessages = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);

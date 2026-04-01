@@ -35,21 +35,21 @@ export type ProviderModelLimits = z.infer<typeof providerModelLimitsSchema>;
 /**
  * Project-level LLM cost management configuration.
  *
- * Structure: `limits[providerApiType][model]` where:
- * - `providerApiType` is one of the supported LLM provider types (e.g. `"openai"`, `"anthropic"`, `"gemini"`)
+ * Structure: `limits[providerId][model]` where:
+ * - `providerId` is the unique database ID of an LLM provider entity (e.g. `"prov_abc123"`)
  *   or `"*"` to match any provider.
  * - `model` is the model name (e.g. `"gpt-4o"`, `"claude-3-5-sonnet-20241022"`) or `"*"` to match any model.
  *
  * Lookup order (most specific wins, no merging):
- * 1. `[providerApiType][model]` — exact match
- * 2. `[providerApiType]["*"]` — any model for the given provider
+ * 1. `[providerId][model]` — exact match
+ * 2. `[providerId]["*"]` — any model for the given provider
  * 3. `["*"]["*"]` — global fallback
  *
  * All caps are optional; absent entries apply no limit.
  */
 export const costManagementConfigSchema = z.object({
   limits: z.record(
-    z.string().describe('Provider API type (e.g. "openai", "anthropic") or "*" for any provider'),
+    z.string().describe('Provider ID (e.g. "prov_abc123") or "*" for any provider'),
     z.record(
       z.string().describe('Model name (e.g. "gpt-4o") or "*" for any model'),
       providerModelLimitsSchema,

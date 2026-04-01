@@ -95,7 +95,7 @@ export class ToolExecutor {
       messages.push({ role: 'user' as const, content: 'Please complete the requested task based on the system instructions.' });
 
       const toolModel = tool.llmSettings?.model;
-      const toolLimits = resolveProviderModelLimits(costManagementConfig, llmProviderEntity.apiType, toolModel);
+      const toolLimits = resolveProviderModelLimits(costManagementConfig, llmProviderEntity.id, toolModel);
       const toolMaxTokens = resolveOutputCap((tool.llmSettings as any)?.defaultMaxTokens, toolLimits, 'tool');
       const toolInputCap = toolLimits?.inputTokensLimits?.tool;
       const truncatedToolMessages = truncateMessagesToTokenBudget(messages, toolInputCap, toolModel);

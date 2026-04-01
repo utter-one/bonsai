@@ -2188,7 +2188,7 @@ export class ConversationRunner {
         this.turnData.promptRenderEndMs = Date.now();
         this.turnData.firstTokenMs = null;
         this.turnData.llmStartMs = Date.now();
-        const completionLimits = resolveProviderModelLimits(this.stageData.costManagementConfig, this.stageData.completionLlmProviderInfo?.apiType ?? '', this.stageData.stage.llmSettings?.model);
+        const completionLimits = resolveProviderModelLimits(this.stageData.costManagementConfig, this.stageData.completionLlmProviderInfo?.id ?? '', this.stageData.stage.llmSettings?.model);
         const completionMaxTokens = resolveOutputCap((this.stageData.stage.llmSettings as any)?.defaultMaxTokens, completionLimits, 'completion');
         const completionInputCap = completionLimits?.inputTokensLimits?.completion;
         await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined, completionMaxTokens, completionInputCap, this.stageData.stage.llmSettings?.model);
@@ -2300,7 +2300,7 @@ export class ConversationRunner {
         { role: 'user' as const, content: userInput },
       ];
       const fillerModel = this.stageData.agent?.fillerSettings?.llmSettings?.model;
-      const fillerLimits = resolveProviderModelLimits(this.stageData.costManagementConfig, this.stageData.fillerLlmProviderInfo?.apiType ?? '', fillerModel);
+      const fillerLimits = resolveProviderModelLimits(this.stageData.costManagementConfig, this.stageData.fillerLlmProviderInfo?.id ?? '', fillerModel);
       const fillerMaxTokens = resolveOutputCap((this.stageData.agent?.fillerSettings?.llmSettings as any)?.defaultMaxTokens, fillerLimits, 'filler');
       const fillerInputCap = fillerLimits?.inputTokensLimits?.filler;
       const truncatedFillerMessages = truncateMessagesToTokenBudget(fillerMessages, fillerInputCap, fillerModel);
