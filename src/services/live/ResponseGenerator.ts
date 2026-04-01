@@ -21,9 +21,9 @@ export class ResponseGenerator {
    * @param maxTokens - Optional maximum output tokens (project cap applied as hard ceiling over entity defaultMaxTokens)
    * @param inputTokenCap - Optional maximum input context tokens; oldest non-system history messages are trimmed when exceeded
    * @param model - Model name used for token estimation during input truncation
-   * @returns Truncation info indicating whether context was trimmed and the original estimated token count
+   * @param onTruncation - Called synchronously with truncation metadata before streaming begins; use to capture info before the generation-completed callback fires
    */
-  async generateResponse(context: ConversationContext, stage: Stage, renderedPrompt: string, completionLlmProvider: ILlmProvider, assistantPrefix?: string, maxTokens?: number, inputTokenCap?: number, model?: string): Promise<TruncationInfo> {
+  async generateResponse(context: ConversationContext, stage: Stage, renderedPrompt: string, completionLlmProvider: ILlmProvider, assistantPrefix?: string, maxTokens?: number, inputTokenCap?: number, model?: string, onTruncation?: (info: TruncationInfo) => void): Promise<void> {
     const history = context.history.map(msg => { return { role: msg.role, content: msg.content } as LlmMessage; });
     let messages: LlmMessage[] = [
       { role: 'system', content: renderedPrompt },
@@ -34,7 +34,7 @@ export class ResponseGenerator {
       messages.push({ role: 'assistant', content: assistantPrefix });
     }
     const { messages: truncatedMessages, ...truncationInfo } = truncateMessagesToTokenBudget(messages, inputTokenCap, model);
+    onTruncation?.(truncationInfo);
     await completionLlmProvider.generateStream(truncatedMessages, maxTokens !== undefined ? { maxTokens } : {});
-    return truncationInfo;
   }
 }

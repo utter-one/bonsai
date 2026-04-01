@@ -2194,7 +2194,7 @@ export class ConversationRunner {
         const completionLimits = resolveProviderModelLimits(this.stageData.costManagementConfig, this.stageData.completionLlmProviderInfo?.id ?? '', this.stageData.stage.llmSettings?.model);
         const completionMaxTokens = resolveOutputCap((this.stageData.stage.llmSettings as any)?.defaultMaxTokens, completionLimits, 'completion');
         const completionInputCap = completionLimits?.inputTokensLimits?.completion;
-        this.turnData.completionTruncationInfo = await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined, completionMaxTokens, completionInputCap, this.stageData.stage.llmSettings?.model);
+        await this.responseGenerator.generateResponse(context, this.stageData.stage, this.stageData.lastCompletionPrompt, this.stageData.completionLlmProvider, this.lastFillerSentence ?? undefined, completionMaxTokens, completionInputCap, this.stageData.stage.llmSettings?.model, (info) => { this.turnData.completionTruncationInfo = info; });
       }
       this.lastFillerSentence = null;
       this.lastFillerPrompt = null;
