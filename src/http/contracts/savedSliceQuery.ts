@@ -12,6 +12,7 @@ export const createSavedSliceQuerySchema = z.object({
   name: z.string().min(1).max(255).describe('Unique name for this saved query within the project'),
   query: sliceQuerySchema.describe('The full slice query configuration to save'),
   isShared: z.boolean().default(false).describe('Whether this query is visible to all operators in the project'),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Arbitrary key-value metadata, e.g. chart display settings from the UI'),
 });
 
 /**
@@ -22,6 +23,7 @@ export const updateSavedSliceQuerySchema = z.object({
   name: z.string().min(1).max(255).optional().describe('Updated name for this saved query'),
   query: sliceQuerySchema.optional().describe('Updated slice query configuration'),
   isShared: z.boolean().optional().describe('Updated sharing flag'),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Arbitrary key-value metadata, e.g. chart display settings from the UI'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
 });
 
@@ -43,6 +45,7 @@ export const savedSliceQueryResponseSchema = z.object({
   operatorId: z.string().nullable().describe('Operator who created this query, or null if the operator has been deleted'),
   query: sliceQuerySchema.describe('The saved slice query configuration'),
   isShared: z.boolean().describe('Whether this query is visible to all operators in the project'),
+  metadata: z.record(z.string(), z.unknown()).nullable().describe('Arbitrary key-value metadata, e.g. chart display settings from the UI'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the query was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the query was last updated'),

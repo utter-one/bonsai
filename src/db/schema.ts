@@ -461,6 +461,7 @@ export const savedSliceQueries = pgTable('saved_slice_queries', {
   operatorId: text('operator_id').references(() => operators.id, { onDelete: 'set null' }),
   query: jsonb('query').notNull().$type<Record<string, any>>(),
   isShared: boolean('is_shared').notNull().default(false),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

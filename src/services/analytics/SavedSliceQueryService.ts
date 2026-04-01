@@ -66,6 +66,7 @@ export class SavedSliceQueryService extends BaseService {
         name: input.name,
         query: input.query as Record<string, any>,
         isShared: input.isShared ?? false,
+        metadata: input.metadata ?? null,
         version: 1,
       }).returning();
 
@@ -111,6 +112,7 @@ export class SavedSliceQueryService extends BaseService {
       if (updateData.name !== undefined) updatePayload.name = updateData.name;
       if (updateData.query !== undefined) updatePayload.query = updateData.query;
       if (updateData.isShared !== undefined) updatePayload.isShared = updateData.isShared;
+      if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
 
       const updated = await db.update(savedSliceQueries).set(updatePayload).where(and(eq(savedSliceQueries.projectId, projectId), eq(savedSliceQueries.id, id), eq(savedSliceQueries.version, expectedVersion))).returning();
 
