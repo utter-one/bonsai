@@ -24,7 +24,7 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
     @inject(SessionManager) private sessionManager: SessionManager,
     @inject(ApiKeyService) private apiKeyService: ApiKeyService,
     @inject(ProjectService) private projectService: ProjectService,
-  ) {}
+  ) { }
 
   /**
    * Handles authentication requests.
@@ -89,11 +89,12 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
       logger.info({ sessionId: context.session!.id, projectId: apiKey.projectId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
 
       const project = await this.projectService.getProjectById(apiKey.projectId);
+      const sendVoiceInput = message.sessionSettings?.sendVoiceInput !== false;
       const projectSettings = {
         projectId: project.id,
-        acceptVoice: project.acceptVoice,
+        acceptVoice: project.acceptVoice && sendVoiceInput,
         generateVoice: project.generateVoice,
-        asrConfig: project.asrConfig ?? null,
+        asrConfig: project.asrConfig && sendVoiceInput ? project.asrConfig : null,
       };
 
       const response: AuthResponse = { type: 'auth', success: true, sessionId: context.session!.id, projectSettings, requestId: message.requestId };
