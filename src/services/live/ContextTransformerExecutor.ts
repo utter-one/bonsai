@@ -261,7 +261,7 @@ export class ContextTransformerExecutor {
       const transformerLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, transformerData.llmProviderInfo.id, transformerModel);
       const transformerMaxTokens = resolveOutputCap((transformerData.transformer.llmSettings as any)?.defaultMaxTokens, transformerLimits, 'transformation');
       const transformerInputCap = transformerLimits?.inputTokensLimits?.transformation;
-      const truncatedTransformerMessages = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);
+      const { messages: truncatedTransformerMessages, ...transformerTruncation } = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);
       const result = await llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
       rawResponse = JSON.stringify(result, null, 2);
@@ -285,7 +285,7 @@ export class ContextTransformerExecutor {
       }
 
       const endMs = Date.now();
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, llmUsage: buildLlmUsage(result.usage, transformerData.llmProviderInfo, transformerData.transformer.llmSettings?.model), durationMs: endMs - startMs, startMs, endMs };
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, llmUsage: buildLlmUsage(result.usage, transformerData.llmProviderInfo, transformerData.transformer.llmSettings?.model, transformerTruncation), durationMs: endMs - startMs, startMs, endMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id, transformerId: transformer.id }, 'Error executing context transformer');
       const endMs = Date.now();

@@ -98,12 +98,12 @@ export class ToolExecutor {
       const toolLimits = resolveProviderModelLimits(costManagementConfig, llmProviderEntity.id, toolModel);
       const toolMaxTokens = resolveOutputCap((tool.llmSettings as any)?.defaultMaxTokens, toolLimits, 'tool');
       const toolInputCap = toolLimits?.inputTokensLimits?.tool;
-      const truncatedToolMessages = truncateMessagesToTokenBudget(messages, toolInputCap, toolModel);
+      const { messages: truncatedToolMessages, ...toolTruncation } = truncateMessagesToTokenBudget(messages, toolInputCap, toolModel);
       const toolOptions = { outputFormat: this.getOutputFormat(tool), ...(toolMaxTokens !== undefined ? { maxTokens: toolMaxTokens } : {}) };
       const result = await llmProvider.generate(truncatedToolMessages, toolOptions);
       const endMs = Date.now();
       const durationMs = endMs - toolStartMs;
-      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmUsage: buildLlmUsage(result.usage, llmProviderEntity, tool.llmSettings?.model), durationMs, startMs: toolStartMs, endMs };
+      return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmUsage: buildLlmUsage(result.usage, llmProviderEntity, tool.llmSettings?.model, toolTruncation), durationMs, startMs: toolStartMs, endMs };
     } catch (error) {
       logger.error({ toolId: tool.id, error }, `Error executing tool "${tool.name}"`);
       const endMs = Date.now();

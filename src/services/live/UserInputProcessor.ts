@@ -258,7 +258,7 @@ export class UserInputProcessor {
       const copyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, copyModel);
       const copyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, copyLimits, 'classification');
       const copyInputCap = copyLimits?.inputTokensLimits?.classification;
-      const truncatedCopyMessages = truncateMessagesToTokenBudget(messages, copyInputCap, copyModel);
+      const { messages: truncatedCopyMessages, ...copyTruncation } = truncateMessagesToTokenBudget(messages, copyInputCap, copyModel);
       const result = await llmProvider.generate(truncatedCopyMessages, copyMaxTokens !== undefined ? { maxTokens: copyMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
 
@@ -270,7 +270,7 @@ export class UserInputProcessor {
         ...classificationResult,
         renderedPrompt,
         result: textContent,
-        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model),
+        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model, copyTruncation),
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,
@@ -313,7 +313,7 @@ export class UserInputProcessor {
       const classifyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, classifyModel);
       const classifyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, classifyLimits, 'classification');
       const classifyInputCap = classifyLimits?.inputTokensLimits?.classification;
-      const truncatedClassifyMessages = truncateMessagesToTokenBudget(messages, classifyInputCap, classifyModel);
+      const { messages: truncatedClassifyMessages, ...classifyTruncation } = truncateMessagesToTokenBudget(messages, classifyInputCap, classifyModel);
       const result = await llmProvider.generate(truncatedClassifyMessages, classifyMaxTokens !== undefined ? { maxTokens: classifyMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
 
@@ -332,7 +332,7 @@ export class UserInputProcessor {
         classifierName: classifier.name,
         actions,
         renderedPrompt,
-        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model),
+        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model, classifyTruncation),
         durationMs: endMs - classifyStartMs,
         startMs: classifyStartMs,
         endMs,
