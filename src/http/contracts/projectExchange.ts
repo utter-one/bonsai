@@ -66,6 +66,7 @@ export const moderationConfigExchangeV1Schema = z.object({
   enabled: z.boolean().describe('Whether content moderation is enabled for this project'),
   llmHint: providerHintSchema.describe('Provider hint identifying the LLM provider used for moderation'),
   blockedCategories: z.array(z.string()).optional().describe('List of category names that should cause the input to be blocked'),
+  mode: z.enum(['strict', 'standard']).optional().describe('Moderation execution mode: "strict" (default) runs before all processing; "standard" runs in parallel with filler generation'),
 }).openapi('ModerationConfigExchangeV1').describe('Content moderation configuration with provider hint instead of provider UUID');
 
 /** Moderation config for the exchange format */
