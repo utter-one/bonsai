@@ -190,6 +190,7 @@ Describes a single field in a typed schema. Used in `userProfileVariableDescript
 | `enabled` | `boolean` | Yes | Whether content moderation is enabled for this project |
 | `llmProviderId` | `string` | Yes | ID of the LLM provider used for moderation (must support moderation API, e.g. OpenAI or Mistral) |
 | `blockedCategories` | `string[]` | No | List of category names that should cause the input to be blocked. If omitted or empty, any flagged category will block the input. Category names are provider-specific. |
+| `mode` | `string` | No | Execution mode: `strict` (default) or `standard`. In `strict` mode, moderation runs before any other processing. In `standard` mode, moderation runs in parallel with classification after filler generation, reducing latency. See [Content Moderation](../guide/moderation#moderation-mode). |
 
 ## Archive Project
 

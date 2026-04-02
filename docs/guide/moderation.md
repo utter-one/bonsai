@@ -148,7 +148,7 @@ In `standard` mode the filler sentence is generated and sent to TTS/the client b
 ## Performance
 
 - In `strict` mode, moderation latency adds directly to turn latency.
-- In `standard` mode, moderation overlaps with filler generation, reducing the net impact on perceived latency.
+- In `standard` mode, moderation runs in parallel with classification/knowledge retrieval (after filler generation), effectively hiding moderation latency behind the longest pipeline step.
 - Duration is tracked in `moderationDurationMs` and included in turn timing metadata.
 - Moderation latency is visible in the [Analytics](/api/analytics) endpoints.
 
