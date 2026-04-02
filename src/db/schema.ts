@@ -105,6 +105,7 @@ export const projects = pgTable('projects', {
     enabled: boolean;
     llmProviderId: string;
     blockedCategories?: string[];
+    mode?: 'strict' | 'standard';
   }>(),
   costManagementConfig: jsonb('cost_management_config').$type<{
     limits: Record<string, Record<string, {

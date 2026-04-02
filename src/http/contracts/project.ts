@@ -55,6 +55,11 @@ export const moderationConfigSchema = z.object({
     + 'OpenAI categories: harassment, harassment/threatening, hate, hate/threatening, illicit, illicit/violent, self-harm, self-harm/instructions, self-harm/intent, sexual, sexual/minors, violence, violence/graphic. '
     + 'Mistral categories: sexual, hate_and_discrimination, violence_and_threats, dangerous_and_criminal_content, selfharm, health, financial, law, pii.'
   ),
+  mode: z.enum(['strict', 'standard']).optional().describe(
+    'Moderation execution mode. '
+    + '"strict" (default): moderation runs before all other processing — the turn is held until the moderation result is available. '
+    + '"standard": moderation runs in parallel with filler sentence generation, reducing perceived latency while still blocking flagged input before classification and response generation.'
+  ),
 }).openapi('ModerationConfig').describe('Content moderation configuration');
 
 export type ModerationConfig = z.infer<typeof moderationConfigSchema>;

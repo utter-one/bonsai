@@ -33,6 +33,7 @@ import { TemplatingEngine } from "./TemplatingEngine";
 import { extractTextFromContent, getContentSize } from "../../utils/llm";
 import { KnowledgeService } from "../KnowledgeService";
 import { ModerationService } from "../ModerationService";
+import type { ModerationResult } from "../ModerationService";
 import type { FaqItem } from "./ConversationContextBuilder";
 import type { AgentResponse } from "../../http/contracts/agent";
 import type { CostManagementConfig } from "../../http/contracts/costManagement";
@@ -89,6 +90,10 @@ export type TurnData = {
   fillerLlmUsage: LlmUsageMetadata | null;
   /** Duration of the moderation API call in milliseconds; null when moderation was not performed */
   moderationDurationMs: number | null;
+  /** Unix timestamp (ms) when the moderation API call started; null when moderation was not performed */
+  moderationStartMs: number | null;
+  /** Unix timestamp (ms) when the moderation API call completed; null when moderation was not performed */
+  moderationEndMs: number | null;
   /** Unix timestamp (ms) when ASR recognition started */
   asrStartMs: number | null;
   /** Unix timestamp (ms) when a stage transition (goToStage) was initiated by an action outcome */
@@ -195,7 +200,7 @@ export class ConversationRunner {
   }
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
-  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null, completionTruncationInfo: null };
+  private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, moderationStartMs: null, moderationEndMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null, completionTruncationInfo: null };
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -1866,6 +1871,8 @@ export class ConversationRunner {
       fillerDurationMs: null,
       fillerLlmUsage: null,
       moderationDurationMs: null,
+      moderationStartMs: null,
+      moderationEndMs: null,
       asrStartMs: null,
       stageTransitionStartMs: null,
       stageTransitionEndMs: null,
@@ -1903,39 +1910,15 @@ export class ConversationRunner {
     };
     const userMessageEventId = await this.saveAndSendEvent('message', preliminaryMessageEventData);
 
-    // Safety: moderation must fully resolve before any LLM call that receives user-derived content.
-    // This prevents inappropriate content from reaching provider APIs and risking account bans.
-    const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
-    this.turnData.moderationDurationMs = moderationResult.durationMs > 0 ? moderationResult.durationMs : null;
-    const moderationStartMs = moderationResult.durationMs > 0 ? moderationResult.startMs : null;
-    const moderationEndMs = moderationStartMs !== null ? moderationStartMs + moderationResult.durationMs : null;
-    if (moderationResult.detectedCategories.length > 0) {
-      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs, startMs: moderationResult.startMs, endMs: moderationResult.startMs + moderationResult.durationMs };
-      await this.saveAndSendEvent('moderation', moderationEventData);
-    }
-    if (moderationResult.flagged) {
-      logger.warn({ conversationId: this.conversation.id, categories: moderationResult.blockingCategories }, 'User input blocked by content moderation');
+    const isStrictModerationMode = this.stageData.project.moderationConfig?.mode !== 'standard';
 
-      // Execute __moderation_blocked global action if configured, otherwise abort silently
-      logger.info({ globalActions: this.stageData.globalActions }, 'Checking for __moderation_blocked global action');
-      const moderationBlockedAction = this.stageData.globalActions.find(ga => ga.id === '__moderation_blocked');
-      if (moderationBlockedAction) {
-        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), '', '', this.stageData.faq);
-        const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context, this.stageData.id, null, this.saveAndSendEvent.bind(this));
-        await this.applyActionOutcome(context, executionOutcome);
-        const messageEventData: MessageEventData = {
-          text: '[Content removed by moderation]',
-          originalText: userInput,
-          role: 'user',
-          visibility: this.turnMessageVisibility,
-          metadata: { moderationDurationMs: this.turnData.moderationDurationMs }
-        };
-        await this.saveAndSendEvent('message', messageEventData);
-        await this.generateResponse(context, executionOutcome);
-        return;
-      }
-      // No moderation block action defined - carry on
-      userInput = '[Content removed by moderation]';
+    if (isStrictModerationMode) {
+      // Strict mode (default): moderation fully resolves before any LLM call that receives user-derived content.
+      // This prevents inappropriate content from reaching provider APIs and risking account bans.
+      const moderationResult = await this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
+      const newUserInput = await this.handleModerationResult(moderationResult, userInput, userInputSource);
+      if (newUserInput === null) return;
+      userInput = newUserInput;
     }
 
     // Start filler sentence immediately — opens the response turn early by sending
@@ -1974,10 +1957,23 @@ export class ConversationRunner {
       this.turnData.fillerSentence = fillerSentence;
     }
 
+    // Standard mode: fire moderation in parallel with processTextInput to reduce latency.
+    // Moderation is started here, after filler, so it overlaps with classification/processing.
+    const parallelModerationPromise = isStrictModerationMode ? null : this.moderationService.moderate(userInput, this.stageData.project.moderationConfig, this.conversation.projectId);
+
     const processingStartMs = Date.now();
     const processingResult = await this.userInputProcessor.processTextInput(this.session, userInput, userInput);
     const processingEndMs = Date.now();
     const processingDurationMs = processingEndMs - processingStartMs;
+
+    // Standard mode: await moderation (ran in parallel with processTextInput) and handle before classification.
+    if (parallelModerationPromise) {
+      const moderationResult = await parallelModerationPromise;
+      const newUserInput = await this.handleModerationResult(moderationResult, userInput, userInputSource);
+      if (newUserInput === null) return;
+      userInput = newUserInput;
+    }
+
     const classificationResults = processingResult.actions;
     const knowledgeRetrievalDurationMs = processingResult.knowledgeRetrievalDurationMs;
 
@@ -2117,8 +2113,8 @@ export class ConversationRunner {
       asrStartMs: savedAsrStartMs ?? undefined,
       asrEndMs: savedAsrEndMs ?? undefined,
       asrDurationMs: asrDurationMsValue,
-      moderationStartMs: moderationStartMs ?? undefined,
-      moderationEndMs: moderationEndMs ?? undefined,
+      moderationStartMs: this.turnData.moderationStartMs ?? undefined,
+      moderationEndMs: this.turnData.moderationEndMs ?? undefined,
       moderationDurationMs: this.turnData.moderationDurationMs ?? undefined,
       fillerStartMs: fillerSentence ? fillerStartMs : undefined,
       fillerEndMs: fillerSentence ? fillerEndMs : undefined,
@@ -2282,6 +2278,49 @@ export class ConversationRunner {
       await this.saveAndSendEvent('conversation_aborted', eventData);
       await this.changeTerminalState('finished');
     }
+  }
+
+  /**
+   * Processes a resolved ModerationResult: updates timing metadata, emits the moderation event,
+   * and handles blocked input by executing the `__moderation_blocked` global action (if configured).
+   * @returns `null` when the turn has been fully handled and the caller must return,
+   *          or the (possibly sanitised) `userInput` string to continue with.
+   */
+  private async handleModerationResult(
+    moderationResult: ModerationResult,
+    userInput: string,
+    userInputSource: 'text' | 'voice',
+  ): Promise<string | null> {
+    this.turnData.moderationDurationMs = moderationResult.durationMs > 0 ? moderationResult.durationMs : null;
+    this.turnData.moderationStartMs = moderationResult.durationMs > 0 ? moderationResult.startMs : null;
+    this.turnData.moderationEndMs = this.turnData.moderationStartMs !== null ? this.turnData.moderationStartMs + moderationResult.durationMs : null;
+    if (moderationResult.detectedCategories.length > 0) {
+      const moderationEventData: ModerationEventData = { input: userInput, flagged: moderationResult.flagged, blockingCategories: moderationResult.blockingCategories, detectedCategories: moderationResult.detectedCategories, durationMs: moderationResult.durationMs, startMs: moderationResult.startMs, endMs: moderationResult.startMs + moderationResult.durationMs };
+      await this.saveAndSendEvent('moderation', moderationEventData);
+    }
+    if (moderationResult.flagged) {
+      logger.warn({ conversationId: this.conversation.id, categories: moderationResult.blockingCategories }, 'User input blocked by content moderation');
+      logger.info({ globalActions: this.stageData.globalActions }, 'Checking for __moderation_blocked global action');
+      const moderationBlockedAction = this.stageData.globalActions.find(ga => ga.id === '__moderation_blocked');
+      if (moderationBlockedAction) {
+        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), '', '', this.stageData.faq);
+        const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context, this.stageData.id, null, this.saveAndSendEvent.bind(this));
+        await this.applyActionOutcome(context, executionOutcome);
+        const messageEventData: MessageEventData = {
+          text: '[Content removed by moderation]',
+          originalText: userInput,
+          role: 'user',
+          visibility: this.turnMessageVisibility,
+          metadata: { moderationDurationMs: this.turnData.moderationDurationMs }
+        };
+        await this.saveAndSendEvent('message', messageEventData);
+        await this.generateResponse(context, executionOutcome);
+        return null;
+      }
+      // No moderation block action defined - sanitise input and carry on
+      return '[Content removed by moderation]';
+    }
+    return userInput;
   }
 
   /**
