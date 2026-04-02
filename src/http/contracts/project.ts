@@ -58,7 +58,7 @@ export const moderationConfigSchema = z.object({
   mode: z.enum(['strict', 'standard']).optional().describe(
     'Moderation execution mode. '
     + '"strict" (default): moderation runs before all other processing — the turn is held until the moderation result is available. '
-    + '"standard": moderation runs in parallel with filler sentence generation, reducing perceived latency while still blocking flagged input before classification and response generation.'
+    + '"standard": moderation runs after filler generation, in parallel with classification/knowledge retrieval (processTextInput), reducing perceived latency while still blocking flagged input before classification results are acted upon.'  
   ),
 }).openapi('ModerationConfig').describe('Content moderation configuration');
 
