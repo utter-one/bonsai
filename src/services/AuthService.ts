@@ -32,11 +32,13 @@ export type LoginResponse = {
 };
 
 /**
- * Refresh response containing new access token
+ * Refresh response containing new access token, and up-to-date roles and permissions
  */
 export type RefreshResponse = {
   accessToken: string;
   expiresIn: number;
+  roles: string[];
+  permissions: string[];
 };
 
 /**
@@ -160,11 +162,13 @@ export class AuthService {
 
       const newAccessToken = this.generateToken({ operatorId: operator.id, roles: operator.roles, type: 'access' }, ACCESS_TOKEN_EXPIRY);
 
-      logger.info({ operatorId: operator.id }, 'Token refreshed successfully');
+      logger.info({ operatorId: operator.id, roles: operator.roles }, 'Token refreshed successfully');
 
       return {
         accessToken: newAccessToken,
         expiresIn: this.jwtTimeToSeconds(ACCESS_TOKEN_EXPIRY),
+        roles: operator.roles,
+        permissions: getPermissionsForRoles(operator.roles),
       };
     } catch (error) {
       if (error instanceof jwt.JsonWebTokenError) {
