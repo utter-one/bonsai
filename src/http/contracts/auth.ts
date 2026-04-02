@@ -31,15 +31,19 @@ export const loginResponseSchema = z.object({
   operatorId: z.string().describe('Operator user ID'),
   displayName: z.string().describe('Operator display name'),
   roles: z.array(z.string()).describe('Array of role identifiers'),
+  permissions: z.array(z.string()).describe('Effective permissions derived from assigned roles (deduplicated union)'),
 });
 
 /**
  * Schema for refresh token response
- * Includes new access token and expiry
+ * Includes new access token, expiry, and up-to-date roles and permissions
+ * (roles and permissions may change between refreshes if updated server-side)
  */
 export const refreshTokenResponseSchema = z.object({
   accessToken: z.string().describe('New JWT access token (expires in 15 minutes)'),
   expiresIn: z.number().int().positive().describe('Access token expiry time in seconds'),
+  roles: z.array(z.string()).describe('Up-to-date array of role identifiers (re-fetched from database)'),
+  permissions: z.array(z.string()).describe('Up-to-date effective permissions derived from current roles (deduplicated union)'),
 });
 
 /** Request body for login */
