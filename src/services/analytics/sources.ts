@@ -69,23 +69,24 @@ export type SourceDef = {
 
 const conversationIdDimension: DimensionDef = {
   id: 'conversationId',
-  label: 'Conversation ID',
+  label: 'Conversation',
   sqlExpr: 'ce.conversation_id',
   requiresConversationJoin: false,
   requiresUserJoin: false,
 };
 
-const stageIdDimension: DimensionDef = {
-  id: 'stageId',
-  label: 'Stage ID',
-  sqlExpr: 'ce.stage_id',
-  requiresConversationJoin: false,
-  requiresUserJoin: false,
-};
+// NOTE: this doubles the name dimension, disabling 
+// const stageIdDimension: DimensionDef = {
+//   id: 'stageId',
+//   label: 'Stage ID',
+//   sqlExpr: 'ce.stage_id',
+//   requiresConversationJoin: false,
+//   requiresUserJoin: false,
+// };
 
 const stageNameDimension: DimensionDef = {
   id: 'stageName',
-  label: 'Stage Name',
+  label: 'Stage',
   sqlExpr: `ce.event_data->'metadata'->>'stageName'`,
   requiresConversationJoin: false,
   requiresUserJoin: false,
@@ -134,7 +135,6 @@ const turnsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
-    stageIdDimension,
     stageNameDimension,
     { id: 'source', label: 'Input Source', sqlExpr: `ue.event_data->'metadata'->>'source'`, requiresConversationJoin: false, requiresUserJoin: true, values: ['text', 'voice'] },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
@@ -168,7 +168,6 @@ const toolCallsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
-    stageIdDimension,
     stageNameDimension,
     { id: 'toolId', label: 'Tool ID', sqlExpr: `ce.event_data->>'toolId'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'toolName', label: 'Tool Name', sqlExpr: `ce.event_data->>'toolName'`, requiresConversationJoin: false, requiresUserJoin: false },
@@ -191,7 +190,6 @@ const classificationsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
-    stageIdDimension,
     stageNameDimension,
     { id: 'classifierId', label: 'Classifier ID', sqlExpr: `ce.event_data->>'classifierId'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'classifierName', label: 'Classifier Name', sqlExpr: `ce.event_data->'metadata'->>'classifierName'`, requiresConversationJoin: false, requiresUserJoin: false },
@@ -213,7 +211,6 @@ const transformationsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
-    stageIdDimension,
     stageNameDimension,
     { id: 'transformerId', label: 'Transformer ID', sqlExpr: `ce.event_data->>'transformerId'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'transformerName', label: 'Transformer Name', sqlExpr: `ce.event_data->'metadata'->>'transformerName'`, requiresConversationJoin: false, requiresUserJoin: false },
@@ -235,7 +232,6 @@ const moderationSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
-    stageIdDimension,
     stageNameDimension,
     { id: 'flagged', label: 'Flagged', sqlExpr: `(ce.event_data->>'flagged')`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
   ],
@@ -252,7 +248,6 @@ const eventsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
-    stageIdDimension,
     stageNameDimension,
     {
       id: 'eventType', label: 'Event Type', sqlExpr: 'ce.event_type',
@@ -290,7 +285,6 @@ const llmCallsSource: SourceDef = {
   timeColumn: 'ce.timestamp',
   dimensions: [
     conversationIdDimension,
-    stageIdDimension,
     stageNameDimension,
     { id: 'eventType', label: 'Event Type', sqlExpr: 'ce.event_type', requiresConversationJoin: false, requiresUserJoin: false, values: ['message', 'classification', 'transformation', 'tool_call'] },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
