@@ -7,6 +7,7 @@ import { operators } from '../db/schema';
 import type { JWTPayload } from '../http/middleware/auth';
 import { UnauthorizedError, InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
+import { getPermissionsForRoles } from '../permissions';
 
 /** Access token expiry time (18 hours) */
 const ACCESS_TOKEN_EXPIRY = '18h';
@@ -27,6 +28,7 @@ export type LoginResponse = {
   operatorId: string;
   name: string;
   roles: string[];
+  permissions: string[];
 };
 
 /**
@@ -117,6 +119,7 @@ export class AuthService {
         operatorId: operator.id,
         name: operator.name,
         roles: operator.roles,
+        permissions: getPermissionsForRoles(operator.roles),
       };
     } catch (error) {
       if (error instanceof UnauthorizedError) {

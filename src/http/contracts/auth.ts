@@ -31,6 +31,7 @@ export const loginResponseSchema = z.object({
   operatorId: z.string().describe('Operator user ID'),
   displayName: z.string().describe('Operator display name'),
   roles: z.array(z.string()).describe('Array of role identifiers'),
+  permissions: z.array(z.string()).describe('Effective permissions derived from assigned roles (deduplicated union)'),
 });
 
 /**
