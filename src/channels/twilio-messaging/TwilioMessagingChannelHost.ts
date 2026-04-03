@@ -14,6 +14,7 @@ import { logger } from '../../utils/logger';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { validateRequest } from 'twilio';
 
 /** Default inactivity session timeout in milliseconds (30 minutes). */
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -134,7 +135,6 @@ export class TwilioMessagingChannelHost {
     const { accountSid, authToken, fromNumber } = configResult.data;
 
     // Validate Twilio request signature
-    const { validateRequest } = await import('twilio');
     const twilioSignature = req.headers['x-twilio-signature'] as string | undefined;
     const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
     const isValid = validateRequest(authToken, twilioSignature ?? '', fullUrl, req.body as Record<string, string>);
