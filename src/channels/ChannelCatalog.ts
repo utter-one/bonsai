@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { ICommunicationChannel } from './IChannelDescriptor';
 import { WebSocketCommunicationChannel } from './websocket/WebSocketCommunicationChannel';
 import { WebRTCCommunicationChannel } from './webrtc/WebRTCCommunicationChannel';
+import { TwilioMessagingCommunicationChannel } from './twilio-messaging/TwilioMessagingCommunicationChannel';
+import { TwilioVoiceCommunicationChannel } from './twilio-voice/TwilioVoiceCommunicationChannel';
 
 /**
  * Catalog of available ICommunicationChannel implementations.
@@ -17,8 +19,10 @@ export class ChannelCatalog {
   constructor(
     @inject(WebSocketCommunicationChannel) websocket: WebSocketCommunicationChannel,
     @inject(WebRTCCommunicationChannel) webrtc: WebRTCCommunicationChannel,
+    @inject(TwilioMessagingCommunicationChannel) twilioMessaging: TwilioMessagingCommunicationChannel,
+    @inject(TwilioVoiceCommunicationChannel) twilioVoice: TwilioVoiceCommunicationChannel,
   ) {
-    const entries: ICommunicationChannel[] = [websocket, webrtc];
+    const entries: ICommunicationChannel[] = [websocket, webrtc, twilioMessaging, twilioVoice];
     this.channels = new Map(entries.map((c) => [c.getType(), c]));
   }
 
