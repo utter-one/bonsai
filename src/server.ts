@@ -25,6 +25,7 @@ import { CopyDecoratorController } from './http/controllers/CopyDecoratorControl
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
+import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
@@ -41,6 +42,8 @@ import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
 import { WebSocketChannelHost } from './channels/websocket/WebSocketChannelHost';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
+import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
+import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -67,6 +70,9 @@ export function createApp(): express.Application {
 
   // Parse JSON bodies (10mb limit accommodates migration import bundles)
   app.use(express.json({ limit: '10mb' }));
+
+  // Parse URL-encoded bodies (used by Twilio webhooks)
+  app.use(express.urlencoded({ extended: false }));
 
   // CORS configuration
   app.use(cors({
@@ -188,6 +194,9 @@ export function createApp(): express.Application {
   const providerCatalogController = container.resolve(ProviderCatalogController);
   providerCatalogController.registerRoutes(app);
 
+  const channelCatalogController = container.resolve(ChannelCatalogController);
+  channelCatalogController.registerRoutes(app);
+
   const stageController = container.resolve(StageController);
   stageController.registerRoutes(app);
 
@@ -207,6 +216,8 @@ export function createApp(): express.Application {
   projectExchangeController.registerRoutes(app);
 
   container.resolve(WebRTCChannelHost).registerRoutes(app);
+  container.resolve(TwilioMessagingChannelHost).registerRoutes(app);
+  container.resolve(TwilioVoiceChannelHost).registerRoutes(app);
 
   container.resolve(ConversationTimeoutService).start();
 
@@ -225,6 +236,9 @@ export function startServer(port: number = 3000): void {
   // Initialize WebSocket host
   const wsHost = container.resolve(WebSocketChannelHost);
   wsHost.initialize(server);
+
+  // Initialize Twilio Voice Media Streams host
+  container.resolve(TwilioVoiceChannelHost).initialize(server);
 
   server.listen(port, () => {
     logger.info({ port }, 'HTTP server started');

@@ -23,6 +23,8 @@ import { s3StorageProviderConfigSchema } from '../../services/providers/storage/
 import { azureBlobStorageProviderConfigSchema } from '../../services/providers/storage/AzureBlobStorageProvider';
 import { gcsStorageProviderConfigSchema } from '../../services/providers/storage/GcsStorageProvider';
 import { localStorageProviderConfigSchema } from '../../services/providers/storage/LocalStorageProvider';
+import { twilioMessagingChannelProviderConfigSchema } from '../../services/providers/channel/TwilioMessagingChannelProvider';
+import { twilioVoiceChannelProviderConfigSchema } from '../../services/providers/channel/TwilioVoiceChannelProvider';
 
 extendZodWithOpenApi(z);
 
@@ -73,6 +75,16 @@ export const storageProviderConfigSchema = z.union([
 export type StorageProviderConfig = z.infer<typeof storageProviderConfigSchema>;
 
 /**
+ * Union schema for all channel provider configurations
+ */
+export const channelProviderConfigSchema = z.union([
+  twilioMessagingChannelProviderConfigSchema,
+  twilioVoiceChannelProviderConfigSchema,
+]).describe('Channel provider configuration');
+
+export type ChannelProviderConfig = z.infer<typeof channelProviderConfigSchema>;
+
+/**
  * Union schema for all provider configurations
  */
 export const providerConfigSchema = z.union([
@@ -80,6 +92,7 @@ export const providerConfigSchema = z.union([
   ttsProviderConfigSchema,
   asrProviderConfigSchema,
   storageProviderConfigSchema,
+  channelProviderConfigSchema,
 ]).describe('Provider-specific configuration object');
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;
@@ -92,7 +105,7 @@ export const providerRouteParamsSchema = z.object({
 /**
  * Enum for provider types
  */
-export const providerTypeSchema = z.enum(['asr', 'tts', 'llm', 'embeddings', 'storage']).describe('Type of provider service');
+export const providerTypeSchema = z.enum(['asr', 'tts', 'llm', 'embeddings', 'storage', 'channel']).describe('Type of provider service');
 
 /**
  * Provider name (openai, anthropic, azure, elevenlabs, etc.)

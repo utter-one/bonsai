@@ -197,6 +197,7 @@ export const providerCatalogSchema = z.object({
   llm: z.array(llmProviderInfoSchema).describe('LLM providers'),
   storage: z.array(storageProviderInfoSchema).describe('Storage providers'),
   moderation: z.array(moderationProviderInfoSchema).describe('Moderation providers'),
+  channel: z.array(storageProviderInfoSchema).describe('Communication channel providers'),
 });
 
 export type ProviderCatalog = z.infer<typeof providerCatalogSchema>;
@@ -213,6 +214,7 @@ export class ProviderCatalogService {
       llm: this.getLlmProviders(),
       storage: this.getStorageProviders(),
       moderation: this.getModerationProviders(),
+      channel: this.getChannelProviders(),
     };
   }
 
@@ -11787,6 +11789,26 @@ export class ProviderCatalogService {
             ],
           },
         ],
+      },
+    ];
+  }
+
+  /**
+   * Gets all channel provider information
+   */
+  private getChannelProviders(): StorageProviderInfo[] {
+    return [
+      {
+        apiType: 'twilio_messaging',
+        displayName: 'Twilio Messaging',
+        description: 'Twilio Messaging API for SMS and WhatsApp text-based conversations',
+        features: ['SMS', 'WhatsApp', 'Webhook signature validation', 'Inbound/outbound text messages'],
+      },
+      {
+        apiType: 'twilio_voice',
+        displayName: 'Twilio Voice',
+        description: 'Twilio Voice API for inbound phone calls via Media Streams (8 kHz µLaw bidirectional audio)',
+        features: ['Inbound PSTN calls', 'Media Streams WebSocket', 'µLaw 8 kHz audio', 'Webhook signature validation'],
       },
     ];
   }

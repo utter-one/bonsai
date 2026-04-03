@@ -8,10 +8,10 @@
  */
 
 /** Permitted transport channel types for an API key. */
-export type ApiKeyChannel = 'websocket' | 'webrtc';
+export type ApiKeyChannel = 'websocket' | 'webrtc' | 'twilio_voice' | 'twilio_messaging';
 
 /** All supported API key channel values. */
-export const ALL_API_KEY_CHANNELS: Array<ApiKeyChannel> = ['websocket', 'webrtc'];
+export const ALL_API_KEY_CHANNELS: Array<ApiKeyChannel> = ['websocket', 'webrtc', 'twilio_voice', 'twilio_messaging'];
 
 /**
  * Permitted feature capabilities for an API key.
