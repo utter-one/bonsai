@@ -2,6 +2,9 @@ import type { Session, SessionManager } from '../SessionManager';
 import type { IClientConnection } from '../IClientConnection';
 import type { CALOutputMessage } from '../messages';
 import { logger } from '../../utils/logger';
+import * as _twilio from 'twilio';
+const _twilioModule = (_twilio as any).default ?? _twilio;
+const TwilioClient = _twilioModule.Twilio as typeof import('twilio').Twilio;
 
 /**
  * Twilio Messaging-backed implementation of {@link IClientConnection}.
@@ -59,9 +62,7 @@ export class TwilioMessagingConnection implements IClientConnection {
     if (!body) return;
 
     try {
-      // Lazy import to avoid loading the Twilio SDK unless this channel is actually used.
-      const { Twilio } = await import('twilio');
-      const client = new Twilio(this.accountSid, this.authToken);
+      const client = new TwilioClient(this.accountSid, this.authToken);
       await client.messages.create({ body, from: this.toNumber, to: this.fromNumber });
       logger.info({ to: this.fromNumber, sessionId: this.session?.id }, 'Twilio message sent');
     } catch (error) {
