@@ -6,13 +6,13 @@ import { ConversationState } from '../types/conversationEvents';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
 import { TtsProviderConfig, TtsSettings } from '../services/providers/tts/TtsProviderFactory';
-import { StorageProviderConfig } from '../http/contracts/provider';
+import { StorageProviderConfig, ChannelProviderConfig } from '../http/contracts/provider';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 import { FillerSettings } from '../http/contracts/agent';
 import type { ApiKeySettings } from '../http/contracts/apiKey';
 
 
-export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig;
+export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig | ChannelProviderConfig;
 
 // User table
 export const users = pgTable('users', {

@@ -46,6 +46,7 @@ export default defineConfig({
             { text: 'Content Moderation', link: '/guide/moderation' },
             { text: 'WebSocket Channel', link: '/guide/websocket' },
             { text: 'WebRTC Channel', link: '/guide/webrtc' },
+            { text: 'Twilio Messaging Channel', link: '/guide/twilio-messaging' },
             { text: 'Templating', link: '/guide/templating' },
             { text: 'Scripting', link: '/guide/scripting' },
           ],
@@ -121,6 +122,7 @@ export default defineConfig({
           items: [
             { text: 'WebSocket', link: '/api/websocket' },
             { text: 'WebRTC', link: '/api/webrtc' },
+            { text: 'Twilio Messaging', link: '/api/twilio-messaging' },
           ],
         },
       ],

@@ -42,6 +42,7 @@ import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
 import { WebSocketChannelHost } from './channels/websocket/WebSocketChannelHost';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
+import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -68,6 +69,9 @@ export function createApp(): express.Application {
 
   // Parse JSON bodies (10mb limit accommodates migration import bundles)
   app.use(express.json({ limit: '10mb' }));
+
+  // Parse URL-encoded bodies (used by Twilio webhooks)
+  app.use(express.urlencoded({ extended: false }));
 
   // CORS configuration
   app.use(cors({
@@ -211,6 +215,7 @@ export function createApp(): express.Application {
   projectExchangeController.registerRoutes(app);
 
   container.resolve(WebRTCChannelHost).registerRoutes(app);
+  container.resolve(TwilioMessagingChannelHost).registerRoutes(app);
 
   container.resolve(ConversationTimeoutService).start();
 
