@@ -19,7 +19,9 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import type { ApiKeySettings } from '../../apiKeyFeatures';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
-import { validateRequest } from 'twilio';
+import * as _twilio from 'twilio';
+const _twilioModule = (_twilio as any).default ?? _twilio;
+const validateRequest = _twilioModule.validateRequest as typeof import('twilio').validateRequest;
 
 /** Query param schema shared by both the HTTP webhook and the Media Streams WebSocket URL. */
 const voiceQuerySchema = z.object({

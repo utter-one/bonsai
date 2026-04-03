@@ -14,7 +14,9 @@ import { logger } from '../../utils/logger';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
-import { validateRequest } from 'twilio';
+import * as _twilio from 'twilio';
+const _twilioModule = (_twilio as any).default ?? _twilio;
+const validateRequest = _twilioModule.validateRequest as typeof import('twilio').validateRequest;
 
 /** Default inactivity session timeout in milliseconds (30 minutes). */
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
