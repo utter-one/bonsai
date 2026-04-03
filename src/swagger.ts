@@ -15,7 +15,7 @@ import { conversationResponseSchema, conversationListResponseSchema, conversatio
 import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './http/contracts/stage';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './http/contracts/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
-import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
+import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateSmartFunctionToolSchema, updateWebhookToolSchema, updateScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
 import { createSampleCopySchema, updateSampleCopyBodySchema, deleteSampleCopyBodySchema, sampleCopyResponseSchema, sampleCopyListResponseSchema } from './http/contracts/sampleCopy';
 import { createCopyDecoratorSchema, updateCopyDecoratorBodySchema, deleteCopyDecoratorBodySchema, copyDecoratorResponseSchema, copyDecoratorListResponseSchema } from './http/contracts/copyDecorator';
@@ -250,6 +250,9 @@ export function getOpenAPISpec(): any {
   registry.register('CreateScriptTool', createScriptToolSchema);
   registry.register('ToolType', toolTypeSchema);
   registry.register('CreateToolRequest', createToolSchema);
+  registry.register('UpdateSmartFunctionTool', updateSmartFunctionToolSchema);
+  registry.register('UpdateWebhookTool', updateWebhookToolSchema);
+  registry.register('UpdateScriptTool', updateScriptToolSchema);
   registry.register('UpdateToolRequest', updateToolBodySchema);
   registry.register('DeleteToolRequest', deleteToolBodySchema);
   registry.register('ToolResponse', toolResponseSchema);
