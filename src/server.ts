@@ -43,6 +43,7 @@ import { setSpecProvider } from './services/VersionService';
 import { WebSocketChannelHost } from './channels/websocket/WebSocketChannelHost';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
+import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -216,6 +217,7 @@ export function createApp(): express.Application {
 
   container.resolve(WebRTCChannelHost).registerRoutes(app);
   container.resolve(TwilioMessagingChannelHost).registerRoutes(app);
+  container.resolve(TwilioVoiceChannelHost).registerRoutes(app);
 
   container.resolve(ConversationTimeoutService).start();
 
@@ -234,6 +236,9 @@ export function startServer(port: number = 3000): void {
   // Initialize WebSocket host
   const wsHost = container.resolve(WebSocketChannelHost);
   wsHost.initialize(server);
+
+  // Initialize Twilio Voice Media Streams host
+  container.resolve(TwilioVoiceChannelHost).initialize(server);
 
   server.listen(port, () => {
     logger.info({ port }, 'HTTP server started');

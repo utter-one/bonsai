@@ -11804,6 +11804,12 @@ export class ProviderCatalogService {
         description: 'Twilio Messaging API for SMS and WhatsApp text-based conversations',
         features: ['SMS', 'WhatsApp', 'Webhook signature validation', 'Inbound/outbound text messages'],
       },
+      {
+        apiType: 'twilio_voice',
+        displayName: 'Twilio Voice',
+        description: 'Twilio Voice API for inbound phone calls via Media Streams (8 kHz µLaw bidirectional audio)',
+        features: ['Inbound PSTN calls', 'Media Streams WebSocket', 'µLaw 8 kHz audio', 'Webhook signature validation'],
+      },
     ];
   }
 }
