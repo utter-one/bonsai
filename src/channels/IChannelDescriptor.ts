@@ -2,7 +2,7 @@ import z from "zod";
 import { AudioFormat } from "../types/audio";
 import { ApiKeyChannel } from "../apiKeyFeatures";
 
-export type ChannelCaps = {
+export type ChannelCapabilities = {
   /**
    * Whether the channel supports voice input (e.g. receiving audio from the user).
    */
@@ -40,9 +40,9 @@ export type ChannelCaps = {
 }
 
 /**
- * Interface that all communication skill implementations must adhere to.
+ * Interface that all communication channel implementations must adhere to.
  */
-export interface ICommunicationSkill {
+export interface ICommunicationChannel {
   /** Unique identifier for the channel type, e.g. 'websocket' or 'webrtc'. */
   getType(): ApiKeyChannel;
 
@@ -53,5 +53,5 @@ export interface ICommunicationSkill {
   getConfigSchema(): z.ZodObject<any>;
 
   /** Returns the channel capabilities */
-  getCapabilities(): ChannelCaps;
+  getCapabilities(): ChannelCapabilities;
 }
