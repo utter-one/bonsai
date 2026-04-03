@@ -19,6 +19,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import type { ApiKeySettings } from '../../apiKeyFeatures';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { validateRequest } from 'twilio';
 
 /** Query param schema shared by both the HTTP webhook and the Media Streams WebSocket URL. */
 const voiceQuerySchema = z.object({
@@ -181,7 +182,6 @@ export class TwilioVoiceChannelHost {
     }
     const { authToken } = configResult.data;
 
-    const { validateRequest } = await import('twilio');
     const twilioSignature = req.headers['x-twilio-signature'] as string | undefined;
     const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
     const isValid = validateRequest(authToken, twilioSignature ?? '', fullUrl, req.body as Record<string, string>);
