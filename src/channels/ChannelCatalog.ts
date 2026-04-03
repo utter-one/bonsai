@@ -1,14 +1,53 @@
+import { inject, singleton } from 'tsyringe';
 import { z } from 'zod';
+import type { ICommunicationChannel } from './IChannelDescriptor';
+import { WebSocketCommunicationChannel } from './websocket/WebSocketCommunicationChannel';
+import { WebRTCCommunicationChannel } from './webrtc/WebRTCCommunicationChannel';
 
 /**
- * Catalog of available channel types and their configuration schemas.
+ * Catalog of available ICommunicationChannel implementations.
+ *
+ * Provides a central registry for all channel types supported by the backend,
+ * delegating capability and schema queries to the individual channel instances.
  */
+@singleton()
 export class ChannelCatalog {
+  private readonly channels: Map<string, ICommunicationChannel>;
+
+  constructor(
+    @inject(WebSocketCommunicationChannel) websocket: WebSocketCommunicationChannel,
+    @inject(WebRTCCommunicationChannel) webrtc: WebRTCCommunicationChannel,
+  ) {
+    const entries: ICommunicationChannel[] = [websocket, webrtc];
+    this.channels = new Map(entries.map((c) => [c.getType(), c]));
+  }
+
   /**
-   * Returns the list of supported channel typesby the backend.
+   * Returns all registered channel instances.
+   */
+  getChannels(): ICommunicationChannel[] {
+    return Array.from(this.channels.values());
+  }
+
+  /**
+   * Returns the channel instance for the given channel type.
+   * @param channelType - The channel type identifier, e.g. `'websocket'`.
+   * @returns The matching ICommunicationChannel instance.
+   * @throws Error if the channel type is not registered.
+   */
+  getChannel(channelType: string): ICommunicationChannel {
+    const channel = this.channels.get(channelType);
+    if (!channel) {
+      throw new Error(`Unsupported channel type: ${channelType}`);
+    }
+    return channel;
+  }
+
+  /**
+   * Returns the list of supported channel types registered in the catalog.
    */
   getSupportedChannelTypes(): string[] {
-    return ['websocket', 'webrtc'];
+    return Array.from(this.channels.keys());
   }
 
   /**
@@ -18,14 +57,6 @@ export class ChannelCatalog {
    * @throws Error if the channel type is not supported.
    */
   getChannelConfigSchema(channelType: string): z.ZodObject<any> {
-    switch (channelType) {
-      case 'websocket':
-        return z.object({}); // No specific config for WebSocket channel host at this time
-      case 'webrtc':
-        return z.object({});
-      default:
-        throw new Error(`Unsupported channel type: ${channelType}`);
-    }
+    return this.getChannel(channelType).getConfigSchema();
   }
-
 }

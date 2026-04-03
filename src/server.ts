@@ -25,6 +25,7 @@ import { CopyDecoratorController } from './http/controllers/CopyDecoratorControl
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
+import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
@@ -187,6 +188,9 @@ export function createApp(): express.Application {
 
   const providerCatalogController = container.resolve(ProviderCatalogController);
   providerCatalogController.registerRoutes(app);
+
+  const channelCatalogController = container.resolve(ChannelCatalogController);
+  channelCatalogController.registerRoutes(app);
 
   const stageController = container.resolve(StageController);
   stageController.registerRoutes(app);

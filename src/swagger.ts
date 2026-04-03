@@ -23,6 +23,7 @@ import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironment
 import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, moderationProvidersResponseSchema, moderationProviderInfoSchema, moderationModelInfoSchema, moderationCategoryInfoSchema } from './http/contracts/providerCatalog';
+import { channelCapabilitiesSchema, channelInfoSchema, channelCatalogResponseSchema } from './http/contracts/channelCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
 import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema, tokenUsageByEventTypeSchema, tokenUsageTrendPointSchema } from './http/contracts/analytics';
 import { sourceDimensionSchema, sourceMetricSchema, sourceEntrySchema, sliceQueryRowSchema } from './http/contracts/sliceAnalytics';
@@ -80,6 +81,7 @@ import { CopyDecoratorController } from './http/controllers/CopyDecoratorControl
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
+import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
@@ -396,6 +398,15 @@ export function getOpenAPISpec(): any {
   // Register ProviderCatalog routes from ProviderCatalogController
   const providerCatalogPaths = ProviderCatalogController.getOpenAPIPaths();
   for (const path of providerCatalogPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register ChannelCatalog routes from ChannelCatalogController
+  registry.register('ChannelCapabilities', channelCapabilitiesSchema);
+  registry.register('ChannelInfo', channelInfoSchema);
+  registry.register('ChannelCatalogResponse', channelCatalogResponseSchema);
+  const channelCatalogPaths = ChannelCatalogController.getOpenAPIPaths();
+  for (const path of channelCatalogPaths) {
     registry.registerPath(path);
   }
 
