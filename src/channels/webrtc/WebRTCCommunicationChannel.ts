@@ -57,6 +57,8 @@ export class WebRTCCommunicationChannel implements ICommunicationChannel {
       supportsTextOutput: true,
       supportsCommands: true,
       supportsEvents: true,
+      supportsIncomingConnections: true,
+      supportsOutgoingConnections: false,
       supportedAudioFormats: WEBRTC_SUPPORTED_AUDIO_FORMATS,
     };
   }

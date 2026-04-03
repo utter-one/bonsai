@@ -44,6 +44,8 @@ export class TwilioVoiceCommunicationChannel implements ICommunicationChannel {
       supportsTextOutput: false,
       supportsCommands: false,
       supportsEvents: false,
+      supportsIncomingConnections: true,
+      supportsOutgoingConnections: true,
       supportedAudioFormats: TWILIO_VOICE_SUPPORTED_AUDIO_FORMATS,
     };
   }

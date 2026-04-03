@@ -37,6 +37,8 @@ export class WebSocketCommunicationChannel implements ICommunicationChannel {
       supportsTextOutput: true,
       supportsCommands: true,
       supportsEvents: true,
+      supportsIncomingConnections: true,
+      supportsOutgoingConnections: false,
       supportedAudioFormats: [...audioFormatValues],
     };
   }

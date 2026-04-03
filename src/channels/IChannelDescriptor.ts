@@ -34,6 +34,16 @@ export type ChannelCapabilities = {
   supportsEvents: boolean;
 
   /**
+   * Whether the channel can accept user-initiated sessions (e.g. a client opening a WebSocket connection or a user calling a Twilio number).
+   */
+  supportsIncomingConnections: boolean;
+
+  /**
+   * Whether the channel can initiate sessions to users (e.g. placing an outbound Twilio call or sending a proactive SMS).
+   */
+  supportsOutgoingConnections: boolean;
+
+  /**
    * Optional array of supported audio formats for voice input/output, e.g. ['pcm', 'wav', 'ogg']. Must be specified for voice channels.
    */
   supportedAudioFormats?: AudioFormat[];

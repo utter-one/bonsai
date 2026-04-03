@@ -14,6 +14,8 @@ export const channelCapabilitiesSchema = z.object({
   supportsTextOutput: z.boolean().describe('Whether the channel supports sending text messages to the user'),
   supportsCommands: z.boolean().describe('Whether the channel supports client-sent commands (e.g. go-to-stage, set-var)'),
   supportsEvents: z.boolean().describe('Whether the channel supports server-sent event notifications'),
+  supportsIncomingConnections: z.boolean().describe('Whether the channel can accept user-initiated sessions (e.g. a client opening a WebSocket connection or a user calling a Twilio number)'),
+  supportsOutgoingConnections: z.boolean().describe('Whether the channel can initiate sessions to users (e.g. placing an outbound Twilio call or sending a proactive SMS)'),
   supportedAudioFormats: z.array(audioFormatSchema).optional().describe('Audio formats accepted by this channel for voice input/output. Only present when voice is supported.'),
 }).openapi('ChannelCapabilities');
 

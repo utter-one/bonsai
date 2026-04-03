@@ -35,6 +35,8 @@ export class TwilioMessagingCommunicationChannel implements ICommunicationChanne
       supportsTextOutput: true,
       supportsCommands: false,
       supportsEvents: false,
+      supportsIncomingConnections: true,
+      supportsOutgoingConnections: true,
     };
   }
 }
