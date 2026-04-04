@@ -38,22 +38,19 @@ All other messages (transcription updates, generation events, commands, errors) 
 
 WebRTC connection setup follows a gather-and-return model: the server collects all ICE candidates before returning the SDP answer, so the client receives a complete answer in a single HTTP response with no trickle ICE callbacks needed.
 
-```
-Client                              Server
-  |                                   |
-  |── POST /api/webrtc/offer ────────>|
-  |   { sdpOffer: "..." }             |  creates RTCPeerConnection
-  |                                   |  creates answer
-  |                                   |  waits for ICE gathering
-  |<─ 200 { sdpAnswer: "..." } ───────|
-  |                                   |
-  |═══ DTLS/SCTP handshake ══════════>|
-  |                                   |
-  |── control DataChannel open ─────>|  session registered
-  |── audio DataChannel open ───────>|
-  |                                   |
-  |── auth (JSON, control) ─────────>|
-  |<─ auth response (JSON, control) ──|
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: POST /api/webrtc/offer
+    Note over S: creates RTCPeerConnection, answer, waits for ICE
+    S-->>C: 200 { sdpAnswer }
+    Note over C,S: DTLS/SCTP handshake
+    C->>S: control DataChannel open
+    Note over S: session registered
+    C->>S: audio DataChannel open
+    C->>S: auth (JSON, control)
+    S-->>C: auth response (JSON, control)
 ```
 
 ## Connection Setup
