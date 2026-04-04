@@ -1,8 +1,22 @@
-import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
-export default defineConfig({
+export default withMermaid({
   title: 'Bonsai Backend',
   description: 'Documentation for the Bonsai Backend API',
+  mermaid: {
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#ecfdf5',
+      primaryTextColor: '#064e3b',
+      primaryBorderColor: '#059669',
+      lineColor: '#059669',
+      secondaryColor: '#d1fae5',
+      tertiaryColor: '#f3f4f6',
+      background: '#f9fafb',
+      fontFamily: 'Lexend, system-ui, sans-serif',
+      fontSize: '14px',
+    },
+  },
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
@@ -138,3 +152,4 @@ export default defineConfig({
     },
   },
 })
+

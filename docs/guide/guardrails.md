@@ -84,3 +84,15 @@ See [Actions & Effects](./actions-and-effects) for details on each effect type.
 ## Pipeline Position
 
 The guardrail classifier runs **in parallel** with the stage's own classifiers and context transformers. The resulting guardrail actions are merged with other classification results and processed together in the same turn — there is no sequential overhead compared to having an additional stage classifier.
+
+```mermaid
+flowchart TD
+    A([User Input]) --> B["Stage Classifiers<br>intent detection"]
+    A --> C["Context Transformers<br>data extraction"]
+    A --> D["Guardrail Classifier<br>safety checks"]
+    B -- run in parallel --> E[Merge Results]
+    C -- run in parallel --> E
+    D -- run in parallel --> E
+    E --> F["Action Execution<br>effects · sequential"]
+    F --> G([Response Generation])
+```

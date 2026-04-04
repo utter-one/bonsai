@@ -115,10 +115,15 @@ A stage references several other entities:
 
 Conversations move between stages via the `go_to_stage` effect. When navigating:
 
-1. The `__on_leave` lifecycle action runs on the current stage (if defined)
-2. The new stage is loaded with all its providers, classifiers, and transformers
-3. The `__on_enter` lifecycle action runs on the new stage (if defined)
-4. The new stage's `enterBehavior` determines what happens next
+```mermaid
+flowchart TD
+    A([go_to_stage triggered]) --> B["Run __on_leave<br>on current stage"]
+    B --> C["Load new stage<br>providers · classifiers · transformers"]
+    C --> D["Run __on_enter<br>on new stage"]
+    D --> E{enterBehavior?}
+    E -->|generate_response| F(["AI generates<br>opening response"])
+    E -->|await_user_input| G([Wait for user input])
+```
 
 See [Actions & Effects](./actions-and-effects) for details on lifecycle actions and the `go_to_stage` effect.
 

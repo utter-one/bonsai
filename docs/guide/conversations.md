@@ -20,24 +20,23 @@ A **Conversation** represents a real-time session between an end user and the AI
 
 Conversations follow this state machine:
 
-```
-initialized
-    │
-    ▼
-awaiting_user_input ◄──────────────┐
-    │                                │
-    ▼                                │
-receiving_user_voice                 │
-    │                                │
-    ▼                                │
-processing_user_input                │
-    │                                │
-    ▼                                │
-generating_response ────────────────┘
-    │
-    ├───► finished       (graceful end)
-    ├───► aborted        (immediate end)
-    └───► failed         (error)
+```mermaid
+stateDiagram-v2
+    [*] --> initialized
+    initialized --> awaiting_user_input : start_conversation
+    awaiting_user_input --> receiving_user_voice : voice input starts
+    awaiting_user_input --> processing_user_input : text input received
+    receiving_user_voice --> processing_user_input : voice input ends
+    processing_user_input --> generating_response : classified & transformed
+    generating_response --> awaiting_user_input : response complete
+    generating_response --> finished : end_conversation effect
+    generating_response --> aborted : abort_conversation effect
+    generating_response --> failed : error
+    awaiting_user_input --> finished : end_conversation command
+    awaiting_user_input --> aborted : abort_conversation command
+    finished --> [*]
+    aborted --> [*]
+    failed --> [*]
 ```
 
 | State | Description |

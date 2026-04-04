@@ -130,3 +130,60 @@
 ::-webkit-scrollbar-thumb:hover {
   background: oklch(69.6% 0.17 162.48);
 }
+
+/* =====================
+   Mermaid Diagrams
+   ===================== */
+.vp-doc .mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+
+.vp-doc .mermaid svg {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Dark mode fallback for same-page theme toggle */
+.dark .mermaid svg {
+  background-color: #111827;
+  border-radius: 8px;
+}
+
+.dark .mermaid .node rect,
+.dark .mermaid .node circle,
+.dark .mermaid .node ellipse,
+.dark .mermaid .node polygon,
+.dark .mermaid .node path {
+  fill: #064e3b !important;
+  stroke: #34d399 !important;
+}
+
+.dark .mermaid .nodeLabel,
+.dark .mermaid .node .label {
+  color: #6ee7b7 !important;
+  fill: #6ee7b7 !important;
+}
+
+.dark .mermaid .edgePath .path,
+.dark .mermaid .flowchart-link {
+  stroke: #34d399 !important;
+}
+
+.dark .mermaid .actor {
+  fill: #064e3b !important;
+  stroke: #34d399 !important;
+}
+
+.dark .mermaid .actor text,
+.dark .mermaid .messageText,
+.dark .mermaid text {
+  fill: #6ee7b7 !important;
+}
+
+.dark .mermaid line,
+.dark .mermaid path.arrowMarkerPath {
+  stroke: #34d399 !important;
+}

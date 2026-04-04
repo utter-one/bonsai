@@ -57,40 +57,15 @@ Environments (shared, not project-scoped)
 
 A typical conversation turn follows this pipeline:
 
-```
-User Input (voice or text)
-    │
-    ▼
-┌─────────────────────┐
-│  ASR Transcription  │  (voice → text, if voice input)
-└────────┬────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  Classification (parallel)        │  Classifiers identify actions
-│  Transformation (parallel)        │  Transformers extract data
-└────────┬──────────────────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  Action Execution                 │  Effects run sequentially:
-│  • Scripts, webhooks, tools       │  modify vars, navigate stages,
-│  • Variable/profile modifications │  call external services
-└────────┬──────────────────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  Response Generation              │  LLM generates text using
-│  (streamed)                       │  Handlebars-rendered prompt
-└────────┬──────────────────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  TTS Synthesis (streamed)         │  Text → audio chunks
-└────────┬──────────────────────────┘
-         │
-         ▼
-   Client receives text + audio
+```mermaid
+flowchart TD
+    A(["User Input<br>voice or text"]) -->|voice| B["ASR Transcription<br>voice → text"]
+    A -->|text| C
+    B --> C["Classification & Transformation<br>in parallel"]
+    C --> D["Action Execution<br>effects · sequential"]
+    D --> E["Response Generation<br>LLM · streamed"]
+    E --> F["TTS Synthesis<br>text → audio · streamed"]
+    F --> G(["Client receives<br>text + audio"])
 ```
 
 Each step streams results incrementally to the client via WebSocket, providing low-latency responses.
