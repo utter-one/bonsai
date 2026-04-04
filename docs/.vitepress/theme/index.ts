@@ -1,6 +1,6 @@
 import DefaultTheme from 'vitepress/theme'
-import { useData, inBrowser } from 'vitepress'
-import { watchEffect } from 'vue'
+import { useData, useRouter, inBrowser } from 'vitepress'
+import { watch, onMounted, nextTick } from 'vue'
 import './style.css'
 
 const lightThemeVariables = {
@@ -22,9 +22,9 @@ const darkThemeVariables = {
   primaryBorderColor: '#34d399',
   lineColor: '#34d399',
   secondaryColor: '#065f46',
-  tertiaryColor: '#1f2937',
-  background: '#0d0f14',
-  edgeLabelBackground: '#0d0f14',
+  tertiaryColor: '#090b0c',
+  background: '#090b0c',
+  edgeLabelBackground: '#090b0c',
   fontFamily: 'Lexend, system-ui, sans-serif',
   fontSize: '14px',
 }
@@ -34,13 +34,48 @@ export default {
   setup() {
     if (!inBrowser) return
     const { isDark } = useData()
-    watchEffect(async () => {
+    const router = useRouter()
+
+    const renderDiagrams = async () => {
       const mermaid = (await import('mermaid')).default
       mermaid.initialize({
         startOnLoad: false,
+        htmlLabels: false,
         theme: 'base',
         themeVariables: isDark.value ? darkThemeVariables : lightThemeVariables,
       })
+      await nextTick()
+      // Preserve original source before first render so theme toggle can restore it
+      document.querySelectorAll<HTMLElement>('.mermaid:not([data-processed])').forEach(el => {
+        if (!el.dataset.mermaidSrc) {
+          el.dataset.mermaidSrc = el.textContent?.trim() ?? ''
+        }
+      })
+      const nodes = Array.from(document.querySelectorAll<HTMLElement>('.mermaid:not([data-processed])'))
+      if (nodes.length > 0) {
+        await mermaid.run({ nodes })
+      }
+    }
+
+    onMounted(() => {
+      renderDiagrams()
+    })
+
+    // Re-render on SPA navigation
+    router.onAfterRouteChanged = () => {
+      renderDiagrams()
+    }
+
+    // Re-render with new theme on dark/light toggle
+    watch(isDark, () => {
+      document.querySelectorAll<HTMLElement>('.mermaid[data-processed]').forEach(el => {
+        const src = el.dataset.mermaidSrc
+        if (src) {
+          el.textContent = src
+          el.removeAttribute('data-processed')
+        }
+      })
+      renderDiagrams()
     })
   },
 }

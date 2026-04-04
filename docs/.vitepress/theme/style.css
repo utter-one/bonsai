@@ -148,7 +148,7 @@
 
 /* Dark mode fallback for same-page theme toggle */
 .dark .mermaid svg {
-  background-color: #111827;
+  background-color: #090b0c;
   border-radius: 8px;
 }
 
