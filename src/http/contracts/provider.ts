@@ -25,6 +25,7 @@ import { gcsStorageProviderConfigSchema } from '../../services/providers/storage
 import { localStorageProviderConfigSchema } from '../../services/providers/storage/LocalStorageProvider';
 import { twilioMessagingChannelProviderConfigSchema } from '../../services/providers/channel/TwilioMessagingChannelProvider';
 import { twilioVoiceChannelProviderConfigSchema } from '../../services/providers/channel/TwilioVoiceChannelProvider';
+import { whatsAppChannelProviderConfigSchema } from '../../services/providers/channel/WhatsAppChannelProvider';
 
 extendZodWithOpenApi(z);
 
@@ -80,6 +81,7 @@ export type StorageProviderConfig = z.infer<typeof storageProviderConfigSchema>;
 export const channelProviderConfigSchema = z.union([
   twilioMessagingChannelProviderConfigSchema,
   twilioVoiceChannelProviderConfigSchema,
+  whatsAppChannelProviderConfigSchema,
 ]).describe('Channel provider configuration');
 
 export type ChannelProviderConfig = z.infer<typeof channelProviderConfigSchema>;
