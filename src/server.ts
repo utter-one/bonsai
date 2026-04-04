@@ -44,6 +44,7 @@ import { WebSocketChannelHost } from './channels/websocket/WebSocketChannelHost'
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
 import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
+import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -69,7 +70,8 @@ export function createApp(): express.Application {
   app.set('query parser', (str: string) => qs.parse(str, { allowDots: true, depth: 10 }));
 
   // Parse JSON bodies (10mb limit accommodates migration import bundles)
-  app.use(express.json({ limit: '10mb' }));
+  // The verify callback captures the raw buffer so webhook handlers can validate HMAC-SHA256 signatures.
+  app.use(express.json({ limit: '10mb', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
 
   // Parse URL-encoded bodies (used by Twilio webhooks)
   app.use(express.urlencoded({ extended: false }));
@@ -218,6 +220,7 @@ export function createApp(): express.Application {
   container.resolve(WebRTCChannelHost).registerRoutes(app);
   container.resolve(TwilioMessagingChannelHost).registerRoutes(app);
   container.resolve(TwilioVoiceChannelHost).registerRoutes(app);
+  container.resolve(WhatsAppChannelHost).registerRoutes(app);
 
   container.resolve(ConversationTimeoutService).start();
 
