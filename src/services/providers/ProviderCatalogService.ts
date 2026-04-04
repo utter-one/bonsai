@@ -11810,6 +11810,12 @@ export class ProviderCatalogService {
         description: 'Twilio Voice API for inbound phone calls via Media Streams (8 kHz µLaw bidirectional audio)',
         features: ['Inbound PSTN calls', 'Media Streams WebSocket', 'µLaw 8 kHz audio', 'Webhook signature validation'],
       },
+      {
+        apiType: 'whatsapp',
+        displayName: 'WhatsApp (Meta Cloud API)',
+        description: 'Meta WhatsApp Cloud API for text-based conversations via WhatsApp Business',
+        features: ['WhatsApp messaging', 'Webhook signature validation', 'Inbound/outbound text messages', 'Slash-command interface'],
+      },
     ];
   }
 }

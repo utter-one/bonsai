@@ -5,6 +5,7 @@ import { WebSocketCommunicationChannel } from './websocket/WebSocketCommunicatio
 import { WebRTCCommunicationChannel } from './webrtc/WebRTCCommunicationChannel';
 import { TwilioMessagingCommunicationChannel } from './twilio-messaging/TwilioMessagingCommunicationChannel';
 import { TwilioVoiceCommunicationChannel } from './twilio-voice/TwilioVoiceCommunicationChannel';
+import { WhatsAppCommunicationChannel } from './whatsapp/WhatsAppCommunicationChannel';
 
 /**
  * Catalog of available ICommunicationChannel implementations.
@@ -21,8 +22,9 @@ export class ChannelCatalog {
     @inject(WebRTCCommunicationChannel) webrtc: WebRTCCommunicationChannel,
     @inject(TwilioMessagingCommunicationChannel) twilioMessaging: TwilioMessagingCommunicationChannel,
     @inject(TwilioVoiceCommunicationChannel) twilioVoice: TwilioVoiceCommunicationChannel,
+    @inject(WhatsAppCommunicationChannel) whatsApp: WhatsAppCommunicationChannel,
   ) {
-    const entries: ICommunicationChannel[] = [websocket, webrtc, twilioMessaging, twilioVoice];
+    const entries: ICommunicationChannel[] = [websocket, webrtc, twilioMessaging, twilioVoice, whatsApp];
     this.channels = new Map(entries.map((c) => [c.getType(), c]));
   }
 
