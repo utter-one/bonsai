@@ -110,22 +110,6 @@ Select event types include a `metadata` object with timing measurements (all val
 
 **`tool_call` events** include `durationMs` — the time taken to execute the tool.
 
-## Conversation Artifacts
-
-Artifacts are binary or text data associated with a conversation:
-
-| Artifact Type | Description |
-|---|---|
-| `user_voice` | User's voice audio recording |
-| `user_transcript` | User's speech transcription |
-| `ai_voice` | AI's voice audio output |
-| `ai_transcript` | AI's generated text |
-| `tool_input` | Input sent to a tool |
-| `tool_output` | Output received from a tool |
-| `other` | Any other artifact |
-
-Artifacts can be stored inline (base64), in external storage (S3, Azure Blob, GCS), or both, depending on the project's `storageConfig`.
-
 ## Stage Variables
 
 Conversations maintain variables scoped to each stage. The `stageVars` field is a nested map:
