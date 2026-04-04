@@ -5,6 +5,7 @@ export default withMermaid({
   description: 'Documentation for the Bonsai Backend API',
   mermaid: {
     theme: 'base',
+    htmlLabels: false,
     themeVariables: {
       primaryColor: '#ecfdf5',
       primaryTextColor: '#064e3b',

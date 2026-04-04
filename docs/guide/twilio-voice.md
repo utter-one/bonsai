@@ -109,24 +109,16 @@ You can point multiple Twilio numbers at different webhook URLs with different `
 
 ### Call Flow
 
-```
-Caller dials number
-      │
-      ▼
-Twilio POSTs to /api/twilio/voice/webhook
-      │  (validates signature, reads From, returns TwiML)
-      ▼
-Twilio opens WebSocket to /api/twilio/voice/stream
-      │  (streams µLaw 8 kHz audio in both directions)
-      ▼
-Session created → start_conversation → start_user_voice_input
-      │
-      ├── media events → receiveUserVoiceData()
-      │       └── VAD detects speech end → ASR → LLM → TTS
-      │                                              └── send_ai_voice_chunk
-      │                                                    └── media event → Twilio → caller hears AI
-      │
-      └── caller hangs up → stop event → session unregistered
+```mermaid
+flowchart TD
+    A([Caller dials number]) --> B["POST /api/twilio/voice/webhook (validates signature · returns TwiML)"]
+    B --> C["WebSocket /api/twilio/voice/stream (µLaw 8 kHz · bidirectional)"]
+    C --> D[Session created · start_conversation · start_user_voice_input]
+    D --> E["receiveUserVoiceData() via media events"]
+    E --> F[VAD detects speech end]
+    F --> G[ASR → LLM → TTS → send_ai_voice_chunk]
+    G --> H([media event → Twilio → caller hears AI])
+    D --> I([caller hangs up · stop event · session unregistered])
 ```
 
 ### Audio Format
