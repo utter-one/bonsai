@@ -16,34 +16,31 @@ Bonsai Backend is built on:
 
 Everything in Bonsai Backend revolves around **Projects**. A project is a self-contained conversational AI experience. Here is the full entity hierarchy:
 
-```mermaid
-flowchart LR
-    P([Project])
-    P --> ST[Stages]
-    ST --> AG[Agent]
-    ST --> LLM[LLM Provider]
-    ST --> CL[Default Classifier]
-    ST --> CT[Context Transformers]
-    ST --> GA[Global Actions]
-    ST --> KT[Knowledge tags]
-    ST --> VD[Variable Descriptors]
-    ST --> AC[Actions]
-    P --> AGT[Agents]
-    AGT --> PR[Prompt]
-    AGT --> TTS[TTS Settings]
-    P --> CLS[Classifiers]
-    P --> CTX[Context Transformers]
-    P --> TL[Tools]
-    P --> KC[Knowledge Categories]
-    KC --> KI[Items]
-    P --> GAD[Global Actions]
-    P --> GR[Guardrails]
-    P --> AK[API Keys]
-    P --> CV[Conversations]
-    CV --> EV[Events]
-    EV --> AR[Artifacts]
-    P --> US[Users]
-```
+- **Project**
+  - Stages
+    - Agent
+    - LLM Provider
+    - Default Classifier
+    - Context Transformers
+    - Global Actions
+    - Knowledge tags
+    - Variable Descriptors
+    - Actions
+  - Agents
+    - Prompt
+    - TTS Settings
+  - Classifiers
+  - Context Transformers
+  - Tools
+  - Knowledge Categories
+    - Items
+  - Global Actions
+  - Guardrails
+  - API Keys
+  - Conversations
+    - Events
+      - Artifacts
+  - Users
 
 ## Conversation Flow
 
