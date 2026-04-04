@@ -59,7 +59,6 @@ sequenceDiagram
     O->>A: GET /api/... Authorization: Bearer newToken
     A->>O: 200 OK
 ```
-```
 
 ## Role-Based Access Control (RBAC)
 
