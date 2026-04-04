@@ -16,81 +16,45 @@ Bonsai Backend is built on:
 
 Everything in Bonsai Backend revolves around **Projects**. A project is a self-contained conversational AI experience. Here is the full entity hierarchy:
 
-```
-Project
-├── Stages (conversation phases)
-│   ├── → Agent (AI personality + voice)
-│   ├── → LLM Provider (for response generation)
-│   ├── → Default Classifier (intent detection)
-│   ├── → Context Transformers[] (variable population, prompt fragments, flow control)
-│   ├── → Global Actions[] (reusable behaviors)
-│   ├── → Knowledge tags (FAQ injection)
-│   ├── Variable Descriptors (stage data schema)
-│   └── Actions (triggered behaviors with effects)
-│
-├── Agents (AI personality definitions)
-│   ├── Prompt (system behavior)
-│   └── TTS Settings (voice configuration)
-│
-├── Classifiers (LLM intent classifiers)
-├── Context Transformers (LLM-powered variable population)
-├── Tools (LLM-callable operations)
-├── Knowledge Categories → Items (FAQ)
-├── Global Actions (reusable action definitions)
-├── Guardrails (content safety classifiers)
-├── API Keys (WebSocket authentication)
-│
-├── Conversations → Events → Artifacts
-└── Users (end-user profiles)
-
-Providers (shared, not project-scoped)
-├── LLM (OpenAI, Anthropic, Gemini, Azure)
-├── TTS (ElevenLabs, OpenAI, Deepgram, Cartesia, Azure)
-├── ASR (Azure, ElevenLabs, Deepgram)
-└── Storage (S3, Azure Blob, GCS, Local)
-
-Environments (shared, not project-scoped)
-└── Key-value variable overrides per deployment context
-```
+- **Project**
+  - Stages
+    - Agent
+    - LLM Provider
+    - Default Classifier
+    - Context Transformers
+    - Global Actions
+    - Knowledge tags
+    - Variable Descriptors
+    - Actions
+  - Agents
+    - Prompt
+    - TTS Settings
+  - Classifiers
+  - Context Transformers
+  - Tools
+  - Knowledge Categories
+    - Items
+  - Global Actions
+  - Guardrails
+  - API Keys
+  - Conversations
+    - Events
+      - Artifacts
+  - Users
 
 ## Conversation Flow
 
 A typical conversation turn follows this pipeline:
 
-```
-User Input (voice or text)
-    │
-    ▼
-┌─────────────────────┐
-│  ASR Transcription  │  (voice → text, if voice input)
-└────────┬────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  Classification (parallel)        │  Classifiers identify actions
-│  Transformation (parallel)        │  Transformers extract data
-└────────┬──────────────────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  Action Execution                 │  Effects run sequentially:
-│  • Scripts, webhooks, tools       │  modify vars, navigate stages,
-│  • Variable/profile modifications │  call external services
-└────────┬──────────────────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  Response Generation              │  LLM generates text using
-│  (streamed)                       │  Handlebars-rendered prompt
-└────────┬──────────────────────────┘
-         │
-         ▼
-┌───────────────────────────────────┐
-│  TTS Synthesis (streamed)         │  Text → audio chunks
-└────────┬──────────────────────────┘
-         │
-         ▼
-   Client receives text + audio
+```mermaid
+flowchart TD
+    A(["User Input (voice or text)"]) -->|voice| B["ASR Transcription (voice → text)"]
+    A -->|text| C
+    B --> C["Classification & Transformation (in parallel)"]
+    C --> D["Action Execution (effects · sequential)"]
+    D --> E["Response Generation (LLM · streamed)"]
+    E --> F["TTS Synthesis (text → audio · streamed)"]
+    F --> G(["Client receives (text + audio)"])
 ```
 
 Each step streams results incrementally to the client via WebSocket, providing low-latency responses.

@@ -20,24 +20,23 @@ A **Conversation** represents a real-time session between an end user and the AI
 
 Conversations follow this state machine:
 
-```
-initialized
-    │
-    ▼
-awaiting_user_input ◄──────────────┐
-    │                                │
-    ▼                                │
-receiving_user_voice                 │
-    │                                │
-    ▼                                │
-processing_user_input                │
-    │                                │
-    ▼                                │
-generating_response ────────────────┘
-    │
-    ├───► finished       (graceful end)
-    ├───► aborted        (immediate end)
-    └───► failed         (error)
+```mermaid
+stateDiagram-v2
+    [*] --> initialized
+    initialized --> awaiting_user_input : start_conversation
+    awaiting_user_input --> receiving_user_voice : voice input starts
+    awaiting_user_input --> processing_user_input : text input received
+    receiving_user_voice --> processing_user_input : voice input ends
+    processing_user_input --> generating_response : classified & transformed
+    generating_response --> awaiting_user_input : response complete
+    generating_response --> finished : end_conversation effect
+    generating_response --> aborted : abort_conversation effect
+    generating_response --> failed : error
+    awaiting_user_input --> finished : end_conversation command
+    awaiting_user_input --> aborted : abort_conversation command
+    finished --> [*]
+    aborted --> [*]
+    failed --> [*]
 ```
 
 | State | Description |
@@ -110,22 +109,6 @@ Select event types include a `metadata` object with timing measurements (all val
 **`classification` and `transformation` events** include `durationMs` — the time taken to run the respective classifier or transformer.
 
 **`tool_call` events** include `durationMs` — the time taken to execute the tool.
-
-## Conversation Artifacts
-
-Artifacts are binary or text data associated with a conversation:
-
-| Artifact Type | Description |
-|---|---|
-| `user_voice` | User's voice audio recording |
-| `user_transcript` | User's speech transcription |
-| `ai_voice` | AI's voice audio output |
-| `ai_transcript` | AI's generated text |
-| `tool_input` | Input sent to a tool |
-| `tool_output` | Output received from a tool |
-| `other` | Any other artifact |
-
-Artifacts can be stored inline (base64), in external storage (S3, Azure Blob, GCS), or both, depending on the project's `storageConfig`.
 
 ## Stage Variables
 

@@ -38,22 +38,19 @@ All other messages (transcription updates, generation events, commands, errors) 
 
 WebRTC connection setup follows a gather-and-return model: the server collects all ICE candidates before returning the SDP answer, so the client receives a complete answer in a single HTTP response with no trickle ICE callbacks needed.
 
-```
-Client                              Server
-  |                                   |
-  |── POST /api/webrtc/offer ────────>|
-  |   { sdpOffer: "..." }             |  creates RTCPeerConnection
-  |                                   |  creates answer
-  |                                   |  waits for ICE gathering
-  |<─ 200 { sdpAnswer: "..." } ───────|
-  |                                   |
-  |═══ DTLS/SCTP handshake ══════════>|
-  |                                   |
-  |── control DataChannel open ─────>|  session registered
-  |── audio DataChannel open ───────>|
-  |                                   |
-  |── auth (JSON, control) ─────────>|
-  |<─ auth response (JSON, control) ──|
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: POST /api/webrtc/offer
+    Note over S: creates RTCPeerConnection, answer, waits for ICE
+    S-->>C: 200 { sdpAnswer }
+    Note over C,S: DTLS/SCTP handshake
+    C->>S: control DataChannel open
+    Note over S: session registered
+    C->>S: audio DataChannel open
+    C->>S: auth (JSON, control)
+    S-->>C: auth response (JSON, control)
 ```
 
 ## Connection Setup
@@ -452,34 +449,32 @@ Errors are sent as JSON over the `control` channel:
 
 ## Connection Lifecycle Diagram
 
-```
-Client                                    Server
-  |── POST /api/webrtc/offer ────────────>|
-  |<─ 200 { sdpAnswer } ─────────────────|
-  |                                        |
-  |═══ DTLS/SCTP handshake ══════════════>|
-  |── control open ─────────────────────>|  registerSession()
-  |── audio open ──────────────────────>|
-  |                                        |
-  |── auth (control) ───────────────────>|
-  |<─ auth success (control) ────────────|
-  |                                        |
-  |── start_conversation (control) ─────>|  attachConversationToSession()
-  |<─ start_conversation result ─────────|
-  |                                        |
-  |── start_user_voice_input (control) ──>|
-  |<─ { inputTurnId } ───────────────────|
-  |                                        |
-  |── [binary audio frames] (audio) ────>|  → ASR provider
-  |<─ user_transcribed_chunk (control) ──|  (interim transcription)
-  |                                        |
-  |── end_user_voice_input (control) ───>|
-  |                                        |
-  |<─ start_ai_generation_output ────────|
-  |<─ ai_transcribed_chunk (control) ────|  (text streaming)
-  |<─ [binary audio frames] (audio) ─────|  (TTS streaming)
-  |<─ end_ai_generation_output ──────────|
-  |                                        |
-  |── end_conversation (control) ───────>|
-  |── [control channel closes] ─────────>|  unregisterSession()
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: POST /api/webrtc/offer
+    S-->>C: 200 { sdpAnswer }
+    Note over C,S: DTLS/SCTP handshake
+    C->>S: control open
+    Note over S: registerSession()
+    C->>S: audio open
+    C->>S: auth (control)
+    S-->>C: auth success (control)
+    C->>S: start_conversation (control)
+    Note over S: attachConversationToSession()
+    S-->>C: start_conversation result
+    C->>S: start_user_voice_input (control)
+    S-->>C: inputTurnId
+    C->>S: binary audio frames (audio)
+    Note over S: ASR provider
+    S-->>C: user_transcribed_chunk (interim transcription)
+    C->>S: end_user_voice_input (control)
+    S-->>C: start_ai_generation_output
+    S-->>C: ai_transcribed_chunk (text streaming)
+    S-->>C: binary audio frames (TTS streaming)
+    S-->>C: end_ai_generation_output
+    C->>S: end_conversation (control)
+    C->>S: control channel closes
+    Note over S: unregisterSession()
 ```

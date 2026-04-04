@@ -10,42 +10,25 @@ When enabled on a project, moderation calls the configured LLM provider's modera
 
 Moderation runs as the **first step**, before any other LLM call:
 
-```
-User Input
-    │
-    ▼
-┌─────────────────────┐
-│  Content Moderation  │  ◄── Blocks here if flagged
-└────────┬────────────┘
-         │
-         ▼
-  Filler, Classification, Actions, Response Generation...
+```mermaid
+flowchart TD
+    A([User Input]) --> B["Content Moderation (blocks if flagged)"]
+    B --> C([Filler · Classification · Actions · Response Generation])
 ```
 
 ### Standard mode
 
 Moderation runs **in parallel with `processTextInput`** (classification/knowledge retrieval), after filler generation. This hides moderation latency behind the classification call, which is typically the longest step:
 
-```
-User Input
-    │
-    ▼
-┌─────────────────────┐
-│  Filler Generation  │
-└────────┬────────────┘
-         │
-    ┌────┴─────────────────────────────────────┐
-    │                                          │
-    ▼                                          ▼
-┌─────────────────────┐           ┌────────────────────────────┐
-│  Content Moderation │           │  processTextInput          │
-│  (moderation API)   │           │  (classify / knowledge)    │
-└──────────┬──────────┘           └────────────────┬───────────┘
-           └──────────────┬───────────────────────┘
-                          │  (await both, then check moderation
-                          │   — block if flagged)
-                          ▼
-         Actions, Response Generation...
+```mermaid
+flowchart TD
+    A([User Input]) --> B[Filler Generation]
+    B --> C[Content Moderation]
+    B --> D["processTextInput (classify · knowledge)"]
+    C --> E{"Await both · check moderation"}
+    D --> E
+    E -->|flagged| F([Blocked])
+    E -->|ok| G([Actions · Response Generation])
 ```
 
 ## Configuration
