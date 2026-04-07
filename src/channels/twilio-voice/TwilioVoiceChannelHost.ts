@@ -241,6 +241,7 @@ export class TwilioVoiceChannelHost {
    * sequence: `connected` → `start` → (`media`)* → `stop`.
    */
   private handleStreamConnection(ws: WebSocket, req: IncomingMessage): void {
+    logger.info('TwilioVoice: new WebSocket connection, validating credentials');
     const clientIp = String(req.socket?.remoteAddress ?? '').replace(/^::ffff:/, '');
 
     if (!this.rateLimiter.tryConsume(clientIp)) {
@@ -276,6 +277,7 @@ export class TwilioVoiceChannelHost {
     fromNumber: string,
   ): Promise<void> {
     try {
+      logger.info({ ip: clientIp }, 'TwilioVoice stream: validating API key and channel provider');
       const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
       if (!apiKeyRecord || !apiKeyRecord.isActive) {
         logger.warn({ ip: clientIp }, 'TwilioVoice stream: invalid or inactive API key');
