@@ -227,7 +227,7 @@ export class TwilioVoiceChannelHost {
     if (agentId) streamParams.set('agentId', agentId);
     const streamUrl = `${wsProtocol}://${req.get('host')}/api/twilio/voice/stream?${streamParams.toString()}`;
 
-    logger.info({ projectId, from: fromNumber }, 'TwilioVoice: inbound call accepted, returning TwiML');
+    logger.info({ projectId, streamUrl, from: fromNumber }, 'TwilioVoice: inbound call accepted, returning TwiML');
 
     res.set('Content-Type', 'text/xml').send(
       `<Response><Connect><Stream url="${streamUrl}" track="inbound_track"/></Connect></Response>`,
