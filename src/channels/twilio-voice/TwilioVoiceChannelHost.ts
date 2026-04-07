@@ -342,8 +342,9 @@ export class TwilioVoiceChannelHost {
               if (newId) inputTurnId = newId;
             };
             const registerMarkCallback = (name: string, cb: () => Promise<void>) => { pendingMarkCallbacks.set(name, cb); };
+            const clearMarkCallbacks = () => { pendingMarkCallbacks.clear(); };
 
-            const connection = new TwilioVoiceConnection(ws, startData.streamSid, this.sessionManager, onAiTurnEnd, registerMarkCallback);
+            const connection = new TwilioVoiceConnection(ws, startData.streamSid, this.sessionManager, onAiTurnEnd, registerMarkCallback, clearMarkCallbacks);
             const sessionId = this.sessionManager.registerSession(connection);
             const newSession = this.sessionManager.getSession(sessionId);
             connection.attachSession(newSession);

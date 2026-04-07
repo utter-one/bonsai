@@ -11,12 +11,13 @@ import { logger } from '../../utils/logger';
  * the Twilio Media Streams WebSocket in µLaw 8 kHz format.
  *
  * Outbound CAL messages are handled as follows:
+ * - `start_ai_generation_output`: sends a Twilio `clear` to flush any still-buffered audio from the
+ *   previous turn (barge-in) and cancels all pending mark callbacks so stale echoes are ignored.
  * - `send_ai_voice_chunk`: base64-encodes the µLaw audio payload and sends it to Twilio as a `media` event.
- *   Non-µLaw chunks are logged and dropped to avoid sending corrupted audio.
- * - `end_ai_generation_output`: sends a Twilio `mark` message and registers `onAiTurnEnd` under that
- *   mark name. Twilio echoes the mark back once all buffered audio has finished playing, at which point
- *   the host calls `onAiTurnEnd` to open the next voice input turn. This prevents opening a new input
- *   turn while Twilio is still playing buffered AI audio.
+ *   Non-µLaw chunks are logged and dropped.
+ * - `end_ai_generation_output`: sends a Twilio `mark` after the last audio chunk. Twilio echoes the mark
+ *   once all buffered audio has finished playing, at which point `onAiTurnEnd` opens the next voice
+ *   input turn. This prevents starting user input while audio is still buffered.
  * - All other message types are silently dropped (voice-only channel).
  */
 export class TwilioVoiceConnection implements IClientConnection {
@@ -38,6 +39,12 @@ export class TwilioVoiceConnection implements IClientConnection {
      * Used to defer `onAiTurnEnd` until audio playback is confirmed complete.
      */
     private readonly onRegisterMarkCallback: (name: string, cb: () => Promise<void>) => void,
+    /**
+     * Clears all pending mark callbacks. Called before sending a Twilio `clear` message so that
+     * stale mark echoes (returned by Twilio after the buffer is flushed) are not mistakenly
+     * processed as turn-end signals.
+     */
+    private readonly onClearMarkCallbacks: () => void,
   ) {}
 
   /**
@@ -74,6 +81,14 @@ export class TwilioVoiceConnection implements IClientConnection {
    */
   async sendMessage(msg: CALOutputMessage): Promise<void> {
     switch (msg.type) {
+      case 'start_ai_generation_output': {
+        // Flush any audio still buffered from the previous turn (barge-in scenario).
+        // Clear pending mark callbacks first so the echoed marks Twilio sends back
+        // in response to `clear` are not misinterpreted as turn-end signals.
+        this.onClearMarkCallbacks();
+        this.ws.send(JSON.stringify({ event: 'clear', streamSid: this.streamSid }));
+        break;
+      }
       case 'send_ai_voice_chunk': {
         if (msg.audioFormat !== 'mulaw') {
           logger.warn({ audioFormat: msg.audioFormat, sessionId: this.session?.id }, 'TwilioVoice: received non-mulaw audio chunk, dropping');

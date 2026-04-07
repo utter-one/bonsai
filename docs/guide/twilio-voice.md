@@ -110,29 +110,101 @@ You can point multiple Twilio numbers at different webhook URLs with different `
 ### Call Flow
 
 ```mermaid
-flowchart TD
-    A([Caller dials number]) --> B["POST /api/twilio/voice/webhook (validates signature · returns TwiML)"]
-    B --> C["WebSocket /api/twilio/voice/stream (µLaw 8 kHz · bidirectional)"]
-    C --> D[Session created · start_conversation · start_user_voice_input]
-    D --> E["receiveUserVoiceData() via media events"]
-    E --> F[VAD detects speech end]
-    F --> G[ASR → LLM → TTS → send_ai_voice_chunk]
-    G --> H([media event → Twilio → caller hears AI])
-    D --> I([caller hangs up · stop event · session unregistered])
+sequenceDiagram
+    participant C as Caller
+    participant T as Twilio
+    participant S as bonsai
+
+    C->>T: dials number
+    T->>S: POST /api/twilio/voice/webhook
+    Note over S: validate signature · look up key · provider
+    S->>T: 200 OK — TwiML &lt;Connect&gt;&lt;Stream&gt;
+    T->>S: WS /api/twilio/voice/stream (upgrade)
+    T->>S: connected event
+    T->>S: start event (customParameters: credentials)
+    Note over S: validate key · create session
+    Note over S: start_conversation · start_user_voice_input
+    loop caller speaks
+        C->>T: voice (PSTN)
+        T->>S: media events (inbound · µLaw 8 kHz)
+        Note over S: receiveUserVoiceData → ASR → LLM → TTS
+    end
+    loop AI responds
+        S->>T: media events (µLaw AI audio × N)
+        S->>T: mark { name: "turn-end-N" }
+        T->>C: plays audio to caller
+        T->>S: mark echo (playback complete)
+        Note over S: start_user_voice_input (new input turn)
+    end
+    C->>T: hangs up
+    T->>S: stop event
+    Note over S: session unregistered
 ```
 
 ### Audio Format
 
 Twilio Media Streams use **µLaw (G.711) encoding at 8 kHz, mono**. Your project's TTS provider must be configured to produce µLaw 8 kHz output. Non-µLaw audio chunks from the TTS pipeline are logged and dropped to prevent distorted audio.
 
+### Credential Delivery via TwiML Parameters
+
+The webhook embeds credentials (`apiKey`, `stageId`, `channelProviderId`, `from`) as `<Parameter>` child elements inside the `<Stream>` TwiML verb rather than as URL query parameters. Twilio delivers these in the WebSocket `start` event's `customParameters` object. This is proxy-safe — reverse proxies commonly strip query strings from WebSocket upgrade requests.
+
 ### Voice Input Turn Management
 
 The channel maintains a single open **voice input turn** for the duration of the call:
 
-- On `start`: a `start_user_voice_input` is dispatched to open the first turn.
+- On `start` event: a `start_user_voice_input` is dispatched to open the first turn.
 - All incoming `media` frames are forwarded to the conversation runner continuously.
-- Server-side VAD (Voice Activity Detection) in the conversation runner detects when the caller finishes speaking and triggers ASR + LLM inference.
-- When the AI finishes speaking (`end_ai_generation_output`), a new `start_user_voice_input` is automatically dispatched so the caller can speak again.
+- Server-side VAD (Voice Activity Detection) detects when the caller finishes speaking and triggers ASR + LLM inference.
+- When the AI finishes speaking, a new `start_user_voice_input` is dispatched **only after Twilio confirms playback is complete** — using the mark synchronisation protocol described below.
+
+### Playback Synchronisation with Marks
+
+To avoid opening a new voice input turn while Twilio is still playing buffered AI audio, the server uses Twilio's mark protocol:
+
+```mermaid
+sequenceDiagram
+    participant T as Twilio
+    participant S as bonsai
+
+    S->>T: media (AI audio chunk 1 … N)
+    S->>T: mark { name: "turn-end-0" }
+    Note over T: buffers and plays audio
+    T->>S: mark echo { name: "turn-end-0" }
+    Note over S: playback confirmed complete
+    Note over S: start_user_voice_input
+```
+
+After sending the final audio chunk (`end_ai_generation_output`), the server sends a `mark` message to Twilio. Twilio echoes the mark back only once all buffered audio has finished playing. The server listens for that echo before opening the next input turn.
+
+### Barge-in / Audio Interruption
+
+When the caller interrupts the AI mid-response (barge-in), the server-side VAD detects the caller's speech and a new AI generation turn begins. At that point the server must flush Twilio's audio buffer so the old AI audio stops immediately:
+
+```mermaid
+sequenceDiagram
+    participant C as Caller
+    participant T as Twilio
+    participant S as bonsai
+
+    S->>T: media (AI audio, partially played)
+    S->>T: mark { name: "turn-end-0" }
+    Note over T: playing audio...
+    C->>T: speaks (barge-in)
+    T->>S: media events (inbound · caller's voice)
+    Note over S: VAD detects speech · new generation starts
+    Note over S: clears pending mark callbacks
+    S->>T: clear
+    T-->>S: mark echo { name: "turn-end-0" } (ignored)
+    Note over T: buffer flushed · old audio stops
+    S->>T: media (new AI audio)
+    S->>T: mark { name: "turn-end-1" }
+    T->>C: plays new audio
+    T->>S: mark echo { name: "turn-end-1" }
+    Note over S: start_user_voice_input
+```
+
+The pending mark callbacks are cleared *before* sending `clear` so that the echoed marks Twilio sends back (in response to the buffer flush) are not mistakenly processed as turn-end signals.
 
 ---
 
@@ -142,7 +214,8 @@ The channel maintains a single open **voice input turn** for the duration of the
 |---|---|
 | Twilio opens WebSocket (`start` event) | Session created; `start_conversation` dispatched with `userId = caller phone`; voice input turn opened |
 | `media` event | µLaw audio forwarded to `session.runner.receiveUserVoiceData()` |
-| AI finishes speaking | New voice input turn opened automatically |
+| AI finishes speaking | New voice input turn opened after Twilio confirms audio playback complete (mark echo) |
+| Caller interrupts AI (barge-in) | Audio buffer cleared via `clear`; stale mark echoes ignored; new turn begins |
 | Caller hangs up (`stop` event) | Session unregistered and cleaned up |
 | WebSocket closed unexpectedly | Session unregistered and cleaned up |
 
@@ -159,14 +232,10 @@ The channel maintains a single open **voice input turn** for the duration of the
 | Transcription updates delivered to caller | ❌ |
 | Twilio request signature validation | ✅ |
 | Outbound calls (calling a number) | ❌ (inbound only) |
-| Barge-in / interruption | Partial — VAD handles it server-side; no explicit Twilio `clear` command in V1 |
+| Barge-in / interruption | ✅ — audio buffer cleared via `clear`; mark echoes discarded |
 
 ## Security
 
 Every inbound HTTP webhook is validated using the **Twilio request signature**. Requests with a missing or invalid `X-Twilio-Signature` header are rejected with `403 Forbidden`.
 
-The Media Streams WebSocket validates the **API key** from the query parameter and verifies the **Account SID** from the Twilio `start` event against the configured provider credentials. A mismatch closes the WebSocket immediately.
-
-Make sure:
-- Your backend is reachable at the exact HTTPS URL configured in the Twilio console.
-- If you run behind a reverse proxy, ensure `trust proxy` is enabled (it is by default) so `req.protocol` reflects `https`.
+The Media Streams WebSocket validates the **credentials** from the `start.customParameters` (set via `<Parameter>` TwiML elements) and verifies the **Account SID** from the `start` event against the configured provider credentials. A mismatch closes the WebSocket immediately.
