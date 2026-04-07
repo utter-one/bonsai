@@ -22,6 +22,7 @@ import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext
 import * as _twilio from 'twilio';
 const _twilioModule = (_twilio as any).default ?? _twilio;
 const validateRequest = _twilioModule.validateRequest as typeof import('twilio').validateRequest;
+const { VoiceResponse } = _twilioModule.twiml as typeof import('twilio').twiml;
 
 /** Query param schema shared by both the HTTP webhook and the Media Streams WebSocket URL. */
 const voiceQuerySchema = z.object({
@@ -229,9 +230,9 @@ export class TwilioVoiceChannelHost {
 
     logger.info({ projectId, streamUrl, from: fromNumber }, 'TwilioVoice: inbound call accepted, returning TwiML');
 
-    res.set('Content-Type', 'text/xml').send(
-      `<Response><Connect><Stream url="${streamUrl}" track="inbound_track"/></Connect></Response>`,
-    );
+    const twiml = new VoiceResponse();
+    twiml.connect().stream({ url: streamUrl, track: 'inbound_track' });
+    res.set('Content-Type', 'text/xml').send(twiml.toString());
   }
 
   /**
