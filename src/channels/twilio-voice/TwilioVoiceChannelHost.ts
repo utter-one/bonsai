@@ -38,7 +38,7 @@ const streamQuerySchema = voiceQuerySchema.extend({
 
 /** Shape of a Twilio Media Streams WebSocket message. */
 type TwilioStreamMessage = {
-  event: 'connected' | 'start' | 'media' | 'stop' | string;
+  event: 'connected' | 'start' | 'media' | 'stop' | 'mark' | 'dtmf' | string;
   sequenceNumber?: string;
   streamSid?: string;
   start?: {
@@ -49,7 +49,8 @@ type TwilioStreamMessage = {
     customParameters?: Record<string, string>;
   };
   media?: {
-    track: string;
+    /** 'inbound' = from the caller, 'outbound' = Twilio→caller (echo of our sent audio). */
+    track: 'inbound' | 'outbound' | string;
     chunk: string;
     timestamp: string;
     payload: string;
@@ -57,6 +58,15 @@ type TwilioStreamMessage = {
   stop?: {
     accountSid: string;
     callSid: string;
+  };
+  /** Sent by Twilio after our server-sent mark message's audio has finished playing. */
+  mark?: {
+    name: string;
+  };
+  /** Touch-tone key press detected in the inbound stream (bidirectional streams only). */
+  dtmf?: {
+    track: string;
+    digit: string;
   };
 };
 
@@ -299,11 +309,13 @@ export class TwilioVoiceChannelHost {
       // Per-connection mutable state managed by the message handler closure.
       let session: Session | null = null;
       let inputTurnId: string | null = null;
+      const pendingMarkCallbacks = new Map<string, () => Promise<void>>();
 
       const tryCleanup = async () => {
         if (!session) return;
         const s = session;
         session = null;
+        pendingMarkCallbacks.clear();
         await this.sessionManager.unregisterSession(s.id);
       };
 
@@ -319,6 +331,7 @@ export class TwilioVoiceChannelHost {
             setSession: (s) => { session = s; },
             getInputTurnId: () => inputTurnId,
             setInputTurnId: (id) => { inputTurnId = id; },
+            pendingMarkCallbacks,
             tryCleanup,
           });
         } catch (err) {
@@ -350,6 +363,7 @@ export class TwilioVoiceChannelHost {
       setSession: (s: Session) => void;
       getInputTurnId: () => string | null;
       setInputTurnId: (id: string | null) => void;
+      pendingMarkCallbacks: Map<string, () => Promise<void>>;
       tryCleanup: () => Promise<void>;
     },
   ): Promise<void> {
@@ -378,7 +392,11 @@ export class TwilioVoiceChannelHost {
           if (newId) state.setInputTurnId(newId);
         };
 
-        const connection = new TwilioVoiceConnection(ws, streamSid, this.sessionManager, onAiTurnEnd);
+        const registerMarkCallback = (name: string, cb: () => Promise<void>) => {
+          state.pendingMarkCallbacks.set(name, cb);
+        };
+
+        const connection = new TwilioVoiceConnection(ws, streamSid, this.sessionManager, onAiTurnEnd, registerMarkCallback);
         const sessionId = this.sessionManager.registerSession(connection);
         const session = this.sessionManager.getSession(sessionId);
         connection.attachSession(session);
@@ -396,12 +414,31 @@ export class TwilioVoiceChannelHost {
       }
 
       case 'media': {
+        // Only process inbound audio (from the caller). Outbound is our own sent audio echoed back.
+        if (msg.media?.track !== 'inbound') break;
         const currentSession = state.getSession();
         const currentInputTurnId = state.getInputTurnId();
-        if (!currentSession?.runner || !currentInputTurnId) return;
+        if (!currentSession?.runner || !currentInputTurnId) break;
 
-        const buffer = Buffer.from(msg.media!.payload, 'base64');
+        const buffer = Buffer.from(msg.media.payload, 'base64');
         await currentSession.runner.receiveUserVoiceData(currentInputTurnId, buffer);
+        break;
+      }
+
+      case 'mark': {
+        const markName = msg.mark?.name;
+        if (markName) {
+          const cb = state.pendingMarkCallbacks.get(markName);
+          if (cb) {
+            state.pendingMarkCallbacks.delete(markName);
+            await cb();
+          }
+        }
+        break;
+      }
+
+      case 'dtmf': {
+        logger.info({ projectId, digit: msg.dtmf?.digit, track: msg.dtmf?.track }, 'TwilioVoice stream: DTMF digit received');
         break;
       }
 

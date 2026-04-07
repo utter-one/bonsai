@@ -13,13 +13,17 @@ import { logger } from '../../utils/logger';
  * Outbound CAL messages are handled as follows:
  * - `send_ai_voice_chunk`: base64-encodes the µLaw audio payload and sends it to Twilio as a `media` event.
  *   Non-µLaw chunks are logged and dropped to avoid sending corrupted audio.
- * - `end_ai_generation_output`: invokes the provided callback so the host can open a new voice input turn.
+ * - `end_ai_generation_output`: sends a Twilio `mark` message and registers `onAiTurnEnd` under that
+ *   mark name. Twilio echoes the mark back once all buffered audio has finished playing, at which point
+ *   the host calls `onAiTurnEnd` to open the next voice input turn. This prevents opening a new input
+ *   turn while Twilio is still playing buffered AI audio.
  * - All other message types are silently dropped (voice-only channel).
  */
 export class TwilioVoiceConnection implements IClientConnection {
   readonly connectionType = 'twilio_voice' as const;
 
   private session: Session;
+  private markCounter = 0;
 
   constructor(
     /** The active Twilio Media Streams WebSocket for this call. */
@@ -27,8 +31,13 @@ export class TwilioVoiceConnection implements IClientConnection {
     /** The Twilio stream SID for this call, required by the Media Streams wire format. */
     private readonly streamSid: string,
     private readonly sessionManager: SessionManager,
-    /** Called when the AI finishes a generation turn so the host can start a new voice input turn. */
+    /** Called when Twilio confirms all buffered AI audio has finished playing. */
     private readonly onAiTurnEnd: () => Promise<void>,
+    /**
+     * Registers a callback to be invoked when Twilio sends back a `mark` event with the given name.
+     * Used to defer `onAiTurnEnd` until audio playback is confirmed complete.
+     */
+    private readonly onRegisterMarkCallback: (name: string, cb: () => Promise<void>) => void,
   ) {}
 
   /**
@@ -76,7 +85,12 @@ export class TwilioVoiceConnection implements IClientConnection {
         break;
       }
       case 'end_ai_generation_output': {
-        await this.onAiTurnEnd();
+        // Send a mark to Twilio; Twilio will echo it back once all buffered audio has played.
+        // Only then do we open the next user voice input turn to avoid a race condition.
+        const markName = `bonsai-turn-end-${this.markCounter++}`;
+        const markFrame = JSON.stringify({ event: 'mark', streamSid: this.streamSid, mark: { name: markName } });
+        this.ws.send(markFrame);
+        this.onRegisterMarkCallback(markName, this.onAiTurnEnd);
         break;
       }
       default:
