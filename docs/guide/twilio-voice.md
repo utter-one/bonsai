@@ -118,7 +118,7 @@ sequenceDiagram
     C->>T: dials number
     T->>S: POST /api/twilio/voice/webhook
     Note over S: validate signature · look up key · provider
-    S->>T: 200 OK — TwiML &lt;Connect&gt;&lt;Stream&gt;
+    S->>T: 200 OK — TwiML Connect+Stream
     T->>S: WS /api/twilio/voice/stream (upgrade)
     T->>S: connected event
     T->>S: start event (customParameters: credentials)
