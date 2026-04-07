@@ -241,7 +241,7 @@ export function startServer(port: number = 3000): void {
   wsHost.initialize(server);
 
   // Initialize Twilio Voice Media Streams host
-  //container.resolve(TwilioVoiceChannelHost).initialize(server);
+  container.resolve(TwilioVoiceChannelHost).initialize(server);
 
   server.listen(port, () => {
     logger.info({ port }, 'HTTP server started');
