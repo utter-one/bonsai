@@ -1012,11 +1012,14 @@ export class ConversationRunner {
 
   async receiveUserVoiceData(inputTurnId: string, voiceData: Buffer) {
     if (this.isVadMode) {
-      // In VAD mode, silently drop audio received in any state other than awaiting or receiving.
-      // This is expected: the client streams continuously and the server may be processing or
-      // generating a response. No error is thrown to avoid noisy logs and client-side failures.
-      const validStates = ['awaiting_user_input', 'receiving_user_voice'];
-      if (!validStates.includes(this.conversation.status)) return;
+      // In VAD mode, feed audio to the converter/VAD in all active (non-terminal) states.
+      // This is essential for channels that stream audio continuously (e.g. Twilio Voice):
+      // dropping audio during generating_response or processing_user_input would cause VAD
+      // to miss the caller's speech, since changeState('awaiting_user_input') resets the VAD
+      // to give it a clean slate. ASR is guarded separately in setupInboundConverter's data
+      // handler — it only receives audio when state is receiving_user_voice.
+      const terminalStates = ['finished', 'failed', 'aborted', 'initialized'];
+      if (terminalStates.includes(this.conversation.status)) return;
       if (this.inboundConverter) {
         this.inboundConverter.push(voiceData);
       } else if (this.vadProcessor) {

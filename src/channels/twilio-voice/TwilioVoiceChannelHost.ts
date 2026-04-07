@@ -363,9 +363,13 @@ export class TwilioVoiceChannelHost {
           case 'media': {
             // Only process inbound audio (from the caller). Outbound is our own sent audio echoed back.
             if (msg.media?.track !== 'inbound') break;
-            if (!session?.runner || !inputTurnId) break;
+            if (!session?.runner) break;
+            // In VAD mode the runner ignores inputTurnId entirely (VAD owns the turn lifecycle),
+            // so always forward audio once a session exists. In non-VAD mode inputTurnId must have
+            // been captured from a successful start_user_voice_input; if not yet available the
+            // runner will silently drop audio in awaiting_user_input state.
             const buffer = Buffer.from(msg.media.payload, 'base64');
-            await session.runner.receiveUserVoiceData(inputTurnId, buffer);
+            await session.runner.receiveUserVoiceData(inputTurnId ?? '', buffer);
             break;
           }
 
