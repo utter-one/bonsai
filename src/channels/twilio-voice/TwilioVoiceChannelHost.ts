@@ -32,8 +32,8 @@ const voiceQuerySchema = z.object({
   channelProviderId: z.string().min(1).describe('ID of the Twilio Voice channel provider record'),
 });
 
-/** Extra query param appended to the stream URL by the webhook handler. */
-const streamQuerySchema = voiceQuerySchema.extend({
+/** Credentials delivered via Twilio `<Parameter>` elements in the `start` event's customParameters. */
+const streamCustomParamsSchema = voiceQuerySchema.extend({
   from: z.string().min(1).describe("Caller's E.164 phone number, used as userId"),
 });
 
@@ -154,8 +154,11 @@ export class TwilioVoiceChannelHost {
    * 1. Rate-limit check on caller IP.
    * 2. Validate query params and API key (incl. `twilio_voice` channel permission).
    * 3. Load channel provider and validate Twilio request signature.
-   * 4. Build the Media Streams WebSocket URL with credentials embedded as query params.
+   * 4. Build the Media Streams WebSocket URL and pass credentials as `<Parameter>` elements.
    * 5. Return TwiML `<Connect><Stream>` to instruct Twilio to open the WebSocket.
+   *
+   * Credentials are passed as TwiML `<Parameter>` elements (delivered via `start.customParameters`)
+   * rather than URL query params, because proxies commonly strip WebSocket upgrade query strings.
    */
   private async handleWebhook(req: Request, res: Response): Promise<void> {
     const ip = (req.ip ?? req.socket.remoteAddress ?? '');
@@ -221,28 +224,33 @@ export class TwilioVoiceChannelHost {
       return;
     }
 
-    // Build the stream WebSocket URL — same query params plus "from" so the stream handler
-    // knows the caller's phone number without an extra DB lookup.
+    // Credentials are passed as <Parameter> child elements instead of URL query params.
+    // Proxies commonly strip query strings from WebSocket upgrade requests, making URL
+    // params unreliable. Twilio delivers <Parameter> values in start.customParameters.
     const wsProtocol = req.protocol === 'https' ? 'wss' : 'ws';
-    const streamParams = new URLSearchParams({ apiKey: rawApiKey, stageId, channelProviderId, from: fromNumber });
-    if (agentId) streamParams.set('agentId', agentId);
-    const streamUrl = `${wsProtocol}://${req.get('host')}/api/twilio/voice/stream?${streamParams.toString()}`;
+    const streamUrl = `${wsProtocol}://${req.get('host')}/api/twilio/voice/stream`;
 
     logger.info({ projectId, streamUrl, from: fromNumber }, 'TwilioVoice: inbound call accepted, returning TwiML');
 
     const twiml = new VoiceResponse();
-    twiml.connect().stream({ url: streamUrl, track: 'inbound_track' });
+    const stream = twiml.connect().stream({ url: streamUrl, track: 'inbound_track' });
+    stream.parameter({ name: 'apiKey', value: rawApiKey });
+    stream.parameter({ name: 'stageId', value: stageId });
+    stream.parameter({ name: 'channelProviderId', value: channelProviderId });
+    stream.parameter({ name: 'from', value: fromNumber });
+    if (agentId) stream.parameter({ name: 'agentId', value: agentId });
     res.set('Content-Type', 'text/xml').send(twiml.toString());
   }
 
   /**
    * Handles a new Twilio Media Streams WebSocket connection.
    *
-   * Validates credentials from the URL query string, then processes the Twilio event
-   * sequence: `connected` → `start` → (`media`)* → `stop`.
+   * Rate-limits the connection and wires up the message handler. Credential validation
+   * is deferred to the `start` event, where Twilio delivers them via `customParameters`.
+   *
+   * Event sequence: `connected` → `start` → (`media` | `mark` | `dtmf`)* → `stop`.
    */
   private handleStreamConnection(ws: WebSocket, req: IncomingMessage): void {
-    logger.info('TwilioVoice: new WebSocket connection, validating credentials');
     const clientIp = String(req.socket?.remoteAddress ?? '').replace(/^::ffff:/, '');
 
     if (!this.rateLimiter.tryConsume(clientIp)) {
@@ -251,210 +259,147 @@ export class TwilioVoiceChannelHost {
       return;
     }
 
-    const urlObj = new URL(req.url ?? '/', 'http://localhost');
-    logger.info({ url: req.url }, 'TwilioVoice: parsing stream URL query params');
-    const queryResult = streamQuerySchema.safeParse(Object.fromEntries(urlObj.searchParams));
-    if (!queryResult.success) {
-      logger.warn({ issues: queryResult.error.issues }, 'TwilioVoice stream: invalid query params');
-      ws.close();
-      return;
-    }
-    const { apiKey: rawApiKey, stageId, agentId, channelProviderId, from: fromNumber } = queryResult.data;
+    // Per-connection mutable state.
+    let session: Session | null = null;
+    let inputTurnId: string | null = null;
+    const pendingMarkCallbacks = new Map<string, () => Promise<void>>();
 
-    // Credentials are validated asynchronously; wire up the message handler only after they pass.
-    this.validateAndSetupStream(ws, clientIp, rawApiKey, stageId, agentId, channelProviderId, fromNumber);
-  }
+    const tryCleanup = async () => {
+      if (!session) return;
+      const s = session;
+      session = null;
+      pendingMarkCallbacks.clear();
+      await this.sessionManager.unregisterSession(s.id);
+    };
 
-  /**
-   * Validates API key + provider credentials and, if successful, wires up the Media Streams
-   * message handler for the given WebSocket.
-   */
-  private async validateAndSetupStream(
-    ws: WebSocket,
-    clientIp: string,
-    rawApiKey: string,
-    stageId: string,
-    agentId: string | undefined,
-    channelProviderId: string,
-    fromNumber: string,
-  ): Promise<void> {
-    try {
-      logger.info({ ip: clientIp }, 'TwilioVoice stream: validating API key and channel provider');
-      const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
-      if (!apiKeyRecord || !apiKeyRecord.isActive) {
-        logger.warn({ ip: clientIp }, 'TwilioVoice stream: invalid or inactive API key');
-        ws.close();
-        return;
-      }
+    ws.on('close', async () => { await tryCleanup(); });
 
-      const { projectId, keySettings } = apiKeyRecord;
+    ws.on('message', async (raw: Buffer) => {
+      try {
+        const msg = JSON.parse(raw.toString()) as TwilioStreamMessage;
 
-      if (keySettings?.allowedChannels && !keySettings.allowedChannels.includes('twilio_voice')) {
-        logger.warn({ projectId }, 'TwilioVoice stream: API key does not permit twilio_voice channel');
-        ws.close();
-        return;
-      }
-
-      const providerRecord = await db.query.providers.findFirst({ where: eq(providers.id, channelProviderId) });
-      if (!providerRecord || providerRecord.providerType !== 'channel') {
-        logger.warn({ channelProviderId }, 'TwilioVoice stream: channel provider not found or wrong type');
-        ws.close();
-        return;
-      }
-
-      const configResult = twilioVoiceChannelProviderConfigSchema.safeParse(providerRecord.config);
-      if (!configResult.success) {
-        logger.error({ channelProviderId }, 'TwilioVoice stream: channel provider config is invalid');
-        ws.close();
-        return;
-      }
-      const config = configResult.data;
-
-      // Per-connection mutable state managed by the message handler closure.
-      let session: Session | null = null;
-      let inputTurnId: string | null = null;
-      const pendingMarkCallbacks = new Map<string, () => Promise<void>>();
-
-      const tryCleanup = async () => {
-        if (!session) return;
-        const s = session;
-        session = null;
-        pendingMarkCallbacks.clear();
-        await this.sessionManager.unregisterSession(s.id);
-      };
-
-      ws.on('close', async () => {
-        await tryCleanup();
-      });
-
-      ws.on('message', async (raw: Buffer) => {
-        try {
-          const msg = JSON.parse(raw.toString()) as TwilioStreamMessage;
-          await this.handleStreamMessage(msg, ws, config.accountSid, projectId, keySettings, stageId, agentId, fromNumber, {
-            getSession: () => session,
-            setSession: (s) => { session = s; },
-            getInputTurnId: () => inputTurnId,
-            setInputTurnId: (id) => { inputTurnId = id; },
-            pendingMarkCallbacks,
-            tryCleanup,
-          });
-        } catch (err) {
-          logger.error({ error: err, ip: clientIp }, 'TwilioVoice stream: unhandled error processing message');
-        }
-      });
-
-      logger.info({ ip: clientIp, projectId }, 'TwilioVoice stream: WebSocket connection validated and ready');
-    } catch (err) {
-      logger.error({ error: err, ip: clientIp }, 'TwilioVoice stream: error during connection setup');
-      ws.close();
-    }
-  }
-
-  /**
-   * Processes a single Twilio Media Streams event for a validated connection.
-   */
-  private async handleStreamMessage(
-    msg: TwilioStreamMessage,
-    ws: WebSocket,
-    expectedAccountSid: string,
-    projectId: string,
-    keySettings: ApiKeySettings | null,
-    stageId: string,
-    agentId: string | undefined,
-    fromNumber: string,
-    state: {
-      getSession: () => Session | null;
-      setSession: (s: Session) => void;
-      getInputTurnId: () => string | null;
-      setInputTurnId: (id: string | null) => void;
-      pendingMarkCallbacks: Map<string, () => Promise<void>>;
-      tryCleanup: () => Promise<void>;
-    },
-  ): Promise<void> {
-    switch (msg.event) {
-      case 'connected': {
-        logger.info({ projectId }, 'TwilioVoice stream: connected event received');
-        break;
-      }
-
-      case 'start': {
-        const startData = msg.start;
-        if (!startData) return;
-
-        if (startData.accountSid !== expectedAccountSid) {
-          logger.warn({ projectId, receivedAccountSid: startData.accountSid }, 'TwilioVoice stream: accountSid mismatch, closing');
-          ws.close();
-          return;
-        }
-
-        const streamSid = startData.streamSid;
-
-        const onAiTurnEnd = async () => {
-          const currentSession = state.getSession();
-          if (!currentSession) return;
-          const newId = await this.dispatchStartUserVoiceInput(currentSession);
-          if (newId) state.setInputTurnId(newId);
-        };
-
-        const registerMarkCallback = (name: string, cb: () => Promise<void>) => {
-          state.pendingMarkCallbacks.set(name, cb);
-        };
-
-        const connection = new TwilioVoiceConnection(ws, streamSid, this.sessionManager, onAiTurnEnd, registerMarkCallback);
-        const sessionId = this.sessionManager.registerSession(connection);
-        const session = this.sessionManager.getSession(sessionId);
-        connection.attachSession(session);
-        this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, VOICE_SESSION_SETTINGS, keySettings ?? null);
-        state.setSession(session);
-
-        logger.info({ sessionId, projectId, streamSid, from: fromNumber }, 'TwilioVoice: new voice session created');
-
-        const startMsg: CALInputMessage = { type: 'start_conversation', userId: fromNumber, stageId, agentId, correlationId: undefined };
-        await this.dispatcher.dispatch(startMsg, this.buildContext(session));
-
-        const inputTurnId = await this.dispatchStartUserVoiceInput(session);
-        state.setInputTurnId(inputTurnId);
-        break;
-      }
-
-      case 'media': {
-        // Only process inbound audio (from the caller). Outbound is our own sent audio echoed back.
-        if (msg.media?.track !== 'inbound') break;
-        const currentSession = state.getSession();
-        const currentInputTurnId = state.getInputTurnId();
-        if (!currentSession?.runner || !currentInputTurnId) break;
-
-        const buffer = Buffer.from(msg.media.payload, 'base64');
-        await currentSession.runner.receiveUserVoiceData(currentInputTurnId, buffer);
-        break;
-      }
-
-      case 'mark': {
-        const markName = msg.mark?.name;
-        if (markName) {
-          const cb = state.pendingMarkCallbacks.get(markName);
-          if (cb) {
-            state.pendingMarkCallbacks.delete(markName);
-            await cb();
+        switch (msg.event) {
+          case 'connected': {
+            logger.info({ ip: clientIp }, 'TwilioVoice stream: connected event received');
+            break;
           }
+
+          case 'start': {
+            if (session) {
+              logger.warn({ ip: clientIp }, 'TwilioVoice stream: duplicate start event, ignoring');
+              break;
+            }
+            const startData = msg.start;
+            if (!startData) break;
+
+            // Read credentials from customParameters set in the webhook TwiML.
+            const credsResult = streamCustomParamsSchema.safeParse(startData.customParameters ?? {});
+            if (!credsResult.success) {
+              logger.warn({ ip: clientIp, issues: credsResult.error.issues }, 'TwilioVoice stream: missing or invalid customParameters in start event');
+              ws.close();
+              return;
+            }
+            const { apiKey: rawApiKey, stageId, agentId, channelProviderId, from: fromNumber } = credsResult.data;
+
+            const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
+            if (!apiKeyRecord || !apiKeyRecord.isActive) {
+              logger.warn({ ip: clientIp }, 'TwilioVoice stream: invalid or inactive API key');
+              ws.close();
+              return;
+            }
+            const { projectId, keySettings } = apiKeyRecord;
+
+            if (keySettings?.allowedChannels && !keySettings.allowedChannels.includes('twilio_voice')) {
+              logger.warn({ projectId }, 'TwilioVoice stream: API key does not permit twilio_voice channel');
+              ws.close();
+              return;
+            }
+
+            const providerRecord = await db.query.providers.findFirst({ where: eq(providers.id, channelProviderId) });
+            if (!providerRecord || providerRecord.providerType !== 'channel') {
+              logger.warn({ channelProviderId }, 'TwilioVoice stream: channel provider not found or wrong type');
+              ws.close();
+              return;
+            }
+
+            const configResult = twilioVoiceChannelProviderConfigSchema.safeParse(providerRecord.config);
+            if (!configResult.success) {
+              logger.error({ channelProviderId }, 'TwilioVoice stream: channel provider config is invalid');
+              ws.close();
+              return;
+            }
+            const config = configResult.data;
+
+            if (startData.accountSid !== config.accountSid) {
+              logger.warn({ projectId, receivedAccountSid: startData.accountSid }, 'TwilioVoice stream: accountSid mismatch, closing');
+              ws.close();
+              return;
+            }
+
+            const onAiTurnEnd = async () => {
+              if (!session) return;
+              const newId = await this.dispatchStartUserVoiceInput(session);
+              if (newId) inputTurnId = newId;
+            };
+            const registerMarkCallback = (name: string, cb: () => Promise<void>) => { pendingMarkCallbacks.set(name, cb); };
+
+            const connection = new TwilioVoiceConnection(ws, startData.streamSid, this.sessionManager, onAiTurnEnd, registerMarkCallback);
+            const sessionId = this.sessionManager.registerSession(connection);
+            const newSession = this.sessionManager.getSession(sessionId);
+            connection.attachSession(newSession);
+            this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, VOICE_SESSION_SETTINGS, keySettings ?? null);
+            session = newSession;
+
+            logger.info({ sessionId, projectId, streamSid: startData.streamSid, from: fromNumber }, 'TwilioVoice: new voice session created');
+
+            const startMsg: CALInputMessage = { type: 'start_conversation', userId: fromNumber, stageId, agentId, correlationId: undefined };
+            await this.dispatcher.dispatch(startMsg, this.buildContext(session));
+
+            inputTurnId = await this.dispatchStartUserVoiceInput(session);
+            break;
+          }
+
+          case 'media': {
+            // Only process inbound audio (from the caller). Outbound is our own sent audio echoed back.
+            if (msg.media?.track !== 'inbound') break;
+            if (!session?.runner || !inputTurnId) break;
+            const buffer = Buffer.from(msg.media.payload, 'base64');
+            await session.runner.receiveUserVoiceData(inputTurnId, buffer);
+            break;
+          }
+
+          case 'mark': {
+            const markName = msg.mark?.name;
+            if (markName) {
+              const cb = pendingMarkCallbacks.get(markName);
+              if (cb) {
+                pendingMarkCallbacks.delete(markName);
+                await cb();
+              }
+            }
+            break;
+          }
+
+          case 'dtmf': {
+            logger.info({ digit: msg.dtmf?.digit, track: msg.dtmf?.track }, 'TwilioVoice stream: DTMF digit received');
+            break;
+          }
+
+          case 'stop': {
+            logger.info({ ip: clientIp }, 'TwilioVoice stream: stop event received, ending session');
+            await tryCleanup();
+            break;
+          }
+
+          default:
+            break;
         }
-        break;
+      } catch (err) {
+        logger.error({ error: err, ip: clientIp }, 'TwilioVoice stream: unhandled error processing message');
       }
+    });
 
-      case 'dtmf': {
-        logger.info({ projectId, digit: msg.dtmf?.digit, track: msg.dtmf?.track }, 'TwilioVoice stream: DTMF digit received');
-        break;
-      }
-
-      case 'stop': {
-        logger.info({ projectId }, 'TwilioVoice stream: stop event received, ending session');
-        await state.tryCleanup();
-        break;
-      }
-
-      default:
-        break;
-    }
+    logger.info({ ip: clientIp }, 'TwilioVoice stream: WebSocket connection accepted, awaiting start event');
   }
 
   /**
