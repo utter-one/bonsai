@@ -1,7 +1,7 @@
 import { inject, singleton } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
-import type { Server } from 'http';
-import type { IncomingMessage } from 'http';
+import type { Server, IncomingMessage } from 'http';
+import type { Duplex } from 'stream';
 import { Session, SessionManager } from '../SessionManager';
 import { ChannelHandlerDispatcher } from '../ChannelHandlerDispatcher';
 import { IpRateLimiter } from '../../IpRateLimiter';
@@ -35,7 +35,16 @@ export class WebSocketChannelHost {
    */
   async initialize(server: Server): Promise<void> {
     const maxPayload = parseInt(process.env.WS_MAX_PAYLOAD_BYTES ?? String(10 * 1024 * 1024), 10);
-    this.wss = new WebSocketServer({ server, path: '/ws', maxPayload });
+    this.wss = new WebSocketServer({ noServer: true, maxPayload });
+
+    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+      const url = req.url ?? '';
+      const pathname = url.includes('?') ? url.slice(0, url.indexOf('?')) : url;
+      if (pathname !== '/ws') return;
+      this.wss!.handleUpgrade(req, socket, head, (ws) => {
+        this.wss!.emit('connection', ws, req);
+      });
+    });
 
     this.wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
       // Prefer X-Forwarded-For when present (set by reverse proxies), fall back to socket address

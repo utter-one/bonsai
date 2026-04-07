@@ -1,7 +1,7 @@
 import { inject, singleton } from 'tsyringe';
 import { WebSocketServer, WebSocket } from 'ws';
-import type { Server } from 'http';
-import type { IncomingMessage } from 'http';
+import type { Server, IncomingMessage } from 'http';
+import type { Duplex } from 'stream';
 import type { Request, Response, Router } from 'express';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
@@ -119,7 +119,17 @@ export class TwilioVoiceChannelHost {
    * @param server - The HTTP server to attach to.
    */
   initialize(server: Server): void {
-    this.wss = new WebSocketServer({ server, path: '/api/twilio/voice/stream' });
+    this.wss = new WebSocketServer({ noServer: true });
+
+    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+      const url = req.url ?? '';
+      const pathname = url.includes('?') ? url.slice(0, url.indexOf('?')) : url;
+      if (pathname !== '/api/twilio/voice/stream') return;
+      this.wss!.handleUpgrade(req, socket, head, (ws) => {
+        this.wss!.emit('connection', ws, req);
+      });
+    });
+
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       this.handleStreamConnection(ws, req);
     });
