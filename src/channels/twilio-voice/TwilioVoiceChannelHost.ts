@@ -252,6 +252,7 @@ export class TwilioVoiceChannelHost {
     }
 
     const urlObj = new URL(req.url ?? '/', 'http://localhost');
+    logger.info({ url: req.url }, 'TwilioVoice: parsing stream URL query params');
     const queryResult = streamQuerySchema.safeParse(Object.fromEntries(urlObj.searchParams));
     if (!queryResult.success) {
       logger.warn({ issues: queryResult.error.issues }, 'TwilioVoice stream: invalid query params');
