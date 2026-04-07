@@ -490,6 +490,8 @@ export class ConversationRunner {
       } else {
         throw new NotFoundError(`ASR Provider with ID ${project.asrConfig.asrProviderId} not found`);
       }
+    } else if (this.session.sessionSettings.sendVoiceInput) {
+      logger.warn({ conversationId: conversation.id, projectId: project?.id, acceptVoice: project?.acceptVoice, hasAsrConfig: !!project?.asrConfig?.asrProviderId }, `Session requests voice input but project has no ASR provider configured (acceptVoice=${project?.acceptVoice}, asrProviderId=${project?.asrConfig?.asrProviderId ?? 'unset'}). Voice input will be unavailable.`);
     }
 
     return stageData;
@@ -985,7 +987,7 @@ export class ConversationRunner {
     }
 
     if (!this.stageData.asrProvider) {
-      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}`;
+      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}. Ensure the project has acceptVoice=true and a valid asrConfig.asrProviderId configured.`;
       await this.markAsFailed(errorMessage);
       throw new Error(errorMessage);
     }
@@ -1043,7 +1045,7 @@ export class ConversationRunner {
     }
 
     if (!this.stageData.asrProvider) {
-      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}`;
+      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}. Ensure the project has acceptVoice=true and a valid asrConfig.asrProviderId configured.`;
       await this.markAsFailed(errorMessage);
       throw new Error(errorMessage);
     }
@@ -1078,7 +1080,7 @@ export class ConversationRunner {
     }
 
     if (!this.stageData.asrProvider) {
-      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}`;
+      const errorMessage = `ASR provider not available for conversation ${this.stageData.conversation.id}. Ensure the project has acceptVoice=true and a valid asrConfig.asrProviderId configured.`;
       await this.markAsFailed(errorMessage);
       throw new Error(errorMessage);
     }
