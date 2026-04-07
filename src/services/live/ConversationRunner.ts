@@ -482,16 +482,18 @@ export class ConversationRunner {
       }
     }
 
-    // Initialize ASR provider if configured and client wants to send voice input
-    if (project.acceptVoice && project.asrConfig?.asrProviderId && project.asrConfig.settings && this.session.sessionSettings.sendVoiceInput) {
+    // Initialize ASR provider if configured and client wants to send voice input.
+    // asrConfig.settings is optional — all provider settings schemas use defaults, so null/undefined
+    // is coerced to {} and each provider falls back to its own defaults.
+    if (project.acceptVoice && project.asrConfig?.asrProviderId && this.session.sessionSettings.sendVoiceInput) {
       const asrProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, project.asrConfig.asrProviderId) });
       if (asrProviderEntity) {
-        stageData.asrProvider = this.asrProviderFactory.createProvider(asrProviderEntity, project.asrConfig.settings);
+        stageData.asrProvider = this.asrProviderFactory.createProvider(asrProviderEntity, project.asrConfig.settings ?? {});
       } else {
         throw new NotFoundError(`ASR Provider with ID ${project.asrConfig.asrProviderId} not found`);
       }
     } else if (this.session.sessionSettings.sendVoiceInput) {
-      logger.warn({ conversationId: conversation.id, projectId: project?.id, acceptVoice: project?.acceptVoice, hasAsrConfig: !!project?.asrConfig?.asrProviderId }, `Session requests voice input but project has no ASR provider configured (acceptVoice=${project?.acceptVoice}, asrProviderId=${project?.asrConfig?.asrProviderId ?? 'unset'}). Voice input will be unavailable.`);
+      logger.warn({ conversationId: conversation.id, projectId: project?.id, acceptVoice: project?.acceptVoice, asrProviderId: project?.asrConfig?.asrProviderId ?? null }, `Session requests voice input but ASR provider will not be initialised (acceptVoice=${project?.acceptVoice}, asrProviderId=${project?.asrConfig?.asrProviderId ?? 'unset'}). Both must be set. Voice input will be unavailable.`);
     }
 
     return stageData;
