@@ -312,6 +312,7 @@ export const copyDecorators = pgTable('copy_decorators', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
   primaryKey({ columns: [table.projectId, table.id] }),
+  uniqueIndex('copy_decorators_project_id_name_unique').on(table.projectId, table.name),
 ]);
 
 // SampleCopy table

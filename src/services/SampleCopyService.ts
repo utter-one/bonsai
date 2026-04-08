@@ -7,7 +7,7 @@ import type { CreateSampleCopyRequest, UpdateSampleCopyRequest, SampleCopyRespon
 import type { ListParams } from '../http/contracts/common';
 import { sampleCopyResponseSchema, sampleCopyListResponseSchema } from '../http/contracts/sampleCopy';
 import { AuditService } from './AuditService';
-import { OptimisticLockError, NotFoundError } from '../errors';
+import { OptimisticLockError, NotFoundError, ConflictError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
@@ -50,7 +50,10 @@ export class SampleCopyService extends BaseService {
       logger.info({ sampleCopyId: created.id }, 'Sample copy created successfully');
 
       return sampleCopyResponseSchema.parse(created);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === '23505' || error?.cause?.code === '23505') {
+        throw new ConflictError(`A sample copy named '${input.name}' already exists in this project`);
+      }
       logger.error({ error, sampleCopyId: input.id }, 'Failed to create sample copy');
       throw error;
     }
@@ -197,7 +200,10 @@ export class SampleCopyService extends BaseService {
       logger.info({ sampleCopyId: sampleCopy.id, newVersion: sampleCopy.version }, 'Sample copy updated successfully');
 
       return sampleCopyResponseSchema.parse(sampleCopy);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === '23505' || error?.cause?.code === '23505') {
+        throw new ConflictError(`A sample copy named '${updateData.name}' already exists in this project`);
+      }
       logger.error({ error, sampleCopyId: id }, 'Failed to update sample copy');
       throw error;
     }
