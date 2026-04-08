@@ -7,7 +7,7 @@ import type { CreateCopyDecoratorRequest, UpdateCopyDecoratorRequest, CopyDecora
 import type { ListParams } from '../http/contracts/common';
 import { copyDecoratorResponseSchema, copyDecoratorListResponseSchema } from '../http/contracts/copyDecorator';
 import { AuditService } from './AuditService';
-import { OptimisticLockError, NotFoundError } from '../errors';
+import { OptimisticLockError, NotFoundError, ConflictError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
@@ -49,7 +49,10 @@ export class CopyDecoratorService extends BaseService {
       logger.info({ copyDecoratorId: created.id }, 'Copy decorator created successfully');
 
       return copyDecoratorResponseSchema.parse(created);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === '23505' || error?.cause?.code === '23505') {
+        throw new ConflictError(`A copy decorator named '${input.name}' already exists in this project`);
+      }
       logger.error({ error, copyDecoratorId: input.id }, 'Failed to create copy decorator');
       throw error;
     }
@@ -186,7 +189,10 @@ export class CopyDecoratorService extends BaseService {
       logger.info({ copyDecoratorId: copyDecorator.id, newVersion: copyDecorator.version }, 'Copy decorator updated successfully');
 
       return copyDecoratorResponseSchema.parse(copyDecorator);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === '23505' || error?.cause?.code === '23505') {
+        throw new ConflictError(`A copy decorator named '${updateData.name}' already exists in this project`);
+      }
       logger.error({ error, copyDecoratorId: id }, 'Failed to update copy decorator');
       throw error;
     }

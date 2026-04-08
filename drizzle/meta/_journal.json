@@ -330,6 +330,13 @@
       "when": 1775048445124,
       "tag": "0046_curly_flatman",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1775565009026,
+      "tag": "0047_hot_menace",
+      "breakpoints": true
     }
   ]
 }

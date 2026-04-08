@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError, ArchivedProjectError, TooManyRequestsError } from '../../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError, ArchivedProjectError, TooManyRequestsError, ConflictError } from '../../errors';
 import logger from '../../utils/logger';
 
 /**
@@ -28,6 +28,11 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
 
   if (err instanceof ForbiddenError) {
     res.status(403).json({ error: err.message });
+    return;
+  }
+
+  if (err instanceof ConflictError) {
+    res.status(409).json({ error: err.message });
     return;
   }
 
