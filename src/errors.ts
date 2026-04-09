@@ -128,3 +128,27 @@ export class ConflictError extends Error {
     this.name = 'ConflictError';
   }
 }
+
+/** A single field-level validation error detail, compatible with Zod issue format */
+export type ValidationErrorDetail = {
+  code: string;
+  path: (string | number)[];
+  message: string;
+  origin?: string;
+  minimum?: number;
+  inclusive?: boolean;
+};
+
+/**
+ * Error thrown when business-logic validation fails, returning structured field-level details
+ * compatible with the Zod validation error format expected by clients
+ */
+export class ValidationError extends Error {
+  details: ValidationErrorDetail[];
+
+  constructor(message: string, details: ValidationErrorDetail[]) {
+    super(message);
+    this.name = 'ValidationError';
+    this.details = details;
+  }
+}
