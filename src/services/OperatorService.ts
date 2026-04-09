@@ -8,7 +8,7 @@ import type { ListParams } from '../http/contracts/common';
 import { operatorResponseSchema, operatorListResponseSchema, profileResponseSchema } from '../http/contracts/operator';
 import { AuditService } from './AuditService';
 import { AuthService } from './AuthService';
-import { OptimisticLockError, NotFoundError, InvalidOperationError } from '../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, ValidationError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
@@ -341,12 +341,12 @@ export class OperatorService extends BaseService {
       // Verify old password if changing password
       if (input.newPassword) {
         if (!input.oldPassword) {
-          throw new Error('Old password is required when changing password');
+          throw new ValidationError('Validation failed', [{ code: 'custom', path: ['oldPassword'], message: 'Current password is required when changing password' }]);
         }
 
         const isValidPassword = await this.authService.verifyPassword(input.oldPassword, existingOperator.password);
         if (!isValidPassword) {
-          throw new Error('Invalid old password');
+          throw new ValidationError('Validation failed', [{ code: 'custom', path: ['oldPassword'], message: 'Invalid current password' }]);
         }
       }
 
