@@ -149,7 +149,7 @@ export default withMermaid({
     socialLinks: [],
     footer: {
       message: 'Released under the Apache-2.0 License.',
-      copyright: 'Copyright © utter.one & contributors',
+      copyright: 'Copyright © HearMe (utter.one) & contributors',
     },
   },
 })
