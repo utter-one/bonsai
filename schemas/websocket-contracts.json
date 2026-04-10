@@ -266,6 +266,46 @@
               "type": "boolean",
               "default": true,
               "description": "Whether the client wants to receive all conversation events (e.g. turn start/end, agent actions)"
+            },
+            "sendAudioFormat": {
+              "type": "string",
+              "enum": [
+                "mp3",
+                "opus",
+                "aac",
+                "flac",
+                "wav",
+                "pcm_8000",
+                "pcm_16000",
+                "pcm_22050",
+                "pcm_24000",
+                "pcm_44100",
+                "pcm_48000",
+                "mulaw",
+                "alaw"
+              ],
+              "default": "pcm_16000",
+              "description": "Audio format the client sends for voice input (e.g. pcm_16000, opus, mulaw). Defaults to pcm_16000."
+            },
+            "receiveAudioFormat": {
+              "type": "string",
+              "enum": [
+                "mp3",
+                "opus",
+                "aac",
+                "flac",
+                "wav",
+                "pcm_8000",
+                "pcm_16000",
+                "pcm_22050",
+                "pcm_24000",
+                "pcm_44100",
+                "pcm_48000",
+                "mulaw",
+                "alaw"
+              ],
+              "default": "pcm_16000",
+              "description": "Preferred audio format for AI voice output. Omit to receive the provider native format without conversion. Defaults to pcm_16000."
             }
           },
           "description": "Session settings for the client"
@@ -349,6 +389,9 @@
                 "voiceActivityDetection": {
                   "type": "boolean",
                   "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence"
+                },
+                "serverVad": {
+                  "$ref": "#/definitions/ServerVadConfig"
                 }
               },
               "description": "ASR configuration settings with full ASR settings"
@@ -400,8 +443,7 @@
             "pcm_44100",
             "pcm_48000",
             "mulaw",
-            "alaw",
-            "linear16"
+            "alaw"
           ],
           "description": "Audio input format for speech recognition (e.g., \"pcm_16000\")"
         }
@@ -693,6 +735,53 @@
       },
       "description": "Speechmatics speech-to-text settings"
     },
+    "ServerVadConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "VAD aggressiveness level (0–3). Higher values are more aggressive at filtering non-speech. Default: 2."
+        },
+        "frameDurationMs": {
+          "anyOf": [
+            {
+              "type": "number",
+              "enum": [
+                10
+              ]
+            },
+            {
+              "type": "number",
+              "enum": [
+                20
+              ]
+            },
+            {
+              "type": "number",
+              "enum": [
+                30
+              ]
+            }
+          ],
+          "description": "Duration of each VAD processing frame in milliseconds. Must be 10, 20, or 30. Default: 20."
+        },
+        "silencePaddingMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Amount of silence (in ms) to prepend before the detected speech start as a pre-roll buffer. Default: 300."
+        },
+        "autoEndSilenceDurationMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 5000,
+          "description": "Duration of silence (in ms) after speech that triggers end-of-utterance detection. Default: 800."
+        }
+      },
+      "description": "Server-side VAD configuration. When set, the server autonomously detects speech boundaries — clients send continuous audio without calling start/end_user_voice_input."
+    },
     "project-settings": {
       "type": "object",
       "properties": {
@@ -743,6 +832,9 @@
             "voiceActivityDetection": {
               "type": "boolean",
               "description": "Whether to enable voice activity detection to automatically start/stop recording based on speech presence"
+            },
+            "serverVad": {
+              "$ref": "#/definitions/ServerVadConfig"
             }
           },
           "description": "ASR configuration settings with full ASR settings"
@@ -757,28 +849,19 @@
     "start-conversation-request": {
       "type": "object",
       "properties": {
-        "requestId": {
-          "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
-        },
         "type": {
           "type": "string",
           "enum": [
             "start_conversation"
-          ],
-          "description": "Message type for starting a new conversation"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Session ID in which to start the conversation"
+          ]
         },
         "userId": {
           "type": "string",
-          "description": "User ID initiating the conversation"
+          "description": "Identifier of the user initiating the conversation"
         },
         "agentId": {
           "type": "string",
-          "description": "Optional agent ID for the conversation"
+          "description": "Optional agent identifier to use for the conversation"
         },
         "stageId": {
           "type": "string",
@@ -787,167 +870,168 @@
         "timezone": {
           "type": "string",
           "description": "IANA timezone identifier for this conversation (e.g. America/New_York, Europe/Warsaw). Overrides user profile and project timezone settings. Defaults to UTC when not provided by any source."
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "requestId",
         "type",
-        "sessionId",
         "userId",
-        "stageId"
+        "stageId",
+        "requestId",
+        "sessionId"
       ]
     },
     "start-conversation-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "start_conversation"
-          ],
-          "description": "Message type for start conversation response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
           "description": "Whether conversation was successfully started"
         },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier for the created conversation"
-        },
         "error": {
           "type": "string",
           "description": "Error message if conversation creation failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
-        "success"
+        "success",
+        "sessionId"
       ]
     },
     "resume-conversation-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "resume_conversation"
-          ],
-          "description": "Message type for resuming a conversation"
+          ]
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
         },
         "sessionId": {
           "type": "string",
-          "description": "Session ID in which to resume the conversation"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation to resume"
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "requestId",
+        "conversationId",
         "type",
-        "sessionId",
-        "conversationId"
+        "requestId",
+        "sessionId"
       ]
     },
     "resume-conversation-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "resume_conversation"
-          ],
-          "description": "Message type for resume conversation response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
           "description": "Whether conversation was successfully resumed"
         },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the resumed conversation"
-        },
         "error": {
           "type": "string",
           "description": "Error message if conversation resumption failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
-        "success"
+        "success",
+        "sessionId"
       ]
     },
     "end-conversation-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "end_conversation"
-          ],
-          "description": "Message type for ending a conversation"
+          ]
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
         },
         "sessionId": {
           "type": "string",
-          "description": "Session ID containing the conversation"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation to end"
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "requestId",
+        "conversationId",
         "type",
-        "sessionId",
-        "conversationId"
+        "requestId",
+        "sessionId"
       ]
     },
     "end-conversation-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "end_conversation"
-          ],
-          "description": "Message type for end conversation response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
@@ -956,43 +1040,43 @@
         "error": {
           "type": "string",
           "description": "Error message if conversation termination failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
-        "success"
+        "success",
+        "sessionId"
       ]
     },
     "conversation-event": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "conversation_event"
-          ],
-          "description": "Message type for conversation events"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Session ID containing the conversation"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "inputTurnId": {
           "type": "string",
-          "description": "Identifier of the input turn associated with the event, if applicable"
+          "description": "Identifier of the input turn associated with this event, when applicable"
         },
         "outputTurnId": {
           "type": "string",
-          "description": "Identifier of the output turn associated with the event, if applicable"
+          "description": "Identifier of the output turn associated with this event, when applicable"
         },
         "eventType": {
           "type": "string",
@@ -1000,6 +1084,7 @@
             "message",
             "classification",
             "transformation",
+            "execution_plan",
             "action",
             "command",
             "tool_call",
@@ -1009,7 +1094,13 @@
             "conversation_aborted",
             "conversation_failed",
             "jump_to_stage",
-            "moderation"
+            "moderation",
+            "variables_updated",
+            "user_profile_updated",
+            "user_input_modified",
+            "user_banned",
+            "visibility_changed",
+            "sample_copy_selection"
           ],
           "description": "Type of the conversation event"
         },
@@ -1159,6 +1250,70 @@
             {
               "type": "object",
               "properties": {
+                "stageId": {
+                  "type": "string",
+                  "description": "ID of the stage where execution is taking place"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of all matched actions in original order"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "actionName": {
+                        "type": "string",
+                        "description": "Name of the action this effect originates from"
+                      },
+                      "effect": {
+                        "$ref": "#/definitions/Effect"
+                      }
+                    },
+                    "required": [
+                      "actionName",
+                      "effect"
+                    ]
+                  },
+                  "description": "Final ordered list of effects after filtering, sorting, and conflict resolution"
+                },
+                "lifecycleContext": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "on_enter",
+                    "on_leave",
+                    "on_fallback",
+                    "conversation_start",
+                    "conversation_resume",
+                    "conversation_end",
+                    "conversation_abort",
+                    "conversation_failed",
+                    null
+                  ],
+                  "description": "Lifecycle context in which execution is taking place; null for user-input-triggered executions"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "stageId",
+                "actions",
+                "effects",
+                "lifecycleContext"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
                 "actionName": {
                   "type": "string"
                 },
@@ -1247,6 +1402,10 @@
                 "error": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1324,6 +1483,10 @@
                 "stageId": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation end, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1343,6 +1506,10 @@
                 },
                 "stageId": {
                   "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation abort, if triggered by an action effect"
                 },
                 "metadata": {
                   "type": "object",
@@ -1385,6 +1552,10 @@
                 "toStageId": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this stage jump, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1421,6 +1592,12 @@
                 "durationMs": {
                   "type": "number"
                 },
+                "startMs": {
+                  "type": "number"
+                },
+                "endMs": {
+                  "type": "number"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -1433,19 +1610,197 @@
                 "flagged",
                 "blockingCategories",
                 "detectedCategories",
-                "durationMs"
+                "durationMs",
+                "startMs",
+                "endMs"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this variable update"
+                },
+                "variables": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Snapshot of all conversation variables after the update"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "variables"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this profile update"
+                },
+                "profile": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Updated user profile data"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "profile"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this input modification"
+                },
+                "modifiedInput": {
+                  "type": "string",
+                  "description": "The modified user input after template rendering"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "modifiedInput"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered the ban"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Optional reason for the ban"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this visibility change"
+                },
+                "visibility": {
+                  "type": "object",
+                  "properties": {
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "always",
+                        "stage",
+                        "never",
+                        "conditional"
+                      ],
+                      "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Condition for visibility, evaluated against conversation variables"
+                    }
+                  },
+                  "required": [
+                    "visibility"
+                  ],
+                  "description": "The new visibility settings for current turn messages"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "visibility"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "classifierId": {
+                  "type": "string",
+                  "description": "ID of the classifier that performed the selection"
+                },
+                "input": {
+                  "type": "string",
+                  "description": "The user input that triggered the selection"
+                },
+                "sampleCopy": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Identifier of selected sample copy, or null if none was selected"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "classifierId",
+                "input",
+                "sampleCopy"
               ]
             }
           ],
           "description": "Data associated with the conversation event"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "eventType",
-        "eventData"
+        "eventData",
+        "sessionId"
       ]
     },
     "Effect": {
@@ -1476,6 +1831,9 @@
         },
         {
           "$ref": "#/definitions/ChangeVisibilityEffect"
+        },
+        {
+          "$ref": "#/definitions/BanUserEffect"
         }
       ],
       "discriminator": {
@@ -1489,9 +1847,11 @@
           "modify_user_profile": "#/definitions/ModifyUserProfileEffect",
           "call_tool": "#/definitions/CallToolEffect",
           "generate_response": "#/definitions/GenerateResponseEffect",
-          "change_visibility": "#/definitions/ChangeVisibilityEffect"
+          "change_visibility": "#/definitions/ChangeVisibilityEffect",
+          "ban_user": "#/definitions/BanUserEffect"
         }
-      }
+      },
+      "description": "The effect to be executed"
     },
     "EndConversationEffect": {
       "type": "object",
@@ -1776,35 +2136,45 @@
         "visibility"
       ]
     },
+    "BanUserEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ban_user"
+          ],
+          "description": "Effect type"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for banning the user"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "conversation-event-update": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "conversation_event_update"
-          ],
-          "description": "Message type for conversation events"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Session ID containing the conversation"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "inputTurnId": {
           "type": "string",
-          "description": "Identifier of the input turn associated with the event, if applicable"
+          "description": "Identifier of the input turn associated with this event, when applicable"
         },
         "outputTurnId": {
           "type": "string",
-          "description": "Identifier of the output turn associated with the event, if applicable"
+          "description": "Identifier of the output turn associated with this event, when applicable"
         },
         "eventType": {
           "type": "string",
@@ -1812,6 +2182,7 @@
             "message",
             "classification",
             "transformation",
+            "execution_plan",
             "action",
             "command",
             "tool_call",
@@ -1821,7 +2192,13 @@
             "conversation_aborted",
             "conversation_failed",
             "jump_to_stage",
-            "moderation"
+            "moderation",
+            "variables_updated",
+            "user_profile_updated",
+            "user_input_modified",
+            "user_banned",
+            "visibility_changed",
+            "sample_copy_selection"
           ],
           "description": "Type of the conversation event"
         },
@@ -1971,6 +2348,70 @@
             {
               "type": "object",
               "properties": {
+                "stageId": {
+                  "type": "string",
+                  "description": "ID of the stage where execution is taking place"
+                },
+                "actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of all matched actions in original order"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "actionName": {
+                        "type": "string",
+                        "description": "Name of the action this effect originates from"
+                      },
+                      "effect": {
+                        "$ref": "#/definitions/Effect"
+                      }
+                    },
+                    "required": [
+                      "actionName",
+                      "effect"
+                    ]
+                  },
+                  "description": "Final ordered list of effects after filtering, sorting, and conflict resolution"
+                },
+                "lifecycleContext": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "on_enter",
+                    "on_leave",
+                    "on_fallback",
+                    "conversation_start",
+                    "conversation_resume",
+                    "conversation_end",
+                    "conversation_abort",
+                    "conversation_failed",
+                    null
+                  ],
+                  "description": "Lifecycle context in which execution is taking place; null for user-input-triggered executions"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "stageId",
+                "actions",
+                "effects",
+                "lifecycleContext"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
                 "actionName": {
                   "type": "string"
                 },
@@ -2059,6 +2500,10 @@
                 "error": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -2136,6 +2581,10 @@
                 "stageId": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation end, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -2155,6 +2604,10 @@
                 },
                 "stageId": {
                   "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered conversation abort, if triggered by an action effect"
                 },
                 "metadata": {
                   "type": "object",
@@ -2197,6 +2650,10 @@
                 "toStageId": {
                   "type": "string"
                 },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this stage jump, if triggered by an action effect"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -2233,6 +2690,12 @@
                 "durationMs": {
                   "type": "number"
                 },
+                "startMs": {
+                  "type": "number"
+                },
+                "endMs": {
+                  "type": "number"
+                },
                 "metadata": {
                   "type": "object",
                   "additionalProperties": {
@@ -2245,87 +2708,267 @@
                 "flagged",
                 "blockingCategories",
                 "detectedCategories",
-                "durationMs"
+                "durationMs",
+                "startMs",
+                "endMs"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this variable update"
+                },
+                "variables": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Snapshot of all conversation variables after the update"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "variables"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this profile update"
+                },
+                "profile": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  },
+                  "description": "Updated user profile data"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "profile"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this input modification"
+                },
+                "modifiedInput": {
+                  "type": "string",
+                  "description": "The modified user input after template rendering"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "modifiedInput"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered the ban"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Optional reason for the ban"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this visibility change"
+                },
+                "visibility": {
+                  "type": "object",
+                  "properties": {
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "always",
+                        "stage",
+                        "never",
+                        "conditional"
+                      ],
+                      "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+                    },
+                    "condition": {
+                      "type": "string",
+                      "description": "Condition for visibility, evaluated against conversation variables"
+                    }
+                  },
+                  "required": [
+                    "visibility"
+                  ],
+                  "description": "The new visibility settings for current turn messages"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "sourceActionName",
+                "visibility"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "classifierId": {
+                  "type": "string",
+                  "description": "ID of the classifier that performed the selection"
+                },
+                "input": {
+                  "type": "string",
+                  "description": "The user input that triggered the selection"
+                },
+                "sampleCopy": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Identifier of selected sample copy, or null if none was selected"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "classifierId",
+                "input",
+                "sampleCopy"
               ]
             }
           ],
-          "description": "Data associated with the conversation event"
+          "description": "Updated data for the conversation event"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "eventType",
-        "eventData"
+        "eventData",
+        "sessionId"
       ]
     },
     "start-user-voice-input-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "start_user_voice_input"
-          ],
-          "description": "Message type for starting user voice input"
+          ]
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
         }
       },
       "required": [
-        "requestId",
+        "conversationId",
         "type",
-        "sessionId",
-        "conversationId"
+        "requestId",
+        "sessionId"
       ]
     },
     "start-user-voice-input-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "start_user_voice_input"
-          ],
-          "description": "Message type for start user voice input response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
           "description": "Whether voice input was successfully started"
         },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Identifier for the new voice input turn. Present when success is true"
+        },
         "error": {
           "type": "string",
           "description": "Error message if voice input start failed"
         },
-        "inputTurnId": {
+        "requestId": {
           "type": "string",
-          "description": "Unique identifier for the input turn"
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
         "success",
-        "inputTurnId"
+        "sessionId"
       ]
     },
     "send-user-voice-chunk-request": {
@@ -2360,7 +3003,7 @@
         },
         "inputTurnId": {
           "type": "string",
-          "description": "Unique identifier for the input turn"
+          "description": "Unique identifier for the input turn. Optional in server VAD mode where the turn ID is managed server-side."
         }
       },
       "required": [
@@ -2369,8 +3012,7 @@
         "sessionId",
         "conversationId",
         "audioData",
-        "ordinal",
-        "inputTurnId"
+        "ordinal"
       ]
     },
     "send-user-voice-chunk-response": {
@@ -2407,262 +3049,260 @@
       "required": [
         "type",
         "sessionId",
-        "success",
-        "inputTurnId"
+        "success"
       ]
     },
     "end-user-voice-input-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "end_user_voice_input"
-          ],
-          "description": "Message type for ending user voice input"
+          ]
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Identifier of the input turn to close, as returned by the corresponding result message"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "inputTurnId": {
-          "type": "string",
-          "description": "Unique identifier for the input turn"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
-        "inputTurnId"
+        "type",
+        "inputTurnId",
+        "requestId",
+        "sessionId"
       ]
     },
     "end-user-voice-input-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "end_user_voice_input"
-          ],
-          "description": "Message type for end user voice input response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
           "description": "Whether voice input was successfully ended"
         },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Identifier of the voice input turn that was closed"
+        },
         "error": {
           "type": "string",
           "description": "Error message if voice input ending failed"
         },
-        "inputTurnId": {
+        "requestId": {
           "type": "string",
-          "description": "Unique identifier for the input turn"
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
         "success",
-        "inputTurnId"
+        "inputTurnId",
+        "sessionId"
       ]
     },
     "send-user-text-input-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "send_user_text_input"
-          ],
-          "description": "Message type for sending user text input"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "description": "Text content submitted by the user"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "text": {
-          "type": "string",
-          "description": "Text content from the user"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
-        "text"
+        "type",
+        "text",
+        "requestId",
+        "sessionId"
       ]
     },
     "send-user-text-input-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "send_user_text_input"
-          ],
-          "description": "Message type for send user text input response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
           "description": "Whether text input was successfully received"
         },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Identifier of the input turn created for this text submission, can be used to correlate with conversation events"
+        },
         "error": {
           "type": "string",
           "description": "Error message if text input processing failed"
         },
-        "inputTurnId": {
+        "requestId": {
           "type": "string",
-          "description": "Unique identifier for the input turn, can be used to correlate with voice input if applicable"
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
         "success",
-        "inputTurnId"
+        "inputTurnId",
+        "sessionId"
       ]
     },
     "user-transcribed-chunk": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "user_transcribed_chunk"
-          ],
-          "description": "Message type for user text chunk"
+          ]
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Input turn this transcription chunk belongs to"
+        },
+        "chunkId": {
+          "type": "string",
+          "description": "Unique identifier for this chunk"
+        },
+        "chunkText": {
+          "type": "string",
+          "description": "Transcribed text content"
+        },
+        "ordinal": {
+          "type": "number",
+          "description": "Sequential 0-based position within the transcription stream"
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "True once ASR has finalised its transcript for this chunk"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "inputTurnId": {
-          "type": "string",
-          "description": "Unique identifier for the input turn this chunk belongs to"
-        },
-        "chunkId": {
-          "type": "string",
-          "description": "Unique identifier for this text chunk"
-        },
-        "chunkText": {
-          "type": "string",
-          "description": "Chunk of transcribed text input from the user"
-        },
-        "ordinal": {
-          "type": "number",
-          "description": "Sequential order of this chunk in the transcription sequence"
-        },
-        "isFinal": {
-          "type": "boolean",
-          "description": "Whether this is the final version of the chunk of text input"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "inputTurnId",
         "chunkId",
         "chunkText",
         "ordinal",
-        "isFinal"
+        "isFinal",
+        "sessionId"
       ]
     },
     "go-to-stage-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "go_to_stage"
-          ],
-          "description": "Message type for navigating to a stage"
+          ]
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Identifier of the target stage"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "stageId": {
-          "type": "string",
-          "description": "Unique identifier of the target stage"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
-        "stageId"
+        "type",
+        "stageId",
+        "requestId",
+        "sessionId"
       ]
     },
     "go-to-stage-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "go_to_stage"
-          ],
-          "description": "Message type for go to stage response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
@@ -2671,39 +3311,39 @@
         "error": {
           "type": "string",
           "description": "Error message if navigation failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
-        "success"
+        "success",
+        "sessionId"
       ]
     },
     "set-var-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "set_var"
-          ],
-          "description": "Message type for setting a variable"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "stageId": {
           "type": "string",
-          "description": "Unique identifier of the stage"
+          "description": "Identifier of the stage that owns the variable"
         },
         "variableName": {
           "type": "string",
@@ -2718,35 +3358,38 @@
               "description": "Value to set for the variable (can be string, number, boolean, object, or array)"
             }
           ]
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "stageId",
         "variableName",
-        "variableValue"
+        "variableValue",
+        "requestId",
+        "sessionId"
       ]
     },
     "set-var-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
-            "set_var"
-          ],
-          "description": "Message type for set variable response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+            "set_var_result"
+          ]
         },
         "success": {
           "type": "boolean",
@@ -2755,71 +3398,74 @@
         "error": {
           "type": "string",
           "description": "Error message if setting the variable failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
-        "success"
+        "success",
+        "sessionId"
       ]
     },
     "get-var-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "get_var"
-          ],
-          "description": "Message type for getting a variable"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "stageId": {
           "type": "string",
-          "description": "Unique identifier of the stage"
+          "description": "Identifier of the stage that owns the variable"
         },
         "variableName": {
           "type": "string",
           "description": "Name of the variable to retrieve"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "stageId",
-        "variableName"
+        "variableName",
+        "requestId",
+        "sessionId"
       ]
     },
     "get-var-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "get_var"
-          ],
-          "description": "Message type for get variable response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
@@ -2882,72 +3528,75 @@
               "$ref": "#/definitions/AudioParameterValue"
             }
           ],
-          "description": "Value of the variable (undefined if not found)"
+          "description": "Value of the variable (absent when not found or success is false)"
         },
         "error": {
           "type": "string",
           "description": "Error message if retrieving the variable failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
         "success",
-        "variableName"
+        "variableName",
+        "sessionId"
       ]
     },
     "get-all-vars-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "get_all_vars"
-          ],
-          "description": "Message type for getting all variables"
+          ]
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Identifier of the stage whose variables should be retrieved"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "stageId": {
-          "type": "string",
-          "description": "Unique identifier of the stage"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
-        "stageId"
+        "type",
+        "stageId",
+        "requestId",
+        "sessionId"
       ]
     },
     "get-all-vars-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "get_all_vars"
-          ],
-          "description": "Message type for get all variables response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
@@ -2963,36 +3612,36 @@
         "error": {
           "type": "string",
           "description": "Error message if retrieving variables failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
         "success",
-        "variables"
+        "variables",
+        "sessionId"
       ]
     },
     "run-action-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "run_action"
-          ],
-          "description": "Message type for running an action"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "actionName": {
           "type": "string",
@@ -3004,34 +3653,37 @@
             "$ref": "#/definitions/ParameterValue"
           },
           "description": "Map of parameter names to their values"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "actionName",
-        "parameters"
+        "parameters",
+        "requestId",
+        "sessionId"
       ]
     },
     "run-action-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "run_action"
-          ],
-          "description": "Message type for run action response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
@@ -3156,35 +3808,35 @@
         "error": {
           "type": "string",
           "description": "Error message if action execution failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
-        "success"
+        "success",
+        "sessionId"
       ]
     },
     "call-tool-request": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Unique identifier for request correlation and tracking"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "call_tool"
-          ],
-          "description": "Message type for calling a tool"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "toolId": {
           "type": "string",
@@ -3196,34 +3848,37 @@
             "$ref": "#/definitions/ParameterValue"
           },
           "description": "Map of parameter names to their values"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "requestId",
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "toolId",
-        "parameters"
+        "parameters",
+        "requestId",
+        "sessionId"
       ]
     },
     "call-tool-response": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "call_tool"
-          ],
-          "description": "Message type for call tool response"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
+          ]
         },
         "success": {
           "type": "boolean",
@@ -3348,78 +4003,77 @@
         "error": {
           "type": "string",
           "description": "Error message if tool execution failed"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
+        "conversationId",
         "type",
-        "sessionId",
-        "success"
+        "success",
+        "sessionId"
       ]
     },
     "start-ai-generation-output": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "start_ai_generation_output"
-          ],
-          "description": "Message type for starting AI voice output"
+          ]
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Unique identifier for this generation turn; used to correlate all subsequent output messages"
+        },
+        "expectVoice": {
+          "type": "boolean",
+          "description": "Whether the response will include synthesised voice audio"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "outputTurnId": {
-          "type": "string",
-          "description": "Unique identifier for this voice output sequence for correlation"
-        },
-        "expectVoice": {
-          "type": "boolean",
-          "description": "Whether the AI response will include voice output"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "outputTurnId",
-        "expectVoice"
+        "expectVoice",
+        "sessionId"
       ]
     },
     "send-ai-voice-chunk": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "send_ai_voice_chunk"
-          ],
-          "description": "Message type for sending AI voice chunk"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "outputTurnId": {
           "type": "string",
-          "description": "Unique identifier for this voice output sequence for correlation"
+          "description": "Generation turn this chunk belongs to"
         },
         "audioData": {
           "type": "string",
@@ -3440,162 +4094,158 @@
             "pcm_44100",
             "pcm_48000",
             "mulaw",
-            "alaw",
-            "linear16"
+            "alaw"
           ],
-          "description": "Audio format of the chunk data"
+          "description": "Encoding of audioData"
         },
         "chunkId": {
           "type": "string",
-          "description": "Unique identifier for this specific audio chunk"
+          "description": "Unique identifier for this specific chunk"
         },
         "ordinal": {
           "type": "number",
-          "description": "Sequential order of this chunk in the voice output sequence"
+          "description": "Sequential 0-based position within the output turn's audio stream"
         },
         "isFinal": {
           "type": "boolean",
-          "description": "Whether this is the final chunk in the voice output sequence"
+          "description": "Whether this is the final audio chunk for this output turn"
         },
         "sampleRate": {
           "type": "number",
-          "description": "Sample rate of the audio chunk (e.g., 24000)"
+          "description": "Sample rate in Hz (e.g. 24000)"
         },
         "bitRate": {
           "type": "number",
-          "description": "Bit rate of the audio chunk in bits per second (e.g., 64000)"
+          "description": "Bit rate in bits per second (e.g. 64000)"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "outputTurnId",
         "audioData",
         "audioFormat",
         "chunkId",
         "ordinal",
-        "isFinal"
+        "isFinal",
+        "sessionId"
       ]
     },
     "end-ai-generation-output": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "end_ai_generation_output"
-          ],
-          "description": "Message type for ending AI voice output"
+          ]
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Generation turn that has ended"
+        },
+        "fullText": {
+          "type": "string",
+          "description": "Full text that was synthesised to speech (or generated, when voice is disabled)"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "outputTurnId": {
-          "type": "string",
-          "description": "Unique identifier for this voice output sequence for correlation"
-        },
-        "fullText": {
-          "type": "string",
-          "description": "The full text that was converted to speech, if available"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "outputTurnId",
-        "fullText"
+        "fullText",
+        "sessionId"
       ]
     },
     "ai-transcribed-chunk": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "ai_transcribed_chunk"
-          ],
-          "description": "Message type for AI transcribed text chunk"
+          ]
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Generation turn this chunk belongs to"
+        },
+        "chunkId": {
+          "type": "string",
+          "description": "Unique identifier for this chunk"
+        },
+        "chunkText": {
+          "type": "string",
+          "description": "Transcribed text content"
+        },
+        "ordinal": {
+          "type": "number",
+          "description": "Sequential 0-based position within the transcription stream"
+        },
+        "isFinal": {
+          "type": "boolean",
+          "description": "Whether this is the final transcription chunk for this output turn"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
         },
         "sessionId": {
           "type": "string",
           "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
-        },
-        "outputTurnId": {
-          "type": "string",
-          "description": "Unique identifier for the output turn this chunk belongs to"
-        },
-        "chunkId": {
-          "type": "string",
-          "description": "Unique identifier for this text chunk"
-        },
-        "chunkText": {
-          "type": "string",
-          "description": "Chunk of transcribed text output from the AI"
-        },
-        "ordinal": {
-          "type": "number",
-          "description": "Sequential order of this chunk in the transcription sequence"
-        },
-        "isFinal": {
-          "type": "boolean",
-          "description": "Whether this is the final chunk of text output"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "outputTurnId",
         "chunkId",
         "chunkText",
         "ordinal",
-        "isFinal"
+        "isFinal",
+        "sessionId"
       ]
     },
     "send-ai-image-output": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "send_ai_image_output"
-          ],
-          "description": "Message type for sending AI-generated image"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "outputTurnId": {
           "type": "string",
-          "description": "Unique identifier for this output sequence for correlation"
+          "description": "Generation turn this image belongs to"
         },
         "imageData": {
           "type": "string",
@@ -3603,48 +4253,47 @@
         },
         "mimeType": {
           "type": "string",
-          "description": "MIME type of the image (e.g., image/png, image/jpeg)"
+          "description": "MIME type of imageData (e.g. image/png, image/jpeg)"
         },
         "sequenceNumber": {
           "type": "number",
-          "description": "Sequence number if multiple images in response"
+          "description": "0-based index when multiple images are produced in a single response"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "outputTurnId",
         "imageData",
         "mimeType",
-        "sequenceNumber"
+        "sequenceNumber",
+        "sessionId"
       ]
     },
     "send-ai-audio-output": {
       "type": "object",
       "properties": {
-        "requestId": {
+        "conversationId": {
           "type": "string",
-          "description": "Optional request ID for correlating responses with requests"
+          "description": "Unique identifier of the conversation"
         },
         "type": {
           "type": "string",
           "enum": [
             "send_ai_audio_output"
-          ],
-          "description": "Message type for sending AI-generated audio"
-        },
-        "sessionId": {
-          "type": "string",
-          "description": "Unique identifier for the session"
-        },
-        "conversationId": {
-          "type": "string",
-          "description": "Unique identifier of the conversation"
+          ]
         },
         "outputTurnId": {
           "type": "string",
-          "description": "Unique identifier for this output sequence for correlation"
+          "description": "Generation turn this audio belongs to"
         },
         "audioData": {
           "type": "string",
@@ -3653,20 +4302,29 @@
         "audioFormat": {
           "type": "string",
           "enum": [
-            "pcm",
             "mp3",
+            "opus",
+            "aac",
+            "flac",
             "wav",
-            "opus"
+            "pcm_8000",
+            "pcm_16000",
+            "pcm_22050",
+            "pcm_24000",
+            "pcm_44100",
+            "pcm_48000",
+            "mulaw",
+            "alaw"
           ],
-          "description": "Audio format identifier"
+          "description": "Encoding of audioData"
         },
         "mimeType": {
           "type": "string",
-          "description": "MIME type of the audio (e.g., audio/pcm, audio/mpeg)"
+          "description": "MIME type of audioData (e.g. audio/mpeg, audio/wav)"
         },
         "sequenceNumber": {
           "type": "number",
-          "description": "Sequence number if multiple audio blocks in response"
+          "description": "0-based index when multiple audio blocks are produced in a single response"
         },
         "metadata": {
           "type": "object",
@@ -3684,18 +4342,165 @@
               "description": "Bit depth per sample"
             }
           },
-          "description": "Audio metadata"
+          "description": "Optional low-level audio metadata"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
         }
       },
       "required": [
-        "type",
-        "sessionId",
         "conversationId",
+        "type",
         "outputTurnId",
         "audioData",
         "audioFormat",
         "mimeType",
-        "sequenceNumber"
+        "sequenceNumber",
+        "sessionId"
+      ]
+    },
+    "variables-updated-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this variable update"
+        },
+        "variables": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ParameterValue"
+          },
+          "description": "Snapshot of all conversation variables after the update"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "variables"
+      ]
+    },
+    "user-profile-updated-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this profile update"
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ParameterValue"
+          },
+          "description": "Updated user profile data"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "profile"
+      ]
+    },
+    "user-input-modified-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this input modification"
+        },
+        "modifiedInput": {
+          "type": "string",
+          "description": "The modified user input after template rendering"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "modifiedInput"
+      ]
+    },
+    "user-banned-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered the ban"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for the ban"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName"
+      ]
+    },
+    "visibility-changed-event": {
+      "type": "object",
+      "properties": {
+        "sourceActionName": {
+          "type": "string",
+          "description": "Name of the action that triggered this visibility change"
+        },
+        "visibility": {
+          "type": "object",
+          "properties": {
+            "visibility": {
+              "type": "string",
+              "enum": [
+                "always",
+                "stage",
+                "never",
+                "conditional"
+              ],
+              "description": "Visibility setting for the message: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on condition)"
+            },
+            "condition": {
+              "type": "string",
+              "description": "Condition for visibility, evaluated against conversation variables"
+            }
+          },
+          "required": [
+            "visibility"
+          ],
+          "description": "The new visibility settings for current turn messages"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "sourceActionName",
+        "visibility"
       ]
     }
   }

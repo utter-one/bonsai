@@ -27,7 +27,26 @@ While the most common use case is structured data extraction, transformers are g
 4. The LLM returns a JSON object whose schema is described by <code v-pre>{{schema}}</code>
 5. Only fields declared in `contextFields` are accepted; any extra fields are discarded
 6. The returned values are **merged** into the stage's variable store — fields omitted from the LLM response keep their current values
-7. All variable writes from all transformers are flushed to the database in a single batch update
+7. If any written variables match an action's `watchedVariables` conditions, the action has `triggerOnTransformation: true`, **and** its optional `condition` expression evaluates to truthy — those actions are activated
+8. All variable writes are flushed to the database in a single batch update; triggered actions are returned alongside classifier results for unified execution
+
+```mermaid
+flowchart TD
+    A([User input]) --> B[Run transformers in parallel]
+    A --> C[Run classifiers in parallel]
+    B --> D[LLM extracts JSON fields]
+    D --> E[Discard fields not in contextFields]
+    E --> F[Merge into variable store]
+    F --> T{triggerOnTransformation actions\nwatchedVariables matched?}
+    T -->|yes| TC{condition passes?}
+    TC -->|yes| TA[Transformer-triggered actions]
+    TC -->|no| skip([Action skipped])
+    T -->|no| skip
+    C --> G[Classifier actions resolved]
+    TA --> M[Merge all triggered actions]
+    G --> M
+    M --> I([Response generation with merged actions])
+```
 
 ## Extraction Prompt
 

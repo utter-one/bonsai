@@ -62,7 +62,7 @@ export class ApiKeyService extends BaseService {
       const id = generateId(ID_PREFIXES.API_KEY);
       const key = this.generateApiKey();
 
-      const apiKey = await db.insert(apiKeys).values({ id, projectId, name: input.name, key, isActive: true, metadata: input.metadata, version: 1 }).returning();
+      const apiKey = await db.insert(apiKeys).values({ id, projectId, name: input.name, key, isActive: true, metadata: input.metadata, keySettings: input.keySettings ?? null, version: 1 }).returning();
 
       const createdApiKey = apiKey[0];
 
@@ -71,7 +71,7 @@ export class ApiKeyService extends BaseService {
 
       logger.info({ apiKeyId: createdApiKey.id, projectId }, 'API key created successfully');
 
-      return apiKeyResponseSchema.parse({ ...createdApiKey, key, keyPreview: this.getKeyPreview(key), lastUsedAt: createdApiKey.lastUsedAt?.toISOString() ?? null, createdAt: createdApiKey.createdAt.toISOString(), updatedAt: createdApiKey.updatedAt.toISOString() });
+      return apiKeyResponseSchema.parse({ ...createdApiKey, key, keyPreview: this.getKeyPreview(key), lastUsedAt: createdApiKey.lastUsedAt?.toISOString() ?? null, createdAt: createdApiKey.createdAt.toISOString(), updatedAt: createdApiKey.updatedAt.toISOString(), keySettings: createdApiKey.keySettings ?? null });
     } catch (error) {
       logger.error({ error, projectId, name: input.name }, 'Failed to create API key');
       throw error;
@@ -96,7 +96,7 @@ export class ApiKeyService extends BaseService {
       }
 
       const archived = !(await this.isProjectActive(projectId));
-      return apiKeyResponseSchema.parse({ ...apiKey, keyPreview: this.getKeyPreview(apiKey.key), lastUsedAt: apiKey.lastUsedAt?.toISOString() ?? null, createdAt: apiKey.createdAt.toISOString(), updatedAt: apiKey.updatedAt.toISOString(), archived });
+      return apiKeyResponseSchema.parse({ ...apiKey, keyPreview: this.getKeyPreview(apiKey.key), lastUsedAt: apiKey.lastUsedAt?.toISOString() ?? null, createdAt: apiKey.createdAt.toISOString(), updatedAt: apiKey.updatedAt.toISOString(), archived, keySettings: apiKey.keySettings ?? null });
     } catch (error) {
       logger.error({ error, apiKeyId: id }, 'Failed to fetch API key');
       throw error;
@@ -122,7 +122,7 @@ export class ApiKeyService extends BaseService {
 
       await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, apiKey.id));
 
-      return apiKeyResponseSchema.parse({ ...apiKey, keyPreview: this.getKeyPreview(apiKey.key), lastUsedAt: new Date().toISOString(), createdAt: apiKey.createdAt.toISOString(), updatedAt: apiKey.updatedAt.toISOString() });
+      return apiKeyResponseSchema.parse({ ...apiKey, keyPreview: this.getKeyPreview(apiKey.key), lastUsedAt: new Date().toISOString(), createdAt: apiKey.createdAt.toISOString(), updatedAt: apiKey.updatedAt.toISOString(), keySettings: apiKey.keySettings ?? null });
     } catch (error) {
       logger.error({ error }, 'Failed to fetch API key by key');
       throw error;
@@ -187,6 +187,7 @@ export class ApiKeyService extends BaseService {
         createdAt: item.createdAt.toISOString(),
         updatedAt: item.updatedAt.toISOString(),
         archived: archivedSet.has(item.projectId),
+        keySettings: item.keySettings ?? null,
       }));
 
       logger.debug({ count: apiKeyList.length, total }, 'API keys listed successfully');
@@ -223,7 +224,7 @@ export class ApiKeyService extends BaseService {
         throw new OptimisticLockError(`API key version mismatch. Expected ${input.version}, got ${existingApiKey.version}`);
       }
 
-      const updatedApiKey = await db.update(apiKeys).set({ name: input.name ?? existingApiKey.name, isActive: input.isActive ?? existingApiKey.isActive, metadata: input.metadata ?? existingApiKey.metadata, version: existingApiKey.version + 1, updatedAt: new Date() }).where(and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id))).returning();
+      const updatedApiKey = await db.update(apiKeys).set({ name: input.name ?? existingApiKey.name, isActive: input.isActive ?? existingApiKey.isActive, metadata: input.metadata ?? existingApiKey.metadata, keySettings: input.keySettings !== undefined ? input.keySettings : existingApiKey.keySettings, version: existingApiKey.version + 1, updatedAt: new Date() }).where(and(eq(apiKeys.projectId, projectId), eq(apiKeys.id, id))).returning();
 
       const updated = updatedApiKey[0];
 
@@ -233,7 +234,7 @@ export class ApiKeyService extends BaseService {
 
       logger.info({ apiKeyId: updated.id }, 'API key updated successfully');
 
-      return apiKeyResponseSchema.parse({ ...updated, keyPreview: this.getKeyPreview(updated.key), lastUsedAt: updated.lastUsedAt?.toISOString() ?? null, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+      return apiKeyResponseSchema.parse({ ...updated, keyPreview: this.getKeyPreview(updated.key), lastUsedAt: updated.lastUsedAt?.toISOString() ?? null, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(), keySettings: updated.keySettings ?? null });
     } catch (error) {
       logger.error({ error, apiKeyId: id }, 'Failed to update API key');
       throw error;
@@ -279,15 +280,16 @@ export class ApiKeyService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific API key
    * @param apiKeyId - The unique identifier of the API key
+   * @param projectId - The project ID the API key belongs to
    * @returns Array of audit log entries for the API key
    */
-  async getApiKeyAuditLogs(apiKeyId: string): Promise<any[]> {
-    logger.debug({ apiKeyId }, 'Fetching audit logs for API key');
+  async getApiKeyAuditLogs(apiKeyId: string, projectId: string): Promise<any[]> {
+    logger.debug({ apiKeyId, projectId }, 'Fetching audit logs for API key');
 
     try {
-      return await this.auditService.getEntityAuditLogs('api_key', apiKeyId);
+      return await this.auditService.getEntityAuditLogs('api_key', apiKeyId, projectId);
     } catch (error) {
-      logger.error({ error, apiKeyId }, 'Failed to fetch API key audit logs');
+      logger.error({ error, apiKeyId, projectId }, 'Failed to fetch API key audit logs');
       throw error;
     }
   }

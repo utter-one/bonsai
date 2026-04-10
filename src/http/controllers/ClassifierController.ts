@@ -14,7 +14,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class ClassifierController {
-  constructor(@inject(ClassifierService) private readonly classifierService: ClassifierService) {}
+  constructor(@inject(ClassifierService) private readonly classifierService: ClassifierService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -271,7 +271,7 @@ export class ClassifierController {
   private async getClassifierAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = classifierRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.classifierService.getClassifierAuditLogs(params.id);
+    const auditLogs = await this.classifierService.getClassifierAuditLogs(params.id, params.projectId);
     res.status(200).json(auditLogs);
   }
 

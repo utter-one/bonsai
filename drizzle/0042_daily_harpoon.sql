@@ -1,0 +1,1 @@
+ALTER TABLE "sample_copies" ADD COLUMN "mode" text DEFAULT 'regular' NOT NULL;

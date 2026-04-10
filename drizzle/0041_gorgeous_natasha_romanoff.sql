@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "sample_copies_project_id_name_unique" ON "sample_copies" USING btree ("project_id","name");

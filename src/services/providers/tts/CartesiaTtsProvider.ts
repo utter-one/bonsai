@@ -26,7 +26,7 @@ export const cartesiaTtsSettingsSchema = z.object({
   model: z.string().optional().describe('Model ID to use for speech synthesis (e.g., "sonic-3", "sonic-3-latest", "sonic-3-2026-01-12"). Defaults to "sonic-3-latest"'),
   voiceId: z.string().optional().describe('Voice ID to use for speech synthesis (e.g., "f786b574-daa5-4673-aa0c-cbe3e8534c02" for Katie). See Cartesia voice catalog'),
   language: z.string().optional().describe('Language code for speech synthesis (e.g., "en", "es", "fr"). Sonic-3 supports 42 languages'),
-  audioFormat: z.enum(['pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'pcm_48000', 'opus', 'mulaw', 'alaw']).optional().describe('Preferred audio output format for synthesized speech. Defaults to "pcm_24000"'),
+  audioFormat: z.enum(['pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'pcm_48000', 'mulaw', 'alaw']).optional().describe('Preferred audio output format for synthesized speech. Defaults to "pcm_24000"'),
   speed: z.enum(['slowest', 'slow', 'normal', 'fast', 'fastest']).optional().describe('Speech speed control. Defaults to "normal"'),
   emotion: z.array(z.string()).optional().describe('Emotion tags for expressive speech (e.g., ["positivity:high", "curiosity"]). See Cartesia emotion documentation'),
   maxBufferDelayMs: z.number().int().min(0).max(5000).optional().describe('Maximum time in milliseconds to buffer text chunks before sending to TTS (0-5000ms). Defaults to 3000ms. Set to 0 to disable buffering'),
@@ -162,7 +162,14 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
    * Gets the list of supported audio output formats for Cartesia
    */
   getSupportedFormats(): AudioFormat[] {
-    return ['pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'pcm_48000', 'opus', 'mulaw', 'alaw'];
+    return ['pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'pcm_48000', 'mulaw', 'alaw'];
+  }
+
+  /**
+   * Returns the audio format based on provider configuration
+   */
+  getOutputFormat(): AudioFormat {
+    return this.resolveAudioFormat(this.settings.audioFormat);
   }
 
   /**
@@ -192,7 +199,7 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
     }
 
     // Resolve audio format
-    this.audioFormat = this.resolveAudioFormat(this.settings.audioFormat);
+    this.audioFormat = this.getOutputFormat();
 
     const effectiveModel = this.settings.model ?? 'sonic-3-latest';
     const effectiveVoiceId = this.settings.voiceId ?? 'f786b574-daa5-4673-aa0c-cbe3e8534c02'; // Katie (stable voice for agents)

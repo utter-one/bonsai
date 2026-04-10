@@ -17,7 +17,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class GuardrailController {
-  constructor(@inject(GuardrailService) private readonly guardrailService: GuardrailService) {}
+  constructor(@inject(GuardrailService) private readonly guardrailService: GuardrailService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -272,7 +272,7 @@ export class GuardrailController {
   private async getGuardrailAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = guardrailRouteParamsSchema.parse(req.params);
-    const logs = await this.guardrailService.getGuardrailAuditLogs(params.id);
+    const logs = await this.guardrailService.getGuardrailAuditLogs(params.id, params.projectId);
     res.status(200).json(logs);
   }
 

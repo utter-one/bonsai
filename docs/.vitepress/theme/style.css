@@ -1,66 +1,81 @@
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=PT+Serif+Caption&display=swap');
 
-/* =====================
-   Brand Colors (primary green palette)
-   ===================== */
+/* Mirror app design tokens so docs stay visually synchronized with the console UI. */
 :root {
-  --vp-c-brand-1: oklch(59.6% 0.145 163.225);   /* primary-600 */
-  --vp-c-brand-2: oklch(50.8% 0.118 165.612);   /* primary-700 */
-  --vp-c-brand-3: oklch(43.2% 0.095 166.913);   /* primary-800 */
-  --vp-c-brand-soft: oklch(97.9% 0.021 166.113 / 0.18);  /* primary-50 tinted */
+  --app-color-primary-50: oklch(97.9% 0.021 166.113);
+  --app-color-primary-100: oklch(95% 0.052 163.051);
+  --app-color-primary-200: oklch(90.5% 0.093 164.15);
+  --app-color-primary-300: oklch(84.5% 0.143 164.978);
+  --app-color-primary-400: oklch(76.5% 0.177 163.223);
+  --app-color-primary-500: oklch(69.6% 0.17 162.48);
+  --app-color-primary-600: oklch(59.6% 0.145 163.225);
+  --app-color-primary-700: oklch(50.8% 0.118 165.612);
+  --app-color-primary-800: oklch(43.2% 0.095 166.913);
+  --app-color-primary-900: oklch(37.8% 0.077 168.94);
+  --app-color-primary-950: oklch(26.2% 0.051 172.552);
 
-  /* Backgrounds (light mode) — mist gray */
-  --vp-c-bg: oklch(98.7% 0.002 197.1);          /* gray-50 */
-  --vp-c-bg-soft: oklch(96.3% 0.002 197.1);     /* gray-100 */
-  --vp-c-bg-mute: oklch(92.5% 0.005 214.3);     /* gray-200 */
-  --vp-c-bg-elv: oklch(100% 0 0);               /* white */
+  --app-color-gradient-from: #667eea;
+  --app-color-gradient-to: #764ba2;
 
-  /* Text (light mode) */
-  --vp-c-text-1: oklch(21.8% 0.008 223.9);      /* gray-900 */
-  --vp-c-text-2: oklch(45% 0.017 213.2);        /* gray-600 */
-  --vp-c-text-3: oklch(56% 0.021 213.5);        /* gray-500 */
+  --app-color-gray-50: oklch(98.7% 0.002 197.1);
+  --app-color-gray-100: oklch(96.3% 0.002 197.1);
+  --app-color-gray-200: oklch(92.5% 0.005 214.3);
+  --app-color-gray-300: oklch(87.2% 0.007 219.6);
+  --app-color-gray-400: oklch(72.3% 0.014 214.4);
+  --app-color-gray-500: oklch(56% 0.021 213.5);
+  --app-color-gray-600: oklch(45% 0.017 213.2);
+  --app-color-gray-700: oklch(37.8% 0.015 216);
+  --app-color-gray-800: oklch(27.5% 0.011 216.9);
+  --app-color-gray-900: oklch(21.8% 0.008 223.9);
+  --app-color-gray-950: oklch(14.8% 0.004 228.8);
 
-  /* Dividers */
-  --vp-c-divider: oklch(87.2% 0.007 219.6);     /* gray-300 */
-  --vp-c-border: oklch(92.5% 0.005 214.3);      /* gray-200 */
+  --vp-c-brand-1: var(--app-color-primary-600);
+  --vp-c-brand-2: var(--app-color-primary-700);
+  --vp-c-brand-3: var(--app-color-primary-800);
+  --vp-c-brand-soft: oklch(97.9% 0.021 166.113 / 0.18);
 
-  /* Sidebar / Nav */
+  --vp-c-bg: var(--app-color-gray-50);
+  --vp-c-bg-soft: var(--app-color-gray-100);
+  --vp-c-bg-mute: var(--app-color-gray-200);
+  --vp-c-bg-elv: oklch(100% 0 0);
+
+  --vp-c-text-1: var(--app-color-gray-900);
+  --vp-c-text-2: var(--app-color-gray-600);
+  --vp-c-text-3: var(--app-color-gray-500);
+
+  --vp-c-divider: var(--app-color-gray-300);
+  --vp-c-border: var(--app-color-gray-200);
+
   --vp-nav-bg-color: oklch(98.7% 0.002 197.1 / 0.92);
   --vp-sidebar-bg-color: oklch(96.3% 0.002 197.1);
 
-  /* Code blocks */
-  --vp-code-bg: oklch(92.5% 0.005 214.3);
-  --vp-code-color: oklch(37.8% 0.077 168.94);   /* primary-900 */
+  --vp-code-bg: var(--app-color-gray-200);
+  --vp-code-color: var(--app-color-primary-900);
 }
 
 .dark {
-  --vp-c-brand-1: oklch(76.5% 0.177 163.223);   /* primary-400 — brighter on dark bg */
-  --vp-c-brand-2: oklch(84.5% 0.143 164.978);   /* primary-300 */
-  --vp-c-brand-3: oklch(90.5% 0.093 164.15);    /* primary-200 */
-  --vp-c-brand-soft: oklch(26.2% 0.051 172.552 / 0.35); /* primary-950 tinted */
+  --vp-c-brand-1: var(--app-color-primary-400);
+  --vp-c-brand-2: var(--app-color-primary-300);
+  --vp-c-brand-3: var(--app-color-primary-200);
+  --vp-c-brand-soft: oklch(26.2% 0.051 172.552 / 0.35);
 
-  /* Backgrounds (dark mode) — mist gray dark */
-  --vp-c-bg: oklch(14.8% 0.004 228.8);          /* gray-950 */
-  --vp-c-bg-soft: oklch(21.8% 0.008 223.9);     /* gray-900 */
-  --vp-c-bg-mute: oklch(27.5% 0.011 216.9);     /* gray-800 */
-  --vp-c-bg-elv: oklch(21.8% 0.008 223.9);      /* gray-900 */
+  --vp-c-bg: var(--app-color-gray-950);
+  --vp-c-bg-soft: var(--app-color-gray-900);
+  --vp-c-bg-mute: var(--app-color-gray-800);
+  --vp-c-bg-elv: var(--app-color-gray-900);
 
-  /* Text (dark mode) */
-  --vp-c-text-1: oklch(96.3% 0.002 197.1);      /* gray-100 */
-  --vp-c-text-2: oklch(72.3% 0.014 214.4);      /* gray-400 */
-  --vp-c-text-3: oklch(56% 0.021 213.5);        /* gray-500 */
+  --vp-c-text-1: var(--app-color-gray-100);
+  --vp-c-text-2: var(--app-color-gray-400);
+  --vp-c-text-3: var(--app-color-gray-500);
 
-  /* Dividers */
-  --vp-c-divider: oklch(37.8% 0.015 216);       /* gray-700 */
-  --vp-c-border: oklch(27.5% 0.011 216.9);      /* gray-800 */
+  --vp-c-divider: var(--app-color-gray-700);
+  --vp-c-border: var(--app-color-gray-800);
 
-  /* Sidebar / Nav */
   --vp-nav-bg-color: oklch(14.8% 0.004 228.8 / 0.92);
   --vp-sidebar-bg-color: oklch(21.8% 0.008 223.9);
 
-  /* Code blocks */
-  --vp-code-bg: oklch(27.5% 0.011 216.9);
-  --vp-code-color: oklch(84.5% 0.143 164.978);  /* primary-300 */
+  --vp-code-bg: var(--app-color-gray-800);
+  --vp-code-color: var(--app-color-primary-300);
 }
 
 /* =====================
@@ -87,7 +102,7 @@
    Hero gradient
    ===================== */
 .VPHero .name .clip {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--app-color-gradient-from) 0%, var(--app-color-gradient-to) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -97,12 +112,12 @@
    Button overrides
    ===================== */
 .VPButton.brand {
-  background: linear-gradient(135deg, oklch(59.6% 0.145 163.225), oklch(50.8% 0.118 165.612));
+  background: linear-gradient(135deg, var(--app-color-primary-600), var(--app-color-primary-700));
   border-color: transparent;
 }
 
 .VPButton.brand:hover {
-  background: linear-gradient(135deg, oklch(50.8% 0.118 165.612), oklch(43.2% 0.095 166.913));
+  background: linear-gradient(135deg, var(--app-color-primary-700), var(--app-color-primary-800));
 }
 
 /* =====================
@@ -128,5 +143,62 @@
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(69.6% 0.17 162.48);
+  background: var(--app-color-primary-500);
+}
+
+/* =====================
+   Mermaid Diagrams
+   ===================== */
+.vp-doc .mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+
+.vp-doc .mermaid svg {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Dark mode fallback for same-page theme toggle */
+.dark .mermaid svg {
+  background-color: #090b0c;
+  border-radius: 8px;
+}
+
+.dark .mermaid .node rect,
+.dark .mermaid .node circle,
+.dark .mermaid .node ellipse,
+.dark .mermaid .node polygon,
+.dark .mermaid .node path {
+  fill: #064e3b !important;
+  stroke: #34d399 !important;
+}
+
+.dark .mermaid .nodeLabel,
+.dark .mermaid .node .label {
+  color: #6ee7b7 !important;
+  fill: #6ee7b7 !important;
+}
+
+.dark .mermaid .edgePath .path,
+.dark .mermaid .flowchart-link {
+  stroke: #34d399 !important;
+}
+
+.dark .mermaid .actor {
+  fill: #064e3b !important;
+  stroke: #34d399 !important;
+}
+
+.dark .mermaid .actor text,
+.dark .mermaid .messageText,
+.dark .mermaid text {
+  fill: #6ee7b7 !important;
+}
+
+.dark .mermaid line,
+.dark .mermaid path.arrowMarkerPath {
+  stroke: #34d399 !important;
 }

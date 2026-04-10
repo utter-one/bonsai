@@ -15,7 +15,7 @@ Each project includes:
 | `generateVoice` | Whether the project generates voice output (TTS) |
 | `asrConfig` | ASR (speech-to-text) provider configuration |
 | `storageConfig` | Storage provider for conversation artifacts |
-| `moderationConfig` | Content moderation configuration (provider, blocked categories) |
+| `moderationConfig` | Content moderation configuration (provider, blocked categories, execution mode) |
 | `constants` | Key-value store for templating across all stages |
 | `metadata` | Arbitrary JSON for custom data |
 | `conversationTimeoutSeconds` | Inactivity timeout for active conversations (0 or null = disabled) |

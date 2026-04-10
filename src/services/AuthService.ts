@@ -7,6 +7,7 @@ import { operators } from '../db/schema';
 import type { JWTPayload } from '../http/middleware/auth';
 import { UnauthorizedError, InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
+import { getPermissionsForRoles } from '../permissions';
 
 /** Access token expiry time (18 hours) */
 const ACCESS_TOKEN_EXPIRY = '18h';
@@ -27,14 +28,17 @@ export type LoginResponse = {
   operatorId: string;
   name: string;
   roles: string[];
+  permissions: string[];
 };
 
 /**
- * Refresh response containing new access token
+ * Refresh response containing new access token, and up-to-date roles and permissions
  */
 export type RefreshResponse = {
   accessToken: string;
   expiresIn: number;
+  roles: string[];
+  permissions: string[];
 };
 
 /**
@@ -117,6 +121,7 @@ export class AuthService {
         operatorId: operator.id,
         name: operator.name,
         roles: operator.roles,
+        permissions: getPermissionsForRoles(operator.roles),
       };
     } catch (error) {
       if (error instanceof UnauthorizedError) {
@@ -157,11 +162,13 @@ export class AuthService {
 
       const newAccessToken = this.generateToken({ operatorId: operator.id, roles: operator.roles, type: 'access' }, ACCESS_TOKEN_EXPIRY);
 
-      logger.info({ operatorId: operator.id }, 'Token refreshed successfully');
+      logger.info({ operatorId: operator.id, roles: operator.roles }, 'Token refreshed successfully');
 
       return {
         accessToken: newAccessToken,
         expiresIn: this.jwtTimeToSeconds(ACCESS_TOKEN_EXPIRY),
+        roles: operator.roles,
+        permissions: getPermissionsForRoles(operator.roles),
       };
     } catch (error) {
       if (error instanceof jwt.JsonWebTokenError) {

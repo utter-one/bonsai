@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="./docs/assets/bonsai-logo-h.svg" alt="Bonsai" width="420">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/bonsai-logo-h-w.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/assets/bonsai-logo-h.svg">
+    <img alt="Project logo" src="./docs/assets/bonsai-logo-h.svg" width="420">
+  </picture>
 </p>
 
 Bonsai is a platform for building and operating customer-facing AI agents that must sound like your brand, follow your rules, and stay operable in production.

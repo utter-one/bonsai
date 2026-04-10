@@ -1,8 +1,23 @@
-import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
-export default defineConfig({
+export default withMermaid({
   title: 'Bonsai Backend',
   description: 'Documentation for the Bonsai Backend API',
+  mermaid: {
+    theme: 'base',
+    htmlLabels: false,
+    themeVariables: {
+      primaryColor: '#ecfdf5',
+      primaryTextColor: '#064e3b',
+      primaryBorderColor: '#059669',
+      lineColor: '#059669',
+      secondaryColor: '#d1fae5',
+      tertiaryColor: '#f3f4f6',
+      background: '#f9fafb',
+      fontFamily: 'Lexend, system-ui, sans-serif',
+      fontSize: '14px',
+    },
+  },
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
@@ -44,7 +59,11 @@ export default defineConfig({
             { text: 'Conversations', link: '/guide/conversations' },
             { text: 'Actions & Effects', link: '/guide/actions-and-effects' },
             { text: 'Content Moderation', link: '/guide/moderation' },
-            { text: 'WebSocket Protocol', link: '/guide/websocket' },
+            { text: 'WebSocket Channel', link: '/guide/websocket' },
+            { text: 'WebRTC Channel', link: '/guide/webrtc' },
+            { text: 'Twilio Messaging Channel', link: '/guide/twilio-messaging' },
+            { text: 'Twilio Voice Channel', link: '/guide/twilio-voice' },
+            { text: 'WhatsApp Channel', link: '/guide/whatsapp' },
             { text: 'Templating', link: '/guide/templating' },
             { text: 'Scripting', link: '/guide/scripting' },
           ],
@@ -112,12 +131,17 @@ export default defineConfig({
             { text: 'Migration', link: '/api/migration' },
             { text: 'Audit Logs', link: '/api/audit-logs' },
             { text: 'Analytics', link: '/api/analytics' },
+            { text: 'Analytics Query Engine', link: '/api/analytics-query' },
           ],
         },
         {
           text: 'Real-time',
           items: [
             { text: 'WebSocket', link: '/api/websocket' },
+            { text: 'WebRTC', link: '/api/webrtc' },
+            { text: 'Twilio Messaging', link: '/api/twilio-messaging' },
+            { text: 'Twilio Voice', link: '/api/twilio-voice' },
+            { text: 'WhatsApp', link: '/api/whatsapp' },
           ],
         },
       ],
@@ -125,7 +149,8 @@ export default defineConfig({
     socialLinks: [],
     footer: {
       message: 'Released under the Apache-2.0 License.',
-      copyright: 'Copyright © utter.one & contributors',
+      copyright: 'Copyright © HearMe (utter.one) & contributors',
     },
   },
 })
+

@@ -1,25 +1,32 @@
 import { inject, singleton } from "tsyringe";
-import { Connection, ConnectionManager } from "../../websocket/ConnectionManager";
+import { Session } from "../../channels/SessionManager";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
 import { KnowledgeService } from "../KnowledgeService";
-import { ClassificationEventData } from "../../types/conversationEvents";
+import { ClassificationEventData, SampleCopySelectionEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
-import { classificationResultSchema, ActionClassificationResult, ClassificationResultWithClassifier } from "../../types/classification";
-import { Conversation, GlobalAction, Guardrail } from "../../types/models";
+import { classificationResultSchema, ActionClassificationResult, ActionClassificationResultWithClassifier, SampleCopyClassificationResult, sampleCopyClassificationResultSchema } from "../../types/classification";
 import { extractTextFromContent } from "../../utils/llm";
-import { StageAction } from "../../types/actions";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
+import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
+import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
+import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
 
 /** Result of processing user input, including actions and timing metadata */
 export type ProcessTextInputResult = {
   actions: ActionClassificationResult[];
   /** Duration of the knowledge category retrieval in milliseconds; undefined when knowledge is not used */
   knowledgeRetrievalDurationMs?: number;
+  /** Unix timestamp (ms) when knowledge retrieval started; undefined when knowledge is not used */
+  knowledgeRetrievalStartMs?: number;
+  /** Unix timestamp (ms) when knowledge retrieval completed; undefined when knowledge is not used */
+  knowledgeRetrievalEndMs?: number;
+  /** Result of the sample copy classification; undefined when sample copy is not configured for this stage */
+  sampleCopyResult?: SampleCopyClassificationResult;
 };
 
 /**
@@ -31,7 +38,6 @@ export class UserInputProcessor {
     @inject(TemplatingEngine) private templatingEngine: TemplatingEngine,
     @inject(ConversationContextBuilder) private contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private conversationService: ConversationService,
-    @inject(ConnectionManager) private connectionManager: ConnectionManager,
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
     @inject(ContextTransformerExecutor) private transformerExecutor: ContextTransformerExecutor,
   ) { }
@@ -41,7 +47,7 @@ export class UserInputProcessor {
    * @param text - The text input from the user.
    * @returns A promise that resolves to the processing result with actions and timing metadata.
    */
-  async processTextInput(session: Connection, userInput: string, originalUserInput: string): Promise<ProcessTextInputResult> {
+  async processTextInput(session: Session, userInput: string, originalUserInput: string): Promise<ProcessTextInputResult> {
     // How to process:
     // - Get all classifiers for the current stage.
     // - For each classifier, run the text through it to determine actions with filtered actions based on overrideClassifierId. Do this in parallel.
@@ -54,16 +60,23 @@ export class UserInputProcessor {
       const globalActions = session.runner.getRuntimeData().globalActions.filter(ga => !ga.id.startsWith('__'));
       const guardrails = session.runner.getRuntimeData().guardrails;
       const guardrailClassifier = session.runner.getRuntimeData().guardrailClassifier;
+      const sampleCopies = session.runner.getRuntimeData().sampleCopies;
+      const sampleCopyClassifier = session.runner.getRuntimeData().sampleCopyClassifier;
 
       // Fetch knowledge categories for the default classifier when knowledge is enabled
       let knowledgeCategories: KnowledgeCategoryResponse[] = [];
       let knowledgeRetrievalDurationMs: number | undefined;
+      let knowledgeRetrievalStartMs: number | undefined;
+      let knowledgeRetrievalEndMs: number | undefined;
       if (stage.useKnowledge && stage.defaultClassifierId) {
         const knowledgeStartMs = Date.now();
         knowledgeCategories = stage.knowledgeTags.length > 0
           ? await this.knowledgeService.getCategoriesByTags(conversation.projectId, stage.knowledgeTags)
           : (await this.knowledgeService.listKnowledgeCategories(conversation.projectId, { offset: 0, limit: 100 })).items;
-        knowledgeRetrievalDurationMs = Date.now() - knowledgeStartMs;
+        const knowledgeEndMs = Date.now();
+        knowledgeRetrievalDurationMs = knowledgeEndMs - knowledgeStartMs;
+        knowledgeRetrievalStartMs = knowledgeStartMs;
+        knowledgeRetrievalEndMs = knowledgeEndMs;
         logger.debug({ conversationId: conversation.id, categoryCount: knowledgeCategories.length, classifierId: stage.defaultClassifierId, knowledgeRetrievalDurationMs }, 'Fetched knowledge categories for default classifier');
       }
 
@@ -91,10 +104,19 @@ export class UserInputProcessor {
         })()
         : Promise.resolve(null);
 
-      // Run all classifiers, guardrail classifier, and context transformers in parallel
-      const [classificationResultsWithClassifiers, guardrailResult, transformerTriggeredActions] = await Promise.all([
+      // Build sample copy classification promise if a classifier is configured and there are applicable sample copies for this stage
+      const sampleCopyPromise = sampleCopyClassifier && sampleCopies.length > 0
+        ? (async () => {
+          const sampleCopyContext = await this.contextBuilder.buildContextForSampleCopyClassifier(conversation, stage, sampleCopies, userInput, originalUserInput);
+          return this.classifyCopyForInput(session, sampleCopyContext);
+        })()
+        : Promise.resolve(null);
+
+      // Run all classifiers, guardrail classifier, sample copy classifier, and context transformers in parallel
+      const [classificationResultsWithClassifiers, guardrailResult, sampleCopyResult, transformerTriggeredActions] = await Promise.all([
         Promise.all(actionPromises),
         guardrailPromise,
+        sampleCopyPromise,
         this.transformerExecutor.executeTransformers(session, userInput, originalUserInput),
       ]);
 
@@ -109,13 +131,16 @@ export class UserInputProcessor {
             classifierName: result.classifierName,
             actionCount: result.actions.length,
             systemPrompt: result.renderedPrompt,
-            llmSettings: classifier?.classifier.llmSettings,
+            llmUsage: result.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
+            stageName: stage.name,
             durationMs: result.durationMs,
+            startMs: result.startMs,
+            endMs: result.endMs,
           },
         };
-        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
-        this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData, stage.id);
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
       // Register classification event for guardrail classifier
@@ -128,13 +153,38 @@ export class UserInputProcessor {
             classifierName: guardrailResult.classifierName,
             actionCount: guardrailResult.actions.length,
             systemPrompt: guardrailResult.renderedPrompt,
-            llmSettings: guardrailClassifier?.classifier.llmSettings,
+            llmUsage: guardrailResult.llmUsage,
             currentVariables: conversation?.stageVars[stage.id] || {},
+            stageName: stage.name,
             durationMs: guardrailResult.durationMs,
+            startMs: guardrailResult.startMs,
+            endMs: guardrailResult.endMs,
           },
         };
-        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData);
-        this.connectionManager.sendConversationEvent(conversation.id, 'classification', eventData);
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData, stage.id);
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
+      }
+
+      // Register sample copy selection event
+      if (sampleCopyResult) {
+        const eventData: SampleCopySelectionEventData = {
+          classifierId: sampleCopyClassifier!.classifier.id,
+          input: userInput || '',
+          sampleCopy: sampleCopyResult.sampleCopy,
+          metadata: {
+            classifierName: sampleCopyClassifier!.classifier.name,
+            systemPrompt: sampleCopyResult.renderedPrompt,
+            result: sampleCopyResult.result,
+            llmUsage: sampleCopyResult.llmUsage,
+            currentVariables: conversation?.stageVars[stage.id] || {},
+            stageName: stage.name,
+            durationMs: sampleCopyResult.durationMs,
+            startMs: sampleCopyResult.startMs,
+            endMs: sampleCopyResult.endMs,
+          },
+        };
+        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'sample_copy_selection', eventData, stage.id);
+        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'sample_copy_selection', eventData });
       }
 
       const allActions = [
@@ -173,14 +223,73 @@ export class UserInputProcessor {
         return true;
       });
 
-      return { actions: filteredActions, knowledgeRetrievalDurationMs };
+      return { actions: filteredActions, knowledgeRetrievalDurationMs, knowledgeRetrievalStartMs, knowledgeRetrievalEndMs, sampleCopyResult: sampleCopyResult ?? undefined };
     } catch (error) {
       logger.error({ error, sessionId: session.id }, 'Error processing text input using classifiers');
       throw error;
     }
   }
 
-  private async classifyTextInput(session: Connection, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ClassificationResultWithClassifier & { renderedPrompt: string; durationMs: number }> {
+  private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; result: string; llmUsage?: LlmUsageMetadata; durationMs: number; startMs: number; endMs: number }> {
+    const classifyStartMs = Date.now();
+    try {
+      const classifierData = session.runner.getRuntimeData().sampleCopyClassifier;
+      if (!classifierData) {
+        throw new Error('No sample copy classifier configured for this stage');
+      }
+      logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying sample copy for text input using sample copy classifier');
+      const llmProvider = classifierData.llmProvider;
+      const classifier = classifierData.classifier;
+      const text = context.userInput || '';
+      const renderedPrompt = await this.templatingEngine.render(classifier.prompt, context);
+
+      const messages = [
+        {
+          role: 'system' as const,
+          content: renderedPrompt
+        },
+        {
+          role: 'user' as const,
+          content: text
+        }
+      ];
+
+      const copyModel = classifierData.classifier.llmSettings?.model;
+      const copyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, copyModel);
+      const copyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, copyLimits, 'classification');
+      const copyInputCap = copyLimits?.inputTokensLimits?.classification;
+      const { messages: truncatedCopyMessages, ...copyTruncation } = truncateMessagesToTokenBudget(messages, copyInputCap, copyModel);
+      const result = await llmProvider.generate(truncatedCopyMessages, copyMaxTokens !== undefined ? { maxTokens: copyMaxTokens } : undefined);
+      const textContent = extractTextFromContent(result.content);
+
+      logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received sample copy classification result from LLM provider: ${textContent}`);
+      const classificationResult = sampleCopyClassificationResultSchema.parse(parseJsonFromMarkdown(textContent));
+
+      const endMs = Date.now();
+      return {
+        ...classificationResult,
+        renderedPrompt,
+        result: textContent,
+        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model, copyTruncation),
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
+      };
+    } catch (error) {
+      logger.error({ error, sessionId: session.id }, 'Error classifying sample copy for text input');
+      const endMs = Date.now();
+      return {
+        sampleCopy: null,
+        renderedPrompt: null,
+        result: null,
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
+      };
+    }
+  }
+
+  private async classifyTextInput(session: Session, classifierData: ClassifierRuntimeData, context: ConversationContext): Promise<ActionClassificationResultWithClassifier & { renderedPrompt: string; llmUsage?: LlmUsageMetadata; durationMs: number; startMs: number; endMs: number }> {
     const classifyStartMs = Date.now();
     try {
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying text input using classifier');
@@ -200,7 +309,12 @@ export class UserInputProcessor {
         }
       ];
 
-      const result = await llmProvider.generate(messages);
+      const classifyModel = classifierData.classifier.llmSettings?.model;
+      const classifyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, classifyModel);
+      const classifyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, classifyLimits, 'classification');
+      const classifyInputCap = classifyLimits?.inputTokensLimits?.classification;
+      const { messages: truncatedClassifyMessages, ...classifyTruncation } = truncateMessagesToTokenBudget(messages, classifyInputCap, classifyModel);
+      const result = await llmProvider.generate(truncatedClassifyMessages, classifyMaxTokens !== undefined ? { maxTokens: classifyMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
 
       logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received classification result from LLM provider: ${textContent}`);
@@ -212,21 +326,28 @@ export class UserInputProcessor {
         parameters,
       }));
 
+      const endMs = Date.now();
       return {
         classifierId: classifier.id,
         classifierName: classifier.name,
         actions,
         renderedPrompt,
-        durationMs: Date.now() - classifyStartMs,
+        llmUsage: buildLlmUsage(result.usage, classifierData.llmProviderInfo, classifierData.classifier.llmSettings?.model, classifyTruncation),
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
       };
     } catch (error) {
       logger.error({ error, sessionId: session.id, classifierId: classifierData.classifier.id }, 'Error classifying text input');
+      const endMs = Date.now();
       return {
         classifierId: classifierData.classifier.id,
         classifierName: classifierData.classifier.name,
         actions: [],
         renderedPrompt: null,
-        durationMs: Date.now() - classifyStartMs,
+        durationMs: endMs - classifyStartMs,
+        startMs: classifyStartMs,
+        endMs,
       };
     }
   }

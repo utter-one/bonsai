@@ -110,6 +110,15 @@ export const changeVisibilityEffectSchema = z.object({
 }).openapi('ChangeVisibilityEffect');
 
 /**
+ * Effect type: Ban User
+ * Permanently bans the user associated with the current conversation
+ */
+export const banUserEffectSchema = z.object({
+  type: z.literal('ban_user').describe('Effect type'),
+  reason: z.string().optional().describe('Optional reason for banning the user'),
+}).openapi('BanUserEffect');
+
+/**
  * Discriminated union of all effect types
  * Defines the possible effects that can be executed in stage actions or global actions
  */
@@ -123,6 +132,7 @@ export const effectSchema = z.discriminatedUnion('type', [
   callToolEffectSchema,
   generateResponseEffectSchema,
   changeVisibilityEffectSchema,
+  banUserEffectSchema,
 ]).openapi('Effect');
 
 // Infer types from schemas
@@ -137,6 +147,7 @@ export type ModifyUserProfileEffect = z.infer<typeof modifyUserProfileEffectSche
 export type CallToolEffect = z.infer<typeof callToolEffectSchema>;
 export type GenerateResponseEffect = z.infer<typeof generateResponseEffectSchema>;
 export type ChangeVisibilityEffect = z.infer<typeof changeVisibilityEffectSchema>;
+export type BanUserEffect = z.infer<typeof banUserEffectSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 
 
@@ -192,7 +203,7 @@ export const stageActionSchema = z.object({
   effects: z.preprocess(filterDeprecatedEffects, z.array(effectSchema).describe('Array of effects to execute when action is triggered')),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   triggerOnTransformation: z.boolean().optional().default(false).describe('Whether this action should be triggered on variable transformations'),
-  watchedVariables: z.record(z.string(), fieldWatchTriggerSchema).optional().describe('Optional map of variable paths to watch for changes that trigger this action'),  
+  watchedVariables: z.record(z.string(), fieldWatchTriggerSchema).optional().describe('Optional map of variable paths to watch for changes that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
 }).openapi('StageAction');
 
@@ -233,9 +244,22 @@ export const CONVERSATION_LIFECYCLE_ACTION_IDS = {
 } as const;
 
 /**
- * Type for lifecycle action context - indicates which lifecycle hook is being executed
+ * Schema for lifecycle action context - indicates which lifecycle hook is being executed.
+ * Null when triggered by regular user-input classification.
  */
-export type LifecycleContext = 'on_enter' | 'on_leave' | 'on_fallback' | 'conversation_start' | 'conversation_resume' | 'conversation_end' | 'conversation_abort' | 'conversation_failed' | null;
+export const lifecycleContextSchema = z.enum([
+  'on_enter',
+  'on_leave',
+  'on_fallback',
+  'conversation_start',
+  'conversation_resume',
+  'conversation_end',
+  'conversation_abort',
+  'conversation_failed',
+]).nullable();
+
+/** Type for lifecycle action context - indicates which lifecycle hook is being executed */
+export type LifecycleContext = z.infer<typeof lifecycleContextSchema>;
 
 /**
  * Mapping of lifecycle contexts to effects that should be ignored

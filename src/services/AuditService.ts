@@ -157,33 +157,35 @@ export class AuditService {
    * Query audit logs for a specific entity
    * @param entityType - The type of entity to retrieve logs for (e.g., 'operator')
    * @param entityId - The unique identifier of the entity
+   * @param projectId - Optional project ID to scope the query and avoid collisions from project import/export
    * @returns Array of audit logs for the specified entity, ordered by creation date descending
    */
   async getEntityAuditLogs(
     entityType: string,
-    entityId: string
+    entityId: string,
+    projectId?: string
   ): Promise<AuditLog[]> {
-    logger.debug(
-      { entityType, entityId },
-      'Fetching audit logs for entity'
-    );
+    logger.debug({ entityType, entityId, projectId }, 'Fetching audit logs for entity');
 
     try {
       const logs = await db.query.auditLogs.findMany({
         where: (auditLogs, { eq, and }) =>
-          and(
-            eq(auditLogs.entityType, entityType),
-            eq(auditLogs.entityId, entityId)
-          ),
+          projectId
+            ? and(
+              eq(auditLogs.entityType, entityType),
+              eq(auditLogs.entityId, entityId),
+              eq(auditLogs.projectId, projectId)
+            )
+            : and(
+              eq(auditLogs.entityType, entityType),
+              eq(auditLogs.entityId, entityId)
+            ),
         orderBy: (auditLogs, { desc }) => [desc(auditLogs.createdAt)],
       });
 
       return logs;
     } catch (error) {
-      logger.error(
-        { error, entityType, entityId },
-        'Failed to fetch audit logs'
-      );
+      logger.error({ error, entityType, entityId, projectId }, 'Failed to fetch audit logs');
       throw error;
     }
   }

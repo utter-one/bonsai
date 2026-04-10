@@ -1,12 +1,13 @@
-import { eq } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
+import { eq } from 'drizzle-orm';
 import { conversations, db } from '../../db';
 import { parseJsonFromMarkdown } from '../../utils/jsonParser';
 import logger from '../../utils/logger';
 import { extractTextFromContent } from '../../utils/llm';
 import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
-import { Connection, ConnectionManager } from '../../websocket/ConnectionManager';
+import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
+import { Session } from '../../channels/SessionManager';
 import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
@@ -14,6 +15,8 @@ import { TransformerRuntimeData } from './ConversationRunner';
 import { TemplatingEngine } from './TemplatingEngine';
 import type { ActionClassificationResult } from '../../types/classification';
 import { StageAction } from '../../types/actions';
+import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
+import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
 
 /**
  * Map of variable names to their change event type after a transformer run.
@@ -37,8 +40,14 @@ type TransformerExecutionResult = {
   rawResponse: string;
   /** Error message if the transformer failed, undefined otherwise */
   error?: string;
+  /** Token usage from the LLM call, if available */
+  llmUsage?: LlmUsageMetadata;
   /** Total duration of the transformer execution in milliseconds, including LLM call */
   durationMs: number;
+  /** Unix timestamp (ms) when transformer execution started */
+  startMs: number;
+  /** Unix timestamp (ms) when transformer execution completed */
+  endMs: number;
 };
 
 /**
@@ -51,7 +60,6 @@ export class ContextTransformerExecutor {
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private readonly conversationService: ConversationService,
-    @inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
     @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
   ) {}
 
@@ -68,7 +76,7 @@ export class ContextTransformerExecutor {
    * @param originalUserInput - The original user input before any processing
    * @returns Triggered stage actions based on variable changes
    */
-  async executeTransformers(session: Connection, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
+  async executeTransformers(session: Session, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
     const { transformers, stage, conversation, globalActions } = session.runner.getRuntimeData();
 
     if (transformers.length === 0) {
@@ -126,14 +134,17 @@ export class ContextTransformerExecutor {
           transformerName: result.transformerName,
           systemPrompt: result.renderedPrompt,
           rawResponse: result.rawResponse,
-          llmSettings: transformerData?.transformer.llmSettings,
+          llmUsage: result.llmUsage,
           updatedVariables: stageVars,
+          stageName: stage.name,
           durationMs: result.durationMs,
+          startMs: result.startMs,
+          endMs: result.endMs,
           ...(result.error ? { error: result.error } : {}),
         },
       };
-      await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData);
-      this.connectionManager.sendConversationEvent(conversation.id, 'transformation', eventData);
+      await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData, stage.id);
+      await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'transformation', eventData });
     }
 
     // Build a raw context with the updated stage vars for condition evaluation
@@ -186,7 +197,7 @@ export class ContextTransformerExecutor {
    * @param conditionContext - Conversation context used to evaluate action conditions (has updated stage vars)
    * @returns Array of triggered action classification results
    */
-  private async findTriggeredActions(session: Connection, changeEvents: VariableChangeEvents, stageActions: Record<string, StageAction>, conditionContext: ConversationContext): Promise<ActionClassificationResult[]> {
+  private async findTriggeredActions(session: Session, changeEvents: VariableChangeEvents, stageActions: Record<string, StageAction>, conditionContext: ConversationContext): Promise<ActionClassificationResult[]> {
     logger.info({ changeEvents }, 'Finding triggered actions based on variable change events');
     if (Object.keys(changeEvents).length === 0) {
       return [];
@@ -226,7 +237,7 @@ export class ContextTransformerExecutor {
    * @param transformerData - Runtime data containing the transformer config and its LLM provider
    * @param context - The conversation context built for this transformer
    */
-  private async executeTransformer(session: Connection, transformerData: TransformerRuntimeData, context: ConversationContext): Promise<TransformerExecutionResult> {
+  private async executeTransformer(session: Session, transformerData: TransformerRuntimeData, context: ConversationContext): Promise<TransformerExecutionResult> {
     const { transformer, llmProvider } = transformerData;
     const startMs = Date.now();
 
@@ -246,7 +257,12 @@ export class ContextTransformerExecutor {
         { role: 'user' as const, content: text },
       ];
 
-      const result = await llmProvider.generate(messages);
+      const transformerModel = transformerData.transformer.llmSettings?.model;
+      const transformerLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, transformerData.llmProviderInfo.id, transformerModel);
+      const transformerMaxTokens = resolveOutputCap((transformerData.transformer.llmSettings as any)?.defaultMaxTokens, transformerLimits, 'transformation');
+      const transformerInputCap = transformerLimits?.inputTokensLimits?.transformation;
+      const { messages: truncatedTransformerMessages, ...transformerTruncation } = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);
+      const result = await llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined);
       const textContent = extractTextFromContent(result.content);
       rawResponse = JSON.stringify(result, null, 2);
 
@@ -268,10 +284,12 @@ export class ContextTransformerExecutor {
         }
       }
 
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, durationMs: Date.now() - startMs };
+      const endMs = Date.now();
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields, parsedValues, renderedPrompt, rawResponse, llmUsage: buildLlmUsage(result.usage, transformerData.llmProviderInfo, transformerData.transformer.llmSettings?.model, transformerTruncation), durationMs: endMs - startMs, startMs, endMs };
     } catch (error) {
       logger.error({ error, sessionId: session.id, transformerId: transformer.id }, 'Error executing context transformer');
-      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt, rawResponse, error: String(error), durationMs: Date.now() - startMs };
+      const endMs = Date.now();
+      return { transformerId: transformer.id, transformerName: transformer.name, appliedFields: [], parsedValues: {}, renderedPrompt, rawResponse, error: String(error), durationMs: endMs - startMs, startMs, endMs };
     }
   }
 }

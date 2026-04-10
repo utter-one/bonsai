@@ -20,11 +20,15 @@ import { ContextTransformerController } from './http/controllers/ContextTransfor
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { GuardrailController } from './http/controllers/GuardrailController';
+import { SampleCopyController } from './http/controllers/SampleCopyController';
+import { CopyDecoratorController } from './http/controllers/CopyDecoratorController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
+import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
+import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { MigrationController } from './http/controllers/MigrationController';
@@ -36,7 +40,11 @@ import { requestContextMiddleware } from './http/middleware/requestContext';
 import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
-import { ConversationServer } from './websocket/ConversationServer';
+import { WebSocketChannelHost } from './channels/websocket/WebSocketChannelHost';
+import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
+import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
+import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
+import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 
@@ -62,7 +70,11 @@ export function createApp(): express.Application {
   app.set('query parser', (str: string) => qs.parse(str, { allowDots: true, depth: 10 }));
 
   // Parse JSON bodies (10mb limit accommodates migration import bundles)
-  app.use(express.json({ limit: '10mb' }));
+  // The verify callback captures the raw buffer so webhook handlers can validate HMAC-SHA256 signatures.
+  app.use(express.json({ limit: '10mb', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
+
+  // Parse URL-encoded bodies (used by Twilio webhooks)
+  app.use(express.urlencoded({ extended: false }));
 
   // CORS configuration
   app.use(cors({
@@ -142,6 +154,9 @@ export function createApp(): express.Application {
   const analyticsController = container.resolve(AnalyticsController);
   analyticsController.registerRoutes(app);
 
+  const savedSliceQueryController = container.resolve(SavedSliceQueryController);
+  savedSliceQueryController.registerRoutes(app);
+
   const classifierController = container.resolve(ClassifierController);
   classifierController.registerRoutes(app);
 
@@ -156,6 +171,12 @@ export function createApp(): express.Application {
 
   const globalActionController = container.resolve(GlobalActionController);
   globalActionController.registerRoutes(app);
+
+  const sampleCopyController = container.resolve(SampleCopyController);
+  sampleCopyController.registerRoutes(app);
+
+  const copyDecoratorController = container.resolve(CopyDecoratorController);
+  copyDecoratorController.registerRoutes(app);
 
   const guardrailController = container.resolve(GuardrailController);
   guardrailController.registerRoutes(app);
@@ -175,6 +196,9 @@ export function createApp(): express.Application {
   const providerCatalogController = container.resolve(ProviderCatalogController);
   providerCatalogController.registerRoutes(app);
 
+  const channelCatalogController = container.resolve(ChannelCatalogController);
+  channelCatalogController.registerRoutes(app);
+
   const stageController = container.resolve(StageController);
   stageController.registerRoutes(app);
 
@@ -193,6 +217,11 @@ export function createApp(): express.Application {
   const projectExchangeController = container.resolve(ProjectExchangeController);
   projectExchangeController.registerRoutes(app);
 
+  container.resolve(WebRTCChannelHost).registerRoutes(app);
+  container.resolve(TwilioMessagingChannelHost).registerRoutes(app);
+  container.resolve(TwilioVoiceChannelHost).registerRoutes(app);
+  container.resolve(WhatsAppChannelHost).registerRoutes(app);
+
   container.resolve(ConversationTimeoutService).start();
 
   app.use(errorHandler);
@@ -208,8 +237,11 @@ export function startServer(port: number = 3000): void {
   const server = createServer(app);
 
   // Initialize WebSocket host
-  const wsHost = container.resolve(ConversationServer);
+  const wsHost = container.resolve(WebSocketChannelHost);
   wsHost.initialize(server);
+
+  // Initialize Twilio Voice Media Streams host
+  container.resolve(TwilioVoiceChannelHost).initialize(server);
 
   server.listen(port, () => {
     logger.info({ port }, 'HTTP server started');

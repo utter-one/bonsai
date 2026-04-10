@@ -63,7 +63,7 @@ export class HistoryBuilder {
 
       const eventData = event.eventData as MessageEventData;
       const isVisible = await this.isMessageVisible(event, eventData, currentStageId, context);
-      if (isVisible) {
+      if (isVisible && eventData.text.trim().length > 0) {
         history.push({ role: eventData.role, content: eventData.text });
       }
     }

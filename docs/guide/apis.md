@@ -49,7 +49,18 @@ The WebSocket API is used for **live conversations**: real-time bidirectional co
 - **Authentication:** Project API key (sent in the `auth` message after connecting)
 - **Audience:** Client applications (web apps, mobile apps, kiosks, etc.)
 
-See the [WebSocket Protocol](./websocket) guide for the full message protocol reference.
+See the [WebSocket Channel](./websocket) guide for the full message protocol reference.
+
+## WebRTC API
+
+The WebRTC channel provides the same conversation protocol as WebSocket with lower audio latency. Binary audio travels over an unordered DataChannel (no base64 encoding, no retransmits for stale chunks), while all control messages are JSON over a reliable ordered DataChannel.
+
+- **Signaling endpoint:** `POST /api/webrtc/offer` — exchange SDP offer/answer
+- **Authentication:** Project API key (sent in the `auth` JSON message over the `control` DataChannel)
+- **Audience:** Client applications that need lower-latency voice I/O
+- **Requires:** Two named DataChannels must be created by the client before sending the offer — `control` (ordered, reliable) and `audio` (unordered, no retransmits)
+
+See the [WebRTC Channel](./webrtc) guide for the full protocol reference.
 
 ## Schema Endpoints
 

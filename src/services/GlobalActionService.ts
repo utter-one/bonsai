@@ -276,15 +276,16 @@ export class GlobalActionService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific global action
    * @param globalActionId - The unique identifier of the global action
+   * @param projectId - The project ID the global action belongs to
    * @returns Array of audit log entries for the global action
    */
-  async getGlobalActionAuditLogs(globalActionId: string): Promise<any[]> {
-    logger.debug({ globalActionId }, 'Fetching audit logs for global action');
+  async getGlobalActionAuditLogs(globalActionId: string, projectId: string): Promise<any[]> {
+    logger.debug({ globalActionId, projectId }, 'Fetching audit logs for global action');
 
     try {
-      return await this.auditService.getEntityAuditLogs('global_action', globalActionId);
+      return await this.auditService.getEntityAuditLogs('global_action', globalActionId, projectId);
     } catch (error) {
-      logger.error({ error, globalActionId }, 'Failed to fetch global action audit logs');
+      logger.error({ error, globalActionId, projectId }, 'Failed to fetch global action audit logs');
       throw error;
     }
   }

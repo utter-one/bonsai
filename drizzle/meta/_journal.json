@@ -246,6 +246,97 @@
       "when": 1773998961161,
       "tag": "0034_black_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1774183980827,
+      "tag": "0035_careful_ezekiel_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1774354466201,
+      "tag": "0036_busy_gambit",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1774454689735,
+      "tag": "0037_cooing_sheva_callister",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1774555233924,
+      "tag": "0038_normal_princess_powerful",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1774555836868,
+      "tag": "0039_flaky_energizer",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1774604211765,
+      "tag": "0040_sweet_pet_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1774646955286,
+      "tag": "0041_gorgeous_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1774705250874,
+      "tag": "0042_daily_harpoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1774896781633,
+      "tag": "0043_goofy_yellowjacket",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1774949250182,
+      "tag": "0044_busy_crystal",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1775033847791,
+      "tag": "0045_steady_phantom_reporter",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1775048445124,
+      "tag": "0046_curly_flatman",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1775565009026,
+      "tag": "0047_hot_menace",
+      "breakpoints": true
     }
   ]
 }

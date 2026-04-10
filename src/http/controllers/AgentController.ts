@@ -273,7 +273,7 @@ export class AgentController {
   private async getAgentAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = agentRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.agentService.getAgentAuditLogs(params.id);
+    const auditLogs = await this.agentService.getAgentAuditLogs(params.id, params.projectId);
     res.status(200).json(auditLogs);
   }
 

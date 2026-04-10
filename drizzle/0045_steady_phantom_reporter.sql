@@ -1,0 +1,1 @@
+ALTER TABLE "saved_slice_queries" ADD COLUMN "metadata" jsonb;

@@ -273,15 +273,16 @@ export class ClassifierService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific classifier
    * @param classifierId - The unique identifier of the classifier
+   * @param projectId - The project ID the classifier belongs to
    * @returns Array of audit log entries for the classifier
    */
-  async getClassifierAuditLogs(classifierId: string): Promise<any[]> {
-    logger.debug({ classifierId }, 'Fetching audit logs for classifier');
+  async getClassifierAuditLogs(classifierId: string, projectId: string): Promise<any[]> {
+    logger.debug({ classifierId, projectId }, 'Fetching audit logs for classifier');
 
     try {
-      return await this.auditService.getEntityAuditLogs('classifier', classifierId);
+      return await this.auditService.getEntityAuditLogs('classifier', classifierId, projectId);
     } catch (error) {
-      logger.error({ error, classifierId }, 'Failed to fetch classifier audit logs');
+      logger.error({ error, classifierId, projectId }, 'Failed to fetch classifier audit logs');
       throw error;
     }
   }

@@ -46,6 +46,7 @@ This guide covers:
 | [Context Transformers](./context-transformers) | LLM-powered variable population: data extraction, prompt fragments, flow control |
 | [Tools](./tools) | LLM-powered callable tools |
 | [Knowledge Base](./knowledge) | FAQ categories and items |
+| [Sample Copies](./sample-copies) | Pre-written scripted responses with variant selection and classifier-driven matching |
 | [Global Actions](./global-actions) | Reusable cross-stage action definitions |
 | [Guardrails](./guardrails) | Content safety classifiers and moderation |
 | [Providers](./providers) | LLM, TTS, ASR, and Storage provider integrations |
@@ -53,7 +54,8 @@ This guide covers:
 | [Environments](./environments) | Remote instance connections for migration |
 | [Conversations](./conversations) | Conversation lifecycle, states, and events |
 | [Content Moderation](./moderation) | Input screening and safety policies |
-| [WebSocket Protocol](./websocket) | Real-time communication protocol reference |
+| [WebSocket Channel](./websocket) | Real-time communication protocol reference |
+| [WebRTC Channel](./webrtc) | Lower-latency WebRTC DataChannel protocol reference |
 | [Authentication](./authentication) | Operator auth, API keys, and RBAC |
 | [Templating](./templating) | Handlebars templates in prompts |
 | [Scripting](./scripting) | Sandboxed JavaScript execution in effects |

@@ -27,7 +27,10 @@ export const ID_PREFIXES = {
   INPUT: 'tinp',
   OUTPUT: 'tout',
   CHUNK: 'chnk',
-  ARTIFACT: 'artf'
+  ARTIFACT: 'artf',
+  SAMPLE_COPY: 'scpy',
+  COPY_DECORATOR: 'cdec',
+  SAVED_SLICE_QUERY: 'ssq',
 } as const;
 
 type EntityPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

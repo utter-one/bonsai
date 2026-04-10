@@ -14,7 +14,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class KnowledgeController {
-  constructor(@inject(KnowledgeService) private readonly knowledgeService: KnowledgeService) {}
+  constructor(@inject(KnowledgeService) private readonly knowledgeService: KnowledgeService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -499,7 +499,7 @@ export class KnowledgeController {
   private async getKnowledgeCategoryAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = knowledgeCategoryRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.knowledgeService.getKnowledgeCategoryAuditLogs(params.id);
+    const auditLogs = await this.knowledgeService.getKnowledgeCategoryAuditLogs(params.id, params.projectId);
     res.status(200).json(auditLogs);
   }
 
@@ -510,7 +510,7 @@ export class KnowledgeController {
   private async getKnowledgeItemAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = knowledgeItemRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.knowledgeService.getKnowledgeItemAuditLogs(params.id);
+    const auditLogs = await this.knowledgeService.getKnowledgeItemAuditLogs(params.id, params.projectId);
     res.status(200).json(auditLogs);
   }
 }

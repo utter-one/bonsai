@@ -25,7 +25,7 @@ export type CreateConversationInput = {
   id?: string;
   projectId: string;
   userId: string;
-  clientId: string;
+  sessionId: string;
   stageId: string;
   stageVars?: Record<string, Record<string, any>>;
   status: ConversationState;
@@ -52,7 +52,7 @@ export class ConversationService extends BaseService {
    */
   async createConversation(input: CreateConversationInput, context?: RequestContext): Promise<ConversationResponse> {
     const conversationId = input.id ?? generateId(ID_PREFIXES.CONVERSATION);
-    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, clientId: input.clientId, stageId: input.stageId, operatorId: context?.operatorId }, 'Creating conversation');
+    logger.info({ conversationId, projectId: input.projectId, userId: input.userId, sessionId: input.sessionId, stageId: input.stageId, operatorId: context?.operatorId }, 'Creating conversation');
 
     await this.requireProjectNotArchived(input.projectId);
 
@@ -61,7 +61,7 @@ export class ConversationService extends BaseService {
         id: conversationId,
         projectId: input.projectId,
         userId: input.userId,
-        clientId: input.clientId,
+        sessionId: input.sessionId,
         stageId: input.stageId,
         startingStageId: input.stageId,
         stageVars: {},
@@ -141,7 +141,7 @@ export class ConversationService extends BaseService {
    * @param eventData - The data associated with the event
    * @returns The generated event ID
    */
-  async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData): Promise<string> {
+  async saveConversationEvent(projectId: string, conversationId: string, eventType: ConversationEventType, eventData: ConversationEventData, stageId?: string): Promise<string> {
     logger.debug({ conversationId, eventType }, 'Saving conversation event');
 
     await this.requireProjectNotArchived(projectId);
@@ -154,6 +154,7 @@ export class ConversationService extends BaseService {
         conversationId,
         eventType,
         eventData,
+        stageId: stageId ?? null,
         timestamp: new Date(),
         metadata: null
       };
@@ -271,7 +272,7 @@ export class ConversationService extends BaseService {
         id: conversations.id,
         projectId: conversations.projectId,
         userId: conversations.userId,
-        clientId: conversations.clientId,
+        sessionId: conversations.sessionId,
         stageId: conversations.stageId,
         startingStageId: conversations.startingStageId,
         endingStageId: conversations.endingStageId,
@@ -291,7 +292,7 @@ export class ConversationService extends BaseService {
         }
       }
 
-      // Apply text search (searches id, userId, clientId, stageId, and status)
+      // Apply text search (searches id, userId, sessionId, stageId, and status)
       if (params?.textSearch) {
         const searchTerm = `%${params.textSearch}%`;
         conditions.push(like(conversations.id, searchTerm));
@@ -575,15 +576,16 @@ export class ConversationService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific conversation
    * @param conversationId - The unique identifier of the conversation
+   * @param projectId - The project ID the conversation belongs to
    * @returns Array of audit log entries for the conversation
    */
-  async getConversationAuditLogs(conversationId: string): Promise<any[]> {
-    logger.debug({ conversationId }, 'Fetching audit logs for conversation');
+  async getConversationAuditLogs(conversationId: string, projectId: string): Promise<any[]> {
+    logger.debug({ conversationId, projectId }, 'Fetching audit logs for conversation');
 
     try {
-      return await this.auditService.getEntityAuditLogs('conversation', conversationId);
+      return await this.auditService.getEntityAuditLogs('conversation', conversationId, projectId);
     } catch (error) {
-      logger.error({ error, conversationId }, 'Failed to fetch conversation audit logs');
+      logger.error({ error, conversationId, projectId }, 'Failed to fetch conversation audit logs');
       throw error;
     }
   }

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations, isNull, isNotNull } from 'drizzle-orm';
 import { StageAction, Effect, ToolParameter, StageActionParameter } from '../types/actions';
 import { FieldDescriptor } from '../types/parameters';
@@ -6,18 +6,21 @@ import { ConversationState } from '../types/conversationEvents';
 import { LlmProviderConfig, LlmSettings } from '../services/providers/llm/LlmProviderFactory';
 import { AsrProviderConfig } from '../services/providers/asr/AsrProviderFactory';
 import { TtsProviderConfig, TtsSettings } from '../services/providers/tts/TtsProviderFactory';
-import { StorageProviderConfig } from '../http/contracts/provider';
+import { StorageProviderConfig, ChannelProviderConfig } from '../http/contracts/provider';
 import { ConversationEventData, ConversationEventType } from '../types/conversationEvents';
 import { FillerSettings } from '../http/contracts/agent';
+import type { ApiKeySettings } from '../http/contracts/apiKey';
 
 
-export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig;
+export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig | ChannelProviderConfig;
 
 // User table
 export const users = pgTable('users', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
   profile: jsonb('profile').notNull().$type<Record<string, any>>(),
+  banned: boolean('banned').notNull().default(false),
+  banReason: text('ban_reason'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (table) => [
@@ -29,7 +32,7 @@ export const conversations = pgTable('conversations', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull().references(() => projects.id),
   userId: text('user_id').notNull(),
-  clientId: text('client_id').notNull(),
+  sessionId: text('session_id').notNull(),
   stageId: text('stage_id').notNull(),
   startingStageId: text('starting_stage_id'),
   endingStageId: text('ending_stage_id'),
@@ -53,6 +56,7 @@ export const conversationEvents = pgTable('conversation_events', {
   conversationId: text('conversation_id').notNull(),
   eventType: text('event_type').notNull().$type<ConversationEventType>(),
   eventData: jsonb('event_data').notNull().$type<ConversationEventData>(),
+  stageId: text('stage_id'),
   timestamp: timestamp('timestamp').notNull(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
 }, (table) => [
@@ -84,6 +88,12 @@ export const projects = pgTable('projects', {
     settings?: unknown;
     unintelligiblePlaceholder?: string;
     voiceActivityDetection?: boolean;
+    serverVad?: {
+      mode?: number;
+      frameDurationMs?: 10 | 20 | 30;
+      silencePaddingMs?: number;
+      autoEndSilenceDurationMs?: number;
+    };
   }>(),
   acceptVoice: boolean('accept_voice').notNull().default(true),
   generateVoice: boolean('generate_voice').notNull().default(true),
@@ -95,6 +105,13 @@ export const projects = pgTable('projects', {
     enabled: boolean;
     llmProviderId: string;
     blockedCategories?: string[];
+    mode?: 'strict' | 'standard';
+  }>(),
+  costManagementConfig: jsonb('cost_management_config').$type<{
+    limits: Record<string, Record<string, {
+      outputTokensLimits?: { completion?: number; classification?: number; tool?: number; transformation?: number; filler?: number };
+      inputTokensLimits?: { completion?: number; classification?: number; tool?: number; transformation?: number; filler?: number };
+    }>>;
   }>(),
   constants: jsonb('constants').$type<Record<string, any>>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -103,6 +120,9 @@ export const projects = pgTable('projects', {
   autoCreateUsers: boolean('auto_create_users').notNull().default(false),
   userProfileVariableDescriptors: jsonb('user_profile_variable_descriptors').notNull().default([]).$type<FieldDescriptor[]>(),
   defaultGuardrailClassifierId: text('default_guardrail_classifier_id'),
+  sampleCopyConfig: jsonb('sample_copy_config').$type<{
+    defaultClassifierId?: string;
+  }>(),
   conversationTimeoutSeconds: integer('conversation_timeout_seconds'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -278,6 +298,46 @@ export const knowledgeItems = pgTable('knowledge_items', {
   foreignKey({ columns: [table.projectId, table.categoryId], foreignColumns: [knowledgeCategories.projectId, knowledgeCategories.id] }),
 ]);
 
+export type SamplingMethod = 'random' | 'round_robin';
+export type SampleCopyMode = 'regular' | 'forced';
+
+// CopyDecorator table
+export const copyDecorators = pgTable('copy_decorators', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  template: text('template').notNull(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+  uniqueIndex('copy_decorators_project_id_name_unique').on(table.projectId, table.name),
+]);
+
+// SampleCopy table
+export const sampleCopies = pgTable('sample_copies', {
+  id: text('id').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  name: text('name').notNull(),
+  stages: jsonb('stages').$type<string[]>(),
+  agents: jsonb('agents').$type<string[]>(),
+  promptTrigger: text('prompt_trigger').notNull(),
+  classifierOverrideId: text('classifier_override_id'),
+  content: jsonb('content').notNull().default([]).$type<string[]>(),
+  amount: integer('amount').notNull().default(1),
+  samplingMethod: text('sampling_method').notNull().default('random').$type<SamplingMethod>(),
+  mode: text('mode').notNull().default('regular').$type<SampleCopyMode>(),
+  decoratorId: text('decorator_id'),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.projectId, table.id] }),
+  foreignKey({ columns: [table.projectId, table.decoratorId], foreignColumns: [copyDecorators.projectId, copyDecorators.id] }),
+  uniqueIndex('sample_copies_project_id_name_unique').on(table.projectId, table.name),
+]);
+
 // GlobalAction table
 export const globalActions = pgTable('global_actions', {
   id: text('id').notNull(),
@@ -376,6 +436,7 @@ export const apiKeys = pgTable('api_keys', {
   lastUsedAt: timestamp('last_used_at'),
   isActive: boolean('is_active').notNull().default(true),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
+  keySettings: jsonb('key_settings').$type<ApiKeySettings>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -398,6 +459,24 @@ export const auditLogs = pgTable('audit_logs', {
 }, (table) => [
   index('idx_audit_logs_project_id').on(table.projectId),
   index('idx_audit_logs_created_at').on(table.createdAt),
+]);
+
+// SavedSliceQuery table
+export const savedSliceQueries = pgTable('saved_slice_queries', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  operatorId: text('operator_id').references(() => operators.id, { onDelete: 'set null' }),
+  query: jsonb('query').notNull().$type<Record<string, any>>(),
+  isShared: boolean('is_shared').notNull().default(false),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('saved_slice_queries_project_id_name_unique').on(table.projectId, table.name),
+  index('idx_saved_slice_queries_project_id').on(table.projectId),
+  index('idx_saved_slice_queries_operator_id').on(table.operatorId),
 ]);
 
 export type ArtifactType = 'user_voice' | 'user_transcript' | 'ai_voice' | 'ai_transcript' | 'tool_input' | 'tool_output' | 'other';
@@ -467,6 +546,9 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   guardrails: many(guardrails),
   issues: many(issues),
   apiKeys: many(apiKeys),
+  sampleCopies: many(sampleCopies),
+  copyDecorators: many(copyDecorators),
+  savedSliceQueries: many(savedSliceQueries),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -520,6 +602,25 @@ export const guardrailsRelations = relations(guardrails, ({ one }) => ({
   project: one(projects, {
     fields: [guardrails.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const copyDecoratorsRelations = relations(copyDecorators, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [copyDecorators.projectId],
+    references: [projects.id],
+  }),
+  sampleCopies: many(sampleCopies),
+}));
+
+export const sampleCopiesRelations = relations(sampleCopies, ({ one }) => ({
+  project: one(projects, {
+    fields: [sampleCopies.projectId],
+    references: [projects.id],
+  }),
+  decorator: one(copyDecorators, {
+    fields: [sampleCopies.projectId, sampleCopies.decoratorId],
+    references: [copyDecorators.projectId, copyDecorators.id],
   }),
 }));
 
@@ -579,5 +680,16 @@ export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
   project: one(projects, {
     fields: [apiKeys.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const savedSliceQueriesRelations = relations(savedSliceQueries, ({ one }) => ({
+  project: one(projects, {
+    fields: [savedSliceQueries.projectId],
+    references: [projects.id],
+  }),
+  operator: one(operators, {
+    fields: [savedSliceQueries.operatorId],
+    references: [operators.id],
   }),
 }));

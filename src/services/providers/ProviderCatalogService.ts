@@ -197,6 +197,7 @@ export const providerCatalogSchema = z.object({
   llm: z.array(llmProviderInfoSchema).describe('LLM providers'),
   storage: z.array(storageProviderInfoSchema).describe('Storage providers'),
   moderation: z.array(moderationProviderInfoSchema).describe('Moderation providers'),
+  channel: z.array(storageProviderInfoSchema).describe('Communication channel providers'),
 });
 
 export type ProviderCatalog = z.infer<typeof providerCatalogSchema>;
@@ -213,6 +214,7 @@ export class ProviderCatalogService {
       llm: this.getLlmProviders(),
       storage: this.getStorageProviders(),
       moderation: this.getModerationProviders(),
+      channel: this.getChannelProviders(),
     };
   }
 
@@ -1256,7 +1258,7 @@ export class ProviderCatalogService {
               { id: 'ama-ja', displayName: 'Ama (Japanese)', description: 'Casual, comfortable, confident, knowledgeable, natural', gender: 'female', languages: ['ja-jp'] },
             ],
             languages: ['en', 'es', 'nl', 'de', 'fr', 'it', 'ja'],
-            supportedAudioFormats: ['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac'],
+            supportedAudioFormats: ['pcm_8000', 'pcm_16000', 'pcm_24000', 'pcm_48000', 'mulaw', 'alaw'],
             supportsFullStreaming: true,
             supportsVoiceSettings: false,
           },
@@ -1279,7 +1281,7 @@ export class ProviderCatalogService {
               { id: 'zeus-en', displayName: 'Zeus (English)', description: 'Deep, trustworthy, smooth', gender: 'male', languages: ['en-us'] },
             ],
             languages: ['en'],
-            supportedAudioFormats: ['linear16', 'opus', 'mulaw', 'alaw', 'mp3', 'flac', 'aac'],
+            supportedAudioFormats: ['pcm_8000', 'pcm_16000', 'pcm_24000', 'pcm_48000', 'mulaw', 'alaw'],
             supportsFullStreaming: true,
             supportsVoiceSettings: false,
           },
@@ -11787,6 +11789,32 @@ export class ProviderCatalogService {
             ],
           },
         ],
+      },
+    ];
+  }
+
+  /**
+   * Gets all channel provider information
+   */
+  private getChannelProviders(): StorageProviderInfo[] {
+    return [
+      {
+        apiType: 'twilio_messaging',
+        displayName: 'Twilio Messaging',
+        description: 'Twilio Messaging API for SMS and WhatsApp text-based conversations',
+        features: ['SMS', 'WhatsApp', 'Webhook signature validation', 'Inbound/outbound text messages'],
+      },
+      {
+        apiType: 'twilio_voice',
+        displayName: 'Twilio Voice',
+        description: 'Twilio Voice API for inbound phone calls via Media Streams (8 kHz µLaw bidirectional audio)',
+        features: ['Inbound PSTN calls', 'Media Streams WebSocket', 'µLaw 8 kHz audio', 'Webhook signature validation'],
+      },
+      {
+        apiType: 'whatsapp',
+        displayName: 'WhatsApp (Meta Cloud API)',
+        description: 'Meta WhatsApp Cloud API for text-based conversations via WhatsApp Business',
+        features: ['WhatsApp messaging', 'Webhook signature validation', 'Inbound/outbound text messages', 'Slash-command interface'],
       },
     ];
   }
