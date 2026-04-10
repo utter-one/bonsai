@@ -15,7 +15,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class ToolController {
-  constructor(@inject(ToolService) private readonly toolService: ToolService) {}
+  constructor(@inject(ToolService) private readonly toolService: ToolService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -272,7 +272,7 @@ export class ToolController {
   private async getToolAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = toolRouteParamsSchema.parse(req.params);
-    const logs = await this.toolService.getToolAuditLogs(params.id);
+    const logs = await this.toolService.getToolAuditLogs(params.id, params.projectId);
     res.status(200).json(logs);
   }
 

@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" RENAME COLUMN "client_id" TO "session_id";

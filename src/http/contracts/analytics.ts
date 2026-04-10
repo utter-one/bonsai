@@ -77,6 +77,9 @@ export const latencyStatsResponseSchema = z.object({
   timeToFirstAudioMs: latencyMetricSchema.describe('Time from turn start to first audio chunk (voice only)'),
   llmDurationMs: latencyMetricSchema.describe('Total LLM call duration'),
   ttsDurationMs: latencyMetricSchema.describe('TTS synthesis duration (voice only)'),
+  ttsConnectDurationMs: latencyMetricSchema.describe('TTS WebSocket connection duration (voice only)'),
+  stageTransitionDurationMs: latencyMetricSchema.describe('Stage transition duration when a go_to_stage effect fired'),
+  promptRenderDurationMs: latencyMetricSchema.describe('Prompt template rendering duration'),
   moderationDurationMs: latencyMetricSchema.describe('Moderation API call duration'),
   processingDurationMs: latencyMetricSchema.describe('Classification and transformation processing duration'),
   actionsDurationMs: latencyMetricSchema.describe('Action execution duration'),
@@ -162,17 +165,46 @@ export const conversationTimelineTurnSchema = z.object({
   turnIndex: z.number().int().describe('1-based sequential turn number'),
   timestamp: z.string().describe('Timestamp of the user message event (ISO 8601)'),
   source: z.string().nullable().describe('Input source: text or voice'),
+  turnStartMs: z.number().nullable().describe('Unix timestamp (ms) when the turn started processing'),
+  asrStartMs: z.number().nullable().describe('Unix timestamp (ms) when ASR recognition started'),
+  asrEndMs: z.number().nullable().describe('Unix timestamp (ms) when ASR recognition completed'),
   asrDurationMs: z.number().nullable().describe('ASR transcription duration'),
+  moderationStartMs: z.number().nullable().describe('Unix timestamp (ms) when the moderation API call started'),
+  moderationEndMs: z.number().nullable().describe('Unix timestamp (ms) when the moderation API call completed'),
   moderationDurationMs: z.number().nullable().describe('Content moderation duration'),
+  fillerStartMs: z.number().nullable().describe('Unix timestamp (ms) when filler sentence generation started'),
+  fillerEndMs: z.number().nullable().describe('Unix timestamp (ms) when filler sentence generation completed'),
   processingDurationMs: z.number().nullable().describe('Classification and transformation duration'),
+  processingStartMs: z.number().nullable().describe('Unix timestamp (ms) when user input processing (classification + transformation) started'),
+  processingEndMs: z.number().nullable().describe('Unix timestamp (ms) when user input processing completed'),
   knowledgeRetrievalDurationMs: z.number().nullable().describe('Knowledge base retrieval duration'),
+  knowledgeRetrievalStartMs: z.number().nullable().describe('Unix timestamp (ms) when knowledge retrieval started'),
+  knowledgeRetrievalEndMs: z.number().nullable().describe('Unix timestamp (ms) when knowledge retrieval completed'),
   actionsDurationMs: z.number().nullable().describe('Action execution duration'),
+  actionsStartMs: z.number().nullable().describe('Unix timestamp (ms) when action execution started'),
+  actionsEndMs: z.number().nullable().describe('Unix timestamp (ms) when action execution completed'),
   fillerDurationMs: z.number().nullable().describe('Filler sentence generation duration'),
+  stageTransitionStartMs: z.number().nullable().describe('Unix timestamp (ms) when a stage transition (go_to_stage effect) started; null when no transition occurred'),
+  stageTransitionEndMs: z.number().nullable().describe('Unix timestamp (ms) when the stage transition completed (stage data reloaded, providers re-wired, on_enter executed)'),
+  stageTransitionDurationMs: z.number().nullable().describe('Stage transition duration (go_to_stage effect); null when no transition occurred'),
+  ttsConnectStartMs: z.number().nullable().describe('Unix timestamp (ms) when the TTS WebSocket connection was initiated (voice path only)'),
+  ttsConnectEndMs: z.number().nullable().describe('Unix timestamp (ms) when the TTS WebSocket connection was established and ready (voice path only)'),
+  ttsConnectDurationMs: z.number().nullable().describe('TTS WebSocket connection establishment duration (voice path only)'),
+  promptRenderStartMs: z.number().nullable().describe('Unix timestamp (ms) when prompt template rendering started'),
+  promptRenderEndMs: z.number().nullable().describe('Unix timestamp (ms) when prompt template rendering completed'),
+  promptRenderDurationMs: z.number().nullable().describe('Prompt template rendering duration'),
+  llmStartMs: z.number().nullable().describe('Unix timestamp (ms) when LLM generation started'),
+  llmEndMs: z.number().nullable().describe('Unix timestamp (ms) when LLM generation completed'),
+  firstTokenMs: z.number().nullable().describe('Unix timestamp (ms) when the first LLM token was received'),
+  firstAudioMs: z.number().nullable().describe('Unix timestamp (ms) when the first audio chunk was delivered to the client'),
   timeToFirstTokenMs: z.number().nullable().describe('LLM start to first token'),
   timeToFirstTokenFromTurnStartMs: z.number().nullable().describe('Turn start to first LLM token'),
   timeToFirstAudioMs: z.number().nullable().describe('Turn start to first audio chunk'),
   llmDurationMs: z.number().nullable().describe('Total LLM call duration'),
+  ttsStartMs: z.number().nullable().describe('Unix timestamp (ms) when TTS synthesis started'),
+  ttsEndMs: z.number().nullable().describe('Unix timestamp (ms) when TTS synthesis completed'),
   ttsDurationMs: z.number().nullable().describe('TTS synthesis duration'),
+  turnEndMs: z.number().nullable().describe('Unix timestamp (ms) when the turn completed (after TTS on voice path, after LLM on text path)'),
   totalTurnDurationMs: z.number().nullable().describe('Total turn duration from start to completion'),
 }).openapi('ConversationTimelineTurn');
 
@@ -189,3 +221,75 @@ export const conversationTimelineResponseSchema = z.object({
 
 /** Inferred type for the conversation timeline response */
 export type ConversationTimelineResponse = z.infer<typeof conversationTimelineResponseSchema>;
+
+// ==================
+// Response: Token Usage Stats
+// ==================
+
+/**
+ * Schema for token usage aggregated by event type.
+ */
+export const tokenUsageByEventTypeSchema = z.object({
+  eventType: z.string().describe('Event type (message, classification, transformation, tool_call)'),
+  eventCount: z.number().int().describe('Number of events with token usage data'),
+  totalPromptTokens: z.number().int().describe('Total prompt (input) tokens'),
+  totalCompletionTokens: z.number().int().describe('Total completion (output) tokens'),
+  totalTokens: z.number().int().describe('Total tokens (prompt + completion)'),
+}).openapi('TokenUsageByEventType');
+
+/** Inferred type for token usage by event type */
+export type TokenUsageByEventType = z.infer<typeof tokenUsageByEventTypeSchema>;
+
+/**
+ * Schema for the aggregated token usage response.
+ * Includes both totals and per-event-type breakdowns.
+ */
+export const tokenUsageStatsResponseSchema = z.object({
+  totalEvents: z.number().int().describe('Total number of events with token usage data'),
+  totalPromptTokens: z.number().int().describe('Total prompt (input) tokens across all event types'),
+  totalCompletionTokens: z.number().int().describe('Total completion (output) tokens across all event types'),
+  totalTokens: z.number().int().describe('Total tokens across all event types'),
+  byEventType: z.array(tokenUsageByEventTypeSchema).describe('Token usage breakdown by event type'),
+}).openapi('TokenUsageStatsResponse');
+
+/** Inferred type for the token usage stats response */
+export type TokenUsageStatsResponse = z.infer<typeof tokenUsageStatsResponseSchema>;
+
+// ==================
+// Response: Token Usage Trend
+// ==================
+
+/**
+ * Schema for a single data point in a token usage trend time series.
+ */
+export const tokenUsageTrendPointSchema = z.object({
+  bucket: z.string().describe('Time bucket start (ISO 8601)'),
+  eventCount: z.number().int().describe('Number of events with token usage data in this bucket'),
+  totalPromptTokens: z.number().int().describe('Total prompt tokens in this bucket'),
+  totalCompletionTokens: z.number().int().describe('Total completion tokens in this bucket'),
+  totalTokens: z.number().int().describe('Total tokens in this bucket'),
+}).openapi('TokenUsageTrendPoint');
+
+/** Inferred type for a token usage trend data point */
+export type TokenUsageTrendPoint = z.infer<typeof tokenUsageTrendPointSchema>;
+
+/**
+ * Schema for the token usage trend query, extending the base analytics query with a time bucket interval.
+ */
+export const tokenUsageTrendQuerySchema = analyticsQuerySchema.extend({
+  interval: z.enum(['hour', 'day', 'week']).default('day').describe('Time bucket interval for the trend (hour, day, or week)'),
+}).openapi('TokenUsageTrendQuery');
+
+/** Inferred type for the token usage trend query */
+export type TokenUsageTrendQuery = z.infer<typeof tokenUsageTrendQuerySchema>;
+
+/**
+ * Schema for the token usage trend response — a time series of token consumption data.
+ */
+export const tokenUsageTrendResponseSchema = z.object({
+  interval: z.string().describe('Aggregation interval used (hour, day, or week)'),
+  points: z.array(tokenUsageTrendPointSchema).describe('Time-bucketed data points'),
+}).openapi('TokenUsageTrendResponse');
+
+/** Inferred type for the token usage trend response */
+export type TokenUsageTrendResponse = z.infer<typeof tokenUsageTrendResponseSchema>;

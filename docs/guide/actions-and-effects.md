@@ -262,14 +262,21 @@ Effects from **all** triggered actions are gathered into a single global list, s
 
 ## Execution Flow
 
-When a user sends input, the system:
+When a user sends input, the system runs classifiers and context transformers in parallel, merges results, and executes effects:
 
-1. Runs all classifiers in parallel to identify matching actions
-2. Runs all context transformers in parallel to extract structured data
-3. Deduplicates matched actions across classifiers
-4. If no actions match, executes `__on_fallback` (if defined)
-5. Executes all matched actions' effects sequentially
-6. Applies the combined outcome (variable changes, stage navigation, response generation)
+```mermaid
+flowchart TD
+    A([User Input]) --> B["Run classifiers<br>in parallel"]
+    A --> C["Run transformers<br>in parallel"]
+    B --> D[Deduplicate matched actions]
+    C --> D
+    D --> E{Any actions matched?}
+    E -->|No| F["Execute __on_fallback<br>if defined"]
+    E -->|Yes| G["Sort effects by priority<br>resolve conflicts"]
+    F --> G
+    G --> H["Execute effects<br>sequentially"]
+    H --> I(["Apply outcome"])
+```
 
 Effects within a single action run in order, and their results can be used by subsequent effects. If any effect triggers `end_conversation`, `abort_conversation`, or `go_to_stage`, it takes effect after all current effects complete.
 

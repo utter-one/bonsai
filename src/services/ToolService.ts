@@ -198,19 +198,24 @@ export class ToolService extends BaseService {
       const updatePayload: any = { version: existingTool.version + 1, updatedAt: new Date() };
       if (updateData.name !== undefined) updatePayload.name = updateData.name;
       if (updateData.description !== undefined) updatePayload.description = updateData.description;
-      if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
-      if (updateData.llmProviderId !== undefined) updatePayload.llmProviderId = updateData.llmProviderId;
-      if (updateData.llmSettings !== undefined) updatePayload.llmSettings = updateData.llmSettings;
-      if (updateData.inputType !== undefined) updatePayload.inputType = updateData.inputType;
-      if (updateData.outputType !== undefined) updatePayload.outputType = updateData.outputType;
-      if (updateData.url !== undefined) updatePayload.url = updateData.url;
-      if (updateData.webhookMethod !== undefined) updatePayload.webhookMethod = updateData.webhookMethod;
-      if (updateData.webhookHeaders !== undefined) updatePayload.webhookHeaders = updateData.webhookHeaders;
-      if (updateData.webhookBody !== undefined) updatePayload.webhookBody = updateData.webhookBody;
-      if (updateData.code !== undefined) updatePayload.code = updateData.code;
       if (updateData.parameters !== undefined) updatePayload.parameters = updateData.parameters;
       if (updateData.tags !== undefined) updatePayload.tags = updateData.tags;
       if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
+
+      if (updateData.type === 'smart_function') {
+        updatePayload.llmProviderId = updateData.llmProviderId;
+        updatePayload.llmSettings = updateData.llmSettings;
+        if (updateData.prompt !== undefined) updatePayload.prompt = updateData.prompt;
+        if (updateData.inputType !== undefined) updatePayload.inputType = updateData.inputType;
+        if (updateData.outputType !== undefined) updatePayload.outputType = updateData.outputType;
+      } else if (updateData.type === 'webhook') {
+        if (updateData.url !== undefined) updatePayload.url = updateData.url;
+        if (updateData.webhookMethod !== undefined) updatePayload.webhookMethod = updateData.webhookMethod;
+        if (updateData.webhookHeaders !== undefined) updatePayload.webhookHeaders = updateData.webhookHeaders;
+        if (updateData.webhookBody !== undefined) updatePayload.webhookBody = updateData.webhookBody;
+      } else if (updateData.type === 'script') {
+        if (updateData.code !== undefined) updatePayload.code = updateData.code;
+      }
 
       const updatedTool = await db.update(tools).set(updatePayload).where(and(eq(tools.projectId, projectId), eq(tools.id, id), eq(tools.version, expectedVersion))).returning();
 
@@ -321,15 +326,16 @@ export class ToolService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific tool
    * @param toolId - The unique identifier of the tool
+   * @param projectId - The project ID the tool belongs to
    * @returns Array of audit log entries for the tool
    */
-  async getToolAuditLogs(toolId: string): Promise<any[]> {
-    logger.debug({ toolId }, 'Fetching audit logs for tool');
+  async getToolAuditLogs(toolId: string, projectId: string): Promise<any[]> {
+    logger.debug({ toolId, projectId }, 'Fetching audit logs for tool');
 
     try {
-      return await this.auditService.getEntityAuditLogs('tool', toolId);
+      return await this.auditService.getEntityAuditLogs('tool', toolId, projectId);
     } catch (error) {
-      logger.error({ error, toolId }, 'Failed to fetch tool audit logs');
+      logger.error({ error, toolId, projectId }, 'Failed to fetch tool audit logs');
       throw error;
     }
   }

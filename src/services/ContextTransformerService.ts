@@ -274,15 +274,16 @@ export class ContextTransformerService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific context transformer
    * @param transformerId - The unique identifier of the context transformer
+   * @param projectId - The project ID the context transformer belongs to
    * @returns Array of audit log entries for the context transformer
    */
-  async getContextTransformerAuditLogs(transformerId: string): Promise<any[]> {
-    logger.debug({ transformerId }, 'Fetching audit logs for context transformer');
+  async getContextTransformerAuditLogs(transformerId: string, projectId: string): Promise<any[]> {
+    logger.debug({ transformerId, projectId }, 'Fetching audit logs for context transformer');
 
     try {
-      return await this.auditService.getEntityAuditLogs('context_transformer', transformerId);
+      return await this.auditService.getEntityAuditLogs('context_transformer', transformerId, projectId);
     } catch (error) {
-      logger.error({ error, transformerId }, 'Failed to fetch context transformer audit logs');
+      logger.error({ error, transformerId, projectId }, 'Failed to fetch context transformer audit logs');
       throw error;
     }
   }

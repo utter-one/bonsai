@@ -464,15 +464,16 @@ export class KnowledgeService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific knowledge category
    * @param categoryId - The unique identifier of the knowledge category
+   * @param projectId - The project ID the knowledge category belongs to
    * @returns Array of audit log entries for the knowledge category
    */
-  async getKnowledgeCategoryAuditLogs(categoryId: string): Promise<any[]> {
-    logger.debug({ categoryId }, 'Fetching audit logs for knowledge category');
+  async getKnowledgeCategoryAuditLogs(categoryId: string, projectId: string): Promise<any[]> {
+    logger.debug({ categoryId, projectId }, 'Fetching audit logs for knowledge category');
 
     try {
-      return await this.auditService.getEntityAuditLogs('knowledge_category', categoryId);
+      return await this.auditService.getEntityAuditLogs('knowledge_category', categoryId, projectId);
     } catch (error) {
-      logger.error({ error, categoryId }, 'Failed to fetch knowledge category audit logs');
+      logger.error({ error, categoryId, projectId }, 'Failed to fetch knowledge category audit logs');
       throw error;
     }
   }
@@ -480,15 +481,16 @@ export class KnowledgeService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific knowledge item
    * @param itemId - The unique identifier of the knowledge item
+   * @param projectId - The project ID the knowledge item belongs to
    * @returns Array of audit log entries for the knowledge item
    */
-  async getKnowledgeItemAuditLogs(itemId: string): Promise<any[]> {
-    logger.debug({ itemId }, 'Fetching audit logs for knowledge item');
+  async getKnowledgeItemAuditLogs(itemId: string, projectId: string): Promise<any[]> {
+    logger.debug({ itemId, projectId }, 'Fetching audit logs for knowledge item');
 
     try {
-      return await this.auditService.getEntityAuditLogs('knowledge_item', itemId);
+      return await this.auditService.getEntityAuditLogs('knowledge_item', itemId, projectId);
     } catch (error) {
-      logger.error({ error, itemId }, 'Failed to fetch knowledge item audit logs');
+      logger.error({ error, itemId, projectId }, 'Failed to fetch knowledge item audit logs');
       throw error;
     }
   }

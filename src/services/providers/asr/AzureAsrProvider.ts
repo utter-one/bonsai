@@ -102,11 +102,27 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
   }
 
   /**
-   * Starts the Azure speech recognition session
+   * Starts the Azure speech recognition session.
+   * If the push stream was closed by a previous stop() call (e.g. in multi-turn VAD mode),
+   * a new push stream, audio config, and recognizer are created before starting.
    */
   async start(): Promise<void> {
-    if (!this.speechRecognizer) {
+    if (!this.azureSpeechConfig) {
       throw new Error('Azure Speech recognizer not initialized. Call init() first.');
+    }
+
+    // Recreate push stream and recognizer if the stream was closed by a previous stop().
+    if (!this.audioStream) {
+      logger.info(`[ASR] Recreating push stream and recognizer for new session`);
+      const oldRecognizer = this.speechRecognizer;
+      this.audioStream = azureSDK.AudioInputStream.createPushStream();
+      this.audioConfig = azureSDK.AudioConfig.fromStreamInput(this.audioStream);
+      this.speechRecognizer = new azureSDK.SpeechRecognizer(this.azureSpeechConfig, this.audioConfig);
+      if (this.settings.dictionaryPhrases && this.settings.dictionaryPhrases.length) {
+        const phraseList = PhraseListGrammar.fromRecognizer(this.speechRecognizer);
+        phraseList.addPhrases(this.settings.dictionaryPhrases);
+      }
+      if (oldRecognizer) oldRecognizer.close();
     }
 
     this.bufferArray = [];
@@ -183,7 +199,12 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
   }
 
   /**
-   * Stops the Azure speech recognition session
+   * Stops the Azure speech recognition session.
+   * Closes the push stream to signal EOF and lets Azure finalize all pending recognition
+   * naturally. Do NOT call stopContinuousRecognitionAsync here — it races with (and aborts)
+   * Azure's processing of audio already queued in the push stream, producing no recognized
+   * text. The sessionStopped handler already calls stopContinuousRecognitionAsync and
+   * handleRecognitionStopped when Azure is truly done.
    */
   async stop(): Promise<void> {
     if (!this.speechRecognizer) {
@@ -191,6 +212,17 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
       return;
     }
 
+    if (this.audioStream) {
+      // Closing the push stream sends an EOF: Azure processes all queued audio, fires
+      // 'recognized' for the final phrase, then fires 'sessionStopped' which calls
+      // handleRecognitionStopped(). Returning here lets that happen asynchronously.
+      this.audioStream.close();
+      this.audioStream = undefined;
+      logger.info(`[ASR] Push stream closed, awaiting Azure recognition finalization`);
+      return;
+    }
+
+    // Fallback when stream was already closed: stop the recognizer directly.
     await new Promise<void>((resolve, reject) => {
       this.speechRecognizer!.stopContinuousRecognitionAsync(
         () => {
@@ -232,6 +264,15 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
       this.bufferArray.push(audio);
       logger.info(`[ASR] Buffered audio chunk`);
     }
+  }
+
+  /**
+   * Resets per-turn state without stopping the session. Overrides base to also reset chunkId.
+   */
+  override resetForNewTurn(): void {
+    super.resetForNewTurn();
+    this.chunkId = generateId(ID_PREFIXES.CHUNK);
+    this.bufferArray = [];
   }
 
   /**

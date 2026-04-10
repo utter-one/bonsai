@@ -1,24 +1,35 @@
 # Content Moderation
 
-Bonsai Backend includes built-in content moderation that screens user input before it reaches the AI pipeline. Moderation runs synchronously on every user turn and can block harmful content from being processed.
+Bonsai Backend includes built-in content moderation that screens user input before it reaches the AI pipeline. Moderation can run synchronously (blocking all processing until done) or in parallel with other pipeline steps to reduce latency.
 
 ## How Moderation Works
 
-When enabled on a project, moderation runs as the **first step** in the user input processing pipeline — before classification, context transformation, or LLM response generation.
+When enabled on a project, moderation calls the configured LLM provider's moderation API, which returns a list of detected content categories. If any detected category matches the project's blocklist, the input is flagged. The point in the pipeline at which moderation resolves depends on the configured [mode](#moderation-mode).
 
-```
-User Input
-    │
-    ▼
-┌─────────────────────┐
-│  Content Moderation  │  ◄── Blocks here if flagged
-└────────┬────────────┘
-         │
-         ▼
-  Classification, Actions, Response Generation...
+### Strict mode (default)
+
+Moderation runs as the **first step**, before any other LLM call:
+
+```mermaid
+flowchart TD
+    A([User Input]) --> B["Content Moderation (blocks if flagged)"]
+    B --> C([Filler · Classification · Actions · Response Generation])
 ```
 
-The moderation check calls the configured LLM provider's moderation API, which returns a list of detected content categories. If any detected category matches the project's blocklist, the input is flagged.
+### Standard mode
+
+Moderation runs **in parallel with `processTextInput`** (classification/knowledge retrieval), after filler generation. This hides moderation latency behind the classification call, which is typically the longest step:
+
+```mermaid
+flowchart TD
+    A([User Input]) --> B[Filler Generation]
+    B --> C[Content Moderation]
+    B --> D["processTextInput (classify · knowledge)"]
+    C --> E{"Await both · check moderation"}
+    D --> E
+    E -->|flagged| F([Blocked])
+    E -->|ok| G([Actions · Response Generation])
+```
 
 ## Configuration
 
@@ -39,6 +50,7 @@ Moderation is configured via the `moderationConfig` field on the [Project](./pro
 | `enabled` | `boolean` | Yes | Whether moderation is active |
 | `llmProviderId` | `string` | Yes | ID of the LLM provider to use for moderation |
 | `blockedCategories` | `string[]` | No | Provider-specific category names to block. If omitted or empty, **any** flagged category blocks the input. |
+| `mode` | `string` | No | Execution mode: `strict` (default) or `standard`. See [Moderation Mode](#moderation-mode). |
 
 ## Supported Providers
 
@@ -103,11 +115,25 @@ The `blockedCategories` field controls which detected categories cause blocking:
 
 When moderation detects categories (even if the input is not ultimately blocked), a `moderation` event is emitted to connected WebSocket clients with `receiveEvents` enabled. This allows real-time monitoring dashboards.
 
+## Moderation Mode
+
+The `mode` field controls when the moderation result is awaited relative to the rest of the pipeline.
+
+| Mode | Behaviour | Use case |
+|---|---|---|
+| `strict` (default) | Moderation fully resolves **before** filler generation and all LLM calls. | Highest safety guarantee. No user-derived content ever reaches other providers while unflagged. |
+| `standard` | Moderation runs **in parallel with `processTextInput`** (after filler). Resolves before classification results are acted upon. | Lower latency — moderation latency is hidden behind the classification call. |
+
+::: warning
+In `standard` mode the filler sentence is generated and sent to TTS/the client before moderation completes. If moderation flags the input, the filler may already have been heard by the user. The turn is still aborted correctly — only the short filler audio is affected.
+:::
+
 ## Performance
 
-- Moderation calls are **synchronous** — the turn waits for moderation to complete before proceeding
-- Duration is tracked in `moderationDurationMs` and included in turn timing metadata
-- Moderation latency is visible in the [Analytics](/api/analytics) endpoints
+- In `strict` mode, moderation latency adds directly to turn latency.
+- In `standard` mode, moderation runs in parallel with classification/knowledge retrieval (after filler generation), effectively hiding moderation latency behind the longest pipeline step.
+- Duration is tracked in `moderationDurationMs` and included in turn timing metadata.
+- Moderation latency is visible in the [Analytics](/api/analytics) endpoints.
 
 ## Setting Up Moderation
 

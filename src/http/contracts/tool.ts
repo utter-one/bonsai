@@ -55,7 +55,7 @@ const createToolBaseSchema = z.object({
 export const createSmartFunctionToolSchema = createToolBaseSchema.extend({
   type: z.literal('smart_function').describe('Tool executes an LLM call'),
   prompt: z.string().min(1).describe('Handlebars template rendered before being sent to the LLM'),
-  llmProviderId: z.string().nullable().optional().describe('ID of the LLM provider to use for this tool'),
+  llmProviderId: z.string().describe('ID of the LLM provider to use for this tool'),
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for this tool'),
   inputType: toolInputTypeSchema.describe('Expected input format for the tool'),
   outputType: toolOutputTypeSchema.describe('Expected output format from the tool'),
@@ -92,32 +92,58 @@ export const createToolSchema = z.discriminatedUnion('type', [
   createScriptToolSchema,
 ]);
 
-/**
- * Schema for updating a tool
- * All fields are optional except version; type-specific fields are accepted for all variants
- */
-export const updateToolBodySchema = z.object({
+/** Shared update fields present on every tool type */
+const updateToolBaseSchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name'),
   description: z.string().nullable().optional().describe('Updated description'),
-  // smart_function fields
-  prompt: z.string().min(1).optional().describe('Updated Handlebars prompt template (smart_function)'),
-  llmProviderId: z.string().nullable().optional().describe('Updated LLM provider ID (smart_function)'),
-  llmSettings: llmSettingsSchema.optional().describe('Updated LLM provider-specific settings (smart_function)'),
-  inputType: toolInputTypeSchema.optional().describe('Updated input format (smart_function)'),
-  outputType: toolOutputTypeSchema.optional().describe('Updated output format (smart_function)'),
-  // webhook fields
-  url: z.string().url().optional().describe('Updated target URL (webhook)'),
+  parameters: z.array(toolParameterSchema).optional().describe('Updated parameters for the tool (smart_function)'),
+  tags: z.array(z.string()).optional().describe('Updated tags (smart_function)'),
+  metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata (smart_function)'),
+  version: z.number().int().min(1).describe('Current version number for optimistic locking (smart_function)'),
+});
+
+/**
+ * Schema for updating a smart_function tool
+ * llmProviderId and llmSettings are required
+ */
+export const updateSmartFunctionToolSchema = updateToolBaseSchema.extend({
+  type: z.literal('smart_function').describe('Tool executes an LLM call'),
+  prompt: z.string().min(1).optional().describe('Updated Handlebars prompt template'),
+  llmProviderId: z.string().describe('Updated LLM provider ID'),
+  llmSettings: llmSettingsSchema.describe('Updated LLM provider-specific settings'),
+  inputType: toolInputTypeSchema.describe('Updated input format (smart_function)'),
+  outputType: toolOutputTypeSchema.describe('Updated output format (smart_function)'),
+}).openapi('UpdateSmartFunctionTool');
+
+/**
+ * Schema for updating a webhook tool
+ */
+export const updateWebhookToolSchema = updateToolBaseSchema.extend({
+  type: z.literal('webhook').describe('Tool makes an HTTP request'),
+  url: z.url().describe('Updated target URL (webhook)'),
   webhookMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().describe('Updated HTTP method (webhook)'),
   webhookHeaders: z.record(z.string(), z.string()).nullable().optional().describe('Updated HTTP headers (webhook)'),
   webhookBody: z.string().nullable().optional().describe('Updated request body template (webhook)'),
-  // script fields
-  code: z.string().min(1).optional().describe('Updated JavaScript code (script)'),
-  // shared fields
-  parameters: z.array(toolParameterSchema).optional().describe('Updated parameters for the tool'),
-  tags: z.array(z.string()).optional().describe('Updated tags'),
-  metadata: z.record(z.string(), z.unknown()).optional().describe('Updated metadata'),
-  version: z.number().int().min(1).describe('Current version number for optimistic locking'),
-});
+}).openapi('UpdateWebhookTool');
+
+/**
+ * Schema for updating a script tool
+ */
+export const updateScriptToolSchema = updateToolBaseSchema.extend({
+  type: z.literal('script').describe('Tool executes isolated JavaScript code'),
+  code: z.string().min(1).describe('Updated JavaScript code (script)'),
+}).openapi('UpdateScriptTool');
+
+/**
+ * Discriminated union schema for updating any tool type
+ * The 'type' field determines which variant is validated
+ * For smart_function tools, llmProviderId and llmSettings are required
+ */
+export const updateToolBodySchema = z.discriminatedUnion('type', [
+  updateSmartFunctionToolSchema,
+  updateWebhookToolSchema,
+  updateScriptToolSchema,
+]);
 
 /**
  * Schema for deleting a tool
@@ -182,6 +208,15 @@ export type CreateWebhookToolRequest = z.infer<typeof createWebhookToolSchema>;
 
 /** Request body for creating a script tool */
 export type CreateScriptToolRequest = z.infer<typeof createScriptToolSchema>;
+
+/** Request body for updating a smart_function tool */
+export type UpdateSmartFunctionToolRequest = z.infer<typeof updateSmartFunctionToolSchema>;
+
+/** Request body for updating a webhook tool */
+export type UpdateWebhookToolRequest = z.infer<typeof updateWebhookToolSchema>;
+
+/** Request body for updating a script tool */
+export type UpdateScriptToolRequest = z.infer<typeof updateScriptToolSchema>;
 
 /** Request body for updating a tool */
 export type UpdateToolRequest = z.infer<typeof updateToolBodySchema>;

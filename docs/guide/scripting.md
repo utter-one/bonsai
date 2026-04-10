@@ -35,6 +35,9 @@ Scripts have access to these global variables:
 | `consts` | Read-only | Project-level constants (from project settings) |
 | `stageVars` | Read-only | Variables for all stages, keyed by stage ID |
 | `events` | Read-only | All conversation events in chronological order (messages, actions, stage transitions, etc.) |
+| `copy` | Read-only | Selected sample copy content joined by newlines and rendered using selected decorator; empty string if no copy matched this turn |
+| `copyContent` | Read-only | Raw selected content before copy decorator is applied |
+| `sampleCopy` | Read-only | All sample copies active for the current stage: `Array<{ name, trigger, content: string[] }>` |
 | `console` | — | `console.log()`, `console.error()`, `console.warn()` |
 
 ## Modifying State

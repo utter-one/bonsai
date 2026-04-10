@@ -267,7 +267,7 @@ export class ApiKeyController {
   private async getApiKeyAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = apiKeyRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.apiKeyService.getApiKeyAuditLogs(params.id);
+    const auditLogs = await this.apiKeyService.getApiKeyAuditLogs(params.id, params.projectId);
     res.status(200).json(auditLogs);
   }
 }

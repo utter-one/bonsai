@@ -105,6 +105,17 @@ Filler responses reduce perceived latency by playing a short LLM-generated sente
 4. When the main AI response is ready, it continues from where the filler sentence left off — the filler text is passed as an assistant prefill so the LLM produces a naturally flowing continuation.
 5. If no main response is needed (e.g. the conversation ends), the filler turn is cleanly closed.
 
+```mermaid
+flowchart TD
+    A([User input received]) --> B[Filler LLM call]
+    A --> C[Classification & transformation]
+    B --> D[Filler streamed to client]
+    C --> E[Main AI response ready for generation]
+    D --> E
+    E --> F[LLM continues from filler prefill]
+    F --> G([Response streamed to client])
+```
+
 ### Configuration
 
 Set `fillerSettings` on the agent:

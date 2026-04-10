@@ -43,6 +43,23 @@ curl -X POST http://localhost:3000/api/auth/refresh \
   -d '{ "refreshToken": "eyJhbG..." }'
 ```
 
+```mermaid
+sequenceDiagram
+    participant O as Operator
+    participant A as API
+    O->>A: POST /api/auth/login { id, password }
+    A->>O: { accessToken, refreshToken }
+    O->>A: GET /api/... Authorization: Bearer accessToken
+    A->>O: 200 OK
+    Note over O,A: Access token expires
+    O->>A: GET /api/... Authorization: Bearer expiredToken
+    A->>O: 401 Unauthorized
+    O->>A: POST /api/auth/refresh { refreshToken }
+    A->>O: { accessToken, refreshToken }
+    O->>A: GET /api/... Authorization: Bearer newToken
+    A->>O: 200 OK
+```
+
 ## Role-Based Access Control (RBAC)
 
 Operators are assigned one or more roles. Each role carries a set of permissions in `entity:action` format.
@@ -125,6 +142,21 @@ API keys are used exclusively for WebSocket authentication. The client sends the
   "type": "auth",
   "apiKey": "bonsai_abcdef123456..."
 }
+```
+
+```mermaid
+sequenceDiagram
+    participant O as Operator
+    participant R as REST API
+    participant C as Client App
+    participant W as WebSocket
+    O->>R: POST /api/projects/:id/api-keys { name }
+    R->>O: { key: "bonsai_..." }
+    Note over O,C: Key distributed to client application
+    C->>W: connect ws://host/ws
+    C->>W: auth { apiKey: "bonsai_..." }
+    W->>C: auth { sessionId, projectSettings }
+    Note over C,W: Session ready for conversations
 ```
 
 ### Managing API Keys

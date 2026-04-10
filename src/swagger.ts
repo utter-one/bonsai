@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { createOperatorSchema, updateOperatorBodySchema, deleteOperatorBodySchema, operatorResponseSchema, operatorListResponseSchema, updateProfileSchema, profileResponseSchema } from './http/contracts/operator';
 import { createUserSchema, updateUserBodySchema, userResponseSchema, userListResponseSchema } from './http/contracts/user';
-import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema, archiveProjectSchema, listProjectsQuerySchema, moderationConfigSchema } from './http/contracts/project';
+import { createProjectSchema, updateProjectSchema, projectResponseSchema, projectListResponseSchema, archiveProjectSchema, listProjectsQuerySchema, moderationConfigSchema, sampleCopyConfigSchema } from './http/contracts/project';
+import { requestTypeLimitsSchema, providerModelLimitsSchema, costManagementConfigSchema } from './http/contracts/costManagement';
 import { createAgentSchema, updateAgentBodySchema, deleteAgentBodySchema, agentResponseSchema, agentListResponseSchema, fillerSettingsSchema } from './http/contracts/agent';
 import { loginSchema, refreshTokenSchema, loginResponseSchema, refreshTokenResponseSchema } from './http/contracts/auth';
 import { initialOperatorSetupSchema, setupStatusResponseSchema, initialOperatorSetupResponseSchema } from './http/contracts/setup';
@@ -14,18 +15,22 @@ import { conversationResponseSchema, conversationListResponseSchema, conversatio
 import { createStageSchema, updateStageBodySchema, deleteStageBodySchema, stageResponseSchema, stageListResponseSchema } from './http/contracts/stage';
 import { createClassifierSchema, updateClassifierBodySchema, deleteClassifierBodySchema, classifierResponseSchema, classifierListResponseSchema } from './http/contracts/classifier';
 import { createContextTransformerSchema, updateContextTransformerBodySchema, deleteContextTransformerBodySchema, contextTransformerResponseSchema, contextTransformerListResponseSchema } from './http/contracts/contextTransformer';
-import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
+import { createToolSchema, createSmartFunctionToolSchema, createWebhookToolSchema, createScriptToolSchema, updateSmartFunctionToolSchema, updateWebhookToolSchema, updateScriptToolSchema, updateToolBodySchema, deleteToolBodySchema, toolResponseSchema, toolListResponseSchema, toolTypeSchema } from './http/contracts/tool';
 import { createGlobalActionSchema, updateGlobalActionBodySchema, deleteGlobalActionBodySchema, globalActionResponseSchema, globalActionListResponseSchema, globalActionRouteParamsSchema } from './http/contracts/globalAction';
+import { createSampleCopySchema, updateSampleCopyBodySchema, deleteSampleCopyBodySchema, sampleCopyResponseSchema, sampleCopyListResponseSchema } from './http/contracts/sampleCopy';
+import { createCopyDecoratorSchema, updateCopyDecoratorBodySchema, deleteCopyDecoratorBodySchema, copyDecoratorResponseSchema, copyDecoratorListResponseSchema } from './http/contracts/copyDecorator';
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, moderationProvidersResponseSchema, moderationProviderInfoSchema, moderationModelInfoSchema, moderationCategoryInfoSchema } from './http/contracts/providerCatalog';
+import { channelCapabilitiesSchema, channelInfoSchema, channelCatalogResponseSchema } from './http/contracts/channelCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
-import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema } from './http/contracts/analytics';
-import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema } from './http/contracts/apiKey';
+import { latencyMetricSchema, percentileSetSchema, latencyTrendPointSchema, tokenUsageByEventTypeSchema, tokenUsageTrendPointSchema } from './http/contracts/analytics';
+import { sourceDimensionSchema, sourceMetricSchema, sourceEntrySchema, sliceQueryRowSchema } from './http/contracts/sliceAnalytics';
+import { createApiKeySchema, updateApiKeySchema, deleteApiKeyBodySchema, apiKeyResponseSchema, apiKeyListResponseSchema, apiKeySettingsSchema } from './http/contracts/apiKey';
 import { listParamsSchema, llmSettingsSchema } from './http/contracts/common';
 import { asrConfigSchema } from './http/contracts/project';
-import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, changeVisibilityEffectSchema } from './types/actions';
+import { effectSchema, endConversationEffectSchema, abortConversationEffectSchema, goToStageEffectSchema, modifyUserInputEffectSchema, modifyVariablesEffectSchema, modifyUserProfileEffectSchema, variableOperationSchema, userProfileOperationSchema, callToolEffectSchema, generateResponseEffectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, changeVisibilityEffectSchema, banUserEffectSchema } from './types/actions';
 import { fieldDescriptorSchema } from './types/parameters';
 import { openAILlmSettingsSchema } from './services/providers/llm/OpenAILlmProvider';
 import { openAILegacyLlmSettingsSchema } from './services/providers/llm/OpenAILegacyLlmProvider';
@@ -55,6 +60,7 @@ import { elevenLabsAsrSettingsSchema } from './services/providers/asr/ElevenLabs
 import { deepgramAsrSettingsSchema } from './services/providers/asr/DeepgramAsrProvider';
 import { assemblyAiAsrSettingsSchema } from './services/providers/asr/AssemblyAiAsrProvider';
 import { speechmaticsAsrSettingsSchema } from './services/providers/asr/SpeechmaticsAsrProvider';
+import { serverVadConfigSchema } from './http/contracts/vad';
 import { OperatorController } from './http/controllers/OperatorController';
 import { UserController } from './http/controllers/UserController';
 import { ProjectController } from './http/controllers/ProjectController';
@@ -70,17 +76,23 @@ import { ContextTransformerController } from './http/controllers/ContextTransfor
 import { ToolController } from './http/controllers/ToolController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { GuardrailController } from './http/controllers/GuardrailController';
+import { SampleCopyController } from './http/controllers/SampleCopyController';
+import { CopyDecoratorController } from './http/controllers/CopyDecoratorController';
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
+import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
+import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
+import { savedSliceQueryResponseSchema } from './http/contracts/savedSliceQuery';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
 import { MigrationController } from './http/controllers/MigrationController';
 import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
 import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
+import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { providerHintSchema, providerHintResolutionTargetSchema, providerHintResolutionSchema, asrConfigExchangeV1Schema, storageConfigExchangeV1Schema, moderationConfigExchangeV1Schema, fillerSettingsExchangeV1Schema, projectExchangeV1Schema, agentExchangeV1Schema, stageExchangeV1Schema, classifierExchangeV1Schema, contextTransformerExchangeV1Schema, toolExchangeV1Schema, globalActionExchangeV1Schema, guardrailExchangeV1Schema, knowledgeCategoryExchangeV1Schema, knowledgeItemExchangeV1Schema, projectExchangeBundleV1Schema, projectExchangeImportResultSchema } from './http/contracts/projectExchange';
 
 extendZodWithOpenApi(z);
@@ -129,9 +141,14 @@ export function getOpenAPISpec(): any {
   registry.register('AmazonPollyTtsSettings', amazonPollyTtsSettingsSchema);
 
   // Voice and ASR configuration schemas
+  registry.register('ServerVadConfig', serverVadConfigSchema);
   registry.register('AsrConfig', asrConfigSchema);
   registry.register('ModerationConfig', moderationConfigSchema);
+  registry.register('SampleCopyConfig', sampleCopyConfigSchema);
   registry.register('FillerSettings', fillerSettingsSchema);
+  registry.register('RequestTypeLimits', requestTypeLimitsSchema);
+  registry.register('ProviderModelLimits', providerModelLimitsSchema);
+  registry.register('CostManagementConfig', costManagementConfigSchema);
 
   // ASR provider settings schemas
   registry.register('AzureAsrSettings', azureAsrSettingsSchema);
@@ -159,6 +176,7 @@ export function getOpenAPISpec(): any {
   registry.register('ModifyVariablesEffect', modifyVariablesEffectSchema);
   registry.register('ModifyUserProfileEffect', modifyUserProfileEffectSchema);
   registry.register('ChangeVisibilityEffect', changeVisibilityEffectSchema);
+  registry.register('BanUserEffect', banUserEffectSchema);
   registry.register('VariableOperation', variableOperationSchema);
   registry.register('UserProfileOperation', userProfileOperationSchema);
   registry.register('CallToolEffect', callToolEffectSchema);
@@ -234,6 +252,9 @@ export function getOpenAPISpec(): any {
   registry.register('CreateScriptTool', createScriptToolSchema);
   registry.register('ToolType', toolTypeSchema);
   registry.register('CreateToolRequest', createToolSchema);
+  registry.register('UpdateSmartFunctionTool', updateSmartFunctionToolSchema);
+  registry.register('UpdateWebhookTool', updateWebhookToolSchema);
+  registry.register('UpdateScriptTool', updateScriptToolSchema);
   registry.register('UpdateToolRequest', updateToolBodySchema);
   registry.register('DeleteToolRequest', deleteToolBodySchema);
   registry.register('ToolResponse', toolResponseSchema);
@@ -279,6 +300,7 @@ export function getOpenAPISpec(): any {
   registry.register('LlmProviderInfo', llmProviderInfoSchema);
   registry.register('AuditLogResponse', auditLogResponseSchema);
   registry.register('AuditLogListResponse', auditLogListResponseSchema);
+  registry.register('ApiKeySettings', apiKeySettingsSchema);
   registry.register('CreateApiKeyRequest', createApiKeySchema);
   registry.register('UpdateApiKeyRequest', updateApiKeySchema);
   registry.register('DeleteApiKeyRequest', deleteApiKeyBodySchema);
@@ -319,8 +341,21 @@ export function getOpenAPISpec(): any {
   registry.register('LatencyMetric', latencyMetricSchema);
   registry.register('PercentileSet', percentileSetSchema);
   registry.register('LatencyTrendPoint', latencyTrendPointSchema);
+  registry.register('TokenUsageByEventType', tokenUsageByEventTypeSchema);
+  registry.register('TokenUsageTrendPoint', tokenUsageTrendPointSchema);
+  registry.register('SourceDimension', sourceDimensionSchema);
+  registry.register('SourceMetric', sourceMetricSchema);
+  registry.register('SourceEntry', sourceEntrySchema);
+  registry.register('SliceQueryRow', sliceQueryRowSchema);
+  registry.register('SavedSliceQuery', savedSliceQueryResponseSchema);
   const analyticsPaths = AnalyticsController.getOpenAPIPaths();
   for (const path of analyticsPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register SavedSliceQuery routes from SavedSliceQueryController
+  const savedSliceQueryPaths = SavedSliceQueryController.getOpenAPIPaths();
+  for (const path of savedSliceQueryPaths) {
     registry.registerPath(path);
   }
 
@@ -366,6 +401,15 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register ChannelCatalog routes from ChannelCatalogController
+  registry.register('ChannelCapabilities', channelCapabilitiesSchema);
+  registry.register('ChannelInfo', channelInfoSchema);
+  registry.register('ChannelCatalogResponse', channelCatalogResponseSchema);
+  const channelCatalogPaths = ChannelCatalogController.getOpenAPIPaths();
+  for (const path of channelCatalogPaths) {
+    registry.registerPath(path);
+  }
+
   // Register Environment routes from EnvironmentController
   const environmentPaths = EnvironmentController.getOpenAPIPaths();
   for (const path of environmentPaths) {
@@ -375,6 +419,28 @@ export function getOpenAPISpec(): any {
   // Register GlobalAction routes from GlobalActionController
   const globalActionPaths = GlobalActionController.getOpenAPIPaths();
   for (const path of globalActionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register SampleCopy schemas and routes from SampleCopyController
+  registry.register('CreateSampleCopyRequest', createSampleCopySchema);
+  registry.register('UpdateSampleCopyRequest', updateSampleCopyBodySchema);
+  registry.register('DeleteSampleCopyRequest', deleteSampleCopyBodySchema);
+  registry.register('SampleCopyResponse', sampleCopyResponseSchema);
+  registry.register('SampleCopyListResponse', sampleCopyListResponseSchema);
+  const sampleCopyPaths = SampleCopyController.getOpenAPIPaths();
+  for (const path of sampleCopyPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register CopyDecorator schemas and routes from CopyDecoratorController
+  registry.register('CreateCopyDecoratorRequest', createCopyDecoratorSchema);
+  registry.register('UpdateCopyDecoratorRequest', updateCopyDecoratorBodySchema);
+  registry.register('DeleteCopyDecoratorRequest', deleteCopyDecoratorBodySchema);
+  registry.register('CopyDecoratorResponse', copyDecoratorResponseSchema);
+  registry.register('CopyDecoratorListResponse', copyDecoratorListResponseSchema);
+  const copyDecoratorPaths = CopyDecoratorController.getOpenAPIPaths();
+  for (const path of copyDecoratorPaths) {
     registry.registerPath(path);
   }
 
@@ -455,6 +521,12 @@ export function getOpenAPISpec(): any {
   registry.register('ProjectExchangeImportResult', projectExchangeImportResultSchema);
   const projectExchangePaths = ProjectExchangeController.getOpenAPIPaths();
   for (const path of projectExchangePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register WebRTC signaling routes
+  const webRTCPaths = WebRTCChannelHost.getOpenAPIPaths();
+  for (const path of webRTCPaths) {
     registry.registerPath(path);
   }
 

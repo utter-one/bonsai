@@ -179,6 +179,10 @@ The default limit is **10 attempts per 15 minutes** per IP. Configurable via `RA
 
 ### Voice Input Flow
 
+There are two voice input modes depending on whether the project has `asrConfig.serverVad` configured.
+
+#### Standard Mode (client-managed turns)
+
 Voice input uses a three-step flow:
 
 **1. Start voice input:**
@@ -225,6 +229,39 @@ Response includes `inputTurnId`.
   "inputTurnId": "turn-1"
 }
 ```
+
+#### Server-Side VAD Mode (server-managed turns)
+
+When the project has `asrConfig.serverVad` configured, the server handles speech detection and turn lifecycle automatically using the [Silero VAD](https://github.com/snakers4/silero-vad) model.
+
+**How it works:**
+
+1. After connecting and starting a conversation, the client streams audio continuously via `send_user_voice_chunk` — no `start_user_voice_input` or `end_user_voice_input` calls are needed.
+2. When the server detects the start of speech, it generates a server-side `inputTurnId` and begins ASR recognition automatically.
+3. When silence exceeds `autoEndSilenceDurationMs`, the server finalises the utterance and processes the AI response.
+4. Once the AI response is complete and the conversation returns to `awaiting_user_input`, the VAD resets and is ready for the next utterance.
+
+**Client flow in VAD mode:**
+
+```json
+{
+  "requestId": "req-7",
+  "type": "send_user_voice_chunk",
+  "sessionId": "session-abc",
+  "conversationId": "conv-123",
+  "audioData": "<base64-encoded-audio>",
+  "ordinal": 0
+}
+```
+
+`inputTurnId` is **optional** in VAD mode — the server assigns it server-side and includes it in all downstream events (`user_transcribed_chunk`, `conversation_event`, etc.).
+
+**Important notes:**
+
+- The ASR input format must be PCM (`pcm_8000`, `pcm_16000`, `pcm_32000`, or `pcm_48000`) for server VAD to activate. If the ASR provider requires a non-PCM format, VAD is disabled and standard mode is used as a fallback.
+- `start_user_voice_input` and `end_user_voice_input` are accepted but treated as no-ops in VAD mode.
+- Audio sent while the conversation is in `awaiting_user_input` state (before speech is detected) is silently buffered by the VAD — no error is returned.
+- Configuring `serverVad` automatically disables the need for clients to perform their own silence detection.
 
 ### User Transcription Updates (Server Push)
 
@@ -486,7 +523,7 @@ The `eventData.metadata` object of `message`, `classification`, `transformation`
 
 Supported audio formats for voice chunks:
 
-`mp3`, `opus`, `aac`, `flac`, `wav`, `pcm_8000`, `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`, `pcm_48000`, `mulaw`, `alaw`, `linear16`
+`mp3`, `opus`, `aac`, `flac`, `wav`, `pcm_8000`, `pcm_16000`, `pcm_22050`, `pcm_24000`, `pcm_44100`, `pcm_48000`, `mulaw`, `alaw`
 
 ## Parameter Value Types
 

@@ -108,3 +108,47 @@ export class TooManyRequestsError extends Error {
     this.name = 'TooManyRequestsError';
   }
 }
+
+/**
+ * Error thrown when a user is banned and cannot perform the requested operation
+ */
+export class UserBannedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UserBannedError';
+  }
+}
+
+/**
+ * Error thrown when a resource with the same unique identifier already exists
+ */
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
+/** A single field-level validation error detail, compatible with Zod issue format */
+export type ValidationErrorDetail = {
+  code: string;
+  path: (string | number)[];
+  message: string;
+  origin?: string;
+  minimum?: number;
+  inclusive?: boolean;
+};
+
+/**
+ * Error thrown when business-logic validation fails, returning structured field-level details
+ * compatible with the Zod validation error format expected by clients
+ */
+export class ValidationError extends Error {
+  details: ValidationErrorDetail[];
+
+  constructor(message: string, details: ValidationErrorDetail[]) {
+    super(message);
+    this.name = 'ValidationError';
+    this.details = details;
+  }
+}

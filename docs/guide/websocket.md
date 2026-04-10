@@ -197,6 +197,23 @@ Voice input uses a three-step streaming protocol:
 }
 ```
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: start_user_voice_input
+    S->>C: start_user_voice_input { inputTurnId }
+    loop Audio streaming
+        C->>S: send_user_voice_chunk { audioData, ordinal }
+        S-->>C: user_transcribed_chunk { chunkText, isFinal }
+    end
+    C->>S: end_user_voice_input
+    S->>C: start_ai_generation_output { outputTurnId }
+    S-->>C: ai_transcribed_chunk (xN streamed)
+    S-->>C: send_ai_voice_chunk (xN streamed)
+    S->>C: end_ai_generation_output
+```
+
 ### ASR Transcription Updates
 
 When `receiveTranscriptionUpdates` is enabled, the server sends interim and final transcriptions:
@@ -408,28 +425,26 @@ Errors are returned with a standard structure:
 
 ## Connection Flow Summary
 
-```
-Client                    Server
-  │                         │
-  │──── connect ──────────►│
-  │──── auth ─────────────►│
-  │◄──── auth response ────│
-  │                         │
-  │── start_conversation ─►│
-  │◄── conversation started │
-  │                         │
-  │◄── start_ai_generation  │  (if enterBehavior = generate_response)
-  │◄── ai_transcribed_chunk │  (streamed)
-  │◄── send_ai_voice_chunk  │  (streamed)
-  │◄── end_ai_generation    │
-  │                         │
-  │── send_user_text_input ►│
-  │◄── input acknowledged   │
-  │◄── start_ai_generation  │
-  │◄── ai chunks...         │
-  │◄── end_ai_generation    │
-  │                         │
-  │── end_conversation ────►│
-  │◄── conversation ended   │
-  │                         │
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: connect (WebSocket /ws)
+    C->>S: auth { apiKey, sessionSettings }
+    S->>C: auth { sessionId, projectSettings }
+    C->>S: start_conversation { userId, stageId }
+    S->>C: start_conversation { conversationId }
+    Note over C,S: If enterBehavior = generate_response
+    S->>C: start_ai_generation_output
+    S-->>C: ai_transcribed_chunk (xN streamed)
+    S-->>C: send_ai_voice_chunk (xN streamed)
+    S->>C: end_ai_generation_output
+    C->>S: send_user_text_input { text }
+    S->>C: send_user_text_input { inputTurnId }
+    S->>C: start_ai_generation_output
+    S-->>C: ai_transcribed_chunk (xN streamed)
+    S-->>C: send_ai_voice_chunk (xN streamed)
+    S->>C: end_ai_generation_output
+    C->>S: end_conversation
+    S->>C: end_conversation { success }
 ```

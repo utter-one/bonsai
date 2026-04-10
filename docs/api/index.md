@@ -47,6 +47,8 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 
 ### Data & Content
 - [Knowledge](./knowledge) — Knowledge base categories and items
+- [Sample Copies](./sample-copies) — Pre-written variant answers with classifier-driven selection
+- [Copy Decorators](./copy-decorators) — Templates that wrap selected sample copy content
 - [Conversations](./conversations) — Conversation history and events
 - [Users](./users) — End-user management
 - [Issues](./issues) — Issue tracking
@@ -60,5 +62,6 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 - [Audit Logs](./audit-logs) — Audit trail
 
 ### Real-time
-- [WebSocket](./websocket) — Real-time conversational AI protocol
+- [WebSocket](./websocket) — Real-time conversational AI protocol (WebSocket)
+- [WebRTC](./webrtc) — Real-time conversational AI protocol (WebRTC DataChannel, lower audio latency)
 

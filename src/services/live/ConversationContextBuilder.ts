@@ -1,8 +1,8 @@
 import { and, asc, eq, param } from "drizzle-orm";
 import { conversationEvents, db, projects, stages, users } from "../../db";
-import { Connection } from "../../websocket/ConnectionManager";
+import { Session } from "../../channels/SessionManager";
 import { inject, singleton } from "tsyringe";
-import { Conversation, GlobalAction, Guardrail, Stage } from "../../types/models";
+import { Conversation, GlobalAction, Guardrail, SampleCopy, Stage } from "../../types/models";
 import { FieldDescriptor } from "../../types/parameters";
 import { StageAction } from "../../types/actions";
 import { ConversationEventData } from "../../types/conversationEvents";
@@ -12,6 +12,7 @@ import { isActionActive } from "../../utils/actions";
 import { ActionClassificationResult } from "../../types/classification";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import type { TimeContext, CalendarDay } from "../../types/TimeContext";
+import { SampleCopyDistributor } from "./SampleCopyDistributor";
 
 /**
  * Recursively converts a single FieldDescriptor into a pseudo-JSON value.
@@ -66,6 +67,12 @@ export type FaqItem = {
   answer: string;
 };
 
+export type SampleCopyItem = {
+  name: string;
+  trigger: string;
+  content: string[];
+}
+
 /**
  * A single conversation event entry exposed to the script sandbox.
  * Contains all event types in chronological order, including messages.
@@ -90,11 +97,14 @@ export type ConversationContext = {
   /** ID of the project the conversation belongs to */
   projectId: string;
 
+  /** ID of the user associated with this conversation */
+  userId: string;
+
   /** Stage variables */
   vars: Record<string, any>;
 
   /** Full stage variables for referencing in other stages */
-  stageVars?: Record<string, Record<string, any>>; 
+  stageVars?: Record<string, Record<string, any>>;
 
   /** User profile data */
   userProfile: Record<string, any>;
@@ -139,6 +149,15 @@ export type ConversationContext = {
 
   /** FAQ items gathered from knowledge base categories triggered during this conversation turn */
   faq?: FaqItem[];
+
+  /** All sample copy entities for the project */
+  sampleCopy?: SampleCopyItem[];
+
+  /** Rendered selected sample copy content */
+  copy?: string;
+ 
+  /** Raw content of the selected sample copies */
+  copyContent?: string;
 
   /**
    * Pseudo-JSON schema descriptions of context variables, populated for transformer contexts.
@@ -204,7 +223,7 @@ export class ConversationContextBuilder {
   constructor(
     @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
     @inject(HistoryBuilder) private readonly historyBuilder: HistoryBuilder,
-  ) {}
+  ) { }
 
   /**
    * Builds a rich time context object anchored to the given IANA timezone.
@@ -281,13 +300,13 @@ export class ConversationContextBuilder {
       return addDays(date, daysAhead);
     };
 
-    const nextSunday    = nextWeekday(0);
-    const nextMonday    = nextWeekday(1);
-    const nextTuesday   = nextWeekday(2);
+    const nextSunday = nextWeekday(0);
+    const nextMonday = nextWeekday(1);
+    const nextTuesday = nextWeekday(2);
     const nextWednesday = nextWeekday(3);
-    const nextThursday  = nextWeekday(4);
-    const nextFriday    = nextWeekday(5);
-    const nextSaturday  = nextWeekday(6);
+    const nextThursday = nextWeekday(4);
+    const nextFriday = nextWeekday(5);
+    const nextSaturday = nextWeekday(6);
 
     // Upcoming 14-day calendar window
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -397,11 +416,11 @@ export class ConversationContextBuilder {
     // Filter stage actions: include if triggerOnUserInput is true AND (overrideClassifierId is null OR matches classifierId) AND condition is met
     const stageActionEntries = Object.entries(stage.actions || {})
       .filter(([_, action]) => action.triggerOnUserInput && (!action.overrideClassifierId || action.overrideClassifierId === classifierId));
-    
+
     const stageActionsPromises = stageActionEntries.map(async ([id, action]) => {
       const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
       if (!isActive) return null;
-      
+
       return {
         name: action.name,
         trigger: action.classificationTrigger,
@@ -421,7 +440,7 @@ export class ConversationContextBuilder {
       .map(async action => {
         const isActive = await isActionActive(action, rawContext, this.scriptExecutor);
         if (!isActive) return null;
-        
+
         return {
           name: action.name,
           trigger: action.classificationTrigger,
@@ -492,6 +511,7 @@ export class ConversationContextBuilder {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       stageId: conversation.stageId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
@@ -554,6 +574,7 @@ export class ConversationContextBuilder {
     const context: ConversationContext = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -615,6 +636,7 @@ export class ConversationContextBuilder {
     const context: ConversationContext = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -634,7 +656,7 @@ export class ConversationContextBuilder {
 
     return context;
   }
-  
+
   /**
    * Builds context specifically for a classifier with filtered actions.
    * Only includes actions that are either not assigned to any classifier or assigned to the specific classifier.
@@ -666,6 +688,7 @@ export class ConversationContextBuilder {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -715,15 +738,18 @@ export class ConversationContextBuilder {
    */
   async buildContextForGuardrailClassifier(conversation: Conversation, stage: Stage, guardrails: Guardrail[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
     // Load user data
-    const user = await db.query.users.findFirst({
-      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
-    });
-
-    // Load project constants
-    const project = await db.query.projects.findFirst({
-      where: eq(projects.id, conversation.projectId),
-      columns: { constants: true, timezone: true, languageCode: true },
-    });
+    const [user, project, projectSampleCopies] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+      db.query.sampleCopies.findMany({
+        where: (table, { eq }) => eq(table.projectId, conversation.projectId),
+      }),
+    ]);
 
     // Build raw context for condition evaluation
     const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
@@ -747,11 +773,22 @@ export class ConversationContextBuilder {
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
+      sampleCopy: projectSampleCopies
+        .filter(sc =>
+          (!sc.stages || (sc.stages as string[]).length === 0 || (sc.stages as string[]).includes(stage.id))
+          && (sc.agents === null || (sc.agents as string[]).length === 0 || (sc.agents as string[]).includes(stage.agentId))
+        )
+        .map(sc => ({
+          name: sc.name,
+          trigger: sc.promptTrigger,
+          content: sc.content,
+        })),
       history: [],
       events: [],
       actions: {},
@@ -774,6 +811,74 @@ export class ConversationContextBuilder {
     };
 
     // Get all events from database; history is a filtered view on message events
+    const allEvents = await db.query.conversationEvents.findMany({
+      where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
+      orderBy: asc(conversationEvents.timestamp),
+    });
+    context.events = allEvents.map(e => ({
+      id: e.id,
+      eventType: e.eventType,
+      timestamp: e.timestamp.toISOString(),
+      eventData: e.eventData as ConversationEventData,
+      metadata: e.metadata as Record<string, any> | undefined,
+    }));
+    context.history = await this.historyBuilder.buildHistory(context.events, context);
+
+    return context;
+  }
+
+  /**
+   * Builds context specifically for a sample copy classifier.
+   * Only includes sample copies that are already filtered by the current agent and stage.
+   * @param conversation - Conversation entity
+   * @param stage - Stage entity with agent relation
+   * @param sampleCopies - Array of sample copies pre-filtered for the current agent and stage
+   * @param userInput - The user input text
+   * @param originalUserInput - The original user input before any transformations
+   */
+  async buildContextForSampleCopyClassifier(conversation: Conversation, stage: Stage, sampleCopies: SampleCopy[], userInput?: string, originalUserInput?: string): Promise<ConversationContext> {
+    const [user, project] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+    ]);
+
+    const rawContext = this.buildRawContext(conversation, stage, user?.profile || {}, project?.constants || {}, this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null));
+    rawContext.userInput = userInput;
+    rawContext.originalUserInput = originalUserInput;
+
+    const context = {
+      conversationId: conversation.id,
+      projectId: conversation.projectId,
+      userId: conversation.userId,
+      vars: conversation.stageVars[conversation.stageId] || {},
+      stageVars: conversation.stageVars,
+      userProfile: user?.profile || {},
+      consts: project?.constants || {},
+      agent: (stage as any).agent?.prompt,
+      sampleCopy: sampleCopies.map(sc => ({
+        name: sc.name,
+        trigger: sc.promptTrigger,
+        content: sc.content,
+      })),
+      history: [],
+      events: [],
+      actions: {},
+      userInput,
+      originalUserInput,
+      results: {
+        webhooks: {},
+        tools: {},
+      },
+      time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
+      project: this.buildProjectContext(project?.timezone ?? null, project?.languageCode ?? null),
+      stage: await this.buildStageContext(stage, rawContext),
+    };
+
     const allEvents = await db.query.conversationEvents.findMany({
       where: and(eq(conversationEvents.projectId, conversation.projectId), eq(conversationEvents.conversationId, conversation.id)),
       orderBy: asc(conversationEvents.timestamp),
@@ -838,6 +943,7 @@ export class ConversationContextBuilder {
     const context: ConversationContext = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: stageVars,
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
@@ -887,26 +993,46 @@ export class ConversationContextBuilder {
    * @param faq - Optional FAQ items from knowledge base to include in the context
    * @returns ConversationContext with all relevant data for processing user input and generating responses, including all actions that can be triggered by user input.
    */
-  async buildContextForUserInput(conversation: Conversation, stage: Stage, actions: ActionClassificationResult[], userInput: string, originalUserInput: string, faq?: FaqItem[]): Promise<ConversationContext> {
-    // Load user data
-    const user = await db.query.users.findFirst({
-      where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
-    });
-
-    // Load project constants
-    const project = await db.query.projects.findFirst({
-      where: eq(projects.id, conversation.projectId),
-      columns: { constants: true, timezone: true, languageCode: true },
-    });
+  async buildContextForUserInput(conversation: Conversation, 
+    stage: Stage, 
+    actions: ActionClassificationResult[], 
+    userInput: string, 
+    originalUserInput: string, 
+    sampleCopies: SampleCopy[],
+    copy: string,
+    copyContent: string,
+    faq?: FaqItem[],
+  ): Promise<ConversationContext> {
+    // Load user data, project constants, and all project sample copies in parallel
+    const [user, project, projectSampleCopies] = await Promise.all([
+      db.query.users.findFirst({
+        where: and(eq(users.projectId, conversation.projectId), eq(users.id, conversation.userId)),
+      }),
+      db.query.projects.findFirst({
+        where: eq(projects.id, conversation.projectId),
+        columns: { constants: true, timezone: true, languageCode: true },
+      }),
+      db.query.sampleCopies.findMany({
+        where: (table, { eq }) => eq(table.projectId, conversation.projectId),
+      }),
+    ]);
 
     const context = {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: user?.profile || {},
       consts: project?.constants || {},
       agent: (stage as any).agent?.prompt,
+      copy,
+      copyContent,
+      sampleCopy: projectSampleCopies.map(sc => ({
+        name: sc.name,
+        trigger: sc.promptTrigger,
+        content: sc.content,
+      })),
       history: [],
       events: [],
       actions: actions.reduce((acc, action) => {
@@ -954,6 +1080,7 @@ export class ConversationContextBuilder {
     return {
       conversationId: conversation.id,
       projectId: conversation.projectId,
+      userId: conversation.userId,
       vars: conversation.stageVars[conversation.stageId] || {},
       stageVars: conversation.stageVars,
       userProfile: userProfile || {}, // Not loaded in raw context
@@ -968,22 +1095,22 @@ export class ConversationContextBuilder {
       time: this.buildTimeContext((conversation.metadata?.timezone as string | undefined) ?? 'UTC'),
       project: projectContext,
       stage: {
-          id: conversation.stageId,
-          name: stage.name,
-          availableActions: stage.actions ? Object.entries(stage.actions).map(([_, action]) => ({
-            name: action.name,
-            trigger: action.classificationTrigger,
-            examples: action.examples || undefined,
-            parameters: action.parameters?.map(p => ({
-              name: p.name,
-              type: p.type,
-              description: p.description,
-              required: p.required,
-            })),
-          })) : [],
-          useKnowledge: stage.useKnowledge,
-          enterBehavior: stage.enterBehavior,
-          metadata: stage.metadata || undefined,          
+        id: conversation.stageId,
+        name: stage.name,
+        availableActions: stage.actions ? Object.entries(stage.actions).map(([_, action]) => ({
+          name: action.name,
+          trigger: action.classificationTrigger,
+          examples: action.examples || undefined,
+          parameters: action.parameters?.map(p => ({
+            name: p.name,
+            type: p.type,
+            description: p.description,
+            required: p.required,
+          })),
+        })) : [],
+        useKnowledge: stage.useKnowledge,
+        enterBehavior: stage.enterBehavior,
+        metadata: stage.metadata || undefined,
       }
     };
   }

@@ -18,7 +18,7 @@
     "emitDecoratorMetadata": true,
     "allowJs": true,
     "checkJs": false,
-    "moduleResolution": "node"
+    "moduleResolution": "bundler"
   },
   "include": [
     "src/**/*"

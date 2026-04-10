@@ -274,15 +274,16 @@ export class GuardrailService extends BaseService {
   /**
    * Retrieves all audit log entries for a specific guardrail.
    * @param guardrailId - The unique identifier of the guardrail
+   * @param projectId - The project ID the guardrail belongs to
    * @returns Array of audit log entries for the guardrail
    */
-  async getGuardrailAuditLogs(guardrailId: string): Promise<any[]> {
-    logger.debug({ guardrailId }, 'Fetching audit logs for guardrail');
+  async getGuardrailAuditLogs(guardrailId: string, projectId: string): Promise<any[]> {
+    logger.debug({ guardrailId, projectId }, 'Fetching audit logs for guardrail');
 
     try {
-      return await this.auditService.getEntityAuditLogs('guardrail', guardrailId);
+      return await this.auditService.getEntityAuditLogs('guardrail', guardrailId, projectId);
     } catch (error) {
-      logger.error({ error, guardrailId }, 'Failed to fetch guardrail audit logs');
+      logger.error({ error, guardrailId, projectId }, 'Failed to fetch guardrail audit logs');
       throw error;
     }
   }

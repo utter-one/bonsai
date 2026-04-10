@@ -14,7 +14,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
  */
 @singleton()
 export class ConversationController {
-  constructor(@inject(ConversationService) private readonly conversationService: ConversationService) {}
+  constructor(@inject(ConversationService) private readonly conversationService: ConversationService) { }
 
   /**
    * Get OpenAPI path definitions for this controller
@@ -47,7 +47,7 @@ export class ConversationController {
         path: '/api/projects/{projectId}/conversations',
         tags: ['Conversations'],
         summary: 'List conversations',
-        description: 'Retrieves a paginated list of conversations with optional filtering, sorting, and search. Supports filtering by userId, clientId, stageId, status, and timestamps.',
+        description: 'Retrieves a paginated list of conversations with optional filtering, sorting, and search. Supports filtering by userId, sessionId, stageId, status, and timestamps.',
         request: {
           query: listParamsSchema,
         },
@@ -216,7 +216,7 @@ export class ConversationController {
   private async getConversationAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = conversationRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.conversationService.getConversationAuditLogs(params.id);
+    const auditLogs = await this.conversationService.getConversationAuditLogs(params.id, params.projectId);
     res.status(200).json(auditLogs);
   }
 }

@@ -36,13 +36,13 @@ export const conversationStateSchema = z.object({
 
 /**
  * Schema for conversation response
- * Includes: id, projectId, userId, clientId, stageId, stageVars, status, statusDetails, metadata, createdAt, updatedAt
+ * Includes: id, projectId, userId, sessionId, stageId, stageVars, status, statusDetails, metadata, createdAt, updatedAt
  */
 export const conversationResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the conversation'),
   projectId: z.string().describe('Identifier of the project this conversation belongs to'),
   userId: z.string().describe('Identifier of the user associated with this conversation'),
-  clientId: z.string().describe('Client identifier for the conversation'),
+  sessionId: z.string().describe('ID of the WebSocket session that initiated this conversation'),
   stageId: z.string().describe('Current stage identifier for the conversation'),
   startingStageId: z.string().nullable().describe('Stage identifier at the start of the conversation'),
   endingStageId: z.string().nullable().describe('Stage identifier when the conversation reached a terminal state (finished/failed/aborted)'),
@@ -76,6 +76,7 @@ export const conversationEventResponseSchema = z.object({
   conversationId: z.string().describe('Identifier of the conversation this event belongs to'),
   eventType: conversationEventTypeSchema.describe('Type of the conversation event'),
   eventData: conversationEventDataSchema.describe('Event data payload'),
+  stageId: z.string().nullable().describe('ID of the stage that was active when the event occurred'),
   timestamp: z.coerce.date().describe('Timestamp when the event occurred'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata associated with the event'),
 });

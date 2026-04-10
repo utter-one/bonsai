@@ -57,12 +57,16 @@ export const deleteOperatorBodySchema = z.object({
 /**
  * Schema for updating the logged-in operator's own profile
  * Allows changing display name and/or password
- * If changing password, old password is required for verification
+ * If changing password, old password and confirm password are required
  */
 export const updateProfileSchema = z.object({
   name: z.string().min(1).optional().describe('Updated display name for the operator user'),
   oldPassword: z.string().min(1).optional().describe('Current password (required when changing password)'),
   newPassword: z.string().min(1).optional().describe('New password to set (requires oldPassword)'),
+}).superRefine((data, ctx) => {
+  if (data.newPassword && !data.oldPassword) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['oldPassword'], message: 'Current password is required when changing password' });
+  }
 });
 
 /**

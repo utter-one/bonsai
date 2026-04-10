@@ -118,6 +118,17 @@ A stage can effectively use multiple classifiers:
 
 When multiple classifiers are involved, they all run in parallel. Actions are distributed to their respective classifiers based on the override setting, and results are merged and deduplicated.
 
+```mermaid
+flowchart TB
+    A(["User Input<br>+ available actions"]) --> B["Default Classifier<br>actions without override"]
+    A --> C["Override Classifier A<br>its assigned actions"]
+    A --> D["Override Classifier B<br>its assigned actions"]
+    B -- run in parallel --> E[Merge & Deduplicate]
+    C -- run in parallel --> E
+    D -- run in parallel --> E
+    E --> F(["Matched action IDs<br>+ extracted parameters"])
+```
+
 ## Classification Results
 
 Each classifier returns:
