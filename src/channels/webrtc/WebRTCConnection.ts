@@ -35,6 +35,8 @@ export class WebRTCConnection implements IClientConnection {
 
   private session: Session;
   private activeInputTurnId: string | null = null;
+  /** Leftover PCM bytes that did not fill a complete 10ms frame on the last push. */
+  private audioRemainder: Buffer = Buffer.alloc(0);
 
   constructor(
     private readonly controlChannel: RTCDataChannel,
@@ -250,9 +252,10 @@ export class WebRTCConnection implements IClientConnection {
   }
 
   /**
-   * Converts a 16-bit PCM Buffer to Int16Array and pushes it to the RTCAudioSource.
-   * The sample rate is derived from the session's receiveAudioFormat setting.
-   * Logs a warning and skips if the format is not a PCM variant.
+   * Converts a 16-bit PCM Buffer to fixed-size 10ms frames and pushes each frame to the
+   * RTCAudioSource. RTCAudioSource.onData requires exactly one 10ms frame per call
+   * (sampleRate / 100 samples). Incomplete frames are buffered in audioRemainder and
+   * combined with the next chunk.
    */
   private pushAudioToTrack(audioData: Buffer): void {
     const { receiveAudioFormat } = this.session.sessionSettings;
@@ -262,10 +265,27 @@ export class WebRTCConnection implements IClientConnection {
     }
     try {
       const sampleRate = pcmSampleRate(receiveAudioFormat);
-      const samples = new Int16Array(audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength));
-      this.audioSource.onData({ samples, sampleRate, bitsPerSample: 16, channelCount: 1, numberOfFrames: samples.length });
-    } catch (error) {
-      logger.error({ error, conversationId: this.session?.conversationId, sessionId: this.session?.id }, 'WebRTCConnection failed to push audio to track');
+      const frameSamples = sampleRate / 100;   // 10ms per frame
+      const frameBytes = frameSamples * 2;     // 16-bit signed LE = 2 bytes per sample
+
+      const combined = this.audioRemainder.length > 0
+        ? Buffer.concat([this.audioRemainder, audioData])
+        : audioData;
+
+      let offset = 0;
+      while (offset + frameBytes <= combined.length) {
+        // .slice() creates a copy with its own ArrayBuffer — node-wrtc checks samples.buffer.byteLength
+        // and rejects a view into Node's shared buffer pool whose byteLength >> frameBytes.
+        const samples = new Int16Array(combined.buffer, combined.byteOffset + offset, frameSamples).slice();
+        this.audioSource.onData({ samples, sampleRate, bitsPerSample: 16, channelCount: 1 });
+        offset += frameBytes;
+      }
+
+      this.audioRemainder = combined.length > offset
+        ? Buffer.from(combined.buffer, combined.byteOffset + offset, combined.length - offset)
+        : Buffer.alloc(0);
+    } catch (err) {
+      logger.error({ err, conversationId: this.session?.conversationId, sessionId: this.session?.id }, 'WebRTCConnection failed to push audio to track');
     }
   }
 }

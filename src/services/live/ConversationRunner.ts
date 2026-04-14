@@ -195,7 +195,7 @@ export class ConversationRunner {
   private asrPreWarmPromise: Promise<void> | null = null;
 
   /** True when server-side VAD is active for this session. VAD owns the turn lifecycle when active. */
-  private get isVadMode(): boolean {
+  get isVadMode(): boolean {
     return this.vadProcessor !== null;
   }
 

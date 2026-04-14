@@ -10,6 +10,7 @@ import { IpRateLimiter } from '../../IpRateLimiter';
 import { WebRTCConnection } from './WebRTCConnection';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { BaseInputMessage } from '../websocket/contracts/common';
+import { isPcmFormat } from '../../services/audio/AudioFormatUtils';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { logger } from '../../utils/logger';
@@ -252,9 +253,14 @@ export class WebRTCChannelHost {
     if (audioSink) {
       audioSink.ondata = (data: RTCAudioSinkData) => {
         if (!session?.conversationId || !session?.runner) return;
-        const pcmBuffer = Buffer.from(data.samples.buffer.slice(data.samples.byteOffset, data.samples.byteOffset + data.samples.byteLength));
-        session.runner.receiveUserVoiceData(webrtcConnection.getActiveInputTurnId() ?? '', pcmBuffer).catch((err) => {
-          logger.error({ error: err, sessionId: session?.id }, 'WebRTC failed to process inbound audio frame');
+        // In VAD mode the runner manages turn lifecycle internally and must receive audio
+        // continuously. In non-VAD mode only forward when the client has an active voice
+        // input turn; forwarding without one would throw inside the runner (wrong state).
+        const activeInputTurnId = webrtcConnection.getActiveInputTurnId();
+        if (activeInputTurnId === null && !session.runner.isVadMode) return;
+        const pcmBuffer = Buffer.from(data.samples.buffer, data.samples.byteOffset, data.samples.byteLength);
+        session.runner.receiveUserVoiceData(activeInputTurnId ?? '', pcmBuffer).catch((err) => {
+          logger.error({ err, sessionId: session?.id }, 'WebRTC failed to process inbound audio frame');
         });
       };
     }
@@ -314,6 +320,17 @@ export class WebRTCChannelHost {
       },
       sendError: (error: string, correlationId?: string) => connection.sendError(error, correlationId),
     };
+
+    // RTCAudioSink always delivers Opus-native PCM at 48 kHz regardless of what the client
+    // declared in sendAudioFormat, so override it before the ConversationRunner initialises
+    // its inbound audio pipeline (VAD / ASR). If the client requested a non-PCM receiveAudioFormat
+    // (e.g. opus), fall back to pcm_16000 because RTCAudioSource.onData requires raw PCM.
+    if (wsMessage.type === 'start_conversation') {
+      session.sessionSettings.sendAudioFormat = 'pcm_48000';
+      if (!isPcmFormat(session.sessionSettings.receiveAudioFormat)) {
+        session.sessionSettings.receiveAudioFormat = 'pcm_16000';
+      }
+    }
 
     await this.dispatcher.dispatch(calMessage, context);
   }
