@@ -34,6 +34,7 @@ Content-Type: application/json
 | `conversationTimeoutSeconds` | `integer` (min: 0) | No | Inactivity timeout in seconds. Active conversations with no new events for this duration are automatically aborted. Set to `0` or omit to disable. Negative values are rejected. |
 | `autoCreateUsers` | `boolean` | No (default: `false`) | When enabled, users are automatically created on first WebSocket connection if they do not exist |
 | `defaultGuardrailClassifierId` | `string` | No | ID of the classifier used to evaluate guardrails for all conversations in this project |
+| `startingStageId` | `string` | No | ID of the stage to start new conversations at when no `stageId` is provided at conversation start time. Acts as the project-level default starting stage. |
 
 **Response** `201 Created` — [Project Response](#project-response)
 
@@ -99,6 +100,7 @@ All fields from the create body are optional. `version` is required for optimist
 | `conversationTimeoutSeconds` | `integer` (min: 0) or `null` | No | Updated inactivity timeout in seconds. Set to `0` or `null` to disable. |
 | `autoCreateUsers` | `boolean` | No | Updated auto-create users setting |
 | `defaultGuardrailClassifierId` | `string` or `null` | No | Updated guardrail classifier ID. Set to `null` to disable. |
+| `startingStageId` | `string` or `null` | No | Updated default starting stage ID. Set to `null` to remove. |
 
 **Response** `200 OK` — [Project Response](#project-response)
 
@@ -138,6 +140,7 @@ DELETE /api/projects/:id
 | `conversationTimeoutSeconds` | `integer` | Yes | Inactivity timeout in seconds. `null` or `0` means no timeout. |
 | `autoCreateUsers` | `boolean` | No | Whether users are auto-created on first WebSocket connection |
 | `defaultGuardrailClassifierId` | `string` | Yes | Classifier ID for evaluating guardrails |
+| `startingStageId` | `string` | Yes | Default starting stage ID. `null` means no project-level default is set. |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
