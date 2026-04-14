@@ -4,6 +4,7 @@ import { openAILlmSettingsSchema } from '../../services/providers/llm/OpenAILlmP
 import { openAILegacyLlmSettingsSchema } from '../../services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmSettingsSchema } from '../../services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmSettingsSchema } from '../../services/providers/llm/GeminiLlmProvider';
+import { ollamaLlmSettingsSchema } from '../../services/providers/llm/OllamaLlmProvider';
 import { elevenLabsTtsSettingsSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
@@ -105,6 +106,7 @@ export const llmSettingsSchema = z.union([
   openAILegacyLlmSettingsSchema,
   anthropicLlmSettingsSchema,
   geminiLlmSettingsSchema,
+  ollamaLlmSettingsSchema,
 ]).openapi('LlmSettings').nullable().optional().describe('LLM provider-specific settings for this stage');
 
 // ====================
