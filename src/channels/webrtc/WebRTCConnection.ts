@@ -1,38 +1,44 @@
 import type { Session, SessionManager } from '../SessionManager';
 import type { IClientConnection } from '../IClientConnection';
 import type { CALOutputMessage } from '../messages';
+import { pcmSampleRate, isPcmFormat } from '../../services/audio/AudioFormatUtils';
 import { logger } from '../../utils/logger';
 
-/**
- * Encodes a binary audio frame for the audio DataChannel.
- *
- * Frame format: [2 bytes: turnId length as uint16 LE] [N bytes: turnId as UTF-8] [remaining: raw audio]
- */
-function encodeAudioFrame(turnId: string, audioData: Buffer): Buffer {
-  const turnIdBytes = Buffer.from(turnId, 'utf8');
-  const header = Buffer.allocUnsafe(2);
-  header.writeUInt16LE(turnIdBytes.length, 0);
-  return Buffer.concat([header, turnIdBytes, audioData]);
-}
+/** Shape of PCM audio data pushed to an RTCAudioSource. */
+type RTCAudioData = {
+  samples: Int16Array;
+  sampleRate: number;
+  bitsPerSample?: number;
+  channelCount?: number;
+  numberOfFrames?: number;
+};
+
+/** Minimal interface for the node-webrtc RTCAudioSource nonstandard API. */
+type RTCAudioSourceType = {
+  createTrack(): MediaStreamTrack;
+  onData(data: RTCAudioData): void;
+};
 
 /**
- * WebRTC DataChannel-backed implementation of {@link IClientConnection}.
+ * WebRTC-backed implementation of {@link IClientConnection}.
  *
- * Uses two RTCDataChannel instances:
- * - `control`: ordered, reliable — all JSON messages (same wire protocol as WebSocket)
- * - `audio`: unordered, no retransmits — binary audio frames for AI voice output (lower latency)
+ * Uses one named RTCDataChannel and one native WebRTC audio media track:
+ * - `control` DataChannel (ordered, reliable): all JSON messages (same wire protocol as WebSocket)
+ * - Audio media track (RTP/SRTP + Opus): bidirectional voice audio without DataChannel framing overhead
  *
- * Binary audio frame format (audio channel, outbound AI voice):
- * [2 bytes: outputTurnId length as uint16 LE] [N bytes: outputTurnId as UTF-8] [remaining: raw audio]
+ * AI voice output PCM frames are pushed into the RTCAudioSource, which handles Opus encoding
+ * and RTP packetisation before delivering audio to the client's audio track.
+ * Inbound user voice audio arrives via the RTCAudioSink wired in {@link WebRTCChannelHost}.
  */
 export class WebRTCConnection implements IClientConnection {
   readonly connectionType = 'webrtc' as const;
 
   private session: Session;
+  private activeInputTurnId: string | null = null;
 
   constructor(
     private readonly controlChannel: RTCDataChannel,
-    private readonly audioChannel: RTCDataChannel,
+    private readonly audioSource: RTCAudioSourceType,
     private readonly sessionManager: SessionManager,
   ) { }
 
@@ -46,14 +52,34 @@ export class WebRTCConnection implements IClientConnection {
   }
 
   /**
-   * Closes both DataChannels and unregisters the session.
+   * Sets the active input turn ID for correlating inbound audio with a voice input turn.
+   * @param turnId - The turn ID returned by the start_user_voice_input response.
+   */
+  setActiveInputTurnId(turnId: string): void {
+    this.activeInputTurnId = turnId;
+  }
+
+  /**
+   * Clears the active input turn ID when a voice input turn ends.
+   */
+  clearActiveInputTurnId(): void {
+    this.activeInputTurnId = null;
+  }
+
+  /**
+   * Returns the currently active input turn ID, or null if no voice input turn is active.
+   */
+  getActiveInputTurnId(): string | null {
+    return this.activeInputTurnId;
+  }
+
+  /**
+   * Closes the control DataChannel and unregisters the session.
+   * The audio media track lifecycle is managed by the RTCPeerConnection, not here.
    */
   async close(): Promise<void> {
     if (this.controlChannel.readyState === 'open') {
       this.controlChannel.close();
-    }
-    if (this.audioChannel.readyState === 'open') {
-      this.audioChannel.close();
     }
     if (this.session) {
       await this.sessionManager.unregisterSession(this.session.id);
@@ -79,8 +105,8 @@ export class WebRTCConnection implements IClientConnection {
   }
 
   /**
-   * Translates a CAL output message and sends it over the appropriate DataChannel.
-   * AI voice chunks go as binary frames on the audio DataChannel; all other messages
+   * Translates a CAL output message and sends it over the appropriate channel.
+   * AI voice chunks are pushed to the RTCAudioSource as PCM frames; all other messages
    * are JSON-serialised on the control DataChannel.
    * @param msg - The CAL output message to transmit.
    */
@@ -133,7 +159,7 @@ export class WebRTCConnection implements IClientConnection {
       }
 
       case 'send_ai_voice_chunk': {
-        this.sendAudioFrame(msg.outputTurnId, msg.audioData);
+        this.pushAudioToTrack(msg.audioData);
         break;
       }
 
@@ -223,13 +249,23 @@ export class WebRTCConnection implements IClientConnection {
     }
   }
 
-  /** Encodes and sends an audio frame over the audio DataChannel. */
-  private sendAudioFrame(turnId: string, audioData: Buffer): void {
+  /**
+   * Converts a 16-bit PCM Buffer to Int16Array and pushes it to the RTCAudioSource.
+   * The sample rate is derived from the session's receiveAudioFormat setting.
+   * Logs a warning and skips if the format is not a PCM variant.
+   */
+  private pushAudioToTrack(audioData: Buffer): void {
+    const { receiveAudioFormat } = this.session.sessionSettings;
+    if (!receiveAudioFormat || !isPcmFormat(receiveAudioFormat)) {
+      logger.warn({ receiveAudioFormat, sessionId: this.session?.id }, 'WebRTCConnection: receiveAudioFormat is not PCM, skipping audio frame');
+      return;
+    }
     try {
-      const frame = encodeAudioFrame(turnId, audioData);
-      this.audioChannel.send(frame.buffer as ArrayBuffer);
+      const sampleRate = pcmSampleRate(receiveAudioFormat);
+      const samples = new Int16Array(audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength));
+      this.audioSource.onData({ samples, sampleRate, bitsPerSample: 16, channelCount: 1, numberOfFrames: samples.length });
     } catch (error) {
-      logger.error({ error, conversationId: this.session?.conversationId, sessionId: this.session?.id }, 'WebRTCConnection failed to send audio frame');
+      logger.error({ error, conversationId: this.session?.conversationId, sessionId: this.session?.id }, 'WebRTCConnection failed to push audio to track');
     }
   }
 }
