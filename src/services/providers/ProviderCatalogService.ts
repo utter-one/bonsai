@@ -11698,6 +11698,23 @@ export class ProviderCatalogService {
           { id: 'grok-2-vision-1212', displayName: 'Grok 2 Vision', description: 'Grok 2 variant with vision capabilities for image understanding', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: true, supportsReasoning: false, contextWindow: 32768 },
         ],
       },
+      {
+        apiType: 'ollama',
+        displayName: 'Ollama',
+        description: 'Self-hosted open-source models via Ollama. Supports local instances (http://localhost:11434) and Ollama Cloud (https://ollama.com). Available models depend on what has been pulled on the target server — use GET /api/providers/:id/models for the live list.',
+        models: [
+          { id: 'llama3.2', displayName: 'Llama 3.2', recommended: true, description: 'Meta Llama 3.2 — fast, capable general-purpose model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false },
+          { id: 'llama3.2:1b', displayName: 'Llama 3.2 1B', description: 'Lightweight 1B parameter variant of Llama 3.2', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false },
+          { id: 'llama3.3', displayName: 'Llama 3.3', description: 'Meta Llama 3.3 with improved instruction following', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false, contextWindow: 131072 },
+          { id: 'gemma3', displayName: 'Gemma 3', description: 'Google Gemma 3 open model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false },
+          { id: 'gemma3:27b', displayName: 'Gemma 3 27B', description: 'Largest Gemma 3 variant with higher capability', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false },
+          { id: 'qwen3:8b', displayName: 'Qwen 3 8B', description: 'Alibaba Qwen 3 8B with strong reasoning', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false, supportsReasoning: true },
+          { id: 'qwen3:32b', displayName: 'Qwen 3 32B', description: 'Alibaba Qwen 3 32B — larger, more capable variant', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false, supportsReasoning: true },
+          { id: 'mistral', displayName: 'Mistral 7B', description: 'Mistral 7B Instruct — efficient and highly capable', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false },
+          { id: 'phi4', displayName: 'Phi 4', description: 'Microsoft Phi 4 small language model with strong reasoning', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false, supportsReasoning: true },
+          { id: 'deepseek-r2:8b', displayName: 'DeepSeek R2 8B', description: 'DeepSeek R2 reasoning model (8B)', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false, supportsReasoning: true },
+        ],
+      },
     ];
   }
 
