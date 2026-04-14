@@ -37,6 +37,12 @@ export class WebRTCConnection implements IClientConnection {
   private activeInputTurnId: string | null = null;
   /** Leftover PCM bytes that did not fill a complete 10ms frame on the last push. */
   private audioRemainder: Buffer = Buffer.alloc(0);
+  /** Queue of 10ms PCM frames waiting to be delivered to the RTCAudioSource. */
+  private frameQueue: Int16Array[] = [];
+  /** setInterval handle for the real-time audio scheduler (one frame per 10ms tick). */
+  private schedulerInterval: ReturnType<typeof setInterval> | null = null;
+  /** Sample rate negotiated when the scheduler was started; used by the interval callback. */
+  private schedulerSampleRate: number = 0;
 
   constructor(
     private readonly controlChannel: RTCDataChannel,
@@ -76,10 +82,11 @@ export class WebRTCConnection implements IClientConnection {
   }
 
   /**
-   * Closes the control DataChannel and unregisters the session.
+   * Closes the control DataChannel, stops the audio scheduler, and unregisters the session.
    * The audio media track lifecycle is managed by the RTCPeerConnection, not here.
    */
   async close(): Promise<void> {
+    this.stopAudioScheduler();
     if (this.controlChannel.readyState === 'open') {
       this.controlChannel.close();
     }
@@ -166,6 +173,8 @@ export class WebRTCConnection implements IClientConnection {
       }
 
       case 'end_ai_generation_output': {
+        // Flush any sub-frame audio remainder so the last few ms of the turn are heard.
+        this.flushAudioRemainder();
         this.sendControl({
           type: 'end_ai_generation_output',
           sessionId,
@@ -252,10 +261,10 @@ export class WebRTCConnection implements IClientConnection {
   }
 
   /**
-   * Converts a 16-bit PCM Buffer to fixed-size 10ms frames and pushes each frame to the
-   * RTCAudioSource. RTCAudioSource.onData requires exactly one 10ms frame per call
-   * (sampleRate / 100 samples). Incomplete frames are buffered in audioRemainder and
-   * combined with the next chunk.
+   * Enqueues 10ms PCM frames from the incoming Buffer into the audio scheduler's frame queue.
+   * Frames are dequeued and delivered to RTCAudioSource at real-time pace (one per 10ms tick)
+   * to avoid overflowing the source's internal ring buffer.
+   * Sub-frame leftover bytes are held in audioRemainder and prepended to the next chunk.
    */
   private pushAudioToTrack(audioData: Buffer): void {
     const { receiveAudioFormat } = this.session.sessionSettings;
@@ -263,29 +272,71 @@ export class WebRTCConnection implements IClientConnection {
       logger.warn({ receiveAudioFormat, sessionId: this.session?.id }, 'WebRTCConnection: receiveAudioFormat is not PCM, skipping audio frame');
       return;
     }
-    try {
-      const sampleRate = pcmSampleRate(receiveAudioFormat);
-      const frameSamples = sampleRate / 100;   // 10ms per frame
-      const frameBytes = frameSamples * 2;     // 16-bit signed LE = 2 bytes per sample
+    const sampleRate = pcmSampleRate(receiveAudioFormat);
+    const frameSamples = sampleRate / 100;   // 10ms per frame
+    const frameBytes = frameSamples * 2;     // 16-bit LE = 2 bytes per sample
 
-      const combined = this.audioRemainder.length > 0
-        ? Buffer.concat([this.audioRemainder, audioData])
-        : audioData;
+    this.ensureAudioScheduler(sampleRate);
 
-      let offset = 0;
-      while (offset + frameBytes <= combined.length) {
-        // .slice() creates a copy with its own ArrayBuffer — node-wrtc checks samples.buffer.byteLength
-        // and rejects a view into Node's shared buffer pool whose byteLength >> frameBytes.
-        const samples = new Int16Array(combined.buffer, combined.byteOffset + offset, frameSamples).slice();
-        this.audioSource.onData({ samples, sampleRate, bitsPerSample: 16, channelCount: 1 });
-        offset += frameBytes;
-      }
+    const combined = this.audioRemainder.length > 0
+      ? Buffer.concat([this.audioRemainder, audioData])
+      : audioData;
 
-      this.audioRemainder = combined.length > offset
-        ? Buffer.from(combined.buffer, combined.byteOffset + offset, combined.length - offset)
-        : Buffer.alloc(0);
-    } catch (err) {
-      logger.error({ err, conversationId: this.session?.conversationId, sessionId: this.session?.id }, 'WebRTCConnection failed to push audio to track');
+    let offset = 0;
+    while (offset + frameBytes <= combined.length) {
+      // .slice() gives the frame its own ArrayBuffer — node-wrtc validates samples.buffer.byteLength.
+      const samples = new Int16Array(combined.buffer, combined.byteOffset + offset, frameSamples).slice();
+      this.frameQueue.push(samples);
+      offset += frameBytes;
     }
+
+    this.audioRemainder = combined.length > offset
+      ? Buffer.from(combined.buffer, combined.byteOffset + offset, combined.length - offset)
+      : Buffer.alloc(0);
+  }
+
+  /**
+   * Pads the current audioRemainder with silence to a full 10ms frame and enqueues it.
+   * Called at end_ai_generation_output so the last few ms of a TTS turn are not silently dropped.
+   */
+  private flushAudioRemainder(): void {
+    if (this.audioRemainder.length === 0 || this.schedulerSampleRate === 0) return;
+    const frameSamples = this.schedulerSampleRate / 100;
+    const frameBytes = frameSamples * 2;
+    const padded = Buffer.alloc(frameBytes); // zero-filled = silence padding
+    this.audioRemainder.copy(padded);
+    this.frameQueue.push(new Int16Array(padded.buffer, 0, frameSamples));
+    this.audioRemainder = Buffer.alloc(0);
+  }
+
+  /**
+   * Starts the real-time audio scheduler if not already running.
+   * The scheduler dequeues one 10ms frame per tick and delivers it to RTCAudioSource.
+   */
+  private ensureAudioScheduler(sampleRate: number): void {
+    if (this.schedulerInterval !== null) return;
+    this.schedulerSampleRate = sampleRate;
+    this.schedulerInterval = setInterval(() => {
+      const frame = this.frameQueue.shift();
+      if (!frame) return;
+      try {
+        this.audioSource.onData({ samples: frame, sampleRate: this.schedulerSampleRate, bitsPerSample: 16, channelCount: 1 });
+      } catch (err) {
+        logger.error({ err, sessionId: this.session?.id }, 'WebRTCConnection audio scheduler error');
+      }
+    }, 10);
+  }
+
+  /**
+   * Stops the real-time audio scheduler and discards any queued frames.
+   * Called on connection close.
+   */
+  private stopAudioScheduler(): void {
+    if (this.schedulerInterval !== null) {
+      clearInterval(this.schedulerInterval);
+      this.schedulerInterval = null;
+    }
+    this.frameQueue = [];
+    this.audioRemainder = Buffer.alloc(0);
   }
 }
