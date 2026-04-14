@@ -9,6 +9,7 @@ import { openAILlmProviderConfigSchema } from '../../services/providers/llm/Open
 import { openAILegacyLlmProviderConfigSchema } from '../../services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmProviderConfigSchema } from '../../services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmProviderConfigSchema } from '../../services/providers/llm/GeminiLlmProvider';
+import { ollamaLlmProviderConfigSchema } from '../../services/providers/llm/OllamaLlmProvider';
 import { elevenLabsTtsProviderConfigSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsProviderConfigSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsProviderConfigSchema } from '../../services/providers/tts/DeepgramTtsProvider';
@@ -39,6 +40,7 @@ export const llmProviderConfigSchema = z.union([
   openAILegacyLlmProviderConfigSchema,
   anthropicLlmProviderConfigSchema,
   geminiLlmProviderConfigSchema,
+  ollamaLlmProviderConfigSchema,
 ]).describe('LLM provider configuration');
 
 /**
