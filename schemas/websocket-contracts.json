@@ -865,7 +865,7 @@
         },
         "stageId": {
           "type": "string",
-          "description": "Stage ID to initiate the conversation at a specific stage"
+          "description": "Stage ID to initiate the conversation at a specific stage. When omitted, falls back to the project-level default starting stage."
         },
         "timezone": {
           "type": "string",
@@ -883,7 +883,6 @@
       "required": [
         "type",
         "userId",
-        "stageId",
         "requestId",
         "sessionId"
       ]

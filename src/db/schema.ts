@@ -123,6 +123,7 @@ export const projects = pgTable('projects', {
   sampleCopyConfig: jsonb('sample_copy_config').$type<{
     defaultClassifierId?: string;
   }>(),
+  startingStageId: text('starting_stage_id'),
   conversationTimeoutSeconds: integer('conversation_timeout_seconds'),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
