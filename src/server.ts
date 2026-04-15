@@ -29,6 +29,7 @@ import { ChannelCatalogController } from './http/controllers/ChannelCatalogContr
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
+import { FunnelController } from './http/controllers/FunnelController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { MigrationController } from './http/controllers/MigrationController';
@@ -156,6 +157,9 @@ export function createApp(): express.Application {
 
   const savedSliceQueryController = container.resolve(SavedSliceQueryController);
   savedSliceQueryController.registerRoutes(app);
+
+  const funnelController = container.resolve(FunnelController);
+  funnelController.registerRoutes(app);
 
   const classifierController = container.resolve(ClassifierController);
   classifierController.registerRoutes(app);

@@ -480,6 +480,23 @@ export const savedSliceQueries = pgTable('saved_slice_queries', {
   index('idx_saved_slice_queries_operator_id').on(table.operatorId),
 ]);
 
+// SavedFunnelQuery table
+export const savedFunnelQueries = pgTable('saved_funnel_queries', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  operatorId: text('operator_id').references(() => operators.id, { onDelete: 'set null' }),
+  query: jsonb('query').notNull().$type<Record<string, any>>(),
+  isShared: boolean('is_shared').notNull().default(false),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('saved_funnel_queries_project_id_name_unique').on(table.projectId, table.name),
+  index('idx_saved_funnel_queries_project_id').on(table.projectId),
+  index('idx_saved_funnel_queries_operator_id').on(table.operatorId),
+]);
+
 export type ArtifactType = 'user_voice' | 'user_transcript' | 'ai_voice' | 'ai_transcript' | 'tool_input' | 'tool_output' | 'other';
 
 // ConversationArtifact table
@@ -550,6 +567,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   sampleCopies: many(sampleCopies),
   copyDecorators: many(copyDecorators),
   savedSliceQueries: many(savedSliceQueries),
+  savedFunnelQueries: many(savedFunnelQueries),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -691,6 +709,17 @@ export const savedSliceQueriesRelations = relations(savedSliceQueries, ({ one })
   }),
   operator: one(operators, {
     fields: [savedSliceQueries.operatorId],
+    references: [operators.id],
+  }),
+}));
+
+export const savedFunnelQueriesRelations = relations(savedFunnelQueries, ({ one }) => ({
+  project: one(projects, {
+    fields: [savedFunnelQueries.projectId],
+    references: [projects.id],
+  }),
+  operator: one(operators, {
+    fields: [savedFunnelQueries.operatorId],
     references: [operators.id],
   }),
 }));
