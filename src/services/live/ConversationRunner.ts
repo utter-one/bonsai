@@ -6,7 +6,7 @@ import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS 
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
 import { conversations, users, sampleCopies } from "../../db/schema";
-import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility } from "../../types/conversationEvents";
+import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility, VariablesUpdatedEventData } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
@@ -1321,6 +1321,9 @@ export class ConversationRunner {
     await db.update(conversations)
       .set({ stageVars: this.conversation.stageVars, updatedAt: new Date() })
       .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+
+    const variablesUpdatedEventData: VariablesUpdatedEventData = { sourceActionName: 'set_var', changedVariableNames: [variableName], variables: this.conversation.stageVars?.[stageId] ?? {} };
+    await this.saveAndSendEvent('variables_updated', variablesUpdatedEventData);
 
     logger.debug({ conversationId: this.conversation.id, stageId, variableName }, `Successfully set variable ${variableName}`);
   }

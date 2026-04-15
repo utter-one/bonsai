@@ -87,6 +87,8 @@ import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
 import { savedSliceQueryResponseSchema } from './http/contracts/savedSliceQuery';
+import { FunnelController } from './http/controllers/FunnelController';
+import { funnelStepSchema, funnelQuerySchema, funnelStepResultSchema, funnelQueryResponseSchema, savedFunnelQueryResponseSchema } from './http/contracts/funnels';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
@@ -358,6 +360,17 @@ export function getOpenAPISpec(): any {
   // Register SavedSliceQuery routes from SavedSliceQueryController
   const savedSliceQueryPaths = SavedSliceQueryController.getOpenAPIPaths();
   for (const path of savedSliceQueryPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Funnel analytics schemas and routes from FunnelController
+  registry.register('FunnelStep', funnelStepSchema);
+  registry.register('FunnelQuery', funnelQuerySchema);
+  registry.register('FunnelStepResult', funnelStepResultSchema);
+  registry.register('FunnelQueryResponse', funnelQueryResponseSchema);
+  registry.register('SavedFunnelQuery', savedFunnelQueryResponseSchema);
+  const funnelPaths = FunnelController.getOpenAPIPaths();
+  for (const path of funnelPaths) {
     registry.registerPath(path);
   }
 

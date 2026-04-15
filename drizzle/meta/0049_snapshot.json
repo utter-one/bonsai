@@ -1,6 +1,6 @@
-{
-  "id": "9e2fe96b-b4e8-4a67-8c7c-467b5380e455",
-  "prevId": "082bbd79-1ba1-4eca-93db-4330587ebd49",
+﻿{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "prevId": "9e2fe96b-b4e8-4a67-8c7c-467b5380e455",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -55,7 +55,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -419,7 +419,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -536,7 +536,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -931,7 +931,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'initialized'"
+          "default": "\u0027initialized\u0027"
         },
         "status_reason": {
           "name": "status_reason",
@@ -1259,14 +1259,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "effects": {
           "name": "effects",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "examples": {
           "name": "examples",
@@ -1279,7 +1279,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -1378,7 +1378,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "examples": {
           "name": "examples",
@@ -1391,7 +1391,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -1617,7 +1617,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "order": {
           "name": "order",
@@ -1933,7 +1933,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "default_guardrail_classifier_id": {
           "name": "default_guardrail_classifier_id",
@@ -2162,7 +2162,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "amount": {
           "name": "amount",
@@ -2176,14 +2176,14 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'random'"
+          "default": "\u0027random\u0027"
         },
         "mode": {
           "name": "mode",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'regular'"
+          "default": "\u0027regular\u0027"
         },
         "decorator_id": {
           "name": "decorator_id",
@@ -2493,7 +2493,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'generate_response'"
+          "default": "\u0027generate_response\u0027"
         },
         "use_knowledge": {
           "name": "use_knowledge",
@@ -2507,7 +2507,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "use_global_actions": {
           "name": "use_global_actions",
@@ -2521,21 +2521,21 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "variable_descriptors": {
           "name": "variable_descriptors",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "actions": {
           "name": "actions",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'::jsonb"
+          "default": "\u0027{}\u0027::jsonb"
         },
         "default_classifier_id": {
           "name": "default_classifier_id",
@@ -2548,14 +2548,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "tags": {
           "name": "tags",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -2678,7 +2678,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'smart_function'"
+          "default": "\u0027smart_function\u0027"
         },
         "prompt": {
           "name": "prompt",
@@ -2745,14 +2745,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "tags": {
           "name": "tags",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -2891,7 +2891,8 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    }
+    },
+    "public.saved_funnel_queries": null
   },
   "enums": {},
   "schemas": {},
@@ -2993,7 +2994,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "default_guardrail_classifier_id": {
           "name": "default_guardrail_classifier_id",
@@ -3153,7 +3154,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'[]'::jsonb"
+          "default": "\u0027[]\u0027::jsonb"
         },
         "default_guardrail_classifier_id": {
           "name": "default_guardrail_classifier_id",
