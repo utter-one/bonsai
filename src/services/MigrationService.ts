@@ -654,6 +654,7 @@ export class MigrationService extends BaseService {
         moderationConfig: sql`excluded.moderation_config`,
         constants: sql`excluded.constants`,
         metadata: sql`excluded.metadata`,
+        startingStageId: sql`excluded.starting_stage_id`,
         version: sql`${projects.version} + 1`,
         updatedAt: sql`now()`,
       },

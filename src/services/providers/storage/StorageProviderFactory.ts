@@ -1,7 +1,8 @@
-import { singleton } from 'tsyringe';
+import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IStorageProvider } from './IStorageProvider';
+import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 export type StorageProviderApiType = 's3' | 'azure-blob' | 'gcs' | 'local';
 
@@ -16,6 +17,8 @@ export type StorageProviderConfig = Record<string, unknown>;
  */
 @singleton()
 export class StorageProviderFactory {
+  constructor(@inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils) {}
+
   /**
    * Create a storage provider instance
    * @param provider - Provider entity from database
@@ -27,23 +30,25 @@ export class StorageProviderFactory {
       throw new Error(`Provider ${provider.id} is not a storage provider (type: ${provider.providerType})`);
     }
 
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
     let instance: IStorageProvider;
 
     switch (provider.apiType as StorageProviderApiType) {
       case 's3':
-        instance = await this.createS3Provider(provider, settings);
+        instance = await this.createS3Provider(resolvedProvider, settings);
         break;
 
       case 'azure-blob':
-        instance = await this.createAzureBlobProvider(provider, settings);
+        instance = await this.createAzureBlobProvider(resolvedProvider, settings);
         break;
 
       case 'gcs':
-        instance = await this.createGcsProvider(provider, settings);
+        instance = await this.createGcsProvider(resolvedProvider, settings);
         break;
 
       case 'local':
-        instance = await this.createLocalProvider(provider, settings);
+        instance = await this.createLocalProvider(resolvedProvider, settings);
         break;
 
       default:

@@ -37,6 +37,7 @@ Used for: response generation (stages), classification (classifiers), data extra
 | `perplexity` | Perplexity AI |
 | `cohere` | Cohere API |
 | `xai` | xAI (Grok models) |
+| `ollama` | Ollama (local or cloud self-hosted models) |
 
 **Configuration example (OpenAI):**
 
@@ -47,6 +48,23 @@ Used for: response generation (stages), classification (classifiers), data extra
   "baseUrl": "https://api.openai.com/v1"
 }
 ```
+
+**Configuration example (Ollama — local):**
+
+```json
+{}
+```
+
+Or with explicit fields:
+
+```json
+{
+  "baseUrl": "http://localhost:11434",
+  "apiKey": "ollama"
+}
+```
+
+Both `baseUrl` and `apiKey` are optional. `baseUrl` defaults to `http://localhost:11434`; `apiKey` defaults to `"ollama"` (the dummy value ignored by local Ollama). To connect to [Ollama Cloud](https://ollama.com), set `baseUrl` to `https://ollama.com` and provide a real `apiKey`.
 
 **LLM Settings** (per-reference, not in the provider config):
 

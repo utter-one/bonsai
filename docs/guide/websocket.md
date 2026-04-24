@@ -98,7 +98,7 @@ All messages follow this structure:
 | Field | Required | Description |
 |---|---|---|
 | `userId` | Yes | User initiating the conversation |
-| `stageId` | Yes | Stage to start at |
+| `stageId` | No | Stage to start at. Falls back to the project's `startingStageId` if omitted. If neither is set, the request fails. |
 | `agentId` | No | Override the default agent |
 | `timezone` | No | IANA timezone identifier (e.g. `America/New_York`). Takes highest precedence in the timezone resolution chain: `start_conversation.timezone` → `userProfile.timezone` → `project.timezone` → UTC. Persisted for the lifetime of the conversation so resume works correctly. |
 

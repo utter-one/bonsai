@@ -5,10 +5,11 @@ import type { ApiKeyChannel } from '../../apiKeyFeatures';
 import type { AudioFormat } from '../../types/audio';
 
 /**
- * Audio formats supported by the WebRTC audio DataChannel.
+ * PCM audio formats supported by the WebRTC channel.
  *
- * The audio DataChannel carries raw binary frames (container-agnostic),
- * so only uncontainerised PCM-family formats are appropriate.
+ * The audio media track uses Opus on the wire; the RTCAudioSource/RTCAudioSink nonstandard
+ * APIs operate on 16-bit signed LE PCM internally. Only PCM-family formats are valid here
+ * because G.711 (mulaw/alaw) cannot be fed directly to RTCAudioSource.onData.
  */
 const WEBRTC_SUPPORTED_AUDIO_FORMATS: AudioFormat[] = [
   'pcm_8000',
@@ -17,19 +18,17 @@ const WEBRTC_SUPPORTED_AUDIO_FORMATS: AudioFormat[] = [
   'pcm_24000',
   'pcm_44100',
   'pcm_48000',
-  'mulaw',
-  'alaw',
 ];
 
 /**
  * ICommunicationChannel implementation for the WebRTC transport.
  *
- * Uses two named RTCDataChannels:
- * - `control` (ordered, reliable): JSON messages (same wire protocol as WebSocket)
- * - `audio` (unordered, maxRetransmits=0): binary audio frames for lower-latency voice
+ * Uses one named RTCDataChannel and one bidirectional native audio media track:
+ * - `control` DataChannel (ordered, reliable): JSON messages (same wire protocol as WebSocket)
+ * - Audio media track (RTP/SRTP + Opus): voice audio in both directions
  *
- * Only raw PCM-family audio formats are supported because audio is transmitted
- * as raw binary without an audio container.
+ * Only PCM-family audio formats are supported because the RTCAudioSource/RTCAudioSink
+ * nonstandard APIs require 16-bit signed LE PCM samples.
  */
 @singleton()
 export class WebRTCCommunicationChannel implements ICommunicationChannel {

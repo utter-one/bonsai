@@ -11,10 +11,10 @@ export const AGGREGATION_FUNCTIONS = ['count', 'sum', 'avg', 'min', 'max', 'p50'
 export type AggregationFn = (typeof AGGREGATION_FUNCTIONS)[number];
 
 /** Identifier for an analytics source */
-export type SourceId = 'conversations' | 'events' | 'turns' | 'tool_calls' | 'classifications' | 'transformations' | 'moderation' | 'stage_visits' | 'llm_calls';
+export type SourceId = 'conversations' | 'events' | 'turns' | 'tool_calls' | 'classifications' | 'transformations' | 'moderation' | 'stage_visits' | 'llm_calls' | 'actions' | 'variables' | 'user_profile';
 
 /** All valid source IDs */
-export const SOURCE_IDS: SourceId[] = ['conversations', 'events', 'turns', 'tool_calls', 'classifications', 'transformations', 'moderation', 'stage_visits', 'llm_calls'];
+export const SOURCE_IDS: SourceId[] = ['conversations', 'events', 'turns', 'tool_calls', 'classifications', 'transformations', 'moderation', 'stage_visits', 'llm_calls', 'actions', 'variables', 'user_profile'];
 
 /** Definition of a dimension (categorical field) available for groupBy and filtering */
 export type DimensionDef = {
@@ -26,6 +26,8 @@ export type DimensionDef = {
   requiresConversationJoin: boolean;
   /** Whether querying this dimension requires a LATERAL join to the user message */
   requiresUserJoin: boolean;
+  /** SQL fragment appended to the FROM clause when this dimension is selected (e.g. a CROSS JOIN LATERAL for UNNEST). Deduplicated when multiple selected dimensions share the same join. */
+  lateralJoinSql?: string;
   /** Optional hint of known values (for UI enumeration) */
   values?: string[];
 };
@@ -40,6 +42,8 @@ export type MetricDef = {
   unit: 'ms' | 'tokens' | 'count' | 'boolean';
   /** Whether this metric requires a LATERAL join to the user message (turns source only) */
   requiresUserJoin?: boolean;
+  /** Whether this metric requires a LEFT JOIN to the conversations table (stage_visits CTE source only) */
+  requiresConversationJoin?: boolean;
 };
 
 /** Complete definition of an analytics source */
@@ -122,6 +126,7 @@ const conversationsSource: SourceDef = {
   ],
   metrics: [
     { id: 'durationMs', label: 'Conversation Duration', sqlExpr: 'EXTRACT(EPOCH FROM (c.last_activity_at - c.created_at)) * 1000', unit: 'ms' },
+    { id: 'turnsAmount', label: 'Turns Amount', sqlExpr: `(SELECT COUNT(*) FROM conversation_events ce2 WHERE ce2.project_id = c.project_id AND ce2.conversation_id = c.id AND ce2.event_type = 'message' AND ce2.event_data->>'role' = 'assistant')`, unit: 'count' },
   ],
 };
 
@@ -195,6 +200,7 @@ const classificationsSource: SourceDef = {
     { id: 'classifierName', label: 'Classifier', sqlExpr: `ce.event_data->'metadata'->>'classifierName'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'model', label: 'LLM Model', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'model'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
+    { id: 'actionName', label: 'Action Name', sqlExpr: `act_item->>'name'`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements(ce.event_data->'actions') AS clf_item\nCROSS JOIN LATERAL jsonb_array_elements(clf_item->'actions') AS act_item` },
   ],
   metrics: [
     { id: 'durationMs', label: 'Classification Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms' },
@@ -234,6 +240,8 @@ const moderationSource: SourceDef = {
     conversationIdDimension,
     stageNameDimension,
     { id: 'flagged', label: 'Flagged', sqlExpr: `(ce.event_data->>'flagged')`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
+    { id: 'detectedCategory', label: 'Detected Category', sqlExpr: `detected_category`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements_text(ce.event_data->'detectedCategories') AS detected_category` },
+    { id: 'blockingCategory', label: 'Blocking Category', sqlExpr: `blocking_category`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements_text(ce.event_data->'blockingCategories') AS blocking_category` },
   ],
   metrics: [
     { id: 'durationMs', label: 'Moderation Duration', sqlExpr: `(ce.event_data->>'durationMs')::numeric`, unit: 'ms' },
@@ -254,6 +262,7 @@ const eventsSource: SourceDef = {
       requiresConversationJoin: false, requiresUserJoin: false,
       values: ['message', 'classification', 'transformation', 'execution_plan', 'command', 'tool_call', 'conversation_start', 'conversation_resume', 'conversation_end', 'conversation_aborted', 'conversation_failed', 'jump_to_stage', 'moderation', 'variables_updated', 'user_profile_updated', 'user_input_modified', 'user_banned', 'visibility_changed', 'sample_copy_selection'],
     },
+    { id: 'sourceActionName', label: 'Source Action', sqlExpr: `ce.event_data->>'sourceActionName'`, requiresConversationJoin: false, requiresUserJoin: false },
   ],
   metrics: [],
 };
@@ -268,10 +277,14 @@ const stageVisitsSource: SourceDef = {
   requiresCte: true,
   dimensions: [
     { id: 'conversationId', label: 'Conversation', sqlExpr: 'sv.conversation_id', requiresConversationJoin: false, requiresUserJoin: false },
-    { id: 'stageId', label: 'Stage ID', sqlExpr: 'sv.stage_id', requiresConversationJoin: false, requiresUserJoin: false },
+    { id: 'stageName', label: 'Stage Name', sqlExpr: 's.name', requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: 'LEFT JOIN stages s ON s.id = sv.stage_id' },
+    { id: 'stageSource', label: 'Stage Source', sqlExpr: 'sv.source_type', requiresConversationJoin: false, requiresUserJoin: false, values: ['starting_stage', 'transition'] },
+    { id: 'fromStageName', label: 'From Stage Name', sqlExpr: 'fs.name', requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: 'LEFT JOIN stages fs ON fs.id = sv.from_stage_id' },
   ],
   metrics: [
     { id: 'timeOnStageMs', label: 'Time on Stage', sqlExpr: `EXTRACT(EPOCH FROM (sv.next_ts - sv.timestamp)) * 1000`, unit: 'ms' },
+    { id: 'conversationLengthMs', label: 'Conversation Length', sqlExpr: `EXTRACT(EPOCH FROM (c.last_activity_at - c.created_at)) * 1000`, unit: 'ms', requiresConversationJoin: true },
+    { id: 'turnsAmount', label: 'Turns Amount', sqlExpr: `(SELECT COUNT(*) FROM conversation_events ce_turns WHERE ce_turns.conversation_id = sv.conversation_id AND ce_turns.event_type = 'message' AND ce_turns.event_data->>'role' = 'assistant' AND ce_turns.timestamp >= sv.timestamp AND (sv.next_ts IS NULL OR ce_turns.timestamp < sv.next_ts))`, unit: 'count' },
   ],
 };
 
@@ -296,6 +309,54 @@ const llmCallsSource: SourceDef = {
   ],
 };
 
+const actionsSource: SourceDef = {
+  id: 'actions',
+  label: 'Actions',
+  description: 'Action execution analytics from execution_plan events. One row per action per execution plan. Tracks which actions fired, in which stages and lifecycle contexts.',
+  table: 'conversation_events',
+  eventTypeFilter: 'execution_plan',
+  timeColumn: 'ce.timestamp',
+  dimensions: [
+    conversationIdDimension,
+    stageNameDimension,
+    { id: 'actionName', label: 'Action Name', sqlExpr: `action_name`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements_text(ce.event_data->'actions') AS action_name` },
+    { id: 'lifecycleContext', label: 'Lifecycle Context', sqlExpr: `ce.event_data->>'lifecycleContext'`, requiresConversationJoin: false, requiresUserJoin: false, values: ['on_enter', 'on_leave', 'on_fallback', 'conversation_start', 'conversation_resume', 'conversation_end', 'conversation_abort', 'conversation_failed'] },
+  ],
+  metrics: [],
+};
+
+const variablesSource: SourceDef = {
+  id: 'variables',
+  label: 'Variables',
+  description: 'Variable change analytics from variables_updated events. One row per changed variable name per event.',
+  table: 'conversation_events',
+  eventTypeFilter: 'variables_updated',
+  timeColumn: 'ce.timestamp',
+  dimensions: [
+    conversationIdDimension,
+    stageNameDimension,
+    { id: 'variableName', label: 'Variable Name', sqlExpr: `variable_name`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements_text(ce.event_data->'changedVariableNames') AS variable_name` },
+    { id: 'sourceActionName', label: 'Source Action', sqlExpr: `ce.event_data->>'sourceActionName'`, requiresConversationJoin: false, requiresUserJoin: false },
+  ],
+  metrics: [],
+};
+
+const userProfileSource: SourceDef = {
+  id: 'user_profile',
+  label: 'User Profile',
+  description: 'User profile change analytics from user_profile_updated events. One row per changed profile field per event.',
+  table: 'conversation_events',
+  eventTypeFilter: 'user_profile_updated',
+  timeColumn: 'ce.timestamp',
+  dimensions: [
+    conversationIdDimension,
+    stageNameDimension,
+    { id: 'profileName', label: 'Profile Field Name', sqlExpr: `profile_name`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements_text(ce.event_data->'changedProfileNames') AS profile_name` },
+    { id: 'sourceActionName', label: 'Source Action', sqlExpr: `ce.event_data->>'sourceActionName'`, requiresConversationJoin: false, requiresUserJoin: false },
+  ],
+  metrics: [],
+};
+
 /** Map of all analytics sources keyed by SourceId */
 export const SOURCES: Record<SourceId, SourceDef> = {
   conversations: conversationsSource,
@@ -307,4 +368,7 @@ export const SOURCES: Record<SourceId, SourceDef> = {
   moderation: moderationSource,
   stage_visits: stageVisitsSource,
   llm_calls: llmCallsSource,
+  actions: actionsSource,
+  variables: variablesSource,
+  user_profile: userProfileSource,
 };

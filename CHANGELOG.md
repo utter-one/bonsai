@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-04-24
+
+### Breaking Changes
+
+- **`MASTER_ENCRYPTION_KEY` is now required** — the secrets subsystem is always active. The server will refuse to start if `MASTER_ENCRYPTION_KEY` is not set in the environment. Generate a 32-byte key with `openssl rand -hex 32` and add it to your environment before upgrading. See the [Secrets Management guide](docs/guide/secrets.md) for details.
+
+### Added
+
+- **Secrets management** — a new first-class secrets subsystem that stores sensitive values encrypted at rest:
+  - `secrets` database table with AES-256-GCM encryption via a `MASTER_ENCRYPTION_KEY` environment variable.
+  - Provider configs and environment variables now accept opaque `@sec:local:id` references; they are resolved to plaintext automatically at runtime.
+  - `GET /api/secrets` — list all secrets (values are never returned) with an `orphans` field identifying references that no longer appear in any config.
+  - `GET /api/secrets/:id/value` — reveal the decrypted value for a specific secret (requires `secrets:reveal` permission).
+  - `DELETE /api/secrets/:id` — delete a secret by ID.
+  - New permissions: `secrets:read`, `secrets:delete`, `secrets:reveal`.
+  - Migration script (`npm run secrets:migrate`) supports  encrypting existing plaintext provider credentials in-place.
+- **Analytics funnel engine** — a new analytics sub-system for measuring sequential user journeys:
+  - `POST /api/projects/:projectId/analytics/funnels/query` — execute an ad-hoc funnel query with up to 15 ordered steps. Supported event types: `enter_stage`, `end_stage`, `action_fire`, `variable_changed`, `user_profile_changed`, `session_started`, `tool_response`.
+  - Response includes per-step `userCount`, `percentage`, `dropoffCount`, `dropoffPercentage`, and an overall `totalConversionRate`.
+  - Relative and absolute time-range filtering (consistent with slice-and-dice analytics).
+  - **Saved Funnel Queries** — persist and manage named funnel queries via CRUD endpoints under `/api/projects/:projectId/analytics/funnels/saved-queries`. Supports `isShared` flag and optimistic locking.
+- **Extended analytics sources** — three new data sources are now available in the slice-and-dice analytics query engine:
+  - `actions` — action execution analytics from `execution_plan` events; one row per action per plan. Dimensions include `actionName`, `stageName`, and lifecycle context.
+  - `variables` — one row per changed variable per `variables_updated` event.
+  - `user_profile` — one row per changed field per `user_profile_updated` event.
+  - The `stage_visits` source now includes stage names via a join, enabling `stageName` breakdowns.
+- **Ollama LLM provider** — built-in support for self-hosted Ollama instances:
+  - New `ollama` provider type with configurable base URL.
+  - Ollama models appear in the provider catalog with capability descriptions.
+- **Project `startingStageId`** — projects can now set a default starting stage; it is used as a fallback when the client omits `stageId` in the `startConversation` WebSocket message. Set to `null` to clear the default.
+
+### Improved
+
+- **WebRTC audio pipeline** — significant rework of the WebRTC channel's audio handling:
+  - Native media tracks and `RTCAudio` interfaces replace the previous ad-hoc approach.
+  - Outbound PCM audio is buffered into fixed-size frames and scheduled with real-time timing to reduce jitter and underruns.
+  - Inbound audio format settings are managed per-connection rather than globally.
+
+### Fixed
+
+- Duplicate user messages were sent to the LLM during response generation — the current user input was included both via the conversation history (persisted before the LLM call) and explicitly appended, causing every response to see the user's last message twice.
+
 ## [0.3.0] - 2026-04-10
 
 ### Breaking Changes

@@ -66,8 +66,14 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
         throw new UserBannedError(`User ${user.id} is banned and cannot start a conversation${user.banReason ? `: ${user.banReason}` : ''}`);
       }
 
+      // Resolve stageId: explicit message value takes priority, then fall back to project default
+      const resolvedStageId = message.stageId ?? project.startingStageId;
+      if (!resolvedStageId) {
+        throw new InvalidOperationError('No stageId provided and the project has no default startingStageId set');
+      }
+
       // Get stage to extract projectId
-      const stage = await this.stageService.getStageById(context.session.projectId, message.stageId);
+      const stage = await this.stageService.getStageById(context.session.projectId, resolvedStageId);
 
       // Validate that the stage belongs to the project the API key is authorized for
       if (stage.projectId !== context.session.projectId) {
@@ -78,7 +84,7 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
       const profileTimezone = user.profile.timezone as string | undefined;
       const resolvedTimezone = message.timezone ?? profileTimezone ?? project.timezone ?? null;
 
-      const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: message.stageId, sessionId: context.session.id, status: 'initialized', metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null });
+      const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: resolvedStageId, sessionId: context.session.id, status: 'initialized', metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null });
       conversationId = conversation.id;
 
       await this.sessionManager.attachConversationToSession(context.session.id, conversationId);

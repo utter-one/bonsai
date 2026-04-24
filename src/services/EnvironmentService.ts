@@ -15,6 +15,7 @@ import { BaseService } from './BaseService';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
+import { SecretsManagerRegistry } from './secrets/SecretsManagerRegistry';
 
 /**
  * Service for managing environments with full CRUD operations and audit logging
@@ -23,7 +24,10 @@ import { generateId, ID_PREFIXES } from '../utils/idGenerator';
  */
 @injectable()
 export class EnvironmentService extends BaseService {
-  constructor(@inject(AuditService) private readonly auditService: AuditService) {
+  constructor(
+    @inject(AuditService) private readonly auditService: AuditService,
+    @inject(SecretsManagerRegistry) private readonly secretsRegistry: SecretsManagerRegistry,
+  ) {
     super();
   }
 
@@ -39,7 +43,8 @@ export class EnvironmentService extends BaseService {
     logger.info({ environmentId, description: input.description, operatorId: context?.operatorId }, 'Creating environment');
 
     try {
-      const environment = await db.insert(environments).values({ id: environmentId, description: input.description, url: input.url, login: input.login, password: input.password, version: 1 }).returning();
+      const passwordToStore = this.secretsRegistry.isSecretReference(input.password) ? input.password : await this.secretsRegistry.storeSecret(this.secretsRegistry.defaultManagerName, input.password);
+      const environment = await db.insert(environments).values({ id: environmentId, description: input.description, url: input.url, login: input.login, password: passwordToStore, version: 1 }).returning();
 
       const createdEnvironment = environment[0];
 
@@ -173,7 +178,9 @@ export class EnvironmentService extends BaseService {
       if (updateData.description !== undefined) updatePayload.description = updateData.description;
       if (updateData.url !== undefined) updatePayload.url = updateData.url;
       if (updateData.login !== undefined) updatePayload.login = updateData.login;
-      if (updateData.password !== undefined) updatePayload.password = updateData.password;
+      if (updateData.password !== undefined) {
+        updatePayload.password = this.secretsRegistry.isSecretReference(updateData.password) ? updateData.password : await this.secretsRegistry.storeSecret(this.secretsRegistry.defaultManagerName, updateData.password);
+      }
 
       const updatedEnvironment = await db.update(environments).set(updatePayload).where(and(eq(environments.id, id), eq(environments.version, expectedVersion))).returning();
 

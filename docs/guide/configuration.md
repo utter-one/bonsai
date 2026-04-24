@@ -27,6 +27,12 @@ Bonsai Backend is configured through environment variables. Copy the `.env.examp
 |---|---|---|
 | `JWT_SECRET` | — | **Required.** Secret key used to sign and verify JWT tokens |
 
+### Secrets Management
+
+| Variable | Default | Description |
+|---|---|---|
+| `MASTER_ENCRYPTION_KEY` | — | **Required.** 32-byte AES master key (64-char hex or 44-char base64) used to encrypt provider API keys and other credentials stored in the database. Generate with: `openssl rand -hex 32`. See [Secrets Management](/guide/secrets). |
+
 ### Logging
 
 | Variable | Default | Description |

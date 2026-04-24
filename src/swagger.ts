@@ -45,6 +45,7 @@ import { fireworksAILlmSettingsSchema } from './services/providers/llm/Fireworks
 import { perplexityLlmSettingsSchema } from './services/providers/llm/PerplexityLlmProvider';
 import { cohereLlmSettingsSchema } from './services/providers/llm/CohereLlmProvider';
 import { xAILlmSettingsSchema } from './services/providers/llm/XAILlmProvider';
+import { ollamaLlmSettingsSchema } from './services/providers/llm/OllamaLlmProvider';
 import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from './services/providers/tts/DeepgramTtsProvider';
@@ -86,12 +87,16 @@ import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
 import { savedSliceQueryResponseSchema } from './http/contracts/savedSliceQuery';
+import { FunnelController } from './http/controllers/FunnelController';
+import { funnelStepSchema, funnelQuerySchema, funnelStepResultSchema, funnelQueryResponseSchema, savedFunnelQueryResponseSchema } from './http/contracts/funnels';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
 import { MigrationController } from './http/controllers/MigrationController';
 import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
 import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
+import { SecretController } from './http/controllers/SecretController';
+import { secretResponseSchema, secretListResponseSchema, secretValueResponseSchema } from './http/contracts/secret';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { providerHintSchema, providerHintResolutionTargetSchema, providerHintResolutionSchema, asrConfigExchangeV1Schema, storageConfigExchangeV1Schema, moderationConfigExchangeV1Schema, fillerSettingsExchangeV1Schema, projectExchangeV1Schema, agentExchangeV1Schema, stageExchangeV1Schema, classifierExchangeV1Schema, contextTransformerExchangeV1Schema, toolExchangeV1Schema, globalActionExchangeV1Schema, guardrailExchangeV1Schema, knowledgeCategoryExchangeV1Schema, knowledgeItemExchangeV1Schema, projectExchangeBundleV1Schema, projectExchangeImportResultSchema } from './http/contracts/projectExchange';
 
@@ -130,6 +135,7 @@ export function getOpenAPISpec(): any {
   registry.register('PerplexityLlmSettings', perplexityLlmSettingsSchema);
   registry.register('CohereLlmSettings', cohereLlmSettingsSchema);
   registry.register('XAILlmSettings', xAILlmSettingsSchema);
+  registry.register('OllamaLlmSettings', ollamaLlmSettingsSchema);
   registry.register('LlmSettings', llmSettingsSchema);
 
   // TTS settings schemas (provider-specific)
@@ -359,6 +365,17 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Funnel analytics schemas and routes from FunnelController
+  registry.register('FunnelStep', funnelStepSchema);
+  registry.register('FunnelQuery', funnelQuerySchema);
+  registry.register('FunnelStepResult', funnelStepResultSchema);
+  registry.register('FunnelQueryResponse', funnelQueryResponseSchema);
+  registry.register('SavedFunnelQuery', savedFunnelQueryResponseSchema);
+  const funnelPaths = FunnelController.getOpenAPIPaths();
+  for (const path of funnelPaths) {
+    registry.registerPath(path);
+  }
+
   // Register Classifier routes from ClassifierController
   const classifierPaths = ClassifierController.getOpenAPIPaths();
   for (const path of classifierPaths) {
@@ -521,6 +538,14 @@ export function getOpenAPISpec(): any {
   registry.register('ProjectExchangeImportResult', projectExchangeImportResultSchema);
   const projectExchangePaths = ProjectExchangeController.getOpenAPIPaths();
   for (const path of projectExchangePaths) {
+    registry.registerPath(path);
+  }
+
+  registry.register('SecretResponse', secretResponseSchema);
+  registry.register('SecretListResponse', secretListResponseSchema);
+  registry.register('SecretValueResponse', secretValueResponseSchema);
+  const secretPaths = SecretController.getOpenAPIPaths();
+  for (const path of secretPaths) {
     registry.registerPath(path);
   }
 

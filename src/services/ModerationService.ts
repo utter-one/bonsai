@@ -50,7 +50,7 @@ export class ModerationService {
       return { flagged: false, blockingCategories: [], detectedCategories: [], durationMs: 0, startMs: 0 };
     }
 
-    const provider = this.llmProviderFactory.createProviderForEnumeration(providerEntity);
+    const provider = await this.llmProviderFactory.createProviderForEnumeration(providerEntity);
     await provider.init();
 
     const startMs = Date.now();

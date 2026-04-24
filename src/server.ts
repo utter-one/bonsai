@@ -29,6 +29,7 @@ import { ChannelCatalogController } from './http/controllers/ChannelCatalogContr
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
+import { FunnelController } from './http/controllers/FunnelController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { MigrationController } from './http/controllers/MigrationController';
@@ -47,6 +48,9 @@ import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChann
 import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
+import { SecretsManagerRegistry } from './services/secrets/SecretsManagerRegistry';
+import { LocalSecretsManager, LOCAL_SECRETS_MANAGER_NAME } from './services/secrets/LocalSecretsManager';
+import { SecretController } from './http/controllers/SecretController';
 
 // Register the OpenAPI spec provider before the IoC container is used.
 // This breaks the circular module dependency that would arise from VersionService
@@ -126,6 +130,11 @@ export function createApp(): express.Application {
   const versionController = container.resolve(VersionController);
   versionController.registerRoutes(app);
 
+  // Bootstrap secrets manager registry — must run before any controller that uses ProviderService / EnvironmentService
+  const secretsRegistry = container.resolve(SecretsManagerRegistry);
+  const localSecretsManager = container.resolve(LocalSecretsManager);
+  secretsRegistry.register(LOCAL_SECRETS_MANAGER_NAME, localSecretsManager);
+
   // Authentication middleware (optional - sets req.user if token is valid)
   app.use(optionalAuthMiddleware);
 
@@ -156,6 +165,9 @@ export function createApp(): express.Application {
 
   const savedSliceQueryController = container.resolve(SavedSliceQueryController);
   savedSliceQueryController.registerRoutes(app);
+
+  const funnelController = container.resolve(FunnelController);
+  funnelController.registerRoutes(app);
 
   const classifierController = container.resolve(ClassifierController);
   classifierController.registerRoutes(app);
@@ -216,6 +228,9 @@ export function createApp(): express.Application {
 
   const projectExchangeController = container.resolve(ProjectExchangeController);
   projectExchangeController.registerRoutes(app);
+
+  const secretController = container.resolve(SecretController);
+  secretController.registerRoutes(app);
 
   container.resolve(WebRTCChannelHost).registerRoutes(app);
   container.resolve(TwilioMessagingChannelHost).registerRoutes(app);

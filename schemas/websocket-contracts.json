@@ -865,7 +865,7 @@
         },
         "stageId": {
           "type": "string",
-          "description": "Stage ID to initiate the conversation at a specific stage"
+          "description": "Stage ID to initiate the conversation at a specific stage. When omitted, falls back to the project-level default starting stage."
         },
         "timezone": {
           "type": "string",
@@ -883,7 +883,6 @@
       "required": [
         "type",
         "userId",
-        "stageId",
         "requestId",
         "sessionId"
       ]
@@ -1622,6 +1621,13 @@
                   "type": "string",
                   "description": "Name of the action that triggered this variable update"
                 },
+                "changedVariableNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of the variables that were changed by this update"
+                },
                 "variables": {
                   "type": "object",
                   "additionalProperties": {
@@ -1638,6 +1644,7 @@
               },
               "required": [
                 "sourceActionName",
+                "changedVariableNames",
                 "variables"
               ]
             },
@@ -1647,6 +1654,13 @@
                 "sourceActionName": {
                   "type": "string",
                   "description": "Name of the action that triggered this profile update"
+                },
+                "changedProfileNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of the profile fields that were changed by this update"
                 },
                 "profile": {
                   "type": "object",
@@ -1664,6 +1678,7 @@
               },
               "required": [
                 "sourceActionName",
+                "changedProfileNames",
                 "profile"
               ]
             },
@@ -2720,6 +2735,13 @@
                   "type": "string",
                   "description": "Name of the action that triggered this variable update"
                 },
+                "changedVariableNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of the variables that were changed by this update"
+                },
                 "variables": {
                   "type": "object",
                   "additionalProperties": {
@@ -2736,6 +2758,7 @@
               },
               "required": [
                 "sourceActionName",
+                "changedVariableNames",
                 "variables"
               ]
             },
@@ -2745,6 +2768,13 @@
                 "sourceActionName": {
                   "type": "string",
                   "description": "Name of the action that triggered this profile update"
+                },
+                "changedProfileNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Names of the profile fields that were changed by this update"
                 },
                 "profile": {
                   "type": "object",
@@ -2762,6 +2792,7 @@
               },
               "required": [
                 "sourceActionName",
+                "changedProfileNames",
                 "profile"
               ]
             },
@@ -4371,6 +4402,13 @@
           "type": "string",
           "description": "Name of the action that triggered this variable update"
         },
+        "changedVariableNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of the variables that were changed by this update"
+        },
         "variables": {
           "type": "object",
           "additionalProperties": {
@@ -4387,6 +4425,7 @@
       },
       "required": [
         "sourceActionName",
+        "changedVariableNames",
         "variables"
       ]
     },
@@ -4396,6 +4435,13 @@
         "sourceActionName": {
           "type": "string",
           "description": "Name of the action that triggered this profile update"
+        },
+        "changedProfileNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of the profile fields that were changed by this update"
         },
         "profile": {
           "type": "object",
@@ -4413,6 +4459,7 @@
       },
       "required": [
         "sourceActionName",
+        "changedProfileNames",
         "profile"
       ]
     },

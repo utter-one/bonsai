@@ -25,6 +25,11 @@ export class ResponseGenerator {
    */
   async generateResponse(context: ConversationContext, stage: Stage, renderedPrompt: string, completionLlmProvider: ILlmProvider, assistantPrefix?: string, maxTokens?: number, inputTokenCap?: number, model?: string, onTruncation?: (info: TruncationInfo) => void): Promise<void> {
     const history = context.history.map(msg => { return { role: msg.role, content: msg.content } as LlmMessage; });
+    // The current user message is saved to the DB before context is built, so it ends up in
+    // context.history. Remove it here to avoid sending it twice — it is appended explicitly below.
+    if (context.userInput && history.at(-1)?.role === 'user') {
+      history.pop();
+    }
     let messages: LlmMessage[] = [
       { role: 'system', content: renderedPrompt },
       ...history,

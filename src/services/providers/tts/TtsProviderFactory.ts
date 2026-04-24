@@ -1,4 +1,4 @@
-import { singleton } from 'tsyringe';
+import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ITtsProvider } from './ITtsProvider';
@@ -8,6 +8,7 @@ import { DeepgramTtsProvider, DeepgramTtsProviderConfig, deepgramTtsProviderConf
 import { CartesiaTtsProvider, CartesiaTtsProviderConfig, cartesiaTtsProviderConfigSchema, CartesiaTtsSettings } from './CartesiaTtsProvider';
 import { AzureTtsProvider, AzureTtsProviderConfig, azureTtsProviderConfigSchema, AzureTtsSettings } from './AzureTtsProvider';
 import { AmazonPollyTtsProvider, AmazonPollyTtsProviderConfig, amazonPollyTtsProviderConfigSchema, AmazonPollyTtsSettings } from './AmazonPollyTtsProvider';
+import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 /**
  * Supported TTS provider API types
@@ -30,6 +31,8 @@ export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderC
  */
 @singleton()
 export class TtsProviderFactory {
+  constructor(@inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils) {}
+
   /**
    * Creates a TTS provider instance from a provider entity
    * @param provider - Provider entity from database containing configuration
@@ -37,7 +40,7 @@ export class TtsProviderFactory {
    * @returns Configured TTS provider instance
    * @throws {Error} When provider type is not 'tts' or when API type is not supported
    */
-  createProvider(provider: Provider, settings: TtsSettings): ITtsProvider {
+  async createProvider(provider: Provider, settings: TtsSettings): Promise<ITtsProvider> {
     // Validate provider type
     if (provider.providerType !== 'tts') {
       const errorMessage = `Provider ${provider.id} is not a TTS provider. Expected providerType 'tts', got '${provider.providerType}'`;
@@ -45,25 +48,28 @@ export class TtsProviderFactory {
       throw new Error(errorMessage);
     }
 
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
+
     // Create provider instance based on API type
     switch (provider.apiType) {
       case 'elevenlabs':
-        return this.createElevenLabsProvider(provider, settings as ElevenLabsTtsSettings);
+        return this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsTtsSettings);
 
       case 'openai':
-        return this.createOpenAiProvider(provider, settings as OpenAiTtsSettings);
+        return this.createOpenAiProvider(resolvedProvider, settings as OpenAiTtsSettings);
 
       case 'deepgram':
-        return this.createDeepgramProvider(provider, settings as DeepgramTtsSettings);
+        return this.createDeepgramProvider(resolvedProvider, settings as DeepgramTtsSettings);
 
       case 'cartesia':
-        return this.createCartesiaProvider(provider, settings as CartesiaTtsSettings);
+        return this.createCartesiaProvider(resolvedProvider, settings as CartesiaTtsSettings);
 
       case 'azure':
-        return this.createAzureProvider(provider, settings as AzureTtsSettings);
+        return this.createAzureProvider(resolvedProvider, settings as AzureTtsSettings);
 
       case 'amazon-polly':
-        return this.createAmazonPollyProvider(provider, settings as AmazonPollyTtsSettings);
+        return this.createAmazonPollyProvider(resolvedProvider, settings as AmazonPollyTtsSettings);
 
       default:
         const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia, azure, amazon-polly`;

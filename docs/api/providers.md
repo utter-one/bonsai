@@ -172,6 +172,7 @@ Configuration varies by provider type and API type:
 | `perplexity` | `apiKey`, `baseUrl` (optional) |
 | `cohere` | `apiKey`, `baseUrl` (optional) |
 | `xai` | `apiKey`, `baseUrl` (optional) |
+| `ollama` | `baseUrl` (optional, default `http://localhost:11434`), `apiKey` (optional, default `"ollama"`) |
 
 ### TTS Providers
 

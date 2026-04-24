@@ -6,7 +6,7 @@ import { ToolExecutor } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
 import { UserService } from '../UserService';
-import type { AbortConversationEffect, BanUserEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext } from '../../types/actions';
+import type { AbortConversationEffect, BanUserEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext, ModifyVariablesEffect, ModifyUserProfileEffect } from '../../types/actions';
 import type { MessageVisibility, ConversationEventType, ConversationEventData, ActionsExecutionPlanEventData } from '../../types/conversationEvents';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
@@ -433,14 +433,16 @@ export class ActionsExecutor {
         return await this.executeModifyUserInput(effect, context, actionName, emitEvent);
 
       case 'modify_variables': {
+        const changedVariableNames = (effect as ModifyVariablesEffect).modifications.map((m) => m.variableName);
         const result = await this.modifyVariablesExecutor.execute(effect, context);
-        await emitEvent('variables_updated', { sourceActionName: actionName, variables: context.vars as any });
+        await emitEvent('variables_updated', { sourceActionName: actionName, changedVariableNames, variables: context.vars as any });
         return result;
       }
 
       case 'modify_user_profile': {
+        const changedProfileNames = (effect as ModifyUserProfileEffect).modifications.map((m) => m.fieldName);
         const result = await this.modifyUserProfileExecutor.execute(effect, context);
-        await emitEvent('user_profile_updated', { sourceActionName: actionName, profile: context.userProfile as any });
+        await emitEvent('user_profile_updated', { sourceActionName: actionName, changedProfileNames, profile: context.userProfile as any });
         return result;
       }
 

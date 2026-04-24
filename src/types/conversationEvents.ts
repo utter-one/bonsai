@@ -261,6 +261,8 @@ export type ModerationEventData = z.infer<typeof moderationEventDataSchema>;
 export const variablesUpdatedEventDataSchema = z.object({
   /** Name of the action that triggered this variable update */
   sourceActionName: z.string().describe('Name of the action that triggered this variable update'),
+  /** Names of the variables that were changed by this update */
+  changedVariableNames: z.array(z.string()).describe('Names of the variables that were changed by this update'),
   /** Snapshot of all conversation variables after the update */
   variables: z.record(z.string(), parameterValueSchema).describe('Snapshot of all conversation variables after the update'),
   metadata: z.record(z.string(), z.any()).optional(),
@@ -275,6 +277,8 @@ export type VariablesUpdatedEventData = z.infer<typeof variablesUpdatedEventData
 export const userProfileUpdatedEventDataSchema = z.object({
   /** Name of the action that triggered this profile update */
   sourceActionName: z.string().describe('Name of the action that triggered this profile update'),
+  /** Names of the profile fields that were changed by this update */
+  changedProfileNames: z.array(z.string()).describe('Names of the profile fields that were changed by this update'),
   /** Updated user profile data */
   profile: z.record(z.string(), parameterValueSchema).describe('Updated user profile data'),
   metadata: z.record(z.string(), z.any()).optional(),

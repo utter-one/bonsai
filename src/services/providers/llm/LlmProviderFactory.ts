@@ -1,4 +1,4 @@
-import { singleton } from 'tsyringe';
+import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ILlmProvider } from './ILlmProvider';
@@ -15,21 +15,23 @@ import { FireworksAILlmProvider, FireworksAILlmProviderConfig, fireworksAILlmPro
 import { PerplexityLlmProvider, PerplexityLlmProviderConfig, perplexityLlmProviderConfigSchema, PerplexityLlmSettings } from './PerplexityLlmProvider';
 import { CohereLlmProvider, CohereLlmProviderConfig, cohereLlmProviderConfigSchema, CohereLlmSettings } from './CohereLlmProvider';
 import { XAILlmProvider, XAILlmProviderConfig, xAILlmProviderConfigSchema, XAILlmSettings } from './XAILlmProvider';
+import { OllamaLlmProvider, OllamaLlmProviderConfig, ollamaLlmProviderConfigSchema, OllamaLlmSettings } from './OllamaLlmProvider';
+import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 /**
  * Supported LLM provider API types
  */
-export type LlmProviderApiType = 'openai' | 'openai-legacy' | 'anthropic' | 'gemini' | 'groq' | 'mistral' | 'deepseek' | 'openrouter' | 'together-ai' | 'fireworks-ai' | 'perplexity' | 'cohere' | 'xai';
+export type LlmProviderApiType = 'openai' | 'openai-legacy' | 'anthropic' | 'gemini' | 'groq' | 'mistral' | 'deepseek' | 'openrouter' | 'together-ai' | 'fireworks-ai' | 'perplexity' | 'cohere' | 'xai' | 'ollama';
 
 /**
  * Union type for all LLM provider settings
  */
-export type LlmSettings = OpenAILlmSettings | OpenAILegacyLlmSettings | AnthropicLlmSettings | GeminiLlmSettings | GroqLlmSettings | MistralLlmSettings | DeepSeekLlmSettings | OpenRouterLlmSettings | TogetherAILlmSettings | FireworksAILlmSettings | PerplexityLlmSettings | CohereLlmSettings | XAILlmSettings;
+export type LlmSettings = OpenAILlmSettings | OpenAILegacyLlmSettings | AnthropicLlmSettings | GeminiLlmSettings | GroqLlmSettings | MistralLlmSettings | DeepSeekLlmSettings | OpenRouterLlmSettings | TogetherAILlmSettings | FireworksAILlmSettings | PerplexityLlmSettings | CohereLlmSettings | XAILlmSettings | OllamaLlmSettings;
 
 /**
  * Union type for all LLM provider configurations
  */
-export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProviderConfig | AnthropicLlmProviderConfig | GeminiLlmProviderConfig | GroqLlmProviderConfig | MistralLlmProviderConfig | DeepSeekLlmProviderConfig | OpenRouterLlmProviderConfig | TogetherAILlmProviderConfig | FireworksAILlmProviderConfig | PerplexityLlmProviderConfig | CohereLlmProviderConfig | XAILlmProviderConfig;
+export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProviderConfig | AnthropicLlmProviderConfig | GeminiLlmProviderConfig | GroqLlmProviderConfig | MistralLlmProviderConfig | DeepSeekLlmProviderConfig | OpenRouterLlmProviderConfig | TogetherAILlmProviderConfig | FireworksAILlmProviderConfig | PerplexityLlmProviderConfig | CohereLlmProviderConfig | XAILlmProviderConfig | OllamaLlmProviderConfig;
 
 /**
  * Factory service for creating LLM provider instances based on provider entity configuration
@@ -37,6 +39,8 @@ export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProvide
  */
 @singleton()
 export class LlmProviderFactory {
+  constructor(@inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils) {}
+
   /**
    * Creates an LLM provider instance from a provider entity
    * @param provider - Provider entity from database containing configuration
@@ -44,7 +48,7 @@ export class LlmProviderFactory {
    * @returns Configured and initialized LLM provider instance
    * @throws {Error} When provider type is not 'llm', API type is not supported, or model is missing
    */
-  createProvider(provider: Provider, settings: LlmSettings): ILlmProvider {
+  async createProvider(provider: Provider, settings: LlmSettings): Promise<ILlmProvider> {
     if (provider.providerType !== 'llm') {
       const errorMessage = `Provider ${provider.id} is not an LLM provider. Expected providerType 'llm', got '${provider.providerType}'`;
       logger.error(errorMessage);
@@ -58,7 +62,8 @@ export class LlmProviderFactory {
     }
 
     logger.info(`Creating ${provider.apiType} LLM provider for provider ${provider.id} with model ${settings.model}`);
-    const instance = this.instantiateProvider(provider, settings);
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings);
     instance.init();
     return instance;
   }
@@ -70,14 +75,15 @@ export class LlmProviderFactory {
    * @returns LLM provider instance suitable for calling enumerateModels()
    * @throws {Error} When provider type is not 'llm' or API type is not supported
    */
-  createProviderForEnumeration(provider: Provider): ILlmProvider {
+  async createProviderForEnumeration(provider: Provider): Promise<ILlmProvider> {
     if (provider.providerType !== 'llm') {
       const errorMessage = `Provider ${provider.id} is not an LLM provider. Expected providerType 'llm', got '${provider.providerType}'`;
       logger.error(errorMessage);
       throw new Error(errorMessage);
     }
 
-    return this.instantiateProvider(provider, { model: '' } as LlmSettings);
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    return this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, { model: '' } as LlmSettings);
   }
 
   /**
@@ -127,8 +133,11 @@ export class LlmProviderFactory {
       case 'xai':
         return new XAILlmProvider(xAILlmProviderConfigSchema.parse(provider.config), settings as XAILlmSettings);
 
+      case 'ollama':
+        return new OllamaLlmProvider(ollamaLlmProviderConfigSchema.parse(provider.config), settings as OllamaLlmSettings);
+
       default: {
-        const errorMessage = `Unsupported LLM provider API type: ${provider.apiType}. Supported types: openai, openai-legacy, anthropic, gemini, groq, mistral, deepseek, openrouter, together-ai, fireworks-ai, perplexity, cohere, xai`;
+        const errorMessage = `Unsupported LLM provider API type: ${provider.apiType}. Supported types: openai, openai-legacy, anthropic, gemini, groq, mistral, deepseek, openrouter, together-ai, fireworks-ai, perplexity, cohere, xai, ollama`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
       }
@@ -145,7 +154,7 @@ export class LlmProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: LlmProviderApiType[] = ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai'];
+    const supportedApiTypes: LlmProviderApiType[] = ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai', 'ollama'];
     return supportedApiTypes.includes(provider.apiType as LlmProviderApiType);
   }
 
@@ -154,6 +163,6 @@ export class LlmProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): LlmProviderApiType[] {
-    return ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai'];
+    return ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai', 'ollama'];
   }
 }

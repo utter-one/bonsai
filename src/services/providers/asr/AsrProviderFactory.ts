@@ -1,4 +1,4 @@
-import { singleton } from 'tsyringe';
+import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IAsrProvider } from './IAsrProvider';
@@ -7,6 +7,7 @@ import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProvid
 import { DeepgramAsrProvider, DeepgramAsrProviderConfig, deepgramAsrProviderConfigSchema, DeepgramAsrSettings, deepgramAsrSettingsSchema } from './DeepgramAsrProvider';
 import { AssemblyAiAsrProvider, AssemblyAiAsrProviderConfig, assemblyAiAsrProviderConfigSchema, AssemblyAiAsrSettings, assemblyAiAsrSettingsSchema } from './AssemblyAiAsrProvider';
 import { SpeechmaticsAsrProvider, SpeechmaticsAsrProviderConfig, speechmaticsAsrProviderConfigSchema, SpeechmaticsAsrSettings, speechmaticsAsrSettingsSchema } from './SpeechmaticsAsrProvider';
+import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 /**
  * Supported ASR provider API types
@@ -29,13 +30,15 @@ export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderCo
  */
 @singleton()
 export class AsrProviderFactory {
+  constructor(@inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils) {}
+
   /**
    * Creates an ASR provider instance from a provider entity
    * @param provider - Provider entity from database containing configuration
    * @returns Configured ASR provider instance
    * @throws {Error} When provider type is not 'asr' or when API type is not supported
    */
-  createProvider(provider: Provider, settings: unknown): IAsrProvider {
+  async createProvider(provider: Provider, settings: unknown): Promise<IAsrProvider> {
     // Validate provider type
     if (provider.providerType !== 'asr') {
       const errorMessage = `Provider ${provider.id} is not an ASR provider. Expected providerType 'asr', got '${provider.providerType}'`;
@@ -43,22 +46,25 @@ export class AsrProviderFactory {
       throw new Error(errorMessage);
     }
 
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
+
     // Create provider instance based on API type
     switch (provider.apiType) {
       case 'azure':
-        return this.createAzureProvider(provider, settings as AzureAsrSettings);
+        return this.createAzureProvider(resolvedProvider, settings as AzureAsrSettings);
 
       case 'elevenlabs':
-        return this.createElevenLabsProvider(provider, settings as ElevenLabsAsrSettings);
+        return this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsAsrSettings);
 
       case 'deepgram':
-        return this.createDeepgramProvider(provider, settings as DeepgramAsrSettings);
+        return this.createDeepgramProvider(resolvedProvider, settings as DeepgramAsrSettings);
 
       case 'assemblyai':
-        return this.createAssemblyAiProvider(provider, settings as AssemblyAiAsrSettings);
+        return this.createAssemblyAiProvider(resolvedProvider, settings as AssemblyAiAsrSettings);
 
       case 'speechmatics':
-        return this.createSpeechmaticsProvider(provider, settings as SpeechmaticsAsrSettings);
+        return this.createSpeechmaticsProvider(resolvedProvider, settings as SpeechmaticsAsrSettings);
 
       default:
         const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai, speechmatics`;

@@ -10,28 +10,47 @@ import { IpRateLimiter } from '../../IpRateLimiter';
 import { WebRTCConnection } from './WebRTCConnection';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { BaseInputMessage } from '../websocket/contracts/common';
+import { isPcmFormat } from '../../services/audio/AudioFormatUtils';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { logger } from '../../utils/logger';
 
-const { RTCPeerConnection: NodeRTCPeerConnection } = wrtc as unknown as { RTCPeerConnection: typeof RTCPeerConnection };
+/** Shape of PCM audio data received from an RTCAudioSink data event. */
+type RTCAudioSinkData = {
+  samples: Int16Array;
+  sampleRate: number;
+  bitsPerSample: number;
+  channelCount: number;
+  numberOfFrames: number;
+};
+
+/** Minimal interface for the node-webrtc RTCAudioSource nonstandard API. */
+type RTCAudioSourceType = {
+  createTrack(): MediaStreamTrack;
+  onData(data: { samples: Int16Array; sampleRate: number; bitsPerSample?: number; channelCount?: number; numberOfFrames?: number }): void;
+};
+
+/** Minimal interface for the node-webrtc RTCAudioSink nonstandard API. */
+type RTCAudioSinkType = {
+  stop(): void;
+  readonly stopped: boolean;
+  ondata: ((data: RTCAudioSinkData) => void) | null;
+};
+
+/** Constructor types extracted from the wrtc.nonstandard namespace. */
+type WrtcNonstandard = {
+  RTCAudioSource: { new(): RTCAudioSourceType };
+  RTCAudioSink: { new(track: MediaStreamTrack): RTCAudioSinkType };
+};
+
+const { RTCPeerConnection: NodeRTCPeerConnection, nonstandard } = wrtc as unknown as {
+  RTCPeerConnection: typeof RTCPeerConnection;
+  nonstandard: WrtcNonstandard;
+};
+const { RTCAudioSource: NodeRTCAudioSource, RTCAudioSink: NodeRTCAudioSink } = nonstandard;
 
 const ICE_GATHERING_TIMEOUT_MS = parseInt(process.env.WEBRTC_ICE_GATHERING_TIMEOUT_MS ?? '5000', 10);
 const STUN_URL = process.env.WEBRTC_STUN_URL ?? 'stun:stun.l.google.com:19302';
-
-/**
- * Decodes a binary audio frame received on the audio DataChannel.
- *
- * Frame format: [2 bytes: turnId length as uint16 LE] [N bytes: turnId as UTF-8] [remaining: raw audio]
- */
-function decodeAudioFrame(data: Buffer): { turnId: string; audioData: Buffer } | null {
-  if (data.length < 2) return null;
-  const turnIdLength = data.readUInt16LE(0);
-  if (data.length < 2 + turnIdLength) return null;
-  const turnId = data.subarray(2, 2 + turnIdLength).toString('utf8');
-  const audioData = Buffer.from(data.subarray(2 + turnIdLength));
-  return { turnId, audioData };
-}
 
 /**
  * Waits for RTCPeerConnection ICE gathering to complete, or resolves after a timeout.
@@ -67,15 +86,13 @@ const webRTCOfferResponseSchema = z.object({
  * WebRTC channel host that manages peer connections, signaling, and message routing.
  *
  * Provides a single HTTP POST endpoint for SDP offer/answer exchange. After the peer
- * connection is established, the client communicates over two named DataChannels:
- * - `control` (ordered, reliable): JSON messages using the same protocol as WebSocket
- * - `audio` (unordered, maxRetransmits: 0): binary audio frames for user voice input
+ * connection is established, the client communicates over:
+ * - `control` DataChannel (ordered, reliable): JSON messages using the same protocol as WebSocket
+ * - Native audio media track (RTP/SRTP + Opus): bidirectional voice audio
  *
- * Binary audio frame format (inbound user voice):
- * [2 bytes: inputTurnId length as uint16 LE] [N bytes: inputTurnId as UTF-8] [remaining: raw audio]
- *
- * AI voice output is sent to the client over the `audio` DataChannel using the same frame format
- * with outputTurnId as the turn identifier.
+ * The server creates an RTCAudioSource for outbound AI voice and an RTCAudioSink for inbound
+ * user voice. The client should add its microphone track to the offer so server-side VAD and
+ * ASR can process voice input.
  *
  * Environment variables:
  * - `WEBRTC_ICE_GATHERING_TIMEOUT_MS` — max ms to wait for ICE gather (default: 5000)
@@ -83,7 +100,7 @@ const webRTCOfferResponseSchema = z.object({
  */
 @singleton()
 export class WebRTCChannelHost {
-  private peerConnections: Map<string, RTCPeerConnection> = new Map();
+  private peerConnections: Map<string, { pc: RTCPeerConnection; audioSink: RTCAudioSinkType | null }> = new Map();
 
   constructor(
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
@@ -104,11 +121,10 @@ export class WebRTCChannelHost {
         description:
           'Accepts a WebRTC SDP offer from the client and returns an SDP answer with all ICE candidates embedded ' +
           '(gather-and-return; no trickle ICE). ' +
-          'Before creating the offer the client must open two named DataChannels: ' +
-          '"control" (ordered: true) for all JSON messages (same protocol as WebSocket) and ' +
-          '"audio" (ordered: false, maxRetransmits: 0) for binary audio frames. ' +
-          'Audio frame format: [uint16 LE: turnId byte length] [turnId UTF-8 bytes] [raw PCM audio]. ' +
-          'Once the DataChannels are open, authenticate by sending an "auth" JSON message over the control channel.',
+          'The client must add a microphone audio track and open a "control" DataChannel (ordered: true) before creating the offer. ' +
+          'The server adds an outbound audio track to the answer for AI voice output. ' +
+          'Once the control DataChannel is open, authenticate by sending an "auth" JSON message over it. ' +
+          'All JSON messages use the same protocol as WebSocket. Voice audio flows over native RTP/SRTP media tracks.',
         security: [],
         request: {
           body: {
@@ -140,9 +156,9 @@ export class WebRTCChannelHost {
   }
 
   /**
-   * Handles a WebRTC SDP offer: creates a peer connection, generates an answer,
-   * waits for ICE gathering to complete, and returns the answer.
-   * Session and DataChannel setup happen asynchronously after the ICE connection is established.
+   * Handles a WebRTC SDP offer: creates a peer connection, registers an outbound audio track,
+   * generates an answer, waits for ICE gathering to complete, and returns the answer.
+   * Session setup happens asynchronously after the control DataChannel is established.
    */
   private async handleOffer(req: Request, res: Response): Promise<void> {
     const parsed = webRTCOfferBodySchema.safeParse(req.body);
@@ -165,26 +181,33 @@ export class WebRTCChannelHost {
       return;
     }
 
+    // Create the outbound audio source for AI voice output and add the track to the PC
+    // before setRemoteDescription so it is included in the SDP answer.
+    const audioSource = new NodeRTCAudioSource();
+    const outboundTrack = audioSource.createTrack();
+    pc.addTrack(outboundTrack);
+
+    // Capture the client's inbound audio track when the offer is processed.
+    let inboundAudioTrack: MediaStreamTrack | null = null;
+    pc.ontrack = (event: RTCTrackEvent) => {
+      if (event.track.kind === 'audio') {
+        inboundAudioTrack = event.track;
+        logger.debug({ ip: clientIp }, 'WebRTC inbound audio track received');
+      }
+    };
+
     let controlChannel: RTCDataChannel | null = null;
-    let audioChannel: RTCDataChannel | null = null;
 
     pc.ondatachannel = (event: RTCDataChannelEvent) => {
       const channel = event.channel;
       if (channel.label === 'control') {
         controlChannel = channel;
-      } else if (channel.label === 'audio') {
-        audioChannel = channel;
-      }
-
-      if (controlChannel && audioChannel) {
-        const ctrl = controlChannel;
-        const aud = audioChannel;
         const waitOpen = (ch: RTCDataChannel): Promise<void> =>
           ch.readyState === 'open' ? Promise.resolve() : new Promise<void>((resolve) => { ch.onopen = () => resolve(); });
 
-        Promise.all([waitOpen(ctrl), waitOpen(aud)])
-          .then(() => this.setupConnection(pc, ctrl, aud, clientIp))
-          .catch((err) => logger.error({ error: err, ip: clientIp }, 'WebRTC DataChannels failed to open'));
+        waitOpen(channel)
+          .then(() => this.setupConnection(pc, controlChannel!, audioSource, inboundAudioTrack, clientIp))
+          .catch((err) => logger.error({ error: err, ip: clientIp }, 'WebRTC control channel failed to open'));
       }
     };
 
@@ -211,27 +234,39 @@ export class WebRTCChannelHost {
   }
 
   /**
-   * Creates a {@link WebRTCConnection} and registers a session once both DataChannels are open.
-   * Wires up message handlers for the control and audio channels.
+   * Creates a {@link WebRTCConnection}, registers a session, and wires up message handlers
+   * for the control DataChannel and the native audio media track.
+   * If an inbound audio track was received, an RTCAudioSink is created to forward PCM frames
+   * to the conversation runner.
    */
-  private setupConnection(pc: RTCPeerConnection, controlChannel: RTCDataChannel, audioChannel: RTCDataChannel, clientIp: string): void {
-    const webrtcConnection = new WebRTCConnection(controlChannel, audioChannel, this.sessionManager);
+  private setupConnection(pc: RTCPeerConnection, controlChannel: RTCDataChannel, audioSource: RTCAudioSourceType, inboundAudioTrack: MediaStreamTrack | null, clientIp: string): void {
+    const webrtcConnection = new WebRTCConnection(controlChannel, audioSource, this.sessionManager);
     const sessionId = this.sessionManager.registerSession(webrtcConnection);
     const session = this.sessionManager.getSession(sessionId);
     webrtcConnection.attachSession(session);
 
-    this.peerConnections.set(sessionId, pc);
+    const audioSink: RTCAudioSinkType | null = inboundAudioTrack ? new NodeRTCAudioSink(inboundAudioTrack) : null;
+    this.peerConnections.set(sessionId, { pc, audioSink });
 
-    logger.info({ sessionId, ip: clientIp }, 'WebRTC DataChannels open, session created');
+    logger.info({ sessionId, ip: clientIp, hasAudioTrack: !!inboundAudioTrack }, 'WebRTC control channel open, session created');
+
+    if (audioSink) {
+      audioSink.ondata = (data: RTCAudioSinkData) => {
+        if (!session?.conversationId || !session?.runner) return;
+        // In VAD mode the runner manages turn lifecycle internally and must receive audio
+        // continuously. In non-VAD mode only forward when the client has an active voice
+        // input turn; forwarding without one would throw inside the runner (wrong state).
+        const activeInputTurnId = webrtcConnection.getActiveInputTurnId();
+        if (activeInputTurnId === null && !session.runner.isVadMode) return;
+        const pcmBuffer = Buffer.from(data.samples.buffer, data.samples.byteOffset, data.samples.byteLength);
+        session.runner.receiveUserVoiceData(activeInputTurnId ?? '', pcmBuffer).catch((err) => {
+          logger.error({ err, sessionId: session?.id }, 'WebRTC failed to process inbound audio frame');
+        });
+      };
+    }
 
     controlChannel.onmessage = (event: MessageEvent) => {
       this.handleControlMessage(webrtcConnection, session, event.data as string, clientIp);
-    };
-
-    audioChannel.onmessage = (event: MessageEvent) => {
-      const raw = event.data;
-      const buffer: Buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
-      this.handleAudioMessage(session, buffer);
     };
 
     controlChannel.onclose = () => {
@@ -274,46 +309,42 @@ export class WebRTCChannelHost {
         const outMsg: Record<string, unknown> = { ...msg };
         if (!outMsg.requestId && outMsg.correlationId) outMsg.requestId = outMsg.correlationId;
         if (!outMsg.sessionId && session?.id) outMsg.sessionId = session.id;
+        // Keep the active input turn ID in sync with voice input lifecycle messages so
+        // the audio sink knows which turn to forward inbound audio to.
+        if (outMsg.type === 'start_user_voice_input' && outMsg.success && outMsg.inputTurnId) {
+          connection.setActiveInputTurnId(outMsg.inputTurnId as string);
+        } else if (outMsg.type === 'end_user_voice_input' && outMsg.success) {
+          connection.clearActiveInputTurnId();
+        }
         connection.sendRawControl(outMsg);
       },
       sendError: (error: string, correlationId?: string) => connection.sendError(error, correlationId),
     };
 
+    // RTCAudioSink always delivers Opus-native PCM at 48 kHz regardless of what the client
+    // declared in sendAudioFormat, so override it before the ConversationRunner initialises
+    // its inbound audio pipeline (VAD / ASR). If the client requested a non-PCM receiveAudioFormat
+    // (e.g. opus), fall back to pcm_16000 because RTCAudioSource.onData requires raw PCM.
+    if (wsMessage.type === 'start_conversation') {
+      session.sessionSettings.sendAudioFormat = 'pcm_48000';
+      if (!isPcmFormat(session.sessionSettings.receiveAudioFormat)) {
+        session.sessionSettings.receiveAudioFormat = 'pcm_16000';
+      }
+    }
+
     await this.dispatcher.dispatch(calMessage, context);
   }
 
   /**
-   * Handles a binary audio frame from the user's audio DataChannel.
-   * Decodes the frame and forwards the raw PCM buffer directly to the conversation runner,
-   * bypassing the handler dispatcher to avoid base64 encode/decode overhead.
-   */
-  private async handleAudioMessage(session: Session, data: Buffer): Promise<void> {
-    if (!session?.conversationId || !session?.runner) {
-      logger.debug({ sessionId: session?.id }, 'WebRTC audio frame received before conversation started, ignoring');
-      return;
-    }
-
-    const decoded = decodeAudioFrame(data);
-    if (!decoded) {
-      logger.warn({ sessionId: session?.id }, 'WebRTC received malformed audio frame, ignoring');
-      return;
-    }
-
-    try {
-      await session.runner.receiveUserVoiceData(decoded.turnId, decoded.audioData);
-    } catch (err) {
-      logger.error({ error: err, sessionId: session?.id }, 'WebRTC failed to process audio frame');
-    }
-  }
-
-  /**
-   * Handles DataChannel disconnection: closes the peer connection and unregisters the session.
+   * Handles DataChannel disconnection: stops the audio sink, closes the peer connection,
+   * and unregisters the session.
    */
   private async handleDisconnect(sessionId: string): Promise<void> {
     logger.info({ sessionId }, 'WebRTC control channel closed, cleaning up session');
-    const pc = this.peerConnections.get(sessionId);
-    if (pc) {
-      pc.close();
+    const entry = this.peerConnections.get(sessionId);
+    if (entry) {
+      entry.audioSink?.stop();
+      entry.pc.close();
       this.peerConnections.delete(sessionId);
     }
     await this.sessionManager.unregisterSession(sessionId);
@@ -323,8 +354,9 @@ export class WebRTCChannelHost {
    * Removes a peer connection from the internal map by reference.
    */
   private cleanupPeerConnection(pc: RTCPeerConnection): void {
-    for (const [sessionId, storedPc] of this.peerConnections) {
-      if (storedPc === pc) {
+    for (const [sessionId, entry] of this.peerConnections) {
+      if (entry.pc === pc) {
+        entry.audioSink?.stop();
         this.peerConnections.delete(sessionId);
         break;
       }

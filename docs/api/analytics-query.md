@@ -32,6 +32,10 @@ A source is a named dataset that exposes a set of **dimensions** (categorical fi
 | `transformations` | Context transformer execution: duration and token usage |
 | `moderation` | Content moderation checks: flag rates and durations |
 | `stage_visits` | Stage navigation: visit counts and time spent on each stage |
+| `llm_calls` | All LLM invocations across turns, classifications, transformations, and smart function tool calls |
+| `actions` | Action execution analytics from execution_plan events: which actions fired and in which lifecycle context |
+| `variables` | Variable change analytics from variables_updated events: one row per changed variable per event |
+| `user_profile` | User profile change analytics from user_profile_updated events: one row per changed field per event |
 
 ### Metric Specifications
 
@@ -406,7 +410,7 @@ to=2025-01-03T23:59:59Z" \
 ```bash
 curl "http://localhost:3000/api/projects/my-project/analytics/query?\
 source=stage_visits&\
-groupBy[]=stageId&\
+groupBy[]=stageName&\
 metrics[]=count&\
 metrics[]=avg:timeOnStageMs" \
   -H "Authorization: Bearer eyJhbG..."
@@ -415,12 +419,12 @@ metrics[]=avg:timeOnStageMs" \
 ```json
 {
   "source": "stage_visits",
-  "groupBy": ["stageId"],
+  "groupBy": ["stageName"],
   "metrics": ["count", "avg:timeOnStageMs"],
   "rows": [
-    { "bucket": null, "dimensions": { "stageId": "stg_greeting" }, "metrics": { "count": 500, "avg:timeOnStageMs": 8200.5 } },
-    { "bucket": null, "dimensions": { "stageId": "stg_booking" }, "metrics": { "count": 320, "avg:timeOnStageMs": 45000.2 } },
-    { "bucket": null, "dimensions": { "stageId": "stg_farewell" }, "metrics": { "count": 480, "avg:timeOnStageMs": 3100.0 } }
+    { "bucket": null, "dimensions": { "stageName": "Greeting" }, "metrics": { "count": 500, "avg:timeOnStageMs": 8200.5 } },
+    { "bucket": null, "dimensions": { "stageName": "Booking" }, "metrics": { "count": 320, "avg:timeOnStageMs": 45000.2 } },
+    { "bucket": null, "dimensions": { "stageName": "Farewell" }, "metrics": { "count": 480, "avg:timeOnStageMs": 3100.0 } }
   ]
 }
 ```
@@ -457,46 +461,70 @@ metrics[]=sum:totalTokens" \
 
 | Dimensions | Metrics |
 |---|---|
-| `status`, `startingStageId`, `endingStageId` | `durationMs` |
+| `status`, `startingStageId`, `endingStageId` | `durationMs`, `turnsAmount` |
 
 ### events
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId`, `stageName`, `eventType` | *(none — use `count`)* |
+| `conversationId`, `stageName`, `eventType`, `sourceActionName` | *(none — use `count`)* |
 
 ### turns
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId`, `stageName`, `source`, `model`, `provider`, `prescripted` | `totalTurnDurationMs`, `timeToFirstTokenMs`, `timeToFirstTokenFromTurnStartMs`, `timeToFirstAudioMs`, `llmDurationMs`, `ttsDurationMs`, `ttsConnectDurationMs`, `promptRenderDurationMs`, `moderationDurationMs`, `stageTransitionDurationMs`, `processingDurationMs`, `actionsDurationMs`, `asrDurationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageName`, `source`, `model`, `provider`, `prescripted` | `totalTurnDurationMs`, `timeToFirstTokenMs`, `timeToFirstTokenFromTurnStartMs`, `timeToFirstAudioMs`, `llmDurationMs`, `ttsDurationMs`, `ttsConnectDurationMs`, `promptRenderDurationMs`, `moderationDurationMs`, `stageTransitionDurationMs`, `processingDurationMs`, `actionsDurationMs`, `asrDurationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### tool_calls
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId`, `stageName`, `toolId`, `toolName`, `toolType`, `success`, `sourceActionName` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageName`, `toolName`, `toolType`, `success`, `sourceActionName` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### classifications
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId`, `stageName`, `classifierId`, `classifierName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageName`, `classifierName`, `model`, `provider`, `actionName` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### transformations
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId`, `stageName`, `transformerId`, `transformerName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+| `conversationId`, `stageName`, `transformerName`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
 
 ### moderation
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId`, `stageName`, `flagged` | `durationMs` |
+| `conversationId`, `stageName`, `flagged`, `detectedCategory`, `blockingCategory` | `durationMs` |
 
 ### stage_visits
 
 | Dimensions | Metrics |
 |---|---|
-| `conversationId`, `stageId` | `timeOnStageMs` |
+| `conversationId`, `stageName`, `stageSource`, `fromStageName` | `timeOnStageMs`, `conversationLengthMs`, `turnsAmount` |
+
+### llm_calls
+
+| Dimensions | Metrics |
+|---|---|
+| `conversationId`, `stageName`, `eventType`, `model`, `provider` | `durationMs`, `promptTokens`, `completionTokens`, `totalTokens` |
+
+### actions
+
+| Dimensions | Metrics |
+|---|---|
+| `conversationId`, `stageName`, `actionName`, `lifecycleContext` | *(none — use `count`)* |
+
+### variables
+
+| Dimensions | Metrics |
+|---|---|
+| `conversationId`, `stageName`, `variableName`, `sourceActionName` | *(none — use `count`)* |
+
+### user_profile
+
+| Dimensions | Metrics |
+|---|---|
+| `conversationId`, `stageName`, `profileName`, `sourceActionName` | *(none — use `count`)* |

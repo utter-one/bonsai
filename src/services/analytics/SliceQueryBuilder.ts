@@ -19,6 +19,7 @@ export class SliceQueryBuilder {
   private readonly resolvedNormalizeDimension: DimensionDef | null;
   private readonly needsConversationJoin: boolean;
   private readonly needsUserJoin: boolean;
+  private readonly lateralJoinSqls: string[];
 
   constructor(
     private readonly source: SourceDef,
@@ -54,6 +55,7 @@ export class SliceQueryBuilder {
     }
 
     this.needsConversationJoin = this.resolvedDimensions.some((d) => d.requiresConversationJoin)
+      || this.parsedMetrics.some((m) => m.metricDef?.requiresConversationJoin)
       || this.resolveFilterDimensions().some((d) => d.requiresConversationJoin)
       || (this.resolvedNormalizeDimension?.requiresConversationJoin ?? false);
 
@@ -61,6 +63,15 @@ export class SliceQueryBuilder {
       || this.parsedMetrics.some((m) => m.metricDef?.requiresUserJoin)
       || this.resolveFilterDimensions().some((d) => d.requiresUserJoin)
       || (this.resolvedNormalizeDimension?.requiresUserJoin ?? false);
+
+    const seenJoins = new Set<string>();
+    this.lateralJoinSqls = [
+      ...this.resolvedDimensions,
+      ...(this.resolvedNormalizeDimension ? [this.resolvedNormalizeDimension] : []),
+      ...this.resolveFilterDimensions(),
+    ]
+      .flatMap((d) => (d.lateralJoinSql ? [d.lateralJoinSql] : []))
+      .filter((sql) => { if (seenJoins.has(sql)) return false; seenJoins.add(sql); return true; });
   }
 
   /** Builds the final SQL query string */
@@ -200,6 +211,14 @@ export class SliceQueryBuilder {
       WHEN ce.event_type = 'conversation_start' THEN ce.event_data->>'stageId'
       ELSE ce.event_data->>'toStageId'
     END AS stage_id,
+    CASE
+      WHEN ce.event_type = 'conversation_start' THEN 'starting_stage'
+      ELSE 'transition'
+    END AS source_type,
+    CASE
+      WHEN ce.event_type = 'jump_to_stage' THEN ce.event_data->>'fromStageId'
+      ELSE NULL
+    END AS from_stage_id,
     ce.timestamp,
     LEAD(ce.timestamp) OVER (PARTITION BY ce.conversation_id ORDER BY ce.timestamp) AS next_ts
   FROM conversation_events ce
@@ -246,6 +265,10 @@ export class SliceQueryBuilder {
       if (this.needsUserJoin) {
         parts.push(this.buildUserLateralJoin());
       }
+    }
+
+    for (const joinSql of this.lateralJoinSqls) {
+      parts.push(joinSql);
     }
 
     return parts.join('\n');

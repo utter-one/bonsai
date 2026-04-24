@@ -120,7 +120,7 @@ The default limit is **10 attempts per 15 minutes** per IP. Configurable via `RA
 |-------|------|----------|-------------|
 | `sessionId` | `string` | Yes | Session ID from auth |
 | `userId` | `string` | Yes | User initiating the conversation |
-| `stageId` | `string` | Yes | Initial stage ID |
+| `stageId` | `string` | No | Initial stage ID. Falls back to the project's `startingStageId` if omitted. If neither is set, the request fails. |
 | `agentId` | `string` | No | Agent override |
 | `timezone` | `string` | No | IANA timezone identifier (e.g. `America/New_York`). Highest precedence in: `start_conversation.timezone` → `userProfile.timezone` → `project.timezone` → UTC |
 

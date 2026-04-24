@@ -23,6 +23,7 @@ Each project includes:
 | `defaultGuardrailClassifierId` | Optional default guardrail classifier applied project-wide |
 | `timezone` | Default IANA timezone for the project (e.g. `America/New_York`) |
 | `languageCode` | Optional ISO language code for the project (e.g. `en-US`, `pl-PL`). Exposed in conversation context as `project.languageCode` and `project.language`. |
+| `startingStageId` | Optional default starting stage ID. Used as fallback when the client omits `stageId` in the `startConversation` WebSocket message. Set to `null` to clear. |
 | `userProfileVariableDescriptors` | Typed schema describing the fields expected on a user's profile |
 | `version` | Optimistic locking version number |
 

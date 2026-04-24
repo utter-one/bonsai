@@ -27,7 +27,7 @@ const { VoiceResponse } = _twilioModule.twiml as typeof import('twilio').twiml;
 /** Query param schema shared by both the HTTP webhook and the Media Streams WebSocket URL. */
 const voiceQuerySchema = z.object({
   apiKey: z.string().min(1).describe('API key used to authenticate and identify the project'),
-  stageId: z.string().min(1).describe('Stage ID to start new conversations at'),
+  stageId: z.string().min(1).optional().describe('Stage ID to start new conversations at. When omitted, falls back to the project-level default starting stage.'),
   agentId: z.string().optional().describe('Optional agent ID override'),
   channelProviderId: z.string().min(1).describe('ID of the Twilio Voice channel provider record'),
 });
@@ -235,7 +235,7 @@ export class TwilioVoiceChannelHost {
     const twiml = new VoiceResponse();
     const stream = twiml.connect().stream({ url: streamUrl, track: 'inbound_track' });
     stream.parameter({ name: 'apiKey', value: rawApiKey });
-    stream.parameter({ name: 'stageId', value: stageId });
+    if (stageId) stream.parameter({ name: 'stageId', value: stageId });
     stream.parameter({ name: 'channelProviderId', value: channelProviderId });
     stream.parameter({ name: 'from', value: fromNumber });
     if (agentId) stream.parameter({ name: 'agentId', value: agentId });

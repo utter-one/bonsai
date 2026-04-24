@@ -83,7 +83,7 @@ export class ToolExecutor {
 
     const toolStartMs = Date.now();
     try {
-      const llmProvider = this.llmProviderFactory.createProvider(llmProviderEntity, tool.llmSettings);
+      const llmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, tool.llmSettings);
       const actualContext = { ...context, tool: { parameters } };
       await llmProvider.init();
       const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);

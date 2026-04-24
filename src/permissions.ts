@@ -99,6 +99,11 @@ export const PERMISSIONS = {
   MIGRATION_EXPORT: 'migration:export',
   MIGRATION_IMPORT: 'migration:import',
 
+  // Secrets permissions
+  SECRETS_READ: 'secrets:read',
+  SECRETS_DELETE: 'secrets:delete',
+  SECRETS_REVEAL: 'secrets:reveal',
+
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',
@@ -150,6 +155,8 @@ export const ROLES = {
       PERMISSIONS.API_KEY_READ,
       PERMISSIONS.API_KEY_WRITE,
       PERMISSIONS.API_KEY_DELETE,
+      PERMISSIONS.SECRETS_READ,
+      PERMISSIONS.SECRETS_DELETE,
       PERMISSIONS.AUDIT_READ,
       PERMISSIONS.ANALYTICS_READ,
     ],

@@ -1,15 +1,15 @@
 # WebRTC Channel
 
-The WebRTC channel provides real-time bidirectional communication for live conversation sessions over WebRTC DataChannels. It offers lower audio latency than the WebSocket channel by eliminating base64 encoding and reducing round-trip overhead for audio packets.
+The WebRTC channel provides real-time bidirectional communication for live conversation sessions using a native WebRTC audio media track for voice and an RTCDataChannel for control messages. It offers lower audio latency than the WebSocket channel by using RTP/SRTP transport and native browser audio APIs instead of base64-encoded JSON.
 
 ## When to Use WebRTC vs WebSocket
 
 | Consideration | WebSocket | WebRTC |
 |---|---|---|
-| Audio voice input/output | base64-encoded JSON | raw binary (no encoding overhead) |
-| Control messages (auth, commands) | JSON over TCP | JSON over SCTP (same semantics) |
-| Connection setup | Single HTTP upgrade | HTTP signaling + DTLS/SCTP handshake |
-| Browser native audio | Manual encoding required | `MediaStream` captured directly |
+| Audio voice input/output | base64-encoded JSON | native RTP/SRTP + Opus (no encoding overhead) |
+| Control messages (auth, commands) | JSON over TCP | JSON over SCTP DataChannel (same semantics) |
+| Connection setup | Single HTTP upgrade | HTTP signaling + DTLS/ICE handshake |
+| Browser native audio | Manual encoding required | `getUserMedia()` + `addTrack()` directly |
 | Network compatibility | Works everywhere | May fail with symmetric NAT (STUN only) |
 | Audio latency | Good | Better |
 
@@ -19,18 +19,10 @@ Both channels are available simultaneously. The conversation protocol (message t
 
 ## Architecture
 
-Two RTCDataChannels are created by the client before the SDP offer is sent:
+The client creates one named RTCDataChannel and adds its microphone audio track before generating the SDP offer:
 
 - **`control`** — ordered, reliable. Carries all JSON messages: auth, session lifecycle, user text input, commands, and server push events. Same protocol as WebSocket.
-- **`audio`** — unordered, no retransmits. Carries binary audio frames for user voice input (client → server) and AI voice output (server → client). A dropped audio packet is silently discarded instead of retransmitting a stale chunk.
-
-Audio frames on the `audio` DataChannel use a compact binary format:
-
-```
-[ 2 bytes: uint16 LE — turnId byte length ]
-[ N bytes: turnId encoded as UTF-8        ]
-[ remaining bytes: raw audio data          ]
-```
+- **Audio media track** — bidirectional RTP/SRTP (Opus codec). The client sends microphone audio via `addTrack()` / `getUserMedia()`; the server sends AI voice output back via the same negotiated transceiver.
 
 All other messages (transcription updates, generation events, commands, errors) travel as JSON over the `control` channel — identical to WebSocket wire format.
 
@@ -42,41 +34,44 @@ WebRTC connection setup follows a gather-and-return model: the server collects a
 sequenceDiagram
     participant C as Client
     participant S as Server
-    C->>S: POST /api/webrtc/offer
-    Note over S: creates RTCPeerConnection, answer, waits for ICE
+    C->>S: POST /api/webrtc/offer (SDP with mic track + control DataChannel)
+    Note over S: creates RTCPeerConnection, addTrack(audioSource), answer, waits for ICE
     S-->>C: 200 { sdpAnswer }
-    Note over C,S: DTLS/SCTP handshake
+    Note over C,S: DTLS/ICE handshake
     C->>S: control DataChannel open
     Note over S: session registered
-    C->>S: audio DataChannel open
     C->>S: auth (JSON, control)
     S-->>C: auth response (JSON, control)
 ```
 
 ## Connection Setup
 
-Create the two DataChannels, generate an SDP offer, exchange it with the server, then set the answer as the remote description.
+Create the `control` DataChannel, attach the microphone audio track, generate a SDP offer, exchange it with the server, then set the answer. The server's outbound audio track arrives in `pc.ontrack`.
 
 ```javascript
 const pc = new RTCPeerConnection();
 
-// Create DataChannels BEFORE generating the offer so they are
-// included in the SDP and opened server-side via ondatachannel.
+// Add the microphone track BEFORE generating the offer so it is
+// included in the SDP and the server can answer with its own audio track.
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
+
+// Create the control DataChannel BEFORE generating the offer.
 const controlChannel = pc.createDataChannel('control', {
   ordered: true,
 });
 
-const audioChannel = pc.createDataChannel('audio', {
-  ordered: false,
-  maxRetransmits: 0,
-});
+// Receive the server's outbound audio track (AI voice output).
+const remoteStream = new MediaStream();
+const audioEl = document.getElementById('ai-audio'); // <audio autoplay>
+audioEl.srcObject = remoteStream;
 
-// Wait for both channels to open before authenticating
-let controlOpen = false;
-let audioOpen = false;
+pc.ontrack = (event) => {
+  event.streams[0]?.getTracks().forEach((track) => remoteStream.addTrack(track));
+};
 
-function onBothOpen() {
-  // Authenticate immediately after both channels open
+controlChannel.onopen = () => {
+  // Authenticate immediately after the control channel opens.
   controlChannel.send(JSON.stringify({
     requestId: 'req-1',
     type: 'auth',
@@ -89,22 +84,14 @@ function onBothOpen() {
       receiveEvents: true,
     },
   }));
-}
-
-controlChannel.onopen = () => { controlOpen = true; if (audioOpen) onBothOpen(); };
-audioChannel.onopen  = () => { audioOpen  = true; if (controlOpen) onBothOpen(); };
+};
 
 controlChannel.onmessage = (event) => {
   const msg = JSON.parse(event.data);
   handleControlMessage(msg);
 };
 
-audioChannel.onmessage = (event) => {
-  // Binary audio frame from server (AI voice output)
-  handleAudioFrame(event.data);
-};
-
-// Create offer and send to server
+// Create offer and send to server.
 const offer = await pc.createOffer();
 await pc.setLocalDescription(offer);
 
@@ -120,7 +107,7 @@ await pc.setRemoteDescription({ type: 'answer', sdp: sdpAnswer });
 
 ## Authentication
 
-After both DataChannels open, send an `auth` message over the `control` channel. The format is identical to WebSocket:
+After the `control` DataChannel opens, send an `auth` message over it. The format is identical to WebSocket:
 
 ```json
 {
@@ -239,7 +226,7 @@ Send over the `control` channel:
 
 ### Voice Input
 
-Voice input uses the `control` channel for signaling and the `audio` channel for binary audio data.
+Voice input uses the `control` channel for signaling. The audio itself flows automatically over the native audio media track that was set up during connection (via `getUserMedia()` and `addTrack()`). The server captures it through an RTCAudioSink and routes it to ASR.
 
 **1. Signal start (control channel):**
 
@@ -264,37 +251,9 @@ The server responds with `inputTurnId`:
 }
 ```
 
-**2. Stream audio frames (audio channel):**
+Microphone audio is already streaming to the server via the audio media track established during connection setup. No separate audio transmission step is needed — just signal start and end.
 
-Encode each audio buffer as a binary frame and send it over the `audio` DataChannel:
-
-```javascript
-function encodeAudioFrame(turnId, audioBuffer) {
-  const turnIdBytes = new TextEncoder().encode(turnId);
-  const header = new ArrayBuffer(2);
-  new DataView(header).setUint16(0, turnIdBytes.length, true); // little-endian
-  return concatBuffers([header, turnIdBytes.buffer, audioBuffer]);
-}
-
-function concatBuffers(buffers) {
-  const total = buffers.reduce((n, b) => n + b.byteLength, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const buf of buffers) {
-    out.set(new Uint8Array(buf), offset);
-    offset += buf.byteLength;
-  }
-  return out.buffer;
-}
-
-// Called for each audio chunk from MediaRecorder or AudioWorklet
-function onAudioChunk(audioBuffer, inputTurnId) {
-  const frame = encodeAudioFrame(inputTurnId, audioBuffer);
-  audioChannel.send(frame);
-}
-```
-
-**3. Signal end (control channel):**
+**2. Signal end (control channel):**
 
 ```json
 {
@@ -325,33 +284,20 @@ When `receiveTranscriptionUpdates` is enabled:
 
 ## AI Voice Output
 
-AI voice chunks arrive as binary frames on the `audio` DataChannel using the same format as user voice input frames:
-
-```
-[ 2 bytes: uint16 LE — outputTurnId byte length ]
-[ N bytes: outputTurnId as UTF-8                ]
-[ remaining: raw audio data                      ]
-```
-
-Decode them on the client:
+AI voice audio arrives on the native audio media track received via `pc.ontrack` during connection setup. No extra decoding is needed — attach the stream to an `<audio>` element or a Web Audio API node and the browser plays it automatically.
 
 ```javascript
-audioChannel.onmessage = (event) => {
-  const buffer = event.data instanceof ArrayBuffer
-    ? event.data
-    : event.data.arrayBuffer(); // Blob (some browsers)
+// Set up during connection (see Connection Setup above)
+const remoteStream = new MediaStream();
+const audioEl = document.getElementById('ai-audio'); // <audio autoplay>
+audioEl.srcObject = remoteStream;
 
-  Promise.resolve(buffer).then((buf) => {
-    const view = new DataView(buf);
-    const turnIdLength = view.getUint16(0, true); // little-endian
-    const turnId = new TextDecoder().decode(new Uint8Array(buf, 2, turnIdLength));
-    const audioData = buf.slice(2 + turnIdLength);
-    playAudioChunk(turnId, audioData);
-  });
+pc.ontrack = (event) => {
+  event.streams[0]?.getTracks().forEach((track) => remoteStream.addTrack(track));
 };
 ```
 
-The control channel carries the surrounding generation events:
+The `control` channel carries the surrounding generation events so you can show text streaming or react to turn boundaries:
 
 ```json
 { "type": "start_ai_generation_output", "outputTurnId": "out-uuid", "expectVoice": true }
@@ -453,12 +399,12 @@ Errors are sent as JSON over the `control` channel:
 sequenceDiagram
     participant C as Client
     participant S as Server
-    C->>S: POST /api/webrtc/offer
+    C->>S: POST /api/webrtc/offer (SDP with audio track + control DataChannel)
+    Note over S: addTrack(audioSource), setRemoteDescription, createAnswer
     S-->>C: 200 { sdpAnswer }
-    Note over C,S: DTLS/SCTP handshake
-    C->>S: control open
+    Note over C,S: DTLS/SCTP + ICE handshake
+    C->>S: control DataChannel open
     Note over S: registerSession()
-    C->>S: audio open
     C->>S: auth (control)
     S-->>C: auth success (control)
     C->>S: start_conversation (control)
@@ -466,14 +412,14 @@ sequenceDiagram
     S-->>C: start_conversation result
     C->>S: start_user_voice_input (control)
     S-->>C: inputTurnId
-    C->>S: binary audio frames (audio)
+    Note over C,S: mic audio flows via RTP audio track
     Note over S: ASR provider
-    S-->>C: user_transcribed_chunk (interim transcription)
+    S-->>C: user_transcribed_chunk (interim transcription, control)
     C->>S: end_user_voice_input (control)
-    S-->>C: start_ai_generation_output
-    S-->>C: ai_transcribed_chunk (text streaming)
-    S-->>C: binary audio frames (TTS streaming)
-    S-->>C: end_ai_generation_output
+    S-->>C: start_ai_generation_output (control)
+    S-->>C: ai_transcribed_chunk (text streaming, control)
+    Note over C,S: AI voice flows via RTP audio track
+    S-->>C: end_ai_generation_output (control)
     C->>S: end_conversation (control)
     C->>S: control channel closes
     Note over S: unregisterSession()

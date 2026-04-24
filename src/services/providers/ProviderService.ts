@@ -17,6 +17,7 @@ import { PERMISSIONS } from '../../permissions';
 import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
 import { LlmProviderFactory } from './llm/LlmProviderFactory';
 import type { LlmModelInfo } from './ProviderCatalogService';
+import { SecretRefUtils, SENSITIVE_PROVIDER_CONFIG_FIELDS } from '../secrets/SecretRefUtils';
 
 /**
  * Service for managing provider configurations with full CRUD operations and audit logging
@@ -26,6 +27,7 @@ export class ProviderService extends BaseService {
   constructor(
     @inject(AuditService) private readonly auditService: AuditService,
     @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
+    @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
   ) {
     super();
   }
@@ -42,7 +44,8 @@ export class ProviderService extends BaseService {
     logger.info({ providerId, name: input.name, providerType: input.providerType, apiType: input.apiType, operatorId: context?.operatorId }, 'Creating provider');
 
     try {
-      const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: input.config, createdBy: input.createdBy || context?.operatorId, tags: input.tags, version: 1 }).returning();
+      const secretizedConfig = await this.secretRefUtils.secretizeObject(input.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS);
+      const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: secretizedConfig as typeof input.config, createdBy: input.createdBy || context?.operatorId, tags: input.tags, version: 1 }).returning();
 
       const createdProvider = provider[0];
 
@@ -191,7 +194,7 @@ export class ProviderService extends BaseService {
         description: updateData.description,
         providerType: updateData.providerType,
         apiType: updateData.apiType,
-        config: updateData.config,
+        config: updateData.config ? await this.secretRefUtils.secretizeObject(updateData.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS) : updateData.config,
         tags: updateData.tags,
         version: existingProvider.version + 1,
         updatedAt: new Date(),
@@ -280,7 +283,7 @@ export class ProviderService extends BaseService {
       throw new InvalidOperationError(`Provider ${id} is not an LLM provider (type: ${provider.providerType})`);
     }
 
-    const instance = this.llmProviderFactory.createProviderForEnumeration(provider);
+    const instance = await this.llmProviderFactory.createProviderForEnumeration(provider);
     await instance.init();
     try {
       return await instance.enumerateModels();
