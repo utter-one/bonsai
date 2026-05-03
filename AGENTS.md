@@ -7,7 +7,9 @@
 - `npm start` = db:migrate + tsx src/index.ts
 - `npm run db:generate` → `npm run db:migrate` — schema change flow (never use `db:push` in production)
 - `npm run schemas:generate` — regenerate `schemas/websocket-contracts.json`
-- No test framework, no lint/typecheck. CI only runs `npm install && npm run build`.
+- `npm run test` — run Vitest unit tests (312+ tests, ~3s). Use `npm run test -- path/to/file.test.ts` for specific file
+- `npm run test:coverage` — run tests with v8 coverage report
+- No lint/typecheck. CI runs `npm install && npm run build`.
 
 ## Architecture
 
@@ -138,10 +140,116 @@ Optional but important:
 
 Fresh install without Console requires POST to `/api/setup/initial-operator` to create the first operator account. The setup endpoint is unauthenticated and only available before an operator exists.
 
+## Testing
+
+**Framework**: Vitest with ESM support. Config at `vitest.config.ts`. Tests live in `/tests/` directory (NOT colocated with source files).
+
+### Test Structure
+
+```
+tests/
+├── setup.ts              # Global setup — imports reflect-metadata, resets tsyringe container per test
+├── helpers/
+│   ├── crudServiceTest.ts    # Parameterized CRUD harness (~250 lines) for standard services
+│   ├── testContext.ts        # RequestContext factory
+│   └── mockServices.ts       # Mock AuditService stubs
+├── utils/                # Pure utility function tests
+├── contracts/            # Zod schema validation tests
+└── services/             # Service layer tests
+```
+
+### Critical Patterns
+
+**1. DB mocking is mandatory for service tests** — `src/db/index.ts` is a singleton that connects immediately on import via `new Pool(DB_CONNECTION_STRING)`. Always mock it:
+
+```typescript
+vi.mock('../../src/db/index', () => {
+  const findFirst = vi.fn().mockResolvedValue({});
+  const findMany = vi.fn().mockResolvedValue([]);
+  let lastInsertedValues: Record<string, any> = {};
+  const updateReturning = vi.fn().mockResolvedValue([]);
+  const deleteReturning = vi.fn().mockResolvedValue([]);
+
+  const query = {
+    [tableName]: {
+      findFirst,
+      findMany,
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockImplementation((v) => { lastInsertedValues = v; return { returning: vi.fn().mockResolvedValue([{ ...v }]) }; }),
+      }),
+      update: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: updateReturning,
+        }),
+      }),
+      delete: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: deleteReturning,
+        }),
+      }),
+    },
+  };
+
+  return {
+    db: query,
+    __mocks: { findFirst, findMany, insert: query[tableName].insert, update: updateReturning, remove: deleteReturning, lastInsertedValues },
+  };
+});
+```
+
+**2. Drizzle table names use JavaScript variable names** — e.g., `query.copyDecorators` (camelCase), NOT `query.copy_decorators` (snake_case).
+
+**3. vi.mock hoisting** — mock factories run before top-level code executes. All variables referenced inside the factory must be defined within it or at module scope (no TDZ issues):
+
+```typescript
+// GOOD — self-contained factory
+vi.mock('../../src/db/index', () => {
+  const findFirst = vi.fn().mockResolvedValue({});
+  return { db: { myTable: { findFirst } }, __mocks: { findFirst } };
+});
+
+// BAD — references external variable
+const myFn = vi.fn();
+vi.mock('../../src/db/index', () => ({ db: { myTable: { findFirst: myFn } } }));
+```
+
+**4. Use CRUD harness for standard services** — 25+ services follow identical patterns. Create a test file with ~80 lines of config instead of 150+ lines of repetitive tests:
+
+```typescript
+import { createCrudTests } from '../helpers/crudServiceTest';
+import type { RequestContext } from '../../src/services/RequestContext';
+
+// ... vi.mock setup for db/index and utils/logger ...
+
+import { MyService } from '../../src/services/MyService';
+import { __mocks as dbMock } from '../../src/db/index';
+
+const entityId = 'myent_test001';
+const createPayload = () => ({ id: entityId, name: 'Test Entity' });
+const createEntityRow = (id: string) => ({ id, projectId: '__test_project__', name: 'Test Entity', version: 1, createdAt: new Date(), updatedAt: new Date() });
+
+createCrudTests<MyService>({
+  entityName: 'myEntity',
+  permissions: { write: PERMISSIONS.MY_ENTITY_WRITE, delete: PERMISSIONS.MY_ENTITY_DELETE },
+  hasVersion: true,
+  createService: () => ({ service: new MyService(mockAudit) }),
+  createPayload,
+  createEntityRow,
+  resetMocks: () => { dbMock.findFirst.mockResolvedValue(createEntityRow(entityId)); },
+});
+```
+
+**5. Date handling** — services that call `.toISOString()` on DB Date objects need mocks returning `Date` objects (not ISO strings). Zod schemas validate the transformed output.
+
+**6. Services that auto-generate IDs** (e.g., ApiKeyService) don't fit the harness without mocking `generateId`. Write custom tests instead.
+
+### When to Write Tests
+
+- **Service layer changes**: Always add/update tests for new service methods
+- **Schema changes**: Update corresponding contract tests
+- **Utility functions**: Test edge cases and error paths
+- **Permission logic**: Verify RBAC behavior with different roles
+
 ## Documentation
-
-VitePress docs (`docs/`): never use bare `{{ }}` outside fenced code blocks (Vue interpolation breaks build). Wrap in `<code v-pre>`.
-
-## Branch / PR
 
 PRs to `dev` branch; `main` is production. CI runs on `dev`, Node 20.x, only validates `npm install && npm run build`.
