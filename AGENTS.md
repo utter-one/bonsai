@@ -142,7 +142,7 @@ Fresh install without Console requires POST to `/api/setup/initial-operator` to 
 
 ## Testing
 
-**Framework**: Vitest with ESM support. Config at `vitest.config.ts`. Tests live in `/tests/` directory (NOT colocated with source files).
+**Framework**: Vitest with ESM support. Config at `vitest.config.ts`. Tests live in `/tests/` directory (NOT colocated with source files). Use node v20 via nvm.
 
 ### Test Structure
 
