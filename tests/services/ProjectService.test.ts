@@ -183,10 +183,11 @@ function createProjectRow(overrides?: Record<string, any>) {
 
 describe('ProjectService', () => {
   let service: ProjectService;
+  let mockAudit: { logCreate: ReturnType<typeof vi.fn>; logUpdate: ReturnType<typeof vi.fn>; logDelete: ReturnType<typeof vi.fn>; getEntityAuditLogs: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    const mockAudit = {
+    mockAudit = {
       logCreate: vi.fn().mockResolvedValue(undefined),
       logUpdate: vi.fn().mockResolvedValue(undefined),
       logDelete: vi.fn().mockResolvedValue(undefined),
@@ -203,6 +204,11 @@ describe('ProjectService', () => {
       expect(result).toBeDefined();
       expect(result.id).toBe('proj_test123');
       expect(result.name).toBe('New Project');
+    });
+
+    it('logs audit entry on successful creation', async () => {
+      await service.createProject({ name: 'Audited Project', acceptVoice: false }, defaultContext);
+      expect(mockAudit.logCreate).toHaveBeenCalledWith('project', 'proj_test123', expect.any(Object), 'op_test123');
     });
 
     it('throws ForbiddenError when user lacks write permission', async () => {
@@ -257,6 +263,11 @@ describe('ProjectService', () => {
       expect(result.id).toBe('proj_test123');
     });
 
+    it('logs audit entry on successful update', async () => {
+      await service.updateProject('proj_test123', { name: 'Updated Audited', version: 1 }, defaultContext);
+      expect(mockAudit.logUpdate).toHaveBeenCalledWith('project', 'proj_test123', expect.any(Object), expect.any(Object), 'op_test123', 'proj_test123');
+    });
+
     it('throws ForbiddenError when user lacks write permission', async () => {
       await expect(
         service.updateProject('proj_test123', { name: 'Updated', version: 1 }, deniedContext)
@@ -303,6 +314,11 @@ describe('ProjectService', () => {
       expect(dbMock.transaction).toHaveBeenCalled();
     });
 
+    it('logs audit entry on successful deletion', async () => {
+      await service.deleteProject('proj_test123', defaultContext);
+      expect(mockAudit.logDelete).toHaveBeenCalledWith('project', 'proj_test123', expect.any(Object), 'op_test123');
+    });
+
     it('throws ForbiddenError when user lacks delete permission', async () => {
       await expect(
         service.deleteProject('proj_test123', deniedContext)
@@ -322,6 +338,11 @@ describe('ProjectService', () => {
       const result = await service.archiveProject('proj_test123', { version: 1 }, defaultContext);
       expect(result).toBeDefined();
       expect(result.id).toBe('proj_test123');
+    });
+
+    it('logs audit entry on successful archive', async () => {
+      await service.archiveProject('proj_test123', { version: 1 }, defaultContext);
+      expect(mockAudit.logUpdate).toHaveBeenCalled();
     });
 
     it('throws ArchivedProjectError when already archived', async () => {
@@ -358,6 +379,16 @@ describe('ProjectService', () => {
       const result = await service.unarchiveProject('proj_test123', { version: 1 }, defaultContext);
       expect(result).toBeDefined();
       expect(result.id).toBe('proj_test123');
+    });
+
+    it('logs audit entry on successful unarchive', async () => {
+      dbMock.findFirst.mockResolvedValue(createProjectRow({
+        archivedAt: new Date(),
+        archivedBy: 'op_other',
+        version: 1,
+      }));
+      await service.unarchiveProject('proj_test123', { version: 1 }, defaultContext);
+      expect(mockAudit.logUpdate).toHaveBeenCalled();
     });
 
     it('throws InvalidOperationError when not archived', async () => {
