@@ -54,7 +54,7 @@ export function buildFilterCondition(
   }
 
   // Handle operation filters
-  if (typeof filter === 'object' && 'op' in filter) {
+  if (typeof filter === 'object' && filter !== null && 'op' in filter) {
     const operation = filter as ListFilterOperation;
     switch (operation.op) {
       case 'eq':
