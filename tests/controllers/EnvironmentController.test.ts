@@ -318,7 +318,7 @@ describe('EnvironmentController', () => {
       const mockRouter = { post: vi.fn(), get: vi.fn(), put: vi.fn(), delete: vi.fn() } as any;
       controller.registerRoutes(mockRouter);
 
-      expect(mockRouter.post).toHaveBeenCalledTimes(1);
+      expect(mockRouter.post).toHaveBeenCalledTimes(2);
       expect(mockRouter.get).toHaveBeenCalledTimes(5);
       expect(mockRouter.put).toHaveBeenCalledTimes(1);
       expect(mockRouter.delete).toHaveBeenCalledTimes(1);

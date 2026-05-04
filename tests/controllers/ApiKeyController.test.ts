@@ -99,7 +99,7 @@ describe('ApiKeyController', () => {
       });
       const res = createMockResponse();
 
-      await (controller as any).getApiKeyById(req, res);
+      await (controller as any).getApiKey(req, res);
 
       expect(service.getApiKeyById).toHaveBeenCalledWith(testProjectId, testApiKeyId);
       expect((res as MockResponse).statusCode).toBe(200);
@@ -110,7 +110,7 @@ describe('ApiKeyController', () => {
       const req = createMockRequest({ user: undefined, params: { projectId: testProjectId, id: testApiKeyId } });
       const res = createMockResponse();
 
-      await expect((controller as any).getApiKeyById(req, res)).rejects.toThrow(UnauthorizedError);
+      await expect((controller as any).getApiKey(req, res)).rejects.toThrow(UnauthorizedError);
     });
   });
 
