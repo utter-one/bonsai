@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    chaiConfig: {
+      truncateThreshold: 0,
+    },
     globals: true,
     setupFiles: ['tests/setup.ts'],
     include: ['tests/**/*.test.ts'],
@@ -23,6 +26,9 @@ export default defineConfig({
         'src/index.ts',
         'src/server.ts',
         'src/scripts/**/*',
+      ],
+      reporter: [
+        ['text', { maxCols: 150 }], // Adjust maxCols to prevent truncation of coverage report in the terminal
       ],
       thresholds: {
         lines: 10,
