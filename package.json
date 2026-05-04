@@ -15,8 +15,9 @@
     "schemas:generate": "tsx src/scripts/generateWebSocketSchemas.ts",
     "secrets:migrate": "tsx src/scripts/migrateSecretsToEncrypted.ts",
     "test": "vitest run",
-  "test:watch": "vitest",
-  "test:coverage": "vitest run --coverage"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "coverage:map": "node scripts/mapCoverageToTests.js"
   },
   "author": "utter.one",
   "license": "Apache-2.0",
