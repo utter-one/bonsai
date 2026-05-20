@@ -4,22 +4,24 @@ import type { IClientConnection } from '../IClientConnection';
 import type { CALOutputMessage } from '../messages';
 import { logger } from '../../utils/logger';
 
-/**
- * Twilio Media Streams-backed implementation of {@link IClientConnection}.
- *
- * Each instance represents one inbound phone call session. Audio is exchanged via
- * the Twilio Media Streams WebSocket in µLaw 8 kHz format.
- *
- * Outbound CAL messages are handled as follows:
- * - `start_ai_generation_output`: sends a Twilio `clear` to flush any still-buffered audio from the
- *   previous turn (barge-in) and cancels all pending mark callbacks so stale echoes are ignored.
- * - `send_ai_voice_chunk`: base64-encodes the µLaw audio payload and sends it to Twilio as a `media` event.
- *   Non-µLaw chunks are logged and dropped.
- * - `end_ai_generation_output`: sends a Twilio `mark` after the last audio chunk. Twilio echoes the mark
- *   once all buffered audio has finished playing, at which point `onAiTurnEnd` opens the next voice
- *   input turn. This prevents starting user input while audio is still buffered.
- * - All other message types are silently dropped (voice-only channel).
- */
+ /**
+   * Twilio Media Streams-backed implementation of {@link IClientConnection}.
+   *
+   * Each instance represents one inbound phone call session. Audio is exchanged via
+   * the Twilio Media Streams WebSocket in µLaw 8 kHz format.
+   *
+   * Outbound CAL messages are handled as follows:
+   * - `start_ai_generation_output`: sends a Twilio `clear` to flush any still-buffered audio from the
+   *   previous turn (barge-in) and cancels all pending mark callbacks so stale echoes are ignored.
+   * - `abort_ai_generation_output`: sends a Twilio `clear` to immediately flush buffered AI audio when
+   *   the user barges in, and cancels all pending mark callbacks so stale echoes are ignored.
+   * - `send_ai_voice_chunk`: base64-encodes the µLaw audio payload and sends it to Twilio as a `media` event.
+   *   Non-µLaw chunks are logged and dropped.
+   * - `end_ai_generation_output`: sends a Twilio `mark` after the last audio chunk. Twilio echoes the mark
+   *   once all buffered audio has finished playing, at which point `onAiTurnEnd` opens the next voice
+   *   input turn. This prevents starting user input while audio is still buffered.
+   * - All other message types are silently dropped (voice-only channel).
+   */
 export class TwilioVoiceConnection implements IClientConnection {
   readonly connectionType = 'twilio_voice' as const;
 
@@ -75,8 +77,6 @@ export class TwilioVoiceConnection implements IClientConnection {
 
   /**
    * Sends a CAL output message toward the Twilio caller.
-   *
-   * Only `send_ai_voice_chunk` and `end_ai_generation_output` have observable effects.
    * @param msg - The CAL output message to transmit.
    */
   async sendMessage(msg: CALOutputMessage): Promise<void> {
@@ -97,6 +97,12 @@ export class TwilioVoiceConnection implements IClientConnection {
         const payload = msg.audioData.toString('base64');
         const frame = JSON.stringify({ event: 'media', streamSid: this.streamSid, media: { payload } });
         this.ws.send(frame);
+        break;
+      }
+      case 'abort_ai_generation_output': {
+        // Flush all buffered AI audio immediately so the caller stops hearing the interrupted response.
+        this.onClearMarkCallbacks();
+        this.ws.send(JSON.stringify({ event: 'clear', streamSid: this.streamSid }));
         break;
       }
       case 'end_ai_generation_output': {

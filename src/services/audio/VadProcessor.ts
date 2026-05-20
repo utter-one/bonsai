@@ -63,7 +63,7 @@ export class VadProcessor extends EventEmitter {
       mode: config.mode ?? 2,
       frameDurationMs: config.frameDurationMs ?? 20,
       silencePaddingMs: config.silencePaddingMs ?? 300,
-      autoEndSilenceDurationMs: config.autoEndSilenceDurationMs ?? 800,
+      autoEndSilenceDurationMs: config.autoEndSilenceDurationMs ?? 1000,
     };
   }
 

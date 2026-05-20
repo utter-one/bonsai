@@ -20,7 +20,7 @@ export const serverVadConfigSchema = z.object({
     'Amount of silence (in ms) to prepend before the detected speech start as a pre-roll buffer. Default: 300.'
   ),
   autoEndSilenceDurationMs: z.number().int().min(100).max(5000).optional().describe(
-    'Duration of silence (in ms) after speech that triggers end-of-utterance detection. Default: 800.'
+    'Duration of silence (in ms) after speech that triggers end-of-utterance detection. Default: 1000.'
   ),
 }).openapi('ServerVadConfig');
 

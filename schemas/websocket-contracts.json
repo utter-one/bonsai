@@ -777,7 +777,7 @@
           "type": "integer",
           "minimum": 100,
           "maximum": 5000,
-          "description": "Duration of silence (in ms) after speech that triggers end-of-utterance detection. Default: 800."
+          "description": "Duration of silence (in ms) after speech that triggers end-of-utterance detection. Default: 1500."
         }
       },
       "description": "Server-side VAD configuration. When set, the server autonomously detects speech boundaries — clients send continuous audio without calling start/end_user_voice_input."

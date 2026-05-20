@@ -1778,6 +1778,28 @@ export class ConversationRunner {
     if (this.conversation.status === 'generating_response') {
       await this.abortCurrentResponse();
       this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
+
+      // Transition to receiving_user_voice and start ASR so the user's speech is captured.
+      // Without this, the state guard (status === 'receiving_user_voice') in the audio
+      // forwarding path would silently drop all incoming audio chunks.
+      if (!this.stageData.asrProvider) {
+        logger.warn({ conversationId: this.stageData.conversation.id }, 'Barge-in: no ASR provider available after abort');
+        return;
+      }
+
+      try {
+        await this.changeState('receiving_user_voice');
+        if (this.asrPreWarmPromise) {
+          await this.asrPreWarmPromise;
+          this.asrPreWarmPromise = null;
+          this.stageData.asrProvider.resetForNewTurn();
+        } else {
+          await this.stageData.asrProvider.start();
+        }
+        logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, `Barge-in: transitioned to receiving_user_voice, ASR started`);
+      } catch (error) {
+        logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to start ASR after barge-in abort`);
+      }
       return;
     }
 
@@ -1789,9 +1811,9 @@ export class ConversationRunner {
         inputTurnId: this.turnData.inputTurnId,
       };
       await this.channel.sendMessage(userSpeakingMsg);
-      logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, 'Sent user_speaking_started message during barge-in');
+      logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, 'Sent user_speaking_started message');
     } catch (error) {
-      logger.warn({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, 'Failed to send user_speaking_started during barge-in');
+      logger.warn({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, 'Failed to send user_speaking_started');
     }
 
     // Subsequent barge-in speech_start during receiving_user_voice (user paused briefly then spoke again).
