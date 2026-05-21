@@ -1799,6 +1799,12 @@ export class ConversationRunner {
         logger.info({ conversationId: this.stageData.conversation.id, inputTurnId: this.turnData.inputTurnId }, `Barge-in: transitioned to receiving_user_voice, ASR started`);
       } catch (error) {
         logger.error({ conversationId: this.stageData.conversation.id, error: error instanceof Error ? error.message : String(error) }, `Failed to start ASR after barge-in abort`);
+        // Roll back state so the conversation isn't stuck in receiving_user_voice with no ASR.
+        try {
+          await this.changeState('awaiting_user_input');
+        } catch (rollbackError) {
+          logger.error({ conversationId: this.stageData.conversation.id, error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError) }, `Failed to roll back state after barge-in ASR start failure`);
+        }
       }
       return;
     }
@@ -2521,6 +2527,15 @@ export class ConversationRunner {
     if (!action) {
       // Guard against overwriting a terminal state (e.g. when onGenerationEnded fires
       // after a synchronous TTS provider already completed inline).
+      // Also guard against overwriting receiving_user_voice during an active barge-in:
+      // if VAD triggered speech_start while TTS was streaming, the TTS WebSocket close
+      // event may fire after barge-in has already transitioned to receiving_user_voice.
+      // Transitioning back to awaiting_user_input would reset the VAD and drop the
+      // user's ongoing speech.
+      if (this.isBargeIn) {
+        logger.info({ conversationId: this.conversation.id }, `Barge-in in progress, skipping post-response state transition for conversation ${this.conversation.id}`);
+        return;
+      }
       if (this.conversation.status !== 'finished' && this.conversation.status !== 'failed') {
         await this.changeState('awaiting_user_input');
       }
