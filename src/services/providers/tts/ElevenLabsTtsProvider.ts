@@ -175,6 +175,24 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   }
 
   /**
+   * Cancels the ongoing speech generation without finalizing it.
+   * Used when a user barge-in interrupts the AI's response.
+   */
+  async cancel(): Promise<void> {
+    if (!this.socket) {
+      logger.info(`[ElevenLabs] No active session to cancel`);
+      return;
+    }
+
+    logger.info(`[ElevenLabs] Cancelling speech generation (barge-in)`);
+
+    // Close the WebSocket immediately without sending EOS — abandons the TTS session
+    if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+      this.socket.close();
+    }
+  }
+
+  /**
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */

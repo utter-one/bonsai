@@ -258,6 +258,31 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
   }
 
   /**
+   * Cancels the ongoing speech generation without finalizing it.
+   * Used when a user barge-in interrupts the AI's response.
+   */
+  async cancel(): Promise<void> {
+    if (!this.socket) {
+      logger.info(`[Cartesia] No active session to cancel`);
+      return;
+    }
+
+    logger.info(`[Cartesia] Cancelling speech generation (barge-in)`);
+
+    // Clear buffer timer and resolve pending completions to avoid hanging promises
+    this.clearBufferTimer();
+    for (const resolver of this.pendingCompletions.values()) {
+      resolver();
+    }
+    this.pendingCompletions.clear();
+
+    // Close the WebSocket immediately — abandons the TTS session
+    if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+      this.socket.close();
+    }
+  }
+
+  /**
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */

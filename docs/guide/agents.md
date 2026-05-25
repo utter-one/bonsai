@@ -127,7 +127,8 @@ Set `fillerSettings` on the agent:
     "model": "gpt-4o-mini",
     "temperature": 0.7
   },
-  "prompt": "Generate a single short neutral sentence to fill silence while processing. Examples: \"Hmm, let me think about that.\", \"Sure, one moment.\", \"Let me check that for you.\". Output only the sentence, no quotes."
+  "prompt": "Generate a single short neutral sentence to fill silence while processing. Examples: \"Hmm, let me think about that.\", \"Sure, one moment.\", \"Let me check that for you.\". Output only the sentence, no quotes.",
+  "historyMessageCount": 4
 }
 ```
 
@@ -153,6 +154,7 @@ The `prompt` supports [Handlebars templates](./templating). The following variab
 - Keep the filler prompt strict: instruct the LLM to produce **one sentence only**, with no extra commentary or punctuation.
 - Use a fast, cheap LLM (e.g. `gpt-4o-mini`) since latency here directly affects when the user first hears audio.
 - You can reference <code v-pre>{{userInput}}</code> in the prompt to make fillers slightly context-aware (e.g. different fillers for questions vs statements).
+- Set `historyMessageCount` to include recent conversation messages in the filler LLM context, enabling more natural responses that acknowledge what was just discussed (e.g. "I see you're asking about pricing — let me check that for you.").
 
 ## Usage in Stages
 

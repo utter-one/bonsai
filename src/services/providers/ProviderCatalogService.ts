@@ -11833,6 +11833,12 @@ export class ProviderCatalogService {
         description: 'Meta WhatsApp Cloud API for text-based conversations via WhatsApp Business',
         features: ['WhatsApp messaging', 'Webhook signature validation', 'Inbound/outbound text messages', 'Slash-command interface'],
       },
+      {
+        apiType: 'telegram',
+        displayName: 'Telegram (Bot API)',
+        description: 'Telegram Bot API for text-based conversations via Telegram bots',
+        features: ['Telegram messaging', 'Webhook support', 'Inbound/outbound text messages', 'Slash-command interface'],
+      },
     ];
   }
 }

@@ -35,6 +35,7 @@ import { VersionController } from './http/controllers/VersionController';
 import { MigrationController } from './http/controllers/MigrationController';
 import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
 import { ConversationTimeoutService } from './services/ConversationTimeoutService';
+import { ScenarioRunExecutorService } from './services/testing/ScenarioRunExecutorService';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -46,11 +47,21 @@ import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
 import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
+import { TelegramChannelHost } from './channels/telegram/TelegramChannelHost';
 import logger from './utils/logger';
 import { fileURLToPath } from 'url';
 import { SecretsManagerRegistry } from './services/secrets/SecretsManagerRegistry';
 import { LocalSecretsManager, LOCAL_SECRETS_MANAGER_NAME } from './services/secrets/LocalSecretsManager';
 import { SecretController } from './http/controllers/SecretController';
+import { TesterController } from './http/controllers/TesterController';
+import { ScenarioController } from './http/controllers/ScenarioController';
+import { ScenarioRunController } from './http/controllers/ScenarioRunController';
+import { ScenarioConversationController } from './http/controllers/ScenarioConversationController';
+import { BenchmarkSuiteController } from './http/controllers/BenchmarkSuiteController';
+import { BenchmarkProviderConfigController } from './http/controllers/BenchmarkProviderConfigController';
+import { BenchmarkConfigController } from './http/controllers/BenchmarkConfigController';
+import { BenchmarkRunController } from './http/controllers/BenchmarkRunController';
+import { BenchmarkExecutorService } from './services/BenchmarkExecutorService';
 
 // Register the OpenAPI spec provider before the IoC container is used.
 // This breaks the circular module dependency that would arise from VersionService
@@ -124,6 +135,14 @@ export function createApp(): express.Application {
     const schemaUrl = new URL('../schemas/websocket-contracts.json', import.meta.url);
     const schemaPath = fileURLToPath(schemaUrl);
     res.sendFile(schemaPath);
+  });
+
+  // LLM-ingestible guide endpoint
+  app.get('/llms.txt', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    const llmsUrl = new URL('../llms.txt', import.meta.url);
+    const llmsPath = fileURLToPath(llmsUrl);
+    res.sendFile(llmsPath);
   });
 
   // Unauthenticated system endpoints — registered before auth middleware intentionally
@@ -232,12 +251,32 @@ export function createApp(): express.Application {
   const secretController = container.resolve(SecretController);
   secretController.registerRoutes(app);
 
+  const testerController = container.resolve(TesterController);
+  testerController.registerRoutes(app);
+
+  const scenarioController = container.resolve(ScenarioController);
+  scenarioController.registerRoutes(app);
+
+  const scenarioRunController = container.resolve(ScenarioRunController);
+  scenarioRunController.registerRoutes(app);
+
+  const scenarioConversationController = container.resolve(ScenarioConversationController);
+  scenarioConversationController.registerRoutes(app);
+
+  container.resolve(BenchmarkSuiteController).registerRoutes(app);
+  container.resolve(BenchmarkProviderConfigController).registerRoutes(app);
+  container.resolve(BenchmarkConfigController).registerRoutes(app);
+  container.resolve(BenchmarkRunController).registerRoutes(app);
+
   container.resolve(WebRTCChannelHost).registerRoutes(app);
   container.resolve(TwilioMessagingChannelHost).registerRoutes(app);
   container.resolve(TwilioVoiceChannelHost).registerRoutes(app);
   container.resolve(WhatsAppChannelHost).registerRoutes(app);
+  container.resolve(TelegramChannelHost).registerRoutes(app);
 
   container.resolve(ConversationTimeoutService).start();
+  container.resolve(ScenarioRunExecutorService).start();
+  container.resolve(BenchmarkExecutorService).start();
 
   app.use(errorHandler);
 

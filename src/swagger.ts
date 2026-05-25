@@ -97,7 +97,24 @@ import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migratio
 import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
 import { SecretController } from './http/controllers/SecretController';
 import { secretResponseSchema, secretListResponseSchema, secretValueResponseSchema } from './http/contracts/secret';
+import { TesterController } from './http/controllers/TesterController';
+import { createTesterSchema, updateTesterBodySchema, deleteTesterBodySchema, testerResponseSchema, testerListResponseSchema } from './http/contracts/tester';
+import { ScenarioController } from './http/controllers/ScenarioController';
+import { dataExtractionEntrySchema, createScenarioSchema, updateScenarioBodySchema, deleteScenarioBodySchema, scenarioResponseSchema, scenarioListResponseSchema } from './http/contracts/scenario';
+import { ScenarioRunController } from './http/controllers/ScenarioRunController';
+import { scenarioRunStatusSchema, createScenarioRunSchema, scenarioRunResponseSchema, scenarioRunListResponseSchema } from './http/contracts/scenarioRun';
+import { ScenarioConversationController } from './http/controllers/ScenarioConversationController';
+import { scenarioConversationResponseSchema, scenarioConversationListResponseSchema } from './http/contracts/scenarioConversation';
+import { BenchmarkSuiteController } from './http/controllers/BenchmarkSuiteController';
+import { BenchmarkProviderConfigController } from './http/controllers/BenchmarkProviderConfigController';
+import { BenchmarkConfigController } from './http/controllers/BenchmarkConfigController';
+import { BenchmarkRunController } from './http/controllers/BenchmarkRunController';
+import { timingStatsSchema, benchmarkStatsSchema, createBenchmarkSuiteSchema, updateBenchmarkSuiteSchema, benchmarkSuiteResponseSchema, benchmarkSuiteListResponseSchema, createBenchmarkProviderConfigSchema, updateBenchmarkProviderConfigSchema, benchmarkProviderConfigResponseSchema, benchmarkProviderConfigListResponseSchema, createBenchmarkConfigSchema, updateBenchmarkConfigSchema, benchmarkConfigResponseSchema, benchmarkConfigListResponseSchema, triggerBenchmarkRunSchema, benchmarkConfigExecutionResponseSchema, benchmarkRunResponseSchema, benchmarkRunListResponseSchema, llmIterationOutputSchema, ttsIterationOutputSchema, asrIterationOutputSchema, benchmarkIterationResultDataSchema, benchmarkResultResponseSchema } from './http/contracts/benchmark';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
+import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
+import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
+import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
+import { TelegramChannelHost } from './channels/telegram/TelegramChannelHost';
 import { providerHintSchema, providerHintResolutionTargetSchema, providerHintResolutionSchema, asrConfigExchangeV1Schema, storageConfigExchangeV1Schema, moderationConfigExchangeV1Schema, fillerSettingsExchangeV1Schema, projectExchangeV1Schema, agentExchangeV1Schema, stageExchangeV1Schema, classifierExchangeV1Schema, contextTransformerExchangeV1Schema, toolExchangeV1Schema, globalActionExchangeV1Schema, guardrailExchangeV1Schema, knowledgeCategoryExchangeV1Schema, knowledgeItemExchangeV1Schema, projectExchangeBundleV1Schema, projectExchangeImportResultSchema } from './http/contracts/projectExchange';
 
 extendZodWithOpenApi(z);
@@ -549,9 +566,115 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Tester schemas and routes
+  registry.register('DataExtractionEntry', dataExtractionEntrySchema);
+  registry.register('ScenarioRunStatus', scenarioRunStatusSchema);
+  registry.register('CreateTesterRequest', createTesterSchema);
+  registry.register('UpdateTesterRequest', updateTesterBodySchema);
+  registry.register('DeleteTesterRequest', deleteTesterBodySchema);
+  registry.register('TesterResponse', testerResponseSchema);
+  registry.register('TesterListResponse', testerListResponseSchema);
+  const testerPaths = TesterController.getOpenAPIPaths();
+  for (const path of testerPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Scenario schemas and routes
+  registry.register('CreateScenarioRequest', createScenarioSchema);
+  registry.register('UpdateScenarioRequest', updateScenarioBodySchema);
+  registry.register('DeleteScenarioRequest', deleteScenarioBodySchema);
+  registry.register('ScenarioResponse', scenarioResponseSchema);
+  registry.register('ScenarioListResponse', scenarioListResponseSchema);
+  const scenarioPaths = ScenarioController.getOpenAPIPaths();
+  for (const path of scenarioPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Scenario Run schemas and routes
+  registry.register('CreateScenarioRunRequest', createScenarioRunSchema);
+  registry.register('ScenarioRunResponse', scenarioRunResponseSchema);
+  registry.register('ScenarioRunListResponse', scenarioRunListResponseSchema);
+  const scenarioRunPaths = ScenarioRunController.getOpenAPIPaths();
+  for (const path of scenarioRunPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Scenario Conversation schemas and routes
+  registry.register('ScenarioConversationResponse', scenarioConversationResponseSchema);
+  registry.register('ScenarioConversationListResponse', scenarioConversationListResponseSchema);
+  const scenarioConversationPaths = ScenarioConversationController.getOpenAPIPaths();
+  for (const path of scenarioConversationPaths) {
+    registry.registerPath(path);
+  }
+
   // Register WebRTC signaling routes
   const webRTCPaths = WebRTCChannelHost.getOpenAPIPaths();
   for (const path of webRTCPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Twilio Voice outgoing call route
+  const twilioVoicePaths = TwilioVoiceChannelHost.getOpenAPIPaths();
+  for (const path of twilioVoicePaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Twilio Messaging outgoing send route
+  const twilioMessagingPaths = TwilioMessagingChannelHost.getOpenAPIPaths();
+  for (const path of twilioMessagingPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register WhatsApp outgoing send route
+  const whatsAppPaths = WhatsAppChannelHost.getOpenAPIPaths();
+  for (const path of whatsAppPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Telegram webhook route
+  const telegramPaths = TelegramChannelHost.getOpenAPIPaths();
+  for (const path of telegramPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Benchmark sub-schemas (reusable components) and routes
+  registry.register('BenchmarkTimingStats', timingStatsSchema);
+  registry.register('BenchmarkStats', benchmarkStatsSchema);
+  registry.register('CreateBenchmarkSuiteRequest', createBenchmarkSuiteSchema);
+  registry.register('UpdateBenchmarkSuiteRequest', updateBenchmarkSuiteSchema);
+  registry.register('BenchmarkSuiteResponse', benchmarkSuiteResponseSchema);
+  registry.register('BenchmarkSuiteListResponse', benchmarkSuiteListResponseSchema);
+  registry.register('CreateBenchmarkProviderConfigRequest', createBenchmarkProviderConfigSchema);
+  registry.register('UpdateBenchmarkProviderConfigRequest', updateBenchmarkProviderConfigSchema);
+  registry.register('BenchmarkProviderConfigResponse', benchmarkProviderConfigResponseSchema);
+  registry.register('BenchmarkProviderConfigListResponse', benchmarkProviderConfigListResponseSchema);
+  registry.register('CreateBenchmarkConfigRequest', createBenchmarkConfigSchema);
+  registry.register('UpdateBenchmarkConfigRequest', updateBenchmarkConfigSchema);
+  registry.register('BenchmarkConfigResponse', benchmarkConfigResponseSchema);
+  registry.register('BenchmarkConfigListResponse', benchmarkConfigListResponseSchema);
+  registry.register('TriggerBenchmarkRunRequest', triggerBenchmarkRunSchema);
+  registry.register('BenchmarkConfigExecutionResponse', benchmarkConfigExecutionResponseSchema);
+  registry.register('BenchmarkRunResponse', benchmarkRunResponseSchema);
+  registry.register('BenchmarkRunListResponse', benchmarkRunListResponseSchema);
+  registry.register('LlmIterationOutput', llmIterationOutputSchema);
+  registry.register('TtsIterationOutput', ttsIterationOutputSchema);
+  registry.register('AsrIterationOutput', asrIterationOutputSchema);
+  registry.register('BenchmarkIterationResultData', benchmarkIterationResultDataSchema);
+  registry.register('BenchmarkResultResponse', benchmarkResultResponseSchema);
+  const benchmarkSuitePaths = BenchmarkSuiteController.getOpenAPIPaths();
+  for (const path of benchmarkSuitePaths) {
+    registry.registerPath(path);
+  }
+  const benchmarkProviderConfigPaths = BenchmarkProviderConfigController.getOpenAPIPaths();
+  for (const path of benchmarkProviderConfigPaths) {
+    registry.registerPath(path);
+  }
+  const benchmarkConfigPaths = BenchmarkConfigController.getOpenAPIPaths();
+  for (const path of benchmarkConfigPaths) {
+    registry.registerPath(path);
+  }
+  const benchmarkRunPaths = BenchmarkRunController.getOpenAPIPaths();
+  for (const path of benchmarkRunPaths) {
     registry.registerPath(path);
   }
 

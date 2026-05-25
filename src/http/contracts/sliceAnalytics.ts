@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
-import { SOURCE_IDS } from '../../services/analytics/sources';
+import { SOURCE_IDS, AGGREGATION_FUNCTIONS } from '../../services/analytics/sources';
 
 extendZodWithOpenApi(z);
 
@@ -20,6 +20,7 @@ export const sourceMetricSchema = z.object({
   id: z.string().describe('Metric identifier used in metrics[] after the aggregation function'),
   label: z.string().describe('Human-readable label'),
   unit: z.enum(['ms', 'tokens', 'count', 'boolean']).describe('Unit of measurement'),
+  aggregateFunctions: z.array(z.enum(AGGREGATION_FUNCTIONS)).describe('Aggregation functions available for this metric'),
 }).openapi('SourceMetric');
 
 /** Schema for a single source entry in the catalog */
@@ -63,6 +64,7 @@ export const sliceQuerySchema = z.object({
   from: z.coerce.date().optional().describe('Start of the date range (inclusive). ISO 8601 format. Ignored when relativeTime is set.'),
   to: z.coerce.date().optional().describe('End of the date range (inclusive). ISO 8601 format. Ignored when relativeTime is set.'),
   conversationId: z.string().optional().describe('Filter to a single conversation'),
+  scenarioRunId: z.string().optional().describe('Filter analytics to conversations used by this scenario run'),
   filters: z.record(z.string(), z.string()).optional().describe('Additional equality filters: key = dimension ID, value = exact match value'),
   limit: z.coerce.number().int().min(1).max(10000).default(1000).describe('Maximum number of rows to return (default 1000, max 10000)'),
 }).openapi('SliceQuery');
@@ -78,6 +80,7 @@ export type SliceQuery = {
   from?: Date;
   to?: Date;
   conversationId?: string;
+  scenarioRunId?: string;
   filters?: Record<string, string>;
   limit: number;
 };

@@ -104,6 +104,25 @@ export const PERMISSIONS = {
   SECRETS_DELETE: 'secrets:delete',
   SECRETS_REVEAL: 'secrets:reveal',
 
+  // Tester permissions
+  TESTER_READ: 'tester:read',
+  TESTER_WRITE: 'tester:write',
+  TESTER_DELETE: 'tester:delete',
+
+  // Scenario permissions
+  SCENARIO_READ: 'scenario:read',
+  SCENARIO_WRITE: 'scenario:write',
+  SCENARIO_DELETE: 'scenario:delete',
+
+  // Scenario Run permissions
+  SCENARIO_RUN_READ: 'scenario_run:read',
+  SCENARIO_RUN_WRITE: 'scenario_run:write',
+
+  // Benchmark permissions
+  BENCHMARK_READ: 'benchmark:read',
+  BENCHMARK_WRITE: 'benchmark:write',
+  BENCHMARK_RUN: 'benchmark:run',
+
   // System permissions
   SYSTEM_CONFIG: 'system:config',
   AUDIT_READ: 'audit:read',
@@ -157,6 +176,14 @@ export const ROLES = {
       PERMISSIONS.API_KEY_DELETE,
       PERMISSIONS.SECRETS_READ,
       PERMISSIONS.SECRETS_DELETE,
+      PERMISSIONS.TESTER_READ,
+      PERMISSIONS.TESTER_WRITE,
+      PERMISSIONS.TESTER_DELETE,
+      PERMISSIONS.SCENARIO_READ,
+      PERMISSIONS.SCENARIO_WRITE,
+      PERMISSIONS.SCENARIO_DELETE,
+      PERMISSIONS.SCENARIO_RUN_READ,
+      PERMISSIONS.SCENARIO_RUN_WRITE,
       PERMISSIONS.AUDIT_READ,
       PERMISSIONS.ANALYTICS_READ,
     ],
@@ -194,6 +221,9 @@ export const ROLES = {
       PERMISSIONS.ISSUE_READ,
       PERMISSIONS.PROVIDER_READ,
       PERMISSIONS.API_KEY_READ,
+      PERMISSIONS.TESTER_READ,
+      PERMISSIONS.SCENARIO_READ,
+      PERMISSIONS.SCENARIO_RUN_READ,
       PERMISSIONS.SYSTEM_CONFIG,
       PERMISSIONS.AUDIT_READ,
       PERMISSIONS.ANALYTICS_READ,
@@ -219,6 +249,9 @@ export const ROLES = {
       PERMISSIONS.ISSUE_READ,
       PERMISSIONS.PROVIDER_READ,
       PERMISSIONS.API_KEY_READ,
+      PERMISSIONS.TESTER_READ,
+      PERMISSIONS.SCENARIO_READ,
+      PERMISSIONS.SCENARIO_RUN_READ,
       PERMISSIONS.AUDIT_READ,
       PERMISSIONS.ANALYTICS_READ,
     ],

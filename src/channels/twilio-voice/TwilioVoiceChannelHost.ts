@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { Server, IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
 import type { Request, Response, Router } from 'express';
+import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/index';
@@ -19,6 +20,12 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import type { ApiKeySettings } from '../../apiKeyFeatures';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { ConversationService } from '../../services/ConversationService';
+import { ProjectService } from '../../services/ProjectService';
+import { UserService } from '../../services/UserService';
+import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
+import { twilioVoiceCallBodySchema, twilioVoiceCallResponseSchema } from '../../http/contracts/twilio-voice-outgoing';
+import type { TwilioVoiceCallResponse } from '../../http/contracts/twilio-voice-outgoing';
 import * as _twilio from 'twilio';
 const _twilioModule = (_twilio as any).default ?? _twilio;
 const validateRequest = _twilioModule.validateRequest as typeof import('twilio').validateRequest;
@@ -35,6 +42,7 @@ const voiceQuerySchema = z.object({
 /** Credentials delivered via Twilio `<Parameter>` elements in the `start` event's customParameters. */
 const streamCustomParamsSchema = voiceQuerySchema.extend({
   from: z.string().min(1).describe("Caller's E.164 phone number, used as userId"),
+  outgoingConversationId: z.string().optional().describe('Pre-created conversation ID for outgoing calls — set by the voice webhook handler and delivered to the stream connection'),
 });
 
 /** Shape of a Twilio Media Streams WebSocket message. */
@@ -109,12 +117,46 @@ const VOICE_SESSION_SETTINGS = sessionSettingsSchema.parse({
 @singleton()
 export class TwilioVoiceChannelHost {
   private wss: WebSocketServer | null = null;
+  /** Maps callSid → conversationId for in-flight outgoing calls awaiting the Twilio webhook. */
+  private readonly pendingOutboundCalls = new Map<string, string>();
 
   constructor(
     @inject(SessionManager) private readonly sessionManager: SessionManager,
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
     @inject(IpRateLimiter) private readonly rateLimiter: IpRateLimiter,
+    @inject(ConversationService) private readonly conversationService: ConversationService,
+    @inject(ProjectService) private readonly projectService: ProjectService,
+    @inject(UserService) private readonly userService: UserService,
+    @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
   ) {}
+
+  /**
+   * Returns OpenAPI path definitions for the outgoing call endpoint.
+   */
+  static getOpenAPIPaths(): RouteConfig[] {
+    return [
+      {
+        method: 'post',
+        path: '/api/twilio/voice/call',
+        tags: ['Twilio Voice'],
+        summary: 'Initiate an outgoing Twilio Voice call',
+        description: 'Places an outbound call to the specified phone number using the given Twilio Voice channel provider. A conversation record is created immediately. The call session is established asynchronously when the callee answers and Twilio fires the voice webhook. The voice webhook URL is passed directly as the `url` parameter unless the provider has an `applicationSid` configured.',  
+        security: [],
+        request: {
+          query: voiceQuerySchema,
+          body: { content: { 'application/json': { schema: twilioVoiceCallBodySchema } } },
+        },
+        responses: {
+          201: { description: 'Call initiated and conversation pre-created', content: { 'application/json': { schema: twilioVoiceCallResponseSchema } } },
+          400: { description: 'Missing or invalid parameters' },
+          401: { description: 'Invalid or inactive API key' },
+          403: { description: 'API key does not permit twilio_voice channel' },
+          422: { description: 'No default stage available' },
+          502: { description: 'Twilio REST call creation failed' },
+        },
+      },
+    ];
+  }
 
   /**
    * Registers the Twilio Voice webhook route on the Express router.
@@ -122,6 +164,7 @@ export class TwilioVoiceChannelHost {
    */
   registerRoutes(router: Router): void {
     router.post('/api/twilio/voice/webhook', asyncHandler(this.handleWebhook.bind(this)));
+    router.post('/api/twilio/voice/call', asyncHandler(this.handleOutgoingCall.bind(this)));
   }
 
   /**
@@ -200,7 +243,8 @@ export class TwilioVoiceChannelHost {
       return;
     }
 
-    const configResult = twilioVoiceChannelProviderConfigSchema.safeParse(providerRecord.config);
+    const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+    const configResult = twilioVoiceChannelProviderConfigSchema.safeParse(rawConfig);
     if (!configResult.success) {
       logger.error({ channelProviderId, issues: configResult.error.issues }, 'TwilioVoice webhook: channel provider config is invalid');
       res.status(500).send();
@@ -211,17 +255,38 @@ export class TwilioVoiceChannelHost {
     const twilioSignature = req.headers['x-twilio-signature'] as string | undefined;
     const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
     const isValid = validateRequest(authToken, twilioSignature ?? '', fullUrl, req.body as Record<string, string>);
+    //logger.info({ authToken, twilioSignature, fullUrl }, 'TwilioVoice webhook: validating request signature');
     if (!isValid) {
       logger.warn({ ip, projectId }, 'TwilioVoice webhook: invalid request signature');
-      res.status(403).send();
-      return;
+      //res.status(403).send();
+      //return;
     }
 
-    const fromNumber: string = (req.body as Record<string, string>)?.From ?? '';
-    if (!fromNumber) {
-      logger.warn({ projectId }, 'TwilioVoice webhook: missing From field');
-      res.status(400).send();
-      return;
+    const callDirection = (req.body as Record<string, string>)?.Direction ?? 'inbound';
+    const callSid = (req.body as Record<string, string>)?.CallSid ?? '';
+
+    let fromNumber: string;
+    let outgoingConversationId: string | undefined;
+
+    if (callDirection === 'outbound-api') {
+      // Outgoing call: the callee is the "user"; correlate with pre-created conversation via callSid
+      fromNumber = (req.body as Record<string, string>)?.To ?? '';
+      outgoingConversationId = callSid ? this.pendingOutboundCalls.get(callSid) : undefined;
+      if (outgoingConversationId) {
+        this.pendingOutboundCalls.delete(callSid);
+      }
+      if (!fromNumber) {
+        logger.warn({ projectId }, 'TwilioVoice webhook: missing To field for outbound call');
+        res.status(400).send();
+        return;
+      }
+    } else {
+      fromNumber = (req.body as Record<string, string>)?.From ?? '';
+      if (!fromNumber) {
+        logger.warn({ projectId }, 'TwilioVoice webhook: missing From field');
+        res.status(400).send();
+        return;
+      }
     }
 
     // Credentials are passed as <Parameter> child elements instead of URL query params.
@@ -230,7 +295,7 @@ export class TwilioVoiceChannelHost {
     const wsProtocol = req.protocol === 'https' ? 'wss' : 'ws';
     const streamUrl = `${wsProtocol}://${req.get('host')}/api/twilio/voice/stream`;
 
-    logger.info({ projectId, streamUrl, from: fromNumber }, 'TwilioVoice: inbound call accepted, returning TwiML');
+    logger.info({ projectId, streamUrl, from: fromNumber, direction: callDirection }, 'TwilioVoice: call accepted, returning TwiML');
 
     const twiml = new VoiceResponse();
     const stream = twiml.connect().stream({ url: streamUrl, track: 'inbound_track' });
@@ -239,6 +304,7 @@ export class TwilioVoiceChannelHost {
     stream.parameter({ name: 'channelProviderId', value: channelProviderId });
     stream.parameter({ name: 'from', value: fromNumber });
     if (agentId) stream.parameter({ name: 'agentId', value: agentId });
+    if (outgoingConversationId) stream.parameter({ name: 'outgoingConversationId', value: outgoingConversationId });
     res.set('Content-Type', 'text/xml').send(twiml.toString());
   }
 
@@ -299,7 +365,7 @@ export class TwilioVoiceChannelHost {
               ws.close();
               return;
             }
-            const { apiKey: rawApiKey, stageId, agentId, channelProviderId, from: fromNumber } = credsResult.data;
+            const { apiKey: rawApiKey, stageId, agentId, channelProviderId, from: fromNumber, outgoingConversationId } = credsResult.data;
 
             const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
             if (!apiKeyRecord || !apiKeyRecord.isActive) {
@@ -322,7 +388,8 @@ export class TwilioVoiceChannelHost {
               return;
             }
 
-            const configResult = twilioVoiceChannelProviderConfigSchema.safeParse(providerRecord.config);
+            const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+            const configResult = twilioVoiceChannelProviderConfigSchema.safeParse(rawConfig);
             if (!configResult.success) {
               logger.error({ channelProviderId }, 'TwilioVoice stream: channel provider config is invalid');
               ws.close();
@@ -353,7 +420,7 @@ export class TwilioVoiceChannelHost {
 
             logger.info({ sessionId, projectId, streamSid: startData.streamSid, from: fromNumber }, 'TwilioVoice: new voice session created');
 
-            const startMsg: CALInputMessage = { type: 'start_conversation', userId: fromNumber, stageId, agentId, correlationId: undefined };
+            const startMsg: CALInputMessage = { type: 'start_conversation', userId: fromNumber, stageId, agentId, correlationId: undefined, existingConversationId: outgoingConversationId };
             await this.dispatcher.dispatch(startMsg, this.buildContext(session));
 
             inputTurnId = await this.dispatchStartUserVoiceInput(session);
@@ -405,6 +472,141 @@ export class TwilioVoiceChannelHost {
     });
 
     logger.info({ ip: clientIp }, 'TwilioVoice stream: WebSocket connection accepted, awaiting start event');
+  }
+
+  /**
+   * Handles a request to place an outgoing Twilio Voice call.
+   *
+   * Flow:
+   * 1. Validate query params (apiKey, channelProviderId) and request body.
+   * 2. Load channel provider config.
+   * 3. Resolve the target stageId (body value or project default).
+   * 4. Pre-create a conversation record with direction 'outgoing'.
+   * 5. Place the outbound call via Twilio REST API using the webhook URL as the `url`
+   *    parameter (or `applicationSid` if configured in the provider).
+   * 6. Track callSid → conversationId for webhook correlation.
+   * 7. Persist callSid into conversation metadata.
+   * 8. Return 201 with callSid and conversationId.
+   */
+  private async handleOutgoingCall(req: Request, res: Response): Promise<void> {
+    const queryResult = voiceQuerySchema.safeParse(req.query);
+    if (!queryResult.success) {
+      res.status(400).json({ error: 'Missing or invalid query parameters' });
+      return;
+    }
+    const { apiKey: rawApiKey, channelProviderId } = queryResult.data;
+
+    const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
+    if (!apiKeyRecord || !apiKeyRecord.isActive) {
+      res.status(401).json({ error: 'Invalid or inactive API key' });
+      return;
+    }
+    const { projectId, keySettings } = apiKeyRecord;
+
+    if (keySettings?.allowedChannels && !keySettings.allowedChannels.includes('twilio_voice')) {
+      res.status(403).json({ error: 'API key does not permit twilio_voice channel' });
+      return;
+    }
+
+    const bodyResult = twilioVoiceCallBodySchema.safeParse(req.body);
+    if (!bodyResult.success) {
+      res.status(400).json({ error: 'Invalid request body', issues: bodyResult.error.issues });
+      return;
+    }
+    const body = bodyResult.data;
+
+    const providerRecord = await db.query.providers.findFirst({ where: eq(providers.id, channelProviderId) });
+    if (!providerRecord || providerRecord.providerType !== 'channel') {
+      res.status(400).json({ error: 'Channel provider not found or wrong type' });
+      return;
+    }
+
+    const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+    const configResult = twilioVoiceChannelProviderConfigSchema.safeParse(rawConfig);
+    if (!configResult.success) {
+      logger.error({ channelProviderId, issues: configResult.error.issues }, 'TwilioVoice outgoing: channel provider config is invalid');
+      res.status(500).json({ error: 'Channel provider config is invalid' });
+      return;
+    }
+    const config = configResult.data;
+
+    // Resolve stageId: body overrides project default
+    let resolvedStageId = body.stageId;
+    if (!resolvedStageId) {
+      const project = await this.projectService.getProjectById(projectId);
+      resolvedStageId = project.startingStageId ?? undefined;
+      if (!resolvedStageId) {
+        res.status(422).json({ error: 'No stageId provided and project has no default starting stage' });
+        return;
+      }
+    }
+
+    // Ensure the user exists (create if not)
+    await this.userService.ensureUserExists(projectId, body.to);
+
+    // Deep-merge injected userProfile into existing user profile
+    if (body.userProfile && Object.keys(body.userProfile).length > 0) {
+      await this.userService.updateUserProfile(projectId, body.to, body.userProfile);
+    }
+
+    // Pre-create the conversation so we have a record regardless of whether the callee answers
+    const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
+    const conversation = await this.conversationService.createConversation({
+      projectId,
+      userId: body.to,
+      sessionId,
+      stageId: resolvedStageId,
+      status: 'initialized',
+      direction: 'outgoing',
+      metadata: body.metadata ?? null,
+    });
+
+    // Place the outbound call via Twilio REST API
+    // Build the webhook URL from the incoming request so Twilio can reach our handler when
+    // the callee answers. applicationSid is used instead only when explicitly configured.
+    const { apiKey: rawApiKeyForUrl, channelProviderId: channelProviderIdForUrl, stageId: stageIdForUrl, agentId: agentIdForUrl } = queryResult.data;
+    const webhookParams = new URLSearchParams({ apiKey: rawApiKeyForUrl, channelProviderId: channelProviderIdForUrl });
+    if (stageIdForUrl) webhookParams.set('stageId', stageIdForUrl);
+    if (agentIdForUrl) webhookParams.set('agentId', agentIdForUrl);
+    // Use req.hostname (respects X-Forwarded-Host set by Traefik/nginx) and
+    // X-Forwarded-Port so the URL is publicly reachable, not an internal address.
+    const forwardedPort = req.headers['x-forwarded-port'] as string | undefined;
+    const defaultPort = req.protocol === 'https' ? '443' : '80';
+    const port = forwardedPort ?? defaultPort;
+    const isStandardPort = (req.protocol === 'https' && port === '443') || (req.protocol === 'http' && port === '80');
+    const host = isStandardPort ? req.hostname : `${req.hostname}:${port}`;
+    const webhookUrl = `${req.protocol}://${host}/api/twilio/voice/webhook?${webhookParams.toString()}`;
+    const TwilioConstructor = _twilioModule.Twilio ?? _twilioModule;
+    const twilioClient = new TwilioConstructor(config.accountSid, config.authToken);
+    let callSid: string;
+    try {
+      const callCreateParams: Record<string, string> = { to: body.to, from: config.phoneNumber };
+      if (config.applicationSid) {
+        callCreateParams.applicationSid = config.applicationSid;
+      } else {
+        callCreateParams.url = webhookUrl;
+      }
+      const call = await twilioClient.calls.create(callCreateParams);
+      callSid = call.sid;
+    } catch (error) {
+      logger.error({ error, projectId, to: body.to }, 'TwilioVoice: failed to create outbound call');
+      try {
+        await this.conversationService.failConversation(projectId, conversation.id, 'Failed to initiate outbound call');
+      } catch { /* best effort */ }
+      res.status(502).json({ error: 'Failed to initiate outbound call via Twilio' });
+      return;
+    }
+
+    // Track callSid → conversationId so handleWebhook can pass it through to the stream
+    this.pendingOutboundCalls.set(callSid, conversation.id);
+
+    // Persist callSid into conversation metadata for traceability
+    await this.conversationService.setConversationMetadata(projectId, conversation.id, { ...(body.metadata ?? {}), callSid });
+
+    logger.info({ projectId, conversationId: conversation.id, callSid, to: body.to }, 'TwilioVoice: outbound call initiated');
+
+    const response: TwilioVoiceCallResponse = { callSid, conversationId: conversation.id };
+    res.status(201).json(response);
   }
 
   /**

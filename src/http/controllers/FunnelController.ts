@@ -4,7 +4,7 @@ import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { FunnelQueryService } from '../../services/analytics/FunnelQueryService';
 import { SavedFunnelQueryService } from '../../services/analytics/SavedFunnelQueryService';
-import { funnelQuerySchema, funnelQueryResponseSchema, createSavedFunnelQuerySchema, updateSavedFunnelQuerySchema, deleteSavedFunnelQueryBodySchema, savedFunnelQueryResponseSchema, savedFunnelQueryRouteParamsSchema } from '../contracts/funnels';
+import { funnelQuerySchema, funnelQueryResponseSchema, createSavedFunnelQuerySchema, updateSavedFunnelQuerySchema, deleteSavedFunnelQueryBodySchema, savedFunnelQueryResponseSchema, savedFunnelQueryRouteParamsSchema, funnelQueryParamsSchema } from '../contracts/funnels';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { projectScopedParamsSchema } from '../contracts/common';
@@ -33,6 +33,7 @@ export class FunnelController {
         description: 'Executes a user-centric funnel query that cascades qualifying users through ordered event steps. Returns per-step user counts and conversion rates.',
         request: {
           params: projectScopedParamsSchema,
+          query: funnelQueryParamsSchema,
           body: {
             content: {
               'application/json': {
@@ -175,9 +176,9 @@ export class FunnelController {
 
   private async runFunnelQuery(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ANALYTICS_READ]);
-    const { projectId } = projectScopedParamsSchema.parse(req.params);
+    const { projectId, scenarioRunId } = funnelQueryParamsSchema.parse(req.query);
     const body = funnelQuerySchema.parse(req.body);
-    const result = await this.funnelQueryService.runQuery(projectId, body, req.context);
+    const result = await this.funnelQueryService.runQuery(projectId, body, req.context, scenarioRunId);
     res.status(200).json(result);
   }
 

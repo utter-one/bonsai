@@ -4,6 +4,12 @@ import { relativeTimeSchema } from './sliceAnalytics';
 
 extendZodWithOpenApi(z);
 
+/** Query parameters for the funnel query endpoint */
+export const funnelQueryParamsSchema = z.object({
+  projectId: z.string().min(1).describe('Project identifier'),
+  scenarioRunId: z.string().optional().describe('Filter funnels to conversations used by this scenario run'),
+});
+
 /**
  * Supported event types for funnel step matching.
  * Each type maps to one or more conversation event records in the database.

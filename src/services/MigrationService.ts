@@ -1,5 +1,6 @@
 import { singleton, inject } from 'tsyringe';
 import { sql, eq, inArray } from 'drizzle-orm';
+import { randomBytes } from 'crypto';
 import { db } from '../db/index';
 import {
   providers,
@@ -11,18 +12,28 @@ import {
   globalActions,
   knowledgeCategories,
   knowledgeItems,
+  guardrails,
+  copyDecorators,
+  sampleCopies,
+  savedSliceQueries,
+  savedFunnelQueries,
   stages,
   apiKeys,
   environments,
+  testers,
+  scenarios,
 } from '../db/schema';
 import { BaseService } from './BaseService';
 import { VersionService } from './VersionService';
 import { AuditService } from './AuditService';
+import { SecretsManagerRegistry } from './secrets/SecretsManagerRegistry';
 import type { RequestContext } from './RequestContext';
 import { PERMISSIONS } from '../permissions';
 import { generateId } from '../utils/idGenerator';
 import { logger } from '../utils/logger';
 import { InvalidOperationError, NotFoundError, RemoteConnectionError } from '../errors';
+import { SecretRefUtils } from './secrets/SecretRefUtils';
+import { deriveBundleKey, encryptSecret, decryptSecret } from '../utils/crypto';
 import type { ExportBundle, ExportQuery, PullRequest, MigrationResult, MigrationJob, MigrationSelection, MigrationPreview, EntityStub } from '../http/contracts/migration';
 
 /** Drizzle transaction type, inferred to avoid driver-specific imports. */
@@ -42,7 +53,7 @@ function isSelectAll(sel: MigrationSelection): boolean {
  * Export entity order (FK-safe):
  *   providers → projects → agents → classifiers → contextTransformers
  *   → tools → globalActions → knowledgeCategories → knowledgeItems
- *   → stages → apiKeys
+ *   → copyDecorators → sampleCopies → guardrails → stages → apiKeys
  *
  * Excluded from migration (runtime / credential data):
  *   operators, users, conversations, conversationEvents, conversationArtifacts,
@@ -59,6 +70,8 @@ export class MigrationService extends BaseService {
   constructor(
     @inject(VersionService) private readonly versionService: VersionService,
     @inject(AuditService) private readonly auditService: AuditService,
+    @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(SecretsManagerRegistry) private readonly secretsRegistry: SecretsManagerRegistry,
   ) {
     super();
   }
@@ -90,13 +103,21 @@ export class MigrationService extends BaseService {
       knowledgeCategoryIds: query.knowledgeCategoryIds,
       providerIds: query.providerIds,
       apiKeyIds: query.apiKeyIds,
+      testerIds: query.testerIds,
+      scenarioIds: query.scenarioIds,
+      guardrailIds: query.guardrailIds,
+      copyDecoratorIds: query.copyDecoratorIds,
+      sampleCopyIds: query.sampleCopyIds,
+      savedSliceQueryIds: query.savedSliceQueryIds,
+      savedFunnelQueryIds: query.savedFunnelQueryIds,
     };
 
     logger.info({ selection, operatorId: context.operatorId }, 'Exporting migration bundle');
 
-    const bundle = await this.resolveBundle(selection, restSchemaHash, selection);
+    const rawBundle = await this.resolveBundle(selection, restSchemaHash, selection);
+    const bundle = await this.packBundleSecrets(rawBundle, query.bundlePassword);
 
-    logger.info({ projectCount: bundle.projects.length, stageCount: bundle.stages.length, providerCount: bundle.providers.length, operatorId: context.operatorId }, 'Migration bundle exported successfully');
+    logger.info({ projectCount: bundle.projects.length, stageCount: bundle.stages.length, providerCount: bundle.providers.length, hasSecrets: !!bundle.bundleSecrets, operatorId: context.operatorId }, 'Migration bundle exported successfully');
 
     return bundle;
   }
@@ -108,11 +129,16 @@ export class MigrationService extends BaseService {
    * @param input - Bundle, force flag, and dryRun flag.
    * @param context - Request context for permission checking and audit logging.
    */
-  async importBundle(input: { bundle: ExportBundle; force?: boolean; dryRun?: boolean }, context: RequestContext): Promise<MigrationResult> {
+  async importBundle(input: { bundle: ExportBundle; force?: boolean; dryRun?: boolean; bundlePassword?: string }, context: RequestContext): Promise<MigrationResult> {
     this.requirePermission(context, PERMISSIONS.MIGRATION_IMPORT);
 
     const startedAt = Date.now();
-    const { bundle, force = false, dryRun = false } = input;
+    const { bundle: inputBundle, force = false, dryRun = false, bundlePassword } = input;
+
+    // Decrypt and re-store provider secrets from the bundle before any DB writes.
+    // In dry-run mode we still validate the password/ciphertext but skip DB writes.
+    // The returned bundle has all entity array refs remapped to newly created local secrets.
+    const bundle = await this.unpackBundleSecrets(inputBundle, bundlePassword, dryRun);
 
     const { restSchemaHash: localHash } = this.versionService.getVersion();
     const schemaHashMatch = bundle.restSchemaHash === localHash;
@@ -140,8 +166,15 @@ export class MigrationService extends BaseService {
         upserted.push({ entity: 'globalActions', count: await this.upsertGlobalActions(tx, bundle.globalActions) });
         upserted.push({ entity: 'knowledgeCategories', count: await this.upsertKnowledgeCategories(tx, bundle.knowledgeCategories) });
         upserted.push({ entity: 'knowledgeItems', count: await this.upsertKnowledgeItems(tx, bundle.knowledgeItems) });
+        upserted.push({ entity: 'copyDecorators', count: await this.upsertCopyDecorators(tx, bundle.copyDecorators) });
+        upserted.push({ entity: 'sampleCopies', count: await this.upsertSampleCopies(tx, bundle.sampleCopies) });
+        upserted.push({ entity: 'savedSliceQueries', count: await this.upsertSavedSliceQueries(tx, bundle.savedSliceQueries) });
+        upserted.push({ entity: 'savedFunnelQueries', count: await this.upsertSavedFunnelQueries(tx, bundle.savedFunnelQueries) });
+        upserted.push({ entity: 'guardrails', count: await this.upsertGuardrails(tx, bundle.guardrails) });
         upserted.push({ entity: 'stages', count: await this.upsertStages(tx, bundle.stages) });
         upserted.push({ entity: 'apiKeys', count: await this.upsertApiKeys(tx, bundle.apiKeys) });
+        upserted.push({ entity: 'testers', count: await this.upsertTesters(tx, bundle.testers) });
+        upserted.push({ entity: 'scenarios', count: await this.upsertScenarios(tx, bundle.scenarios) });
       });
 
       // Log a 'migrate' audit entry per entity instance after the transaction commits
@@ -155,8 +188,15 @@ export class MigrationService extends BaseService {
         ...bundle.globalActions.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'globalAction', entityId: row.id, userId: context.operatorId, newEntity: row })),
         ...bundle.knowledgeCategories.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeCategory', entityId: row.id, userId: context.operatorId, newEntity: row })),
         ...bundle.knowledgeItems.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'knowledgeItem', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.copyDecorators.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'copyDecorator', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.sampleCopies.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'sampleCopy', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.savedSliceQueries.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'savedSliceQuery', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.savedFunnelQueries.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'savedFunnelQuery', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.guardrails.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'guardrail', entityId: row.id, userId: context.operatorId, newEntity: row })),
         ...bundle.stages.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'stage', entityId: row.id, userId: context.operatorId, newEntity: row })),
         ...bundle.apiKeys.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'apiKey', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.testers.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'tester', entityId: row.id, userId: context.operatorId, newEntity: row })),
+        ...bundle.scenarios.map(row => this.auditService.logChange({ action: 'MIGRATE', entityType: 'scenario', entityId: row.id, userId: context.operatorId, newEntity: row })),
       ]);
     } else {
       upserted.push(
@@ -169,8 +209,15 @@ export class MigrationService extends BaseService {
         { entity: 'globalActions', count: bundle.globalActions.length },
         { entity: 'knowledgeCategories', count: bundle.knowledgeCategories.length },
         { entity: 'knowledgeItems', count: bundle.knowledgeItems.length },
+        { entity: 'copyDecorators', count: bundle.copyDecorators.length },
+        { entity: 'sampleCopies', count: bundle.sampleCopies.length },
+        { entity: 'savedSliceQueries', count: bundle.savedSliceQueries.length },
+        { entity: 'savedFunnelQueries', count: bundle.savedFunnelQueries.length },
+        { entity: 'guardrails', count: bundle.guardrails.length },
         { entity: 'stages', count: bundle.stages.length },
         { entity: 'apiKeys', count: bundle.apiKeys.length },
+        { entity: 'testers', count: bundle.testers.length },
+        { entity: 'scenarios', count: bundle.scenarios.length },
       );
     }
 
@@ -204,10 +251,12 @@ export class MigrationService extends BaseService {
     const env = await db.query.environments.findFirst({ where: eq(environments.id, environmentId) });
     if (!env) throw new NotFoundError(`Environment with id ${environmentId} not found`);
 
+    const resolvedEnv = await this.secretRefUtils.resolveObject(env as any) as typeof env;
+
     const authRes = await this.safeFetch(`${env.url}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: env.login, password: env.password }),
+      body: JSON.stringify({ id: resolvedEnv.login, password: resolvedEnv.password }),
     });
     if (!authRes.ok) throw new RemoteConnectionError(`Authentication against source failed: HTTP ${authRes.status}`);
 
@@ -293,6 +342,13 @@ export class MigrationService extends BaseService {
       knowledgeCategoryIds: query.knowledgeCategoryIds,
       providerIds: query.providerIds,
       apiKeyIds: query.apiKeyIds,
+      testerIds: query.testerIds,
+      scenarioIds: query.scenarioIds,
+      guardrailIds: query.guardrailIds,
+      copyDecoratorIds: query.copyDecoratorIds,
+      sampleCopyIds: query.sampleCopyIds,
+      savedSliceQueryIds: query.savedSliceQueryIds,
+      savedFunnelQueryIds: query.savedFunnelQueryIds,
     };
 
     const bundle = await this.resolveBundle(selection, '', selection);
@@ -310,18 +366,157 @@ export class MigrationService extends BaseService {
       globalActions: bundle.globalActions.map(toProjectStub),
       knowledgeCategories: bundle.knowledgeCategories.map(toProjectStub),
       knowledgeItems: bundle.knowledgeItems.map(r => ({ id: r.id as string, name: (r.question ?? r.id) as string })),
+      copyDecorators: bundle.copyDecorators.map(toProjectStub),
+      sampleCopies: bundle.sampleCopies.map(toProjectStub),
+      savedSliceQueries: bundle.savedSliceQueries.map(r => ({ id: r.id as string, name: r.name as string })),
+      savedFunnelQueries: bundle.savedFunnelQueries.map(r => ({ id: r.id as string, name: r.name as string })),
+      guardrails: bundle.guardrails.map(toProjectStub),
       stages: bundle.stages.map(toProjectStub),
       apiKeys: bundle.apiKeys.map(toProjectStub),
+      testers: bundle.testers.map(toProjectStub),
+      scenarios: bundle.scenarios.map(toProjectStub),
       totalCount: 0,
     };
     result.totalCount = [
       result.providers, result.projects, result.agents, result.classifiers,
       result.contextTransformers, result.tools, result.globalActions,
-      result.knowledgeCategories, result.knowledgeItems, result.stages, result.apiKeys,
+      result.knowledgeCategories, result.knowledgeItems,
+      result.copyDecorators, result.sampleCopies, result.savedSliceQueries, result.savedFunnelQueries,
+      result.guardrails, result.stages, result.apiKeys,
+      result.testers, result.scenarios,
     ].reduce((sum, arr) => sum + arr.length, 0);
 
     logger.info({ totalCount: result.totalCount, selection, operatorId: context.operatorId }, 'Migration preview computed');
     return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private: secret packaging / unpackaging for bundles
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Scans ALL entity arrays in the bundle for `@sec:*` references and, when a
+   * `bundlePassword` is provided, resolves each plaintext value and re-encrypts
+   * it with a key derived from the password.  The encrypted entries are stored
+   * in `bundleSecrets` (keyed by the original reference string) and returned
+   * as part of the bundle.  Entity records are left unchanged — the original
+   * `@sec:*` references are preserved as lookup keys.
+   *
+   * Scanning all arrays means any entity type that gains secret fields in the
+   * future is handled automatically without changes here.
+   *
+   * Throws `InvalidOperationError` when at least one entity contains secret
+   * references but `bundlePassword` was not supplied.
+   */
+  private async packBundleSecrets(bundle: ExportBundle, bundlePassword?: string): Promise<ExportBundle> {
+    const allRefs = new Set<string>();
+    for (const value of Object.values(bundle)) {
+      if (Array.isArray(value)) {
+        for (const entity of value) {
+          for (const ref of this.secretRefUtils.collectReferences(entity)) {
+            allRefs.add(ref);
+          }
+        }
+      }
+    }
+
+    if (allRefs.size === 0) return bundle;
+
+    if (!bundlePassword) {
+      throw new InvalidOperationError('bundlePassword is required when exporting providers that contain secret configuration (API keys, auth tokens, etc.). Provide a bundlePassword query parameter and use the same value when importing.');
+    }
+
+    const bundleKey = deriveBundleKey(bundlePassword);
+    const bundleSecrets: ExportBundle['bundleSecrets'] = {};
+
+    for (const ref of allRefs) {
+      const plaintext = await this.secretsRegistry.resolveSecret(ref);
+      bundleSecrets[ref] = encryptSecret(plaintext, bundleKey);
+    }
+
+    logger.info({ secretCount: allRefs.size }, 'Provider secrets packed into bundle');
+
+    return { ...bundle, bundleSecrets };
+  }
+
+  /**
+   * Decrypts entries from `bundle.bundleSecrets` using the supplied `bundlePassword`,
+   * stores each plaintext value as a new secret under the local master encryption key,
+   * and returns a copy of the bundle with `@sec:*` references remapped to the newly
+   * created local secret IDs across ALL entity arrays.
+   *
+   * Remapping all arrays means any entity type that gains secret fields in the
+   * future is handled automatically without changes here.
+   *
+   * In `dryRun` mode the secrets are decrypted to verify the password but are
+   * NOT written to the database — the original bundle is returned unchanged.
+   *
+   * Throws `InvalidOperationError` when the bundle contains secrets but no password
+   * is provided, or when decryption fails (wrong password / tampered bundle).
+   */
+  private async unpackBundleSecrets(bundle: ExportBundle, bundlePassword: string | undefined, dryRun: boolean): Promise<ExportBundle> {
+    const { bundleSecrets } = bundle;
+
+    if (!bundleSecrets || Object.keys(bundleSecrets).length === 0) {
+      return bundle;
+    }
+
+    if (!bundlePassword) {
+      throw new InvalidOperationError('bundlePassword is required to import this bundle because it contains encrypted provider secrets.');
+    }
+
+    const bundleKey = deriveBundleKey(bundlePassword);
+
+    // Decrypt all entries first to validate the password before writing anything
+    const decrypted = new Map<string, string>();
+    try {
+      for (const [ref, entry] of Object.entries(bundleSecrets)) {
+        decrypted.set(ref, decryptSecret(entry.encryptedValue, entry.iv, entry.tag, bundleKey));
+      }
+    } catch {
+      throw new InvalidOperationError('Invalid bundlePassword: failed to decrypt bundle secrets. Ensure the same password that was used during export is provided.');
+    }
+
+    if (dryRun) {
+      logger.info({ secretCount: decrypted.size }, 'Bundle secrets validated (dry-run, not written to database)');
+      return bundle;
+    }
+
+    // Store each decrypted secret under the local master key and build a ref remap
+    const refRemap = new Map<string, string>();
+    for (const [oldRef, plaintext] of decrypted) {
+      const newRef = await this.secretsRegistry.storeSecret(this.secretsRegistry.defaultManagerName, plaintext);
+      refRemap.set(oldRef, newRef);
+    }
+
+    logger.info({ secretCount: refRemap.size }, 'Bundle secrets re-encrypted and stored under local master key');
+
+    // Remap refs in every entity array — covers any entity type that holds secrets
+    const remappedBundle = { ...bundle };
+    for (const [key, value] of Object.entries(bundle)) {
+      if (Array.isArray(value)) {
+        (remappedBundle as any)[key] = value.map(entity => this.replaceSecretRefs(entity, refRemap));
+      }
+    }
+
+    return remappedBundle;
+  }
+
+  /**
+   * Recursively walks a JSON-serializable value and replaces any string that
+   * matches a key in `refMap` with the corresponding mapped value.
+   */
+  private replaceSecretRefs(value: unknown, refMap: Map<string, string>): unknown {
+    if (typeof value === 'string') return refMap.has(value) ? refMap.get(value)! : value;
+    if (Array.isArray(value)) return value.map(item => this.replaceSecretRefs(item, refMap));
+    if (value !== null && typeof value === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        result[k] = this.replaceSecretRefs(v, refMap);
+      }
+      return result;
+    }
+    return value;
   }
 
   // ---------------------------------------------------------------------------
@@ -353,15 +548,22 @@ export class MigrationService extends BaseService {
 
     // ── 2. Fetch explicitly selected leaf entities ────────────────────────────
 
-    const [explicitAgentRows, explicitClassifierRows, explicitCtRows, explicitToolRows, explicitGaRows, explicitKcRows, explicitStageRows, explicitApiKeyRows] = await Promise.all([
+    const [explicitAgentRows, explicitClassifierRows, explicitCtRows, explicitToolRows, explicitGaRows, explicitKcRows, explicitGrRows, explicitCdRows, explicitScRows, explicitSSQRows, explicitSFQRows, explicitStageRows, explicitApiKeyRows, explicitTesterRows, explicitScenarioRows] = await Promise.all([
       this.fetchOrAll(selectAll || !!selection.agentIds?.length, agents, selection.agentIds, agents.id),
       this.fetchOrAll(selectAll || !!selection.classifierIds?.length, classifiers, selection.classifierIds, classifiers.id),
       this.fetchOrAll(selectAll || !!selection.contextTransformerIds?.length, contextTransformers, selection.contextTransformerIds, contextTransformers.id),
       this.fetchOrAll(selectAll || !!selection.toolIds?.length, tools, selection.toolIds, tools.id),
       this.fetchOrAll(selectAll || !!selection.globalActionIds?.length, globalActions, selection.globalActionIds, globalActions.id),
       this.fetchOrAll(selectAll || !!selection.knowledgeCategoryIds?.length, knowledgeCategories, selection.knowledgeCategoryIds, knowledgeCategories.id),
+      this.fetchOrAll(selectAll || !!selection.guardrailIds?.length, guardrails, selection.guardrailIds, guardrails.id),
+      this.fetchOrAll(selectAll || !!selection.copyDecoratorIds?.length, copyDecorators, selection.copyDecoratorIds, copyDecorators.id),
+      this.fetchOrAll(selectAll || !!selection.sampleCopyIds?.length, sampleCopies, selection.sampleCopyIds, sampleCopies.id),
+      this.fetchOrAll(selectAll || !!selection.savedSliceQueryIds?.length, savedSliceQueries, selection.savedSliceQueryIds, savedSliceQueries.id),
+      this.fetchOrAll(selectAll || !!selection.savedFunnelQueryIds?.length, savedFunnelQueries, selection.savedFunnelQueryIds, savedFunnelQueries.id),
       this.fetchOrAll(selectAll || !!selection.stageIds?.length, stages, selection.stageIds, stages.id),
       this.fetchOrAll(selectAll || !!selection.apiKeyIds?.length, apiKeys, selection.apiKeyIds, apiKeys.id),
+      this.fetchOrAll(selectAll || !!selection.testerIds?.length, testers, selection.testerIds, testers.id),
+      this.fetchOrAll(selectAll || !!selection.scenarioIds?.length, scenarios, selection.scenarioIds, scenarios.id),
     ]);
 
     // ── 3. Expand project selections: fetch all children for selected projects ─
@@ -370,16 +572,23 @@ export class MigrationService extends BaseService {
 
     const childrenOfProjects = expandedProjectIds.size > 0 && !selectAll
       ? await Promise.all([
-          db.select().from(agents).where(inArray(agents.projectId, [...expandedProjectIds])),
-          db.select().from(classifiers).where(inArray(classifiers.projectId, [...expandedProjectIds])),
-          db.select().from(contextTransformers).where(inArray(contextTransformers.projectId, [...expandedProjectIds])),
-          db.select().from(tools).where(inArray(tools.projectId, [...expandedProjectIds])),
-          db.select().from(globalActions).where(inArray(globalActions.projectId, [...expandedProjectIds])),
-          db.select().from(knowledgeCategories).where(inArray(knowledgeCategories.projectId, [...expandedProjectIds])),
-          db.select().from(stages).where(inArray(stages.projectId, [...expandedProjectIds])),
-          db.select().from(apiKeys).where(inArray(apiKeys.projectId, [...expandedProjectIds])),
-        ])
-      : [[], [], [], [], [], [], [], []];
+        db.select().from(agents).where(inArray(agents.projectId, [...expandedProjectIds])),
+        db.select().from(classifiers).where(inArray(classifiers.projectId, [...expandedProjectIds])),
+        db.select().from(contextTransformers).where(inArray(contextTransformers.projectId, [...expandedProjectIds])),
+        db.select().from(tools).where(inArray(tools.projectId, [...expandedProjectIds])),
+        db.select().from(globalActions).where(inArray(globalActions.projectId, [...expandedProjectIds])),
+        db.select().from(knowledgeCategories).where(inArray(knowledgeCategories.projectId, [...expandedProjectIds])),
+        db.select().from(guardrails).where(inArray(guardrails.projectId, [...expandedProjectIds])),
+        db.select().from(copyDecorators).where(inArray(copyDecorators.projectId, [...expandedProjectIds])),
+        db.select().from(sampleCopies).where(inArray(sampleCopies.projectId, [...expandedProjectIds])),
+        db.select().from(savedSliceQueries).where(inArray(savedSliceQueries.projectId, [...expandedProjectIds])),
+        db.select().from(savedFunnelQueries).where(inArray(savedFunnelQueries.projectId, [...expandedProjectIds])),
+        db.select().from(stages).where(inArray(stages.projectId, [...expandedProjectIds])),
+        db.select().from(apiKeys).where(inArray(apiKeys.projectId, [...expandedProjectIds])),
+        db.select().from(testers).where(inArray(testers.projectId, [...expandedProjectIds])),
+        db.select().from(scenarios).where(inArray(scenarios.projectId, [...expandedProjectIds])),
+      ])
+      : [[], [], [], [], [], [], [], [], [], [], [], [], [], [], []];
 
     // Merge explicit + project-child rows (deduplicated by ID)
     const agentRows = this.dedup([...explicitAgentRows, ...childrenOfProjects[0] as any[]], 'id');
@@ -388,8 +597,15 @@ export class MigrationService extends BaseService {
     const toolRows = this.dedup([...explicitToolRows, ...childrenOfProjects[3] as any[]], 'id');
     const gaRows = this.dedup([...explicitGaRows, ...childrenOfProjects[4] as any[]], 'id');
     const kcRows = this.dedup([...explicitKcRows, ...childrenOfProjects[5] as any[]], 'id');
-    const stageRows = this.dedup([...explicitStageRows, ...childrenOfProjects[6] as any[]], 'id');
-    const apiKeyRows = this.dedup([...explicitApiKeyRows, ...childrenOfProjects[7] as any[]], 'id');
+    const grRows = this.dedup([...explicitGrRows, ...childrenOfProjects[6] as any[]], 'id');
+    const cdRows = this.dedup([...explicitCdRows, ...childrenOfProjects[7] as any[]], 'id');
+    const scRows = this.dedup([...explicitScRows, ...childrenOfProjects[8] as any[]], 'id');
+    const ssqRows = this.dedup([...explicitSSQRows, ...childrenOfProjects[9] as any[]], 'id');
+    const sfqRows = this.dedup([...explicitSFQRows, ...childrenOfProjects[10] as any[]], 'id');
+    const stageRows = this.dedup([...explicitStageRows, ...childrenOfProjects[11] as any[]], 'id');
+    const apiKeyRows = this.dedup([...explicitApiKeyRows, ...childrenOfProjects[12] as any[]], 'id');
+    const testerRows = this.dedup([...explicitTesterRows, ...childrenOfProjects[13] as any[]], 'id');
+    const scenarioRows = this.dedup([...explicitScenarioRows, ...childrenOfProjects[14] as any[]], 'id');
 
     // ── 4. Knowledge items — fetch all items for every included category ─────
 
@@ -410,8 +626,13 @@ export class MigrationService extends BaseService {
       ...toolRows.map(r => r.projectId),
       ...gaRows.map(r => r.projectId),
       ...allKcRows.map(r => r.projectId),
+      ...grRows.map(r => r.projectId),
+      ...ssqRows.map(r => r.projectId),
+      ...sfqRows.map(r => r.projectId),
       ...stageRows.map(r => r.projectId),
       ...apiKeyRows.map(r => r.projectId),
+      ...testerRows.map(r => r.projectId),
+      ...scenarioRows.map(r => r.projectId),
     ]);
 
     const missingProjectIds = [...allEntityProjectIds].filter(id => !expandedProjectIds.has(id));
@@ -445,14 +666,35 @@ export class MigrationService extends BaseService {
       : [];
     const allCtRows = this.dedup([...ctRows, ...additionalCtRows], 'id');
 
-    // ── 8. Collect all referenced providers ──────────────────────────────────
+    // ── 8. Collect parent copyDecorators for sampleCopies that reference decorators not yet in bundle ─
+
+    const sampleCopyDecoratorIds = scRows.map(s => s.decoratorId).filter(Boolean) as string[];
+    const missingDecoratorIds = sampleCopyDecoratorIds.filter(id => !cdRows.find(d => d.id === id));
+    const additionalCdRows = missingDecoratorIds.length > 0
+      ? await db.select().from(copyDecorators).where(inArray(copyDecorators.id, missingDecoratorIds))
+      : [];
+    const allCdRows = this.dedup([...cdRows, ...additionalCdRows], 'id');
+
+    // ── 9. Collect parent classifiers for sampleCopies that reference classifiers not yet in bundle ─
+
+    const sampleCopyClassifierIds = scRows.map(s => s.classifierOverrideId).filter(Boolean) as string[];
+    const missingSampleClassifierIds = sampleCopyClassifierIds.filter(id => !allClassifierRows.find(c => c.id === id));
+    const additionalSampleClassifierRows = missingSampleClassifierIds.length > 0
+      ? await db.select().from(classifiers).where(inArray(classifiers.id, missingSampleClassifierIds))
+      : [];
+    const finalClassifierRows = this.dedup([...allClassifierRows, ...additionalSampleClassifierRows], 'id');
+
+    // ── 10. Collect all referenced providers ──────────────────────────────────
 
     const referencedProviderIds = new Set<string>(selection.providerIds ?? []);
 
     for (const p of allAgentRows) {
       if (p.ttsProviderId) referencedProviderIds.add(p.ttsProviderId);
     }
-    for (const row of [...allClassifierRows, ...allCtRows, ...toolRows, ...stageRows]) {
+    for (const row of [...finalClassifierRows, ...allCtRows, ...toolRows, ...stageRows]) {
+      if (row.llmProviderId) referencedProviderIds.add(row.llmProviderId);
+    }
+    for (const row of testerRows) {
       if (row.llmProviderId) referencedProviderIds.add(row.llmProviderId);
     }
     for (const p of allProjectRows) {
@@ -475,14 +717,21 @@ export class MigrationService extends BaseService {
       providers: providerRows,
       projects: allProjectRows,
       agents: allAgentRows,
-      classifiers: allClassifierRows,
+      classifiers: finalClassifierRows,
       contextTransformers: allCtRows,
       tools: toolRows,
       globalActions: gaRows,
       knowledgeCategories: allKcRows,
       knowledgeItems: kiRows,
+      copyDecorators: allCdRows,
+      sampleCopies: scRows,
+      savedSliceQueries: ssqRows,
+      savedFunnelQueries: sfqRows,
+      guardrails: grRows,
       stages: stageRows,
       apiKeys: apiKeyRows,
+      testers: testerRows,
+      scenarios: scenarioRows,
     };
   }
 
@@ -524,11 +773,14 @@ export class MigrationService extends BaseService {
       const env = await db.query.environments.findFirst({ where: eq(environments.id, environmentId) });
       if (!env) throw new NotFoundError(`Environment with id ${environmentId} not found`);
 
+      // Resolve any encrypted secret references in credentials
+      const resolvedEnv = await this.secretRefUtils.resolveObject(env as any) as typeof env;
+
       // 2. Authenticate against source instance
       const authRes = await this.safeFetch(`${env.url}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: env.login, password: env.password }),
+        body: JSON.stringify({ id: resolvedEnv.login, password: resolvedEnv.password }),
       });
       if (!authRes.ok) throw new RemoteConnectionError(`Authentication against source failed: HTTP ${authRes.status}`);
 
@@ -562,6 +814,9 @@ export class MigrationService extends BaseService {
           for (const v of values) exportUrl.searchParams.append(key, v);
         }
       }
+      // Generate a single-use random bundle password so secrets travel encrypted over the wire
+      const bundlePassword = randomBytes(32).toString('hex');
+      exportUrl.searchParams.set('bundlePassword', bundlePassword);
 
       const exportRes = await this.safeFetch(exportUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
       if (!exportRes.ok) throw new RemoteConnectionError(`Export fetch from source failed: HTTP ${exportRes.status}`);
@@ -569,7 +824,7 @@ export class MigrationService extends BaseService {
       const bundle = await exportRes.json() as ExportBundle;
 
       // 5. Import into local DB
-      const result = await this.importBundle({ bundle, force: input.force ?? false, dryRun: input.dryRun ?? false }, context);
+      const result = await this.importBundle({ bundle, force: input.force ?? false, dryRun: input.dryRun ?? false, bundlePassword }, context);
 
       this.updateJob(jobId, { status: 'completed', completedAt: new Date().toISOString(), result });
     } catch (error) {
@@ -809,6 +1064,99 @@ export class MigrationService extends BaseService {
     return rows.length;
   }
 
+  private async upsertGuardrails(tx: DbTx, rows: any[]): Promise<number> {
+    if (!rows.length) return 0;
+    await tx.insert(guardrails).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: [guardrails.projectId, guardrails.id],
+      set: {
+        projectId: sql`excluded.project_id`,
+        name: sql`excluded.name`,
+        condition: sql`excluded.condition`,
+        classificationTrigger: sql`excluded.classification_trigger`,
+        effects: sql`excluded.effects`,
+        examples: sql`excluded.examples`,
+        tags: sql`excluded.tags`,
+        metadata: sql`excluded.metadata`,
+        version: sql`${guardrails.version} + 1`,
+        updatedAt: sql`now()`,
+      },
+    });
+    return rows.length;
+  }
+
+  private async upsertCopyDecorators(tx: DbTx, rows: any[]): Promise<number> {
+    if (!rows.length) return 0;
+    await tx.insert(copyDecorators).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: [copyDecorators.projectId, copyDecorators.id],
+      set: {
+        projectId: sql`excluded.project_id`,
+        name: sql`excluded.name`,
+        template: sql`excluded.template`,
+        version: sql`${copyDecorators.version} + 1`,
+        updatedAt: sql`now()`,
+      },
+    });
+    return rows.length;
+  }
+
+  private async upsertSampleCopies(tx: DbTx, rows: any[]): Promise<number> {
+    if (!rows.length) return 0;
+    await tx.insert(sampleCopies).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: [sampleCopies.projectId, sampleCopies.id],
+      set: {
+        projectId: sql`excluded.project_id`,
+        name: sql`excluded.name`,
+        stages: sql`excluded.stages`,
+        agents: sql`excluded.agents`,
+        promptTrigger: sql`excluded.prompt_trigger`,
+        classifierOverrideId: sql`excluded.classifier_override_id`,
+        content: sql`excluded.content`,
+        amount: sql`excluded.amount`,
+        samplingMethod: sql`excluded.sampling_method`,
+        mode: sql`excluded.mode`,
+        decoratorId: sql`excluded.decorator_id`,
+        version: sql`${sampleCopies.version} + 1`,
+        updatedAt: sql`now()`,
+      },
+    });
+    return rows.length;
+  }
+
+  private async upsertSavedSliceQueries(tx: DbTx, rows: any[]): Promise<number> {
+    if (!rows.length) return 0;
+    await tx.insert(savedSliceQueries).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: savedSliceQueries.id,
+      set: {
+        name: sql`excluded.name`,
+        projectId: sql`excluded.project_id`,
+        operatorId: sql`null`,
+        query: sql`excluded.query`,
+        isShared: sql`excluded.is_shared`,
+        metadata: sql`excluded.metadata`,
+        version: sql`${savedSliceQueries.version} + 1`,
+        updatedAt: sql`now()`,
+      },
+    });
+    return rows.length;
+  }
+
+  private async upsertSavedFunnelQueries(tx: DbTx, rows: any[]): Promise<number> {
+    if (!rows.length) return 0;
+    await tx.insert(savedFunnelQueries).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: savedFunnelQueries.id,
+      set: {
+        name: sql`excluded.name`,
+        projectId: sql`excluded.project_id`,
+        operatorId: sql`null`,
+        query: sql`excluded.query`,
+        isShared: sql`excluded.is_shared`,
+        version: sql`${savedFunnelQueries.version} + 1`,
+        updatedAt: sql`now()`,
+      },
+    });
+    return rows.length;
+  }
+
   private async upsertStages(tx: DbTx, rows: any[]): Promise<number> {
     if (!rows.length) return 0;
     await tx.insert(stages).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
@@ -850,6 +1198,52 @@ export class MigrationService extends BaseService {
         isActive: sql`excluded.is_active`,
         metadata: sql`excluded.metadata`,
         version: sql`${apiKeys.version} + 1`,
+        updatedAt: sql`now()`,
+      },
+    });
+    return rows.length;
+  }
+
+  private async upsertTesters(tx: DbTx, rows: any[]): Promise<number> {
+    if (!rows.length) return 0;
+    await tx.insert(testers).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: [testers.projectId, testers.id],
+      set: {
+        projectId: sql`excluded.project_id`,
+        name: sql`excluded.name`,
+        description: sql`excluded.description`,
+        prompt: sql`excluded.prompt`,
+        llmProviderId: sql`excluded.llm_provider_id`,
+        llmSettings: sql`excluded.llm_settings`,
+        userProfile: sql`excluded.user_profile`,
+        tags: sql`excluded.tags`,
+        metadata: sql`excluded.metadata`,
+        version: sql`${testers.version} + 1`,
+        updatedAt: sql`now()`,
+      },
+    });
+    return rows.length;
+  }
+
+  private async upsertScenarios(tx: DbTx, rows: any[]): Promise<number> {
+    if (!rows.length) return 0;
+    await tx.insert(scenarios).values(rows.map(r => this.parseTimestamps(r))).onConflictDoUpdate({
+      target: [scenarios.projectId, scenarios.id],
+      set: {
+        projectId: sql`excluded.project_id`,
+        name: sql`excluded.name`,
+        description: sql`excluded.description`,
+        language: sql`excluded.language`,
+        startingStageId: sql`excluded.starting_stage_id`,
+        maxTurns: sql`excluded.max_turns`,
+        endingStageIds: sql`excluded.ending_stage_ids`,
+        personaCanHangUp: sql`excluded.persona_can_hang_up`,
+        dataExtraction: sql`excluded.data_extraction`,
+        contextTransformerId: sql`excluded.context_transformer_id`,
+        dataPostProcessingExpected: sql`excluded.data_post_processing_expected`,
+        tags: sql`excluded.tags`,
+        metadata: sql`excluded.metadata`,
+        version: sql`${scenarios.version} + 1`,
         updatedAt: sql`now()`,
       },
     });

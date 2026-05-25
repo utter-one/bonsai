@@ -31,6 +31,7 @@ export class SliceQueryBuilder {
       from?: Date;
       to?: Date;
       conversationId?: string;
+      scenarioRunConversationIds?: string[];
       filters?: Record<string, string>;
       limit: number;
     },
@@ -339,6 +340,15 @@ export class SliceQueryBuilder {
         : this.source.table === 'conversations' ? 'c.id'
           : 'ce.conversation_id';
       conditions.push(`${convCol} = '${this.escapeParam(this.params.conversationId)}'`);
+    }
+
+    // Scenario run conversation filter
+    if (this.params.scenarioRunConversationIds && this.params.scenarioRunConversationIds.length > 0) {
+      const convCol = this.source.requiresCte ? 'sv.conversation_id'
+        : this.source.table === 'conversations' ? 'c.id'
+          : 'ce.conversation_id';
+      const ids = this.params.scenarioRunConversationIds.map((id) => `'${this.escapeParam(id)}'`).join(', ');
+      conditions.push(`${convCol} IN (${ids})`);
     }
 
     // Additional dimension equality filters

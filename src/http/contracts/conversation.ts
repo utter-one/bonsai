@@ -49,6 +49,7 @@ export const conversationResponseSchema = z.object({
   stageVars: z.record(z.string(), z.record(z.string(), z.unknown())).nullable().describe('Variables stored per stage in the conversation'),
   status: z.string().describe('Current status of the conversation (e.g., initialized, active, completed, failed)'),
   statusDetails: z.string().nullable().describe('Optional details about the current status'),
+  direction: z.enum(['incoming', 'outgoing']).describe('Direction of the conversation – incoming (user-initiated) or outgoing (Bonsai-initiated)'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata associated with the conversation'),
   createdAt: z.coerce.date().describe('Timestamp when the conversation was created'),
   updatedAt: z.coerce.date().describe('Timestamp when the conversation was last updated'),

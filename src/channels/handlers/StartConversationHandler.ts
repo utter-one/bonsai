@@ -45,6 +45,28 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
     let conversationId: string | undefined;
     let conversationAttached = false;
 
+    // Outgoing call path: conversation was pre-created at call initiation time
+    if (message.existingConversationId) {
+      try {
+        conversationId = message.existingConversationId;
+        await this.sessionManager.attachConversationToSession(context.session.id, conversationId);
+        conversationAttached = true;
+        logger.info({ sessionId: context.session.id, conversationId }, 'Attached to pre-created outgoing conversation');
+        await context.session.runner.startConversation();
+        const response: CALStartConversationResponse = { type: 'start_conversation', conversationId, correlationId: message.correlationId, success: true };
+        context.send(response);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to start outgoing conversation';
+        logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId }, 'Failed to start outgoing conversation');
+        if (conversationAttached && conversationId) {
+          this.sessionManager.detachConversationFromSession(context.session.id);
+        }
+        const response: CALStartConversationResponse = { type: 'start_conversation', conversationId: conversationId ?? '', correlationId: message.correlationId, success: false, error: errorMessage };
+        context.send(response);
+      }
+      return;
+    }
+
     try {
       // Get project first to check autoCreateUsers flag and resolve timezone later
       const project = await this.projectService.getProjectById(context.session.projectId);
@@ -64,6 +86,11 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
       // Get stage to extract projectId
       if (user.banned) {
         throw new UserBannedError(`User ${user.id} is banned and cannot start a conversation${user.banReason ? `: ${user.banReason}` : ''}`);
+      }
+
+      // Deep-merge injected userProfile into existing user profile
+      if (message.userProfile && Object.keys(message.userProfile).length > 0) {
+        await this.userService.updateUserProfile(context.session!.projectId, message.userId, message.userProfile);
       }
 
       // Resolve stageId: explicit message value takes priority, then fall back to project default

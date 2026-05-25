@@ -160,6 +160,23 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
   }
 
   /**
+   * Cancels the ongoing speech generation without finalizing it.
+   * Used when a user barge-in interrupts the AI's response.
+   */
+  async cancel(): Promise<void> {
+    logger.info(`[OpenAI TTS] Cancelling speech generation (barge-in)`);
+
+    // Abort all active HTTP requests
+    for (const controller of this.activeRequests) {
+      controller.abort();
+    }
+    this.activeRequests.clear();
+
+    // Discard pending chunk — no final chunk is sent on cancel
+    this.pendingChunk = null;
+  }
+
+  /**
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */

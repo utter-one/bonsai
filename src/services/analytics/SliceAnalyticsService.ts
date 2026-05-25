@@ -1,24 +1,25 @@
-import { singleton } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import { sql } from 'drizzle-orm';
 import { db } from '../../db/index';
 import { BaseService } from '../BaseService';
 import type { RequestContext } from '../RequestContext';
 import { PERMISSIONS } from '../../permissions';
+import { InvalidOperationError } from '../../errors';
 import { SOURCES } from './sources';
 import type { SourceId } from './sources';
 import { SliceQueryBuilder } from './SliceQueryBuilder';
 import type { SourceCatalogResponse, SliceQuery, SliceQueryResponse } from '../../http/contracts/sliceAnalytics';
 import type { RelativeTime } from '../../http/contracts/sliceAnalytics';
-import { InvalidOperationError } from '../../errors';
+import { ScenarioConversationService } from '../testing/ScenarioConversationService';
 
 /** Maps a relative time range to a concrete { from, to } date pair anchored to now */
 function resolveRelativeTime(relativeTime: RelativeTime): { from: Date; to: Date } {
   const to = new Date();
   const from = new Date(to);
   switch (relativeTime.unit) {
-    case 'hours':  from.setHours(from.getHours() - relativeTime.amount); break;
-    case 'days':   from.setDate(from.getDate() - relativeTime.amount); break;
-    case 'weeks':  from.setDate(from.getDate() - relativeTime.amount * 7); break;
+    case 'hours': from.setHours(from.getHours() - relativeTime.amount); break;
+    case 'days': from.setDate(from.getDate() - relativeTime.amount); break;
+    case 'weeks': from.setDate(from.getDate() - relativeTime.amount * 7); break;
     case 'months': from.setMonth(from.getMonth() - relativeTime.amount); break;
   }
   return { from, to };
@@ -31,6 +32,11 @@ function resolveRelativeTime(relativeTime: RelativeTime): { from: Date; to: Date
  */
 @singleton()
 export class SliceAnalyticsService extends BaseService {
+  constructor(
+    @inject(ScenarioConversationService) private readonly scenarioConversationService: ScenarioConversationService,
+  ) {
+    super();
+  }
 
   /**
    * Returns the source catalog: available sources with their dimensions and metrics.
@@ -50,6 +56,7 @@ export class SliceAnalyticsService extends BaseService {
         id: m.id,
         label: m.label,
         unit: m.unit,
+        aggregateFunctions: m.aggregateFunctions,
       })),
     }));
 
@@ -75,6 +82,12 @@ export class SliceAnalyticsService extends BaseService {
       ? { ...params, ...resolveRelativeTime(params.relativeTime) }
       : params;
 
+    // Fetch conversation IDs for scenario run filtering
+    let scenarioRunConversationIds: string[] | undefined;
+    if (resolvedParams.scenarioRunId) {
+      scenarioRunConversationIds = await this.scenarioConversationService.getConversationIdsByScenarioRun(projectId, resolvedParams.scenarioRunId);
+    }
+
     let builder: SliceQueryBuilder;
     try {
       builder = new SliceQueryBuilder(source, {
@@ -85,6 +98,7 @@ export class SliceAnalyticsService extends BaseService {
         from: resolvedParams.from,
         to: resolvedParams.to,
         conversationId: resolvedParams.conversationId,
+        scenarioRunConversationIds,
         filters: resolvedParams.filters,
         limit: resolvedParams.limit,
       }, projectId);

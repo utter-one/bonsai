@@ -1,4 +1,4 @@
-import { singleton } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import { sql } from 'drizzle-orm';
 import { db } from '../../db/index';
 import { BaseService } from '../BaseService';
@@ -7,6 +7,7 @@ import { PERMISSIONS } from '../../permissions';
 import { InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import type { FunnelQueryRequest, FunnelQueryResponse, FunnelStep } from '../../http/contracts/funnels';
+import { ScenarioConversationService } from '../testing/ScenarioConversationService';
 
 /**
  * Executes user-centric funnel queries over conversation events.
@@ -14,14 +15,21 @@ import type { FunnelQueryRequest, FunnelQueryResponse, FunnelStep } from '../../
  */
 @singleton()
 export class FunnelQueryService extends BaseService {
+  constructor(
+    @inject(ScenarioConversationService) private readonly scenarioConversationService: ScenarioConversationService,
+  ) {
+    super();
+  }
+
   /**
    * Runs a funnel query for the given project and returns per-step user counts with conversion metrics.
    * @param projectId - Project to run the query against
    * @param input - Funnel query definition including steps and time range
    * @param context - Request context for authorization
+   * @param scenarioRunId - Optional scenario run ID to filter conversations
    * @throws {InvalidOperationError} When step count, time range, or step params are invalid
    */
-  async runQuery(projectId: string, input: FunnelQueryRequest, context: RequestContext): Promise<FunnelQueryResponse> {
+  async runQuery(projectId: string, input: FunnelQueryRequest, context: RequestContext, scenarioRunId?: string): Promise<FunnelQueryResponse> {
     this.requirePermission(context, PERMISSIONS.ANALYTICS_READ);
 
     this.validateTimeRange(input);
@@ -31,6 +39,12 @@ export class FunnelQueryService extends BaseService {
     this.validateTimeWindow(windowStart, windowEnd);
 
     logger.info({ projectId, stepCount: input.steps.length, windowStart, windowEnd }, 'Running funnel query');
+
+    // Fetch conversation IDs for scenario run filtering
+    let scenarioRunConversationIds: string[] | null = null;
+    if (scenarioRunId) {
+      scenarioRunConversationIds = await this.scenarioConversationService.getConversationIdsByScenarioRun(projectId, scenarioRunId);
+    }
 
     const userCounts: number[] = [];
     let currentUsers: string[] | null = null;
@@ -45,7 +59,7 @@ export class FunnelQueryService extends BaseService {
         break;
       }
 
-      const users = await this.getUsersForStep(projectId, step, windowStart, windowEnd, currentUsers);
+      const users = await this.getUsersForStep(projectId, step, windowStart, windowEnd, currentUsers, scenarioRunConversationIds);
       currentUsers = users;
       userCounts.push(users.length);
     }
@@ -72,14 +86,14 @@ export class FunnelQueryService extends BaseService {
     return { totalConversionRate, usersAtStart, usersAtEnd, steps };
   }
 
-  private async getUsersForStep(projectId: string, step: FunnelStep, windowStart: Date, windowEnd: Date, previousUsers: string[] | null): Promise<string[]> {
+  private async getUsersForStep(projectId: string, step: FunnelStep, windowStart: Date, windowEnd: Date, previousUsers: string[] | null, scenarioRunConversationIds: string[] | null): Promise<string[]> {
     if (step.eventType === 'session_started') {
-      return this.getUsersForSessionStarted(projectId, step.params, windowStart, windowEnd, previousUsers);
+      return this.getUsersForSessionStarted(projectId, step.params, windowStart, windowEnd, previousUsers, scenarioRunConversationIds);
     }
-    return this.getUsersForEventStep(projectId, step, windowStart, windowEnd, previousUsers);
+    return this.getUsersForEventStep(projectId, step, windowStart, windowEnd, previousUsers, scenarioRunConversationIds);
   }
 
-  private async getUsersForEventStep(projectId: string, step: FunnelStep, windowStart: Date, windowEnd: Date, previousUsers: string[] | null): Promise<string[]> {
+  private async getUsersForEventStep(projectId: string, step: FunnelStep, windowStart: Date, windowEnd: Date, previousUsers: string[] | null, scenarioRunConversationIds: string[] | null): Promise<string[]> {
     const p = this.escapeParam(projectId);
     const ws = windowStart.toISOString();
     const we = windowEnd.toISOString();
@@ -135,6 +149,10 @@ export class FunnelQueryService extends BaseService {
       }
     }
 
+    const conversationFilter = scenarioRunConversationIds && scenarioRunConversationIds.length > 0
+      ? `AND c.id IN (${scenarioRunConversationIds.map((id) => `'${this.escapeParam(id)}'`).join(',')})`
+      : '';
+
     const query = `
       SELECT DISTINCT c.user_id
       FROM conversation_events ce
@@ -144,6 +162,7 @@ export class FunnelQueryService extends BaseService {
         AND ce.timestamp >= '${ws}'
         AND ce.timestamp <= '${we}'
         ${cascadeFilter}
+        ${conversationFilter}
         AND (${eventCondition})
     `;
 
@@ -151,13 +170,17 @@ export class FunnelQueryService extends BaseService {
     return result.rows.map((row: any) => row.user_id as string);
   }
 
-  private async getUsersForSessionStarted(projectId: string, params: Record<string, string>, windowStart: Date, windowEnd: Date, previousUsers: string[] | null): Promise<string[]> {
+  private async getUsersForSessionStarted(projectId: string, params: Record<string, string>, windowStart: Date, windowEnd: Date, previousUsers: string[] | null, scenarioRunConversationIds: string[] | null): Promise<string[]> {
     const p = this.escapeParam(projectId);
     const ws = windowStart.toISOString();
     const we = windowEnd.toISOString();
     const minSessions = parseInt(params.minSessions, 10);
     const cascadeFilter = previousUsers !== null
       ? `AND user_id = ANY(ARRAY[${previousUsers.map((u) => `'${this.escapeParam(u)}'`).join(',')}])`
+      : '';
+
+    const conversationFilter = scenarioRunConversationIds && scenarioRunConversationIds.length > 0
+      ? `AND id IN (${scenarioRunConversationIds.map((id) => `'${this.escapeParam(id)}'`).join(',')})`
       : '';
 
     const query = `
@@ -167,6 +190,7 @@ export class FunnelQueryService extends BaseService {
         AND created_at >= '${ws}'
         AND created_at <= '${we}'
         ${cascadeFilter}
+        ${conversationFilter}
       GROUP BY user_id
       HAVING COUNT(DISTINCT session_id) >= ${minSessions}
     `;

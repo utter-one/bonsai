@@ -1,6 +1,6 @@
-﻿{
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "prevId": "9e2fe96b-b4e8-4a67-8c7c-467b5380e455",
+{
+  "id": "2db65bde-3f62-4ebf-b0a8-a44e565c080d",
+  "prevId": "3b31f2f7-130a-4d76-8764-dddc7d06e6ce",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -55,7 +55,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -419,7 +419,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -536,7 +536,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -931,7 +931,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027initialized\u0027"
+          "default": "'initialized'"
         },
         "status_reason": {
           "name": "status_reason",
@@ -939,6 +939,13 @@
           "primaryKey": false,
           "notNull": false,
           "default": null
+        },
+        "direction": {
+          "name": "direction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'incoming'"
         },
         "metadata": {
           "name": "metadata",
@@ -1259,14 +1266,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "effects": {
           "name": "effects",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "examples": {
           "name": "examples",
@@ -1279,7 +1286,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -1378,7 +1385,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "examples": {
           "name": "examples",
@@ -1391,7 +1398,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -1617,7 +1624,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "order": {
           "name": "order",
@@ -1933,7 +1940,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "default_guardrail_classifier_id": {
           "name": "default_guardrail_classifier_id",
@@ -2162,7 +2169,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "amount": {
           "name": "amount",
@@ -2176,14 +2183,14 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027random\u0027"
+          "default": "'random'"
         },
         "mode": {
           "name": "mode",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027regular\u0027"
+          "default": "'regular'"
         },
         "decorator_id": {
           "name": "decorator_id",
@@ -2275,6 +2282,156 @@
           ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.saved_funnel_queries": {
+      "name": "saved_funnel_queries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "query": {
+          "name": "query",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_shared": {
+          "name": "is_shared",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "saved_funnel_queries_project_id_name_unique": {
+          "name": "saved_funnel_queries_project_id_name_unique",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_saved_funnel_queries_project_id": {
+          "name": "idx_saved_funnel_queries_project_id",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_saved_funnel_queries_operator_id": {
+          "name": "idx_saved_funnel_queries_operator_id",
+          "columns": [
+            {
+              "expression": "operator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "saved_funnel_queries_project_id_projects_id_fk": {
+          "name": "saved_funnel_queries_project_id_projects_id_fk",
+          "tableFrom": "saved_funnel_queries",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "saved_funnel_queries_operator_id_operators_id_fk": {
+          "name": "saved_funnel_queries_operator_id_operators_id_fk",
+          "tableFrom": "saved_funnel_queries",
+          "tableTo": "operators",
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -2436,6 +2593,461 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.scenario_conversations": {
+      "name": "scenario_conversations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scenario_run_id": {
+          "name": "scenario_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scenario_id": {
+          "name": "scenario_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tester_id": {
+          "name": "tester_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "conversation_id": {
+          "name": "conversation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "data_extraction_results": {
+          "name": "data_extraction_results",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_transformation_results": {
+          "name": "data_transformation_results",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_scenario_conversations_project_run": {
+          "name": "idx_scenario_conversations_project_run",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scenario_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scenario_conversations_project_id_projects_id_fk": {
+          "name": "scenario_conversations_project_id_projects_id_fk",
+          "tableFrom": "scenario_conversations",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scenario_conversations_project_id_id_pk": {
+          "name": "scenario_conversations_project_id_id_pk",
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scenario_runs": {
+      "name": "scenario_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scenario_id": {
+          "name": "scenario_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tester_ids": {
+          "name": "tester_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "total_conversations": {
+          "name": "total_conversations",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_scenario_runs_project_scenario": {
+          "name": "idx_scenario_runs_project_scenario",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scenario_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scenario_runs_project_id_projects_id_fk": {
+          "name": "scenario_runs_project_id_projects_id_fk",
+          "tableFrom": "scenario_runs",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scenario_runs_project_id_id_pk": {
+          "name": "scenario_runs_project_id_id_pk",
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scenarios": {
+      "name": "scenarios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starting_stage_id": {
+          "name": "starting_stage_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_turns": {
+          "name": "max_turns",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ending_stage_ids": {
+          "name": "ending_stage_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "persona_can_hang_up": {
+          "name": "persona_can_hang_up",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "data_extraction": {
+          "name": "data_extraction",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "context_transformer_id": {
+          "name": "context_transformer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_post_processing_expected": {
+          "name": "data_post_processing_expected",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "scenarios_project_id_projects_id_fk": {
+          "name": "scenarios_project_id_projects_id_fk",
+          "tableFrom": "scenarios",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scenarios_project_id_id_pk": {
+          "name": "scenarios_project_id_id_pk",
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.secrets": {
+      "name": "secrets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "encrypted_value": {
+          "name": "encrypted_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "iv": {
+          "name": "iv",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tag": {
+          "name": "tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.stages": {
       "name": "stages",
       "schema": "",
@@ -2493,7 +3105,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027generate_response\u0027"
+          "default": "'generate_response'"
         },
         "use_knowledge": {
           "name": "use_knowledge",
@@ -2507,7 +3119,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "use_global_actions": {
           "name": "use_global_actions",
@@ -2521,21 +3133,21 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "variable_descriptors": {
           "name": "variable_descriptors",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "actions": {
           "name": "actions",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027{}\u0027::jsonb"
+          "default": "'{}'::jsonb"
         },
         "default_classifier_id": {
           "name": "default_classifier_id",
@@ -2548,14 +3160,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "tags": {
           "name": "tags",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -2645,6 +3257,123 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.testers": {
+      "name": "testers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "llm_provider_id": {
+          "name": "llm_provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "llm_settings": {
+          "name": "llm_settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_profile": {
+          "name": "user_profile",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "testers_project_id_projects_id_fk": {
+          "name": "testers_project_id_projects_id_fk",
+          "tableFrom": "testers",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "testers_project_id_id_pk": {
+          "name": "testers_project_id_id_pk",
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.tools": {
       "name": "tools",
       "schema": "",
@@ -2678,7 +3407,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027smart_function\u0027"
+          "default": "'smart_function'"
         },
         "prompt": {
           "name": "prompt",
@@ -2745,14 +3474,14 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "tags": {
           "name": "tags",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "metadata": {
           "name": "metadata",
@@ -2891,8 +3620,7 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.saved_funnel_queries": null
+    }
   },
   "enums": {},
   "schemas": {},
@@ -2994,7 +3722,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "default_guardrail_classifier_id": {
           "name": "default_guardrail_classifier_id",
@@ -3154,7 +3882,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "\u0027[]\u0027::jsonb"
+          "default": "'[]'::jsonb"
         },
         "default_guardrail_classifier_id": {
           "name": "default_guardrail_classifier_id",

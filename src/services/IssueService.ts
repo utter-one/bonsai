@@ -36,7 +36,7 @@ export class IssueService extends BaseService {
     logger.info({ projectId: input.projectId, environment: input.environment, severity: input.severity, operatorId: context?.operatorId }, 'Creating issue');
 
     try {
-      const issue = await db.insert(issues).values({ projectId: input.projectId, environment: input.environment, buildVersion: input.buildVersion, stage: input.stage, sessionId: input.sessionId, eventIndex: input.eventIndex, userId: input.userId, severity: input.severity, category: input.category, bugDescription: input.bugDescription, expectedBehaviour: input.expectedBehaviour, comments: input.comments ?? '', status: input.status }).returning();
+      const issue = await db.insert(issues).values({ projectId: input.projectId, environment: input.environment, buildVersion: input.buildVersion, stage: input.stage, conversationId: input.conversationId, eventIndex: input.eventIndex, userId: input.userId, severity: input.severity, category: input.category, bugDescription: input.bugDescription, expectedBehaviour: input.expectedBehaviour, comments: input.comments ?? '', status: input.status }).returning();
 
       const createdIssue = issue[0];
 
@@ -95,7 +95,7 @@ export class IssueService extends BaseService {
         environment: issues.environment,
         buildVersion: issues.buildVersion,
         stage: issues.stage,
-        sessionId: issues.sessionId,
+        conversationId: issues.conversationId,
         eventIndex: issues.eventIndex,
         userId: issues.userId,
         severity: issues.severity,

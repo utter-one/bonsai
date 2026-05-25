@@ -67,6 +67,9 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
   /** ASR settings for this provider instance */
   private settings: AssemblyAiAsrSettings;
 
+  /** Target duration per audio chunk sent to AssemblyAI (ms). Must be between 50 and 1000 ms. */
+  private static readonly CHUNK_DURATION_MS = 800;
+
   constructor(config: AssemblyAiAsrProviderConfig, settings: AssemblyAiAsrSettings) {
     super(config);
     this.settings = settings;
@@ -242,9 +245,7 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
     }
 
     if (this.isRecognizing && this.transcriber) {
-      // Send audio data to AssemblyAI using SDK (convert Buffer to ArrayBuffer)
-      const arrayBuffer = audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength);
-      this.transcriber.sendAudio(arrayBuffer);
+      this.sendAudioChunked(audio);
       logger.debug(`[AssemblyAI ASR] Sent audio chunk (${audio.length} bytes)`);
     } else {
       // Buffer audio until connection is ready
@@ -331,12 +332,26 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
     logger.info(`[AssemblyAI ASR] Flushing ${this.audioBuffer.length} buffered audio chunks`);
     for (const buffer of this.audioBuffer) {
       if (this.transcriber) {
-        // Convert Buffer to ArrayBuffer
-        const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-        this.transcriber.sendAudio(arrayBuffer);
+        this.sendAudioChunked(buffer);
       }
     }
     this.audioBuffer = [];
+  }
+
+  /**
+   * Splits an audio buffer into duration-aligned chunks and sends each to AssemblyAI.
+   * AssemblyAI requires each WebSocket frame to represent between 50ms and 1000ms of audio.
+   * Chunk size is derived from the configured sample rate assuming 16-bit PCM (2 bytes/sample).
+   * @param audio Audio buffer to send
+   */
+  private sendAudioChunked(audio: Buffer): void {
+    const bytesPerSample = 2; // pcm_s16le
+    const chunkBytes = Math.floor(this.settings.sampleRate * bytesPerSample * (AssemblyAiAsrProvider.CHUNK_DURATION_MS / 1000));
+    for (let offset = 0; offset < audio.length; offset += chunkBytes) {
+      const slice = audio.subarray(offset, offset + chunkBytes);
+      const arrayBuffer = slice.buffer.slice(slice.byteOffset, slice.byteOffset + slice.byteLength);
+      this.transcriber!.sendAudio(arrayBuffer);
+    }
   }
 
   /**
@@ -373,13 +388,16 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
   async cleanup(): Promise<void> {
     await super.cleanup();
 
-    if (this.transcriber) {
+    const transcriber = this.transcriber;
+    this.transcriber = null;
+
+    if (transcriber) {
       try {
-        await this.transcriber.close();
+        const closeTimeout = new Promise<void>((resolve) => setTimeout(resolve, 5000));
+        await Promise.race([transcriber.close(), closeTimeout]);
       } catch (error) {
         logger.error(`[AssemblyAI ASR] Error closing transcriber during cleanup: ${error}`);
       }
-      this.transcriber = null;
     }
 
     this.audioBuffer = [];

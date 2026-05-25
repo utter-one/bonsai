@@ -93,6 +93,14 @@ export interface ITtsProvider<TChunk extends GeneratedAudioChunk = GeneratedAudi
   sendText(text: string): Promise<void>;
 
   /**
+   * Cancels the ongoing speech generation without finalizing it.
+   * Used when a user barge-in interrupts the AI's response — the TTS session is abandoned
+   * rather than completed, and no end-of-generation callback is fired.
+   * @returns Promise that resolves when cancellation is complete
+   */
+  cancel?(): Promise<void>;
+
+  /**
    * Registers a callback for when speech generation begins
    * This is called at the start of the synthesis process, before any audio chunks are generated
    * @param cb Callback function that is invoked when generation starts

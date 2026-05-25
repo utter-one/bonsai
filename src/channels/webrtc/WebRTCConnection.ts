@@ -172,6 +172,30 @@ export class WebRTCConnection implements IClientConnection {
         break;
       }
 
+      case 'abort_ai_generation_output': {
+        this.sendControl({
+          type: 'abort_ai_generation_output',
+          sessionId,
+          conversationId,
+          requestId: msg.correlationId,
+          outputTurnId: msg.outputTurnId,
+          accumulatedText: msg.accumulatedText,
+          abortTimestampMs: msg.abortTimestampMs,
+        });
+        break;
+      }
+
+      case 'user_speaking_started': {
+        this.sendControl({
+          type: 'user_speaking_started',
+          sessionId,
+          conversationId,
+          requestId: msg.correlationId,
+          inputTurnId: msg.inputTurnId,
+        });
+        break;
+      }
+
       case 'end_ai_generation_output': {
         // Flush any sub-frame audio remainder so the last few ms of the turn are heard.
         this.flushAudioRemainder();

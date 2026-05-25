@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { inject, singleton } from 'tsyringe';
 import type { Request, Response, Router } from 'express';
+import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/index';
@@ -16,6 +17,12 @@ import { logger } from '../../utils/logger';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { ConversationService } from '../../services/ConversationService';
+import { ProjectService } from '../../services/ProjectService';
+import { UserService } from '../../services/UserService';
+import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
+import { whatsAppSendBodySchema, whatsAppSendResponseSchema } from '../../http/contracts/whatsapp-outgoing';
+import type { WhatsAppSendResponse } from '../../http/contracts/whatsapp-outgoing';
 
 /** Default inactivity session timeout in milliseconds (30 minutes). */
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -89,7 +96,39 @@ export class WhatsAppChannelHost {
     @inject(SessionManager) private readonly sessionManager: SessionManager,
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
     @inject(IpRateLimiter) private readonly rateLimiter: IpRateLimiter,
+    @inject(ConversationService) private readonly conversationService: ConversationService,
+    @inject(ProjectService) private readonly projectService: ProjectService,
+    @inject(UserService) private readonly userService: UserService,
+    @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
   ) {}
+
+  /**
+   * Returns OpenAPI path definitions for the outgoing WhatsApp send endpoint.
+   */
+  static getOpenAPIPaths(): RouteConfig[] {
+    return [
+      {
+        method: 'post',
+        path: '/api/whatsapp/send',
+        tags: ['WhatsApp'],
+        summary: 'Initiate an outgoing WhatsApp conversation',
+        description: 'Sends an approved WhatsApp template message to the specified phone number and pre-creates a conversation record. WhatsApp requires an approved template for business-initiated conversations. Future inbound replies will be attached to the same virtual session.',
+        security: [],
+        request: {
+          query: webhookQuerySchema,
+          body: { content: { 'application/json': { schema: whatsAppSendBodySchema } } },
+        },
+        responses: {
+          201: { description: 'Template message sent and conversation pre-created', content: { 'application/json': { schema: whatsAppSendResponseSchema } } },
+          400: { description: 'Missing or invalid parameters' },
+          401: { description: 'Invalid or inactive API key' },
+          403: { description: 'API key does not permit whatsapp channel' },
+          422: { description: 'No default stage available' },
+          502: { description: 'Meta Graph API call failed' },
+        },
+      },
+    ];
+  }
 
   /**
    * Registers the WhatsApp webhook routes on the Express router.
@@ -100,6 +139,7 @@ export class WhatsAppChannelHost {
   registerRoutes(router: Router): void {
     router.get('/api/whatsapp/webhook', asyncHandler(this.handleVerification.bind(this)));
     router.post('/api/whatsapp/webhook', asyncHandler(this.handleWebhook.bind(this)));
+    router.post('/api/whatsapp/send', asyncHandler(this.handleOutgoingMessage.bind(this)));
   }
 
   /**
@@ -130,7 +170,8 @@ export class WhatsAppChannelHost {
       return;
     }
 
-    const configResult = whatsAppChannelProviderConfigSchema.safeParse(providerRecord.config);
+    const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+    const configResult = whatsAppChannelProviderConfigSchema.safeParse(rawConfig);
     if (!configResult.success) {
       logger.error({ channelProviderId, issues: configResult.error.issues }, 'WhatsApp webhook verification: channel provider config is invalid');
       res.status(500).send();
@@ -199,7 +240,8 @@ export class WhatsAppChannelHost {
       return;
     }
 
-    const configResult = whatsAppChannelProviderConfigSchema.safeParse(providerRecord.config);
+    const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+    const configResult = whatsAppChannelProviderConfigSchema.safeParse(rawConfig);
     if (!configResult.success) {
       logger.error({ channelProviderId, issues: configResult.error.issues }, 'WhatsApp webhook: channel provider config is invalid');
       return;
@@ -279,6 +321,141 @@ export class WhatsAppChannelHost {
         await this.dispatchCommand(sessionId, cmd, messageText);
       }
     }
+  }
+
+  /**
+   * Handles a request to send an outgoing WhatsApp template message.
+   *
+   * Flow:
+   * 1. Validate query params (apiKey, channelProviderId) and request body.
+   * 2. Load channel provider config and resolve stageId.
+   * 3. Pre-create a conversation record with direction 'outgoing'.
+   * 4. Send the template message via the Meta WhatsApp Cloud API.
+   * 5. Return 201 with messageId and conversationId.
+   *
+   * Inbound replies will arrive via the webhook and be matched to the existing
+   * virtual session using the phoneSessionMap.
+   */
+  private async handleOutgoingMessage(req: Request, res: Response): Promise<void> {
+    const queryResult = webhookQuerySchema.safeParse(req.query);
+    if (!queryResult.success) {
+      res.status(400).json({ error: 'Missing or invalid query parameters' });
+      return;
+    }
+    const { apiKey: rawApiKey, stageId: queryStageId, agentId: queryAgentId, channelProviderId } = queryResult.data;
+
+    const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
+    if (!apiKeyRecord || !apiKeyRecord.isActive) {
+      res.status(401).json({ error: 'Invalid or inactive API key' });
+      return;
+    }
+    const { projectId, keySettings } = apiKeyRecord;
+
+    if (keySettings?.allowedChannels && !keySettings.allowedChannels.includes('whatsapp')) {
+      res.status(403).json({ error: 'API key does not permit whatsapp channel' });
+      return;
+    }
+
+    const bodyResult = whatsAppSendBodySchema.safeParse(req.body);
+    if (!bodyResult.success) {
+      res.status(400).json({ error: 'Invalid request body', issues: bodyResult.error.issues });
+      return;
+    }
+    const body = bodyResult.data;
+
+    const providerRecord = await db.query.providers.findFirst({ where: eq(providers.id, channelProviderId) });
+    if (!providerRecord || providerRecord.providerType !== 'channel') {
+      res.status(400).json({ error: 'Channel provider not found or wrong type' });
+      return;
+    }
+
+    const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+    const configResult = whatsAppChannelProviderConfigSchema.safeParse(rawConfig);
+    if (!configResult.success) {
+      logger.error({ channelProviderId, issues: configResult.error.issues }, 'WhatsApp outgoing: channel provider config is invalid');
+      res.status(500).json({ error: 'Channel provider config is invalid' });
+      return;
+    }
+    const { phoneNumberId, accessToken } = configResult.data;
+
+    // Resolve stageId: body overrides query param, then project default
+    let resolvedStageId = body.stageId ?? queryStageId;
+    if (!resolvedStageId) {
+      const project = await this.projectService.getProjectById(projectId);
+      resolvedStageId = project.startingStageId ?? undefined;
+      if (!resolvedStageId) {
+        res.status(422).json({ error: 'No stageId provided and project has no default starting stage' });
+        return;
+      }
+    }
+
+    // Ensure the user exists (create if not)
+    await this.userService.ensureUserExists(projectId, body.to);
+
+    // Deep-merge injected userProfile into existing user profile
+    if (body.userProfile && Object.keys(body.userProfile).length > 0) {
+      await this.userService.updateUserProfile(projectId, body.to, body.userProfile);
+    }
+
+    // Pre-create the conversation
+    const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
+    const conversation = await this.conversationService.createConversation({
+      projectId,
+      userId: body.to,
+      sessionId,
+      stageId: resolvedStageId,
+      status: 'initialized',
+      direction: 'outgoing',
+      metadata: body.metadata ?? null,
+    });
+
+    // Build Meta WhatsApp Cloud API template message payload
+    const components: Array<{ type: string; parameters: Array<{ type: string; text: string }> }> = [];
+    if (body.templateParams && body.templateParams.length > 0) {
+      components.push({
+        type: 'body',
+        parameters: body.templateParams.map((text) => ({ type: 'text', text })),
+      });
+    }
+    const messagePayload = {
+      messaging_product: 'whatsapp',
+      to: body.to,
+      type: 'template',
+      template: {
+        name: body.templateName,
+        language: { code: 'en_US' },
+        ...(components.length > 0 ? { components } : {}),
+      },
+    };
+
+    // Send via Meta Graph API
+    let messageId: string;
+    try {
+      const apiResponse = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(messagePayload),
+      });
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        throw new Error(`Meta API error ${apiResponse.status}: ${errorText}`);
+      }
+      const responseData = await apiResponse.json() as { messages?: Array<{ id: string }> };
+      messageId = responseData.messages?.[0]?.id ?? '';
+      if (!messageId) throw new Error('Meta API response did not include a message ID');
+    } catch (error) {
+      logger.error({ error, projectId, to: body.to }, 'WhatsApp: failed to send outbound template message');
+      try {
+        await this.conversationService.failConversation(projectId, conversation.id, 'Failed to send outbound template message');
+      } catch { /* best effort */ }
+      res.status(502).json({ error: 'Failed to send outbound message via Meta WhatsApp API' });
+      return;
+    }
+
+    logger.info({ projectId, conversationId: conversation.id, messageId, to: body.to }, 'WhatsApp: outbound template message sent');
+
+    const response: WhatsAppSendResponse = { messageId, conversationId: conversation.id };
+    res.status(201).json(response);
   }
 
   /**

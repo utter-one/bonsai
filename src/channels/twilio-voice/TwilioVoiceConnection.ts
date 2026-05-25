@@ -13,6 +13,10 @@ import { logger } from '../../utils/logger';
  * Outbound CAL messages are handled as follows:
  * - `start_ai_generation_output`: sends a Twilio `clear` to flush any still-buffered audio from the
  *   previous turn (barge-in) and cancels all pending mark callbacks so stale echoes are ignored.
+ *   When `flushBuffer` is explicitly `false` (filler delivery on non-barge-in turns), the `clear`
+ *   is skipped to avoid unnecessary silence before the first audible filler chunk.
+ * - `abort_ai_generation_output`: sends a Twilio `clear` to immediately flush buffered audio when
+ *   VAD detects user barge-in, and cancels all pending mark callbacks.
  * - `send_ai_voice_chunk`: base64-encodes the µLaw audio payload and sends it to Twilio as a `media` event.
  *   Non-µLaw chunks are logged and dropped.
  * - `end_ai_generation_output`: sends a Twilio `mark` after the last audio chunk. Twilio echoes the mark
@@ -63,7 +67,11 @@ export class TwilioVoiceConnection implements IClientConnection {
     try {
       const { WebSocket: WS } = await import('ws');
       if (this.ws.readyState === WS.OPEN) {
-        this.ws.close();
+        this.ws.send(JSON.stringify({
+          event: 'twiml',
+          streamSid: this.streamSid,
+          twiml: '<Response><Hangup/></Response>'
+        }));
       }
     } catch {
       // ignore close errors
@@ -76,15 +84,23 @@ export class TwilioVoiceConnection implements IClientConnection {
   /**
    * Sends a CAL output message toward the Twilio caller.
    *
-   * Only `send_ai_voice_chunk` and `end_ai_generation_output` have observable effects.
+   * `send_ai_voice_chunk` and `end_ai_generation_output` always have observable effects.
+   * `start_ai_generation_output` sends a Twilio `clear` only when `flushBuffer` is not `false`.
    * @param msg - The CAL output message to transmit.
    */
   async sendMessage(msg: CALOutputMessage): Promise<void> {
     switch (msg.type) {
       case 'start_ai_generation_output': {
         // Flush any audio still buffered from the previous turn (barge-in scenario).
-        // Clear pending mark callbacks first so the echoed marks Twilio sends back
-        // in response to `clear` are not misinterpreted as turn-end signals.
+        // Only flush when explicitly requested — filler delivery sets flushBuffer: false
+        // to avoid unnecessary silence before the first audible filler chunk.
+        if (msg.flushBuffer !== false) {
+          this.onClearMarkCallbacks();
+          this.ws.send(JSON.stringify({ event: 'clear', streamSid: this.streamSid }));
+        }
+        break;
+      }
+      case 'abort_ai_generation_output': {
         this.onClearMarkCallbacks();
         this.ws.send(JSON.stringify({ event: 'clear', streamSid: this.streamSid }));
         break;

@@ -2,6 +2,59 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-05-25
+
+### Added
+
+- **Telegram channel** — new communication channel for Telegram bots with webhook handling, encrypted bot token support, and session management.
+- **Outgoing conversations** — Twilio Messaging, Twilio Voice, and WhatsApp channels now support initiating conversations from the server side with pending start sessions, virtual session creation, and automated opening message generation.
+- **Barge-in support** — preliminary support for users interrupting AI speech during VAD-enabled conversations:
+  - `abort_ai_generation_output` handling for WebRTC and WebSocket connections to flush audio on barge-in.
+  - `SpeechCompletionDetector` for analyzing utterance completeness during barge-in.
+  - Accumulated text handling for barge-in abort scenarios.
+  - Enhanced ASR performance during user speech overlap with VAD.
+- **Automated testing framework** — a new scenario-based testing subsystem:
+  - `TestRunner` and `TesterClientConnection` for automated conversation testing.
+  - `ScenarioConversationEvaluator` and `ScenarioRunExecutorService` for evaluating conversation runs.
+  - Scenario runs with cancellation, deletion, status details, and failure tracking.
+  - Tester hangup prompt and conversation opener for await-user-input flows.
+  - Scenario and tester audit log endpoints.
+  - Extended `ApiKeyChannel` with `testing` variant.
+- **Benchmark engine** — benchmarking features for ASR, LLM, and TTS pipelines with cron scheduling, crash recovery, and file-based ASR input.
+- **LLM guide endpoint** — new `llms.txt` file and endpoint with a conversation client integration guide.
+- **`jsonEscape` templating helper** — new helper for safe JSON string embedding in templates.
+- **Conversation direction** — conversation mapping now includes direction (inbound/outbound) for filtering and ordering.
+- **User profile deep-merge** — conversations now support deep-merging `userProfile` data into existing profiles at conversation start.
+
+### Improved
+
+- **Deepgram** — ASR connections are now created on initialization and held for the entire session, eliminating per-message warmup latency.
+- **Groq** — LLM provider now supports reasoning-specific settings in provider configuration and response generation.
+- **Filler messages** — enhanced with `historyMessageCount` for context awareness, message preparation, streaming support, and early TTS initialization.
+- **Scenario analytics** — `scenarioRunId` is now supported in funnel and slice-and-dice analytics queries.
+- **Scenario evaluation** — enhanced with comparison modes for data extraction and expected value entry types.
+- **Pass/fail evaluation** — improved evaluation logic in `ScenarioConversationEvaluator`.
+- **Twilio Voice** — new `flushBuffer` option to control audio buffering behavior.
+- **Stage navigation** — enhanced logic for navigating to specific stages during conversation start.
+- **Analytics metrics** — logic controlling available aggregation functions moved from frontend to backend.
+- **Logging** — error serializers added for structured error output.
+- **Migration** — schemas and service methods now support copy decorators, sample copies, saved queries, and guardrails.
+- **Client connections** — properly closed on conversation end and timeout.
+
+### Fixed
+
+- Secrets were not migrated alongside entities referencing them — secret references in environment credentials are now resolved during migration.
+- Assembly AI ASR service error on benchmarking with long audio files causing benchmark hangs.
+- Telegram session recreation when no active conversation exists.
+- Telegram encrypted bot token and webhook deployment.
+- Filler message handling preventing duplicate user input in context.
+- TTS provider not properly drained during stage transitions.
+- Filler delivery blocking classification processing — both now run concurrently.
+- Race condition in user creation logic.
+- Manual trigger of global actions now errors correctly instead of executing.
+- Missing LLM provider settings schemas in union causing validation failures.
+- Twilio Voice outgoing calls now use webhook URL when `applicationSid` is not configured.
+
 ## [0.4.0] - 2026-04-24
 
 ### Breaking Changes

@@ -100,6 +100,12 @@ export class TemplatingEngine {
       }
     });
 
+    // Helper to escape a string for safe embedding inside a JSON string literal
+    this.handlebars.registerHelper('jsonEscape', function (value: any) {
+      if (value === null || value === undefined) return '';
+      return JSON.stringify(String(value)).slice(1, -1);
+    });
+
     // Comparison helpers
     this.handlebars.registerHelper('eq', function (a: any, b: any, options: any) {
       const isEqual = a === b;

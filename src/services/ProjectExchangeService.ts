@@ -133,7 +133,7 @@ export class ProjectExchangeService extends BaseService {
     // Transform filler settings helper
     const transformFiller = (f: { llmProviderId: string; llmSettings?: any; prompt: string } | null | undefined): FillerSettingsExchangeV1 | null => {
       if (!f) return null;
-      return { llmHint: hint(f.llmProviderId) ?? { type: 'llm', apiType: 'unknown' }, llmSettings: f.llmSettings, prompt: f.prompt };
+      return { llmHint: hint(f.llmProviderId) ?? { type: 'llm', apiType: 'unknown' }, llmSettings: f.llmSettings, prompt: f.prompt, historyMessageCount: 0 };
     };
 
     const bundle: ProjectExchangeBundleV1 = {
@@ -392,6 +392,7 @@ export class ProjectExchangeService extends BaseService {
           llmProviderId: resolveHint(a.fillerSettings.llmHint) ?? '',
           llmSettings: a.fillerSettings.llmSettings as any,
           prompt: a.fillerSettings.prompt,
+          historyMessageCount: a.fillerSettings.historyMessageCount ?? 0,
         } : null;
         await tx.insert(agents).values({
           id: a.id,

@@ -1,5 +1,6 @@
 import { inject, singleton } from 'tsyringe';
 import type { Request, Response, Router } from 'express';
+import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db/index';
@@ -14,6 +15,12 @@ import { logger } from '../../utils/logger';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
+import { ConversationService } from '../../services/ConversationService';
+import { ProjectService } from '../../services/ProjectService';
+import { UserService } from '../../services/UserService';
+import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
+import { twilioMessagingSendBodySchema, twilioMessagingSendResponseSchema } from '../../http/contracts/twilio-messaging-outgoing';
+import type { TwilioMessagingSendResponse } from '../../http/contracts/twilio-messaging-outgoing';
 import * as _twilio from 'twilio';
 const _twilioModule = (_twilio as any).default ?? _twilio;
 const validateRequest = _twilioModule.validateRequest as typeof import('twilio').validateRequest;
@@ -61,7 +68,38 @@ export class TwilioMessagingChannelHost {
     @inject(SessionManager) private readonly sessionManager: SessionManager,
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
     @inject(IpRateLimiter) private readonly rateLimiter: IpRateLimiter,
+    @inject(ConversationService) private readonly conversationService: ConversationService,
+    @inject(ProjectService) private readonly projectService: ProjectService,
+    @inject(UserService) private readonly userService: UserService,
+    @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
   ) {}
+
+  /**
+   * Returns OpenAPI path definitions for the outgoing messaging endpoint.
+   */
+  static getOpenAPIPaths(): RouteConfig[] {
+    return [
+      {
+        method: 'post',
+        path: '/api/twilio/messaging/send',
+        tags: ['Twilio Messaging'],
+        summary: 'Initiate an outgoing Twilio Messaging conversation',
+        description: 'Starts a conversation for the specified recipient. The AI generates and sends the opening message automatically. Future inbound replies from the recipient will be attached to the same virtual session.',
+        security: [],
+        request: {
+          query: webhookQuerySchema,
+          body: { content: { 'application/json': { schema: twilioMessagingSendBodySchema } } },
+        },
+        responses: {
+          201: { description: 'Conversation started and opening message sent by AI', content: { 'application/json': { schema: twilioMessagingSendResponseSchema } } },
+          400: { description: 'Missing or invalid parameters' },
+          401: { description: 'Invalid or inactive API key' },
+          403: { description: 'API key does not permit twilio_messaging channel' },
+          422: { description: 'No default stage available' },
+        },
+      },
+    ];
+  }
 
   /**
    * Registers the Twilio Messaging webhook route on the Express router.
@@ -69,6 +107,7 @@ export class TwilioMessagingChannelHost {
    */
   registerRoutes(router: Router): void {
     router.post('/api/twilio/messaging/webhook', asyncHandler(this.handleWebhook.bind(this)));
+    router.post('/api/twilio/messaging/send', asyncHandler(this.handleOutgoingMessage.bind(this)));
   }
 
   /**
@@ -128,7 +167,8 @@ export class TwilioMessagingChannelHost {
       return;
     }
 
-    const configResult = twilioMessagingChannelProviderConfigSchema.safeParse(providerRecord.config);
+    const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+    const configResult = twilioMessagingChannelProviderConfigSchema.safeParse(rawConfig);
     if (!configResult.success) {
       logger.error({ channelProviderId, issues: configResult.error.issues }, 'Twilio webhook: channel provider config is invalid');
       res.status(500).send();
@@ -183,6 +223,116 @@ export class TwilioMessagingChannelHost {
     }
 
     res.set('Content-Type', 'text/xml').send('<Response/>');
+  }
+
+  /**
+   * Handles a request to send an outgoing Twilio Messaging SMS.
+   *
+   * Flow:
+   * 1. Validate query params (apiKey, channelProviderId) and request body.
+   * 2. Load channel provider config and resolve stageId.
+   * 3. Create a virtual session and pre-create a conversation record with direction 'outgoing'.
+   * 4. Dispatch `start_conversation` — the AI generates and sends the opening message automatically.
+   * 5. Return 201 with conversationId.
+   *
+   * Inbound replies from the recipient will arrive via the webhook and be matched
+   * to the existing virtual session using the phoneSessionMap.
+   */
+  private async handleOutgoingMessage(req: Request, res: Response): Promise<void> {
+    const queryResult = webhookQuerySchema.safeParse(req.query);
+    if (!queryResult.success) {
+      res.status(400).json({ error: 'Missing or invalid query parameters' });
+      return;
+    }
+    const { apiKey: rawApiKey, stageId: queryStageId, agentId: queryAgentId, channelProviderId } = queryResult.data;
+
+    const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
+    if (!apiKeyRecord || !apiKeyRecord.isActive) {
+      res.status(401).json({ error: 'Invalid or inactive API key' });
+      return;
+    }
+    const { projectId, keySettings } = apiKeyRecord;
+
+    if (keySettings?.allowedChannels && !keySettings.allowedChannels.includes('twilio_messaging')) {
+      res.status(403).json({ error: 'API key does not permit twilio_messaging channel' });
+      return;
+    }
+
+    const bodyResult = twilioMessagingSendBodySchema.safeParse(req.body);
+    if (!bodyResult.success) {
+      res.status(400).json({ error: 'Invalid request body', issues: bodyResult.error.issues });
+      return;
+    }
+    const body = bodyResult.data;
+
+    const providerRecord = await db.query.providers.findFirst({ where: eq(providers.id, channelProviderId) });
+    if (!providerRecord || providerRecord.providerType !== 'channel') {
+      res.status(400).json({ error: 'Channel provider not found or wrong type' });
+      return;
+    }
+
+    const rawConfig = await this.secretRefUtils.resolveObject(providerRecord.config as Record<string, unknown>);
+    const configResult = twilioMessagingChannelProviderConfigSchema.safeParse(rawConfig);
+    if (!configResult.success) {
+      logger.error({ channelProviderId, issues: configResult.error.issues }, 'TwilioMessaging outgoing: channel provider config is invalid');
+      res.status(500).json({ error: 'Channel provider config is invalid' });
+      return;
+    }
+    const { accountSid, authToken, fromNumber } = configResult.data;
+
+    // Resolve stageId: body overrides query param, then project default
+    let resolvedStageId = body.stageId ?? queryStageId;
+    if (!resolvedStageId) {
+      const project = await this.projectService.getProjectById(projectId);
+      resolvedStageId = project.startingStageId ?? undefined;
+      if (!resolvedStageId) {
+        res.status(422).json({ error: 'No stageId provided and project has no default starting stage' });
+        return;
+      }
+    }
+    const resolvedAgentId = body.agentId ?? queryAgentId;
+
+    // Ensure the user exists (create if not)
+    await this.userService.ensureUserExists(projectId, body.to);
+
+    // Deep-merge injected userProfile into existing user profile
+    if (body.userProfile && Object.keys(body.userProfile).length > 0) {
+      await this.userService.updateUserProfile(projectId, body.to, body.userProfile);
+    }
+
+    // Create virtual connection and register a real session so inbound replies
+    // are routed to this conversation instead of spawning a new session.
+    const phoneKey = `${projectId}:${body.to}`;
+    const connection = new TwilioMessagingConnection(body.to, fromNumber, accountSid, authToken, this.sessionManager);
+    const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
+    const sessionId = this.sessionManager.registerSession(connection);
+    const session = this.sessionManager.getSession(sessionId);
+    connection.attachSession(session);
+    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+    this.phoneSessionMap.set(phoneKey, sessionId);
+    this.scheduleTimeout(sessionId, phoneKey);
+
+    logger.info({ sessionId, projectId, to: body.to }, 'TwilioMessaging: outgoing virtual session created');
+
+    // Pre-create the conversation record with direction 'outgoing', then dispatch
+    // `start_conversation` so the AI generates and sends the opening message.
+    const conversation = await this.conversationService.createConversation({
+      projectId,
+      userId: body.to,
+      sessionId,
+      stageId: resolvedStageId,
+      status: 'initialized',
+      direction: 'outgoing',
+      metadata: body.metadata ?? null,
+    });
+
+    const startMsg: CALInputMessage = { type: 'start_conversation', userId: body.to, stageId: resolvedStageId, agentId: resolvedAgentId, correlationId: undefined, existingConversationId: conversation.id };
+    await this.dispatcher.dispatch(startMsg, this.buildContext(sessionId));
+
+    logger.info({ projectId, conversationId: conversation.id, to: body.to }, 'TwilioMessaging: outgoing conversation started');
+
+    const response: TwilioMessagingSendResponse = { conversationId: conversation.id };
+    res.status(201).json(response);
   }
 
   /**

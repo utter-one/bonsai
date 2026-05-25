@@ -16,6 +16,7 @@ export const SENSITIVE_PROVIDER_CONFIG_FIELDS = new Set([
   'verifyToken',
   'keyFileJson',
   'accountSid',
+  'botToken',
 ]);
 
 /**

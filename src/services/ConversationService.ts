@@ -30,6 +30,7 @@ export type CreateConversationInput = {
   stageVars?: Record<string, Record<string, any>>;
   status: ConversationState;
   statusDetails?: string | null;
+  direction?: 'incoming' | 'outgoing';
   metadata?: Record<string, any> | null;
 };
 
@@ -67,6 +68,7 @@ export class ConversationService extends BaseService {
         stageVars: {},
         status: input.status ?? 'initialized',
         statusDetails: input.statusDetails ?? null,
+        direction: input.direction ?? 'incoming',
         metadata: input.metadata ?? null,
       };
 
@@ -169,6 +171,23 @@ export class ConversationService extends BaseService {
       return eventId;
     } catch (error) {
       logger.error({ error, conversationId, eventType }, 'Failed to save conversation event');
+      throw error;
+    }
+  }
+
+  /**
+   * Sets (overwrites) the metadata field of an existing conversation.
+   * Used to attach external identifiers (e.g. Twilio CallSid) after the conversation record is created.
+   * @param projectId - The project the conversation belongs to
+   * @param conversationId - The unique identifier of the conversation
+   * @param metadata - The metadata object to store on the conversation
+   */
+  async setConversationMetadata(projectId: string, conversationId: string, metadata: Record<string, any>): Promise<void> {
+    try {
+      await db.update(conversations).set({ metadata, updatedAt: new Date() }).where(and(eq(conversations.projectId, projectId), eq(conversations.id, conversationId)));
+      logger.debug({ conversationId }, 'Conversation metadata updated');
+    } catch (error) {
+      logger.error({ error, conversationId }, 'Failed to update conversation metadata');
       throw error;
     }
   }
@@ -280,6 +299,7 @@ export class ConversationService extends BaseService {
         statusDetails: conversations.statusDetails,
         createdAt: conversations.createdAt,
         updatedAt: conversations.updatedAt,
+        direction: conversations.direction,
       };
 
       // Apply filters

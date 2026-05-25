@@ -10,6 +10,10 @@ export const AGGREGATION_FUNCTIONS = ['count', 'sum', 'avg', 'min', 'max', 'p50'
 /** Aggregation function type */
 export type AggregationFn = (typeof AGGREGATION_FUNCTIONS)[number];
 
+export const MS_AGGREGATION_FUNCTIONS: AggregationFn[] = ['avg', 'min', 'max', 'p50', 'p95', 'p99'];
+export const TOKEN_AGGREGATION_FUNCTIONS: AggregationFn[] = ['sum', 'avg', 'p95'];
+export const COUNT_AGGREGATION_FUNCTIONS: AggregationFn[] = ['count'];
+
 /** Identifier for an analytics source */
 export type SourceId = 'conversations' | 'events' | 'turns' | 'tool_calls' | 'classifications' | 'transformations' | 'moderation' | 'stage_visits' | 'llm_calls' | 'actions' | 'variables' | 'user_profile';
 
@@ -40,6 +44,8 @@ export type MetricDef = {
   sqlExpr: string;
   /** Unit for display */
   unit: 'ms' | 'tokens' | 'count' | 'boolean';
+  /** Aggregation functions available for this metric in the UI */
+  aggregateFunctions: AggregationFn[];
   /** Whether this metric requires a LATERAL join to the user message (turns source only) */
   requiresUserJoin?: boolean;
   /** Whether this metric requires a LEFT JOIN to the conversations table (stage_visits CTE source only) */
@@ -103,9 +109,9 @@ const stageNameDimension: DimensionDef = {
 
 function tokenMetrics(prefix: string): MetricDef[] {
   return [
-    { id: 'promptTokens', label: 'Prompt Tokens', sqlExpr: `(${prefix}->>'promptTokens')::numeric`, unit: 'tokens' },
-    { id: 'completionTokens', label: 'Completion Tokens', sqlExpr: `(${prefix}->>'completionTokens')::numeric`, unit: 'tokens' },
-    { id: 'totalTokens', label: 'Total Tokens', sqlExpr: `(${prefix}->>'totalTokens')::numeric`, unit: 'tokens' },
+    { id: 'promptTokens', label: 'Prompt Tokens', sqlExpr: `(${prefix}->>'promptTokens')::numeric`, unit: 'tokens', aggregateFunctions: TOKEN_AGGREGATION_FUNCTIONS },
+    { id: 'completionTokens', label: 'Completion Tokens', sqlExpr: `(${prefix}->>'completionTokens')::numeric`, unit: 'tokens', aggregateFunctions: TOKEN_AGGREGATION_FUNCTIONS },
+    { id: 'totalTokens', label: 'Total Tokens', sqlExpr: `(${prefix}->>'totalTokens')::numeric`, unit: 'tokens', aggregateFunctions: TOKEN_AGGREGATION_FUNCTIONS },
   ];
 }
 
@@ -125,8 +131,8 @@ const conversationsSource: SourceDef = {
     { id: 'endingStageId', label: 'Ending Stage', sqlExpr: 'c.ending_stage_id', requiresConversationJoin: false, requiresUserJoin: false },
   ],
   metrics: [
-    { id: 'durationMs', label: 'Conversation Duration', sqlExpr: 'EXTRACT(EPOCH FROM (c.last_activity_at - c.created_at)) * 1000', unit: 'ms' },
-    { id: 'turnsAmount', label: 'Turns Amount', sqlExpr: `(SELECT COUNT(*) FROM conversation_events ce2 WHERE ce2.project_id = c.project_id AND ce2.conversation_id = c.id AND ce2.event_type = 'message' AND ce2.event_data->>'role' = 'assistant')`, unit: 'count' },
+    { id: 'durationMs', label: 'Conversation Duration', sqlExpr: 'EXTRACT(EPOCH FROM (c.last_activity_at - c.created_at)) * 1000', unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'turnsAmount', label: 'Turns Amount', sqlExpr: `(SELECT COUNT(*) FROM conversation_events ce2 WHERE ce2.project_id = c.project_id AND ce2.conversation_id = c.id AND ce2.event_type = 'message' AND ce2.event_data->>'role' = 'assistant')`, unit: 'count', aggregateFunctions: ['sum'] },
   ],
 };
 
@@ -147,19 +153,19 @@ const turnsSource: SourceDef = {
     { id: 'prescripted', label: 'Prescripted Response', sqlExpr: `ce.event_data->'metadata'->>'prescripted'`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
   ],
   metrics: [
-    { id: 'totalTurnDurationMs', label: 'Total Turn Duration', sqlExpr: `(ce.event_data->'metadata'->>'totalTurnDurationMs')::numeric`, unit: 'ms' },
-    { id: 'timeToFirstTokenMs', label: 'Time to First Token', sqlExpr: `(ce.event_data->'metadata'->>'timeToFirstTokenMs')::numeric`, unit: 'ms' },
-    { id: 'timeToFirstTokenFromTurnStartMs', label: 'Time to First Token (from Turn Start)', sqlExpr: `(ce.event_data->'metadata'->>'timeToFirstTokenFromTurnStartMs')::numeric`, unit: 'ms' },
-    { id: 'timeToFirstAudioMs', label: 'Time to First Audio', sqlExpr: `(ce.event_data->'metadata'->>'timeToFirstAudioMs')::numeric`, unit: 'ms' },
-    { id: 'llmDurationMs', label: 'LLM Duration', sqlExpr: `(ce.event_data->'metadata'->>'llmDurationMs')::numeric`, unit: 'ms' },
-    { id: 'ttsDurationMs', label: 'TTS Duration', sqlExpr: `(ce.event_data->'metadata'->>'ttsDurationMs')::numeric`, unit: 'ms' },
-    { id: 'ttsConnectDurationMs', label: 'TTS Connection Duration', sqlExpr: `(ce.event_data->'metadata'->>'ttsConnectDurationMs')::numeric`, unit: 'ms' },
-    { id: 'promptRenderDurationMs', label: 'Prompt Render Duration', sqlExpr: `(ce.event_data->'metadata'->>'promptRenderDurationMs')::numeric`, unit: 'ms' },
-    { id: 'moderationDurationMs', label: 'Moderation Duration', sqlExpr: `(ce.event_data->'metadata'->>'moderationDurationMs')::numeric`, unit: 'ms' },
-    { id: 'stageTransitionDurationMs', label: 'Stage Transition Duration', sqlExpr: `(ue.event_data->'metadata'->>'stageTransitionDurationMs')::numeric`, unit: 'ms', requiresUserJoin: true },
-    { id: 'processingDurationMs', label: 'Processing Duration', sqlExpr: `(ue.event_data->'metadata'->>'processingDurationMs')::numeric`, unit: 'ms', requiresUserJoin: true },
-    { id: 'actionsDurationMs', label: 'Actions Duration', sqlExpr: `(ue.event_data->'metadata'->>'actionsDurationMs')::numeric`, unit: 'ms', requiresUserJoin: true },
-    { id: 'asrDurationMs', label: 'ASR Duration', sqlExpr: `(ue.event_data->'metadata'->>'asrDurationMs')::numeric`, unit: 'ms', requiresUserJoin: true },
+    { id: 'totalTurnDurationMs', label: 'Total Turn Duration', sqlExpr: `(ce.event_data->'metadata'->>'totalTurnDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'timeToFirstTokenMs', label: 'Time to First Token', sqlExpr: `(ce.event_data->'metadata'->>'timeToFirstTokenMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'timeToFirstTokenFromTurnStartMs', label: 'Time to First Token (from Turn Start)', sqlExpr: `(ce.event_data->'metadata'->>'timeToFirstTokenFromTurnStartMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'timeToFirstAudioMs', label: 'Time to First Audio', sqlExpr: `(ce.event_data->'metadata'->>'timeToFirstAudioMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'llmDurationMs', label: 'LLM Duration', sqlExpr: `(ce.event_data->'metadata'->>'llmDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'ttsDurationMs', label: 'TTS Duration', sqlExpr: `(ce.event_data->'metadata'->>'ttsDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'ttsConnectDurationMs', label: 'TTS Connection Duration', sqlExpr: `(ce.event_data->'metadata'->>'ttsConnectDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'promptRenderDurationMs', label: 'Prompt Render Duration', sqlExpr: `(ce.event_data->'metadata'->>'promptRenderDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'moderationDurationMs', label: 'Moderation Duration', sqlExpr: `(ce.event_data->'metadata'->>'moderationDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'stageTransitionDurationMs', label: 'Stage Transition Duration', sqlExpr: `(ue.event_data->'metadata'->>'stageTransitionDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS, requiresUserJoin: true },
+    { id: 'processingDurationMs', label: 'Processing Duration', sqlExpr: `(ue.event_data->'metadata'->>'processingDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS, requiresUserJoin: true },
+    { id: 'actionsDurationMs', label: 'Actions Duration', sqlExpr: `(ue.event_data->'metadata'->>'actionsDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS, requiresUserJoin: true },
+    { id: 'asrDurationMs', label: 'ASR Duration', sqlExpr: `(ue.event_data->'metadata'->>'asrDurationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS, requiresUserJoin: true },
     ...tokenMetrics(`ce.event_data->'metadata'->'llmUsage'`),
   ],
 };
@@ -181,7 +187,7 @@ const toolCallsSource: SourceDef = {
     { id: 'sourceActionName', label: 'Source Action', sqlExpr: `ce.event_data->>'sourceActionName'`, requiresConversationJoin: false, requiresUserJoin: false },
   ],
   metrics: [
-    { id: 'durationMs', label: 'Execution Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms' },
+    { id: 'durationMs', label: 'Execution Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
     ...tokenMetrics(`ce.event_data->'metadata'->'llmUsage'`),
   ],
 };
@@ -203,7 +209,7 @@ const classificationsSource: SourceDef = {
     { id: 'actionName', label: 'Action Name', sqlExpr: `act_item->>'name'`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements(ce.event_data->'actions') AS clf_item\nCROSS JOIN LATERAL jsonb_array_elements(clf_item->'actions') AS act_item` },
   ],
   metrics: [
-    { id: 'durationMs', label: 'Classification Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms' },
+    { id: 'durationMs', label: 'Classification Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
     ...tokenMetrics(`ce.event_data->'metadata'->'llmUsage'`),
   ],
 };
@@ -224,7 +230,7 @@ const transformationsSource: SourceDef = {
     { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
   ],
   metrics: [
-    { id: 'durationMs', label: 'Transformation Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms' },
+    { id: 'durationMs', label: 'Transformation Duration', sqlExpr: `(ce.event_data->'metadata'->>'durationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
     ...tokenMetrics(`ce.event_data->'metadata'->'llmUsage'`),
   ],
 };
@@ -244,7 +250,7 @@ const moderationSource: SourceDef = {
     { id: 'blockingCategory', label: 'Blocking Category', sqlExpr: `blocking_category`, requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: `CROSS JOIN LATERAL jsonb_array_elements_text(ce.event_data->'blockingCategories') AS blocking_category` },
   ],
   metrics: [
-    { id: 'durationMs', label: 'Moderation Duration', sqlExpr: `(ce.event_data->>'durationMs')::numeric`, unit: 'ms' },
+    { id: 'durationMs', label: 'Moderation Duration', sqlExpr: `(ce.event_data->>'durationMs')::numeric`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
   ],
 };
 
@@ -282,9 +288,9 @@ const stageVisitsSource: SourceDef = {
     { id: 'fromStageName', label: 'From Stage Name', sqlExpr: 'fs.name', requiresConversationJoin: false, requiresUserJoin: false, lateralJoinSql: 'LEFT JOIN stages fs ON fs.id = sv.from_stage_id' },
   ],
   metrics: [
-    { id: 'timeOnStageMs', label: 'Time on Stage', sqlExpr: `EXTRACT(EPOCH FROM (sv.next_ts - sv.timestamp)) * 1000`, unit: 'ms' },
-    { id: 'conversationLengthMs', label: 'Conversation Length', sqlExpr: `EXTRACT(EPOCH FROM (c.last_activity_at - c.created_at)) * 1000`, unit: 'ms', requiresConversationJoin: true },
-    { id: 'turnsAmount', label: 'Turns Amount', sqlExpr: `(SELECT COUNT(*) FROM conversation_events ce_turns WHERE ce_turns.conversation_id = sv.conversation_id AND ce_turns.event_type = 'message' AND ce_turns.event_data->>'role' = 'assistant' AND ce_turns.timestamp >= sv.timestamp AND (sv.next_ts IS NULL OR ce_turns.timestamp < sv.next_ts))`, unit: 'count' },
+    { id: 'timeOnStageMs', label: 'Time on Stage', sqlExpr: `EXTRACT(EPOCH FROM (sv.next_ts - sv.timestamp)) * 1000`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
+    { id: 'conversationLengthMs', label: 'Conversation Length', sqlExpr: `EXTRACT(EPOCH FROM (c.last_activity_at - c.created_at)) * 1000`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS, requiresConversationJoin: true },
+    { id: 'turnsAmount', label: 'Turns Amount', sqlExpr: `(SELECT COUNT(*) FROM conversation_events ce_turns WHERE ce_turns.conversation_id = sv.conversation_id AND ce_turns.event_type = 'message' AND ce_turns.event_data->>'role' = 'assistant' AND ce_turns.timestamp >= sv.timestamp AND (sv.next_ts IS NULL OR ce_turns.timestamp < sv.next_ts))`, unit: 'count', aggregateFunctions: COUNT_AGGREGATION_FUNCTIONS },
   ],
 };
 
@@ -304,7 +310,7 @@ const llmCallsSource: SourceDef = {
     { id: 'provider', label: 'LLM Provider', sqlExpr: `ce.event_data->'metadata'->'llmUsage'->>'providerApiType'`, requiresConversationJoin: false, requiresUserJoin: false },
   ],
   metrics: [
-    { id: 'durationMs', label: 'LLM Duration', sqlExpr: `COALESCE((ce.event_data->'metadata'->>'llmDurationMs')::numeric, (ce.event_data->'metadata'->>'durationMs')::numeric)`, unit: 'ms' },
+    { id: 'durationMs', label: 'LLM Duration', sqlExpr: `COALESCE((ce.event_data->'metadata'->>'llmDurationMs')::numeric, (ce.event_data->'metadata'->>'durationMs')::numeric)`, unit: 'ms', aggregateFunctions: MS_AGGREGATION_FUNCTIONS },
     ...tokenMetrics(`ce.event_data->'metadata'->'llmUsage'`),
   ],
 };

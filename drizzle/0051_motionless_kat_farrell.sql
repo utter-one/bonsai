@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ADD COLUMN "direction" text DEFAULT 'incoming' NOT NULL;

@@ -14,14 +14,14 @@ export const issueRouteParamsSchema = z.object({
 /**
  * Schema for creating a new issue
  * Required fields: projectId, environment, buildVersion, severity, category, bugDescription, expectedBehaviour, status
- * Optional fields: stage, sessionId, eventIndex, userId, comments
+ * Optional fields: stage, conversationId, eventIndex, userId, comments
  */
 export const createIssueSchema = z.object({
   projectId: z.string().min(1).describe('ID of the project this issue belongs to'),
   environment: z.string().describe('Environment where issue occurred (e.g., production, staging, development)'),
   buildVersion: z.string().min(1).describe('Application build version where the issue was encountered'),
   stage: z.string().optional().describe('Stage identifier for tracking purposes'),
-  sessionId: z.string().optional().describe('Reference to related conversation session ID'),
+  conversationId: z.string().optional().describe('Reference to related conversation ID'),
   eventIndex: z.number().int().optional().describe('Index of event in session where issue occurred'),
   userId: z.string().optional().describe('User ID who reported or encountered the issue'),
   severity: z.string().min(1).describe('Issue severity level (e.g., critical, high, medium, low)'),
@@ -41,7 +41,7 @@ export const updateIssueBodySchema = z.object({
   environment: z.string().optional().describe('Environment where issue occurred'),
   buildVersion: z.string().min(1).optional().describe('Application build version'),
   stage: z.string().optional().describe('Stage identifier'),
-  sessionId: z.string().optional().describe('Related conversation session ID'),
+  conversationId: z.string().optional().describe('Related conversation ID'),
   eventIndex: z.number().int().optional().describe('Event index in session'),
   userId: z.string().optional().nullable().describe('User ID who reported the issue'),
   severity: z.string().min(1).optional().describe('Issue severity level'),
@@ -62,7 +62,7 @@ export const issueResponseSchema = z.object({
   environment: z.string().describe('Environment where issue occurred'),
   buildVersion: z.string().describe('Application build version'),
   stage: z.string().nullable().describe('Stage identifier'),
-  sessionId: z.string().nullable().describe('Related conversation session ID'),
+  conversationId: z.string().nullable().describe('Related conversation ID'),
   eventIndex: z.number().int().nullable().describe('Event index in session'),
   userId: z.string().nullable().describe('User ID who reported the issue'),
   severity: z.string().describe('Issue severity level'),

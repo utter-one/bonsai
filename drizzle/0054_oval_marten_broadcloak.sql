@@ -1,0 +1,1 @@
+ALTER TABLE "scenario_runs" RENAME COLUMN "tester_ids" TO "testers";

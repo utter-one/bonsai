@@ -871,6 +871,25 @@
           "type": "string",
           "description": "IANA timezone identifier for this conversation (e.g. America/New_York, Europe/Warsaw). Overrides user profile and project timezone settings. Defaults to UTC when not provided by any source."
         },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "incoming",
+            "outgoing"
+          ],
+          "description": "Direction of the conversation. Defaults to incoming when not specified."
+        },
+        "existingConversationId": {
+          "type": "string",
+          "description": "When set, the handler attaches to this pre-created conversation instead of creating a new one. Used for outgoing call flows where the conversation record is created at call initiation time."
+        },
+        "userProfile": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          },
+          "description": "Optional user profile data to inject and deep-merge into the user's existing profile on the users table."
+        },
         "requestId": {
           "type": "string",
           "description": "Unique identifier for request correlation and tracking"
@@ -1099,7 +1118,8 @@
             "user_input_modified",
             "user_banned",
             "visibility_changed",
-            "sample_copy_selection"
+            "sample_copy_selection",
+            "turn_aborted"
           ],
           "description": "Type of the conversation event"
         },
@@ -1796,6 +1816,39 @@
                 "classifierId",
                 "input",
                 "sampleCopy"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "inputTurnId": {
+                  "type": "string",
+                  "description": "Identifier of the input turn that was aborted"
+                },
+                "outputTurnId": {
+                  "type": "string",
+                  "description": "Identifier of the AI generation turn that was aborted"
+                },
+                "accumulatedText": {
+                  "type": "string",
+                  "description": "Full text generated before the barge-in interruption"
+                },
+                "abortTimestampMs": {
+                  "type": "number",
+                  "description": "Unix timestamp in milliseconds when the generation was aborted"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "inputTurnId",
+                "outputTurnId",
+                "accumulatedText",
+                "abortTimestampMs"
               ]
             }
           ],
@@ -2213,7 +2266,8 @@
             "user_input_modified",
             "user_banned",
             "visibility_changed",
-            "sample_copy_selection"
+            "sample_copy_selection",
+            "turn_aborted"
           ],
           "description": "Type of the conversation event"
         },
@@ -2910,6 +2964,39 @@
                 "classifierId",
                 "input",
                 "sampleCopy"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "inputTurnId": {
+                  "type": "string",
+                  "description": "Identifier of the input turn that was aborted"
+                },
+                "outputTurnId": {
+                  "type": "string",
+                  "description": "Identifier of the AI generation turn that was aborted"
+                },
+                "accumulatedText": {
+                  "type": "string",
+                  "description": "Full text generated before the barge-in interruption"
+                },
+                "abortTimestampMs": {
+                  "type": "number",
+                  "description": "Unix timestamp in milliseconds when the generation was aborted"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "inputTurnId",
+                "outputTurnId",
+                "accumulatedText",
+                "abortTimestampMs"
               ]
             }
           ],
@@ -4051,6 +4138,40 @@
         "sessionId"
       ]
     },
+    "abort-ai-generation-request": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "abort_ai_generation"
+          ]
+        },
+        "stageId": {
+          "type": "string",
+          "description": "Identifier of the stage whose generation should be aborted"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Unique identifier for request correlation and tracking"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        }
+      },
+      "required": [
+        "conversationId",
+        "type",
+        "stageId",
+        "requestId",
+        "sessionId"
+      ]
+    },
     "start-ai-generation-output": {
       "type": "object",
       "properties": {
@@ -4071,6 +4192,10 @@
         "expectVoice": {
           "type": "boolean",
           "description": "Whether the response will include synthesised voice audio"
+        },
+        "flushBuffer": {
+          "type": "boolean",
+          "description": "Whether the channel adapter should flush any buffered audio from a previous turn before delivering this turn. Set to false for filler delivery on non-barge-in turns to avoid unnecessary silence."
         },
         "requestId": {
           "type": "string",
@@ -4170,6 +4295,49 @@
         "sessionId"
       ]
     },
+    "abort-ai-generation-output": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "abort_ai_generation_output"
+          ]
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Generation turn that was aborted"
+        },
+        "accumulatedText": {
+          "type": "string",
+          "description": "Full text generated and sent to TTS before the barge-in occurred"
+        },
+        "abortTimestampMs": {
+          "type": "number",
+          "description": "Unix timestamp in milliseconds when the generation was aborted"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        }
+      },
+      "required": [
+        "conversationId",
+        "type",
+        "outputTurnId",
+        "accumulatedText",
+        "abortTimestampMs",
+        "sessionId"
+      ]
+    },
     "end-ai-generation-output": {
       "type": "object",
       "properties": {
@@ -4258,6 +4426,39 @@
         "chunkText",
         "ordinal",
         "isFinal",
+        "sessionId"
+      ]
+    },
+    "user-speaking-started": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "user_speaking_started"
+          ]
+        },
+        "inputTurnId": {
+          "type": "string",
+          "description": "Input turn that was assigned for this user utterance"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        }
+      },
+      "required": [
+        "conversationId",
+        "type",
+        "inputTurnId",
         "sessionId"
       ]
     },
@@ -4548,6 +4749,39 @@
       "required": [
         "sourceActionName",
         "visibility"
+      ]
+    },
+    "turn-aborted-event": {
+      "type": "object",
+      "properties": {
+        "inputTurnId": {
+          "type": "string",
+          "description": "Identifier of the input turn that was aborted"
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Identifier of the AI generation turn that was aborted"
+        },
+        "accumulatedText": {
+          "type": "string",
+          "description": "Full text generated before the barge-in interruption"
+        },
+        "abortTimestampMs": {
+          "type": "number",
+          "description": "Unix timestamp in milliseconds when the generation was aborted"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "nullable": true
+          }
+        }
+      },
+      "required": [
+        "inputTurnId",
+        "outputTurnId",
+        "accumulatedText",
+        "abortTimestampMs"
       ]
     }
   }

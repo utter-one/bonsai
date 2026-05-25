@@ -53,6 +53,11 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 - [Users](./users) — End-user management
 - [Issues](./issues) — Issue tracking
 
+### Testing
+- [Testers](./testers) — LLM-powered user personas for automated scenario testing
+- [Scenarios](./scenarios) — Automated conversation test definitions
+- [Scenario Runs & Conversations](./scenario-runs) — Execution tracking for scenario tests
+
 ### Infrastructure
 - [Providers](./providers) — Provider configuration (LLM, TTS, ASR, Storage)
 - [Provider Catalog](./provider-catalog) — Available provider catalog

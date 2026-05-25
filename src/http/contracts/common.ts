@@ -4,6 +4,15 @@ import { openAILlmSettingsSchema } from '../../services/providers/llm/OpenAILlmP
 import { openAILegacyLlmSettingsSchema } from '../../services/providers/llm/OpenAILegacyLlmProvider';
 import { anthropicLlmSettingsSchema } from '../../services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmSettingsSchema } from '../../services/providers/llm/GeminiLlmProvider';
+import { groqLlmSettingsSchema } from '../../services/providers/llm/GroqLlmProvider';
+import { mistralLlmSettingsSchema } from '../../services/providers/llm/MistralLlmProvider';
+import { deepSeekLlmSettingsSchema } from '../../services/providers/llm/DeepSeekLlmProvider';
+import { openRouterLlmSettingsSchema } from '../../services/providers/llm/OpenRouterLlmProvider';
+import { togetherAILlmSettingsSchema } from '../../services/providers/llm/TogetherAILlmProvider';
+import { fireworksAILlmSettingsSchema } from '../../services/providers/llm/FireworksAILlmProvider';
+import { perplexityLlmSettingsSchema } from '../../services/providers/llm/PerplexityLlmProvider';
+import { cohereLlmSettingsSchema } from '../../services/providers/llm/CohereLlmProvider';
+import { xAILlmSettingsSchema } from '../../services/providers/llm/XAILlmProvider';
 import { ollamaLlmSettingsSchema } from '../../services/providers/llm/OllamaLlmProvider';
 import { elevenLabsTtsSettingsSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsProvider';
@@ -97,16 +106,25 @@ export type ProjectScopedParams = z.infer<typeof projectScopedParamsSchema>;
 // ====================
 
 /**
- * Discriminated union of all LLM settings types
- * Each settings object contains provider-specific configuration for LLM generation
- * Individual schemas are defined in their respective provider files
+ * Union of all LLM settings types with catchall to preserve provider-specific fields.
+ * The provider is identified at the parent level via llmProviderId; actual validation
+ * happens in LlmProviderFactory.createProvider() which casts to the correct type.
  */
 export const llmSettingsSchema = z.union([
-  openAILlmSettingsSchema,
-  openAILegacyLlmSettingsSchema,
-  anthropicLlmSettingsSchema,
-  geminiLlmSettingsSchema,
-  ollamaLlmSettingsSchema,
+  openAILlmSettingsSchema.catchall(z.unknown()),
+  openAILegacyLlmSettingsSchema.catchall(z.unknown()),
+  anthropicLlmSettingsSchema.catchall(z.unknown()),
+  geminiLlmSettingsSchema.catchall(z.unknown()),
+  groqLlmSettingsSchema.catchall(z.unknown()),
+  mistralLlmSettingsSchema.catchall(z.unknown()),
+  deepSeekLlmSettingsSchema.catchall(z.unknown()),
+  openRouterLlmSettingsSchema.catchall(z.unknown()),
+  togetherAILlmSettingsSchema.catchall(z.unknown()),
+  fireworksAILlmSettingsSchema.catchall(z.unknown()),
+  perplexityLlmSettingsSchema.catchall(z.unknown()),
+  cohereLlmSettingsSchema.catchall(z.unknown()),
+  xAILlmSettingsSchema.catchall(z.unknown()),
+  ollamaLlmSettingsSchema.catchall(z.unknown()),
 ]).openapi('LlmSettings').nullable().optional().describe('LLM provider-specific settings for this stage');
 
 // ====================

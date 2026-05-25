@@ -13,6 +13,7 @@ import {
   calRunActionResponseSchema,
   calCallToolRequestSchema,
   calCallToolResponseSchema,
+  calAbortAiGenerationRequestSchema,
 } from '../../messages';
 
 /** Request to navigate to a specific stage in a conversation. */
@@ -65,3 +66,7 @@ export type CallToolRequest = z.infer<typeof callToolRequestSchema>;
 /** Response to call tool request. */
 export const callToolResponseSchema = calToWsOutput(calCallToolResponseSchema);
 export type CallToolResponse = z.infer<typeof callToolResponseSchema>;
+
+/** Request to abort (barge-in on) an ongoing AI generation. */
+export const abortAiGenerationRequestSchema = calToWsInput(calAbortAiGenerationRequestSchema);
+export type AbortAiGenerationRequest = z.infer<typeof abortAiGenerationRequestSchema>;

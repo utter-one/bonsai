@@ -44,6 +44,7 @@ export default withMermaid({
             { text: 'Agents', link: '/guide/agents' },
             { text: 'Classifiers', link: '/guide/classifiers' },
             { text: 'Context Transformers', link: '/guide/context-transformers' },
+            { text: 'Classifiers vs Transformers', link: '/guide/classifiers-vs-transformers' },
             { text: 'Tools', link: '/guide/tools' },
             { text: 'Knowledge Base', link: '/guide/knowledge' },
             { text: 'Global Actions', link: '/guide/global-actions' },
@@ -66,6 +67,12 @@ export default withMermaid({
             { text: 'WhatsApp Channel', link: '/guide/whatsapp' },
             { text: 'Templating', link: '/guide/templating' },
             { text: 'Scripting', link: '/guide/scripting' },
+          ],
+        },
+        {
+          text: 'Testing',
+          items: [
+            { text: 'Automated Testing', link: '/guide/testing' },
           ],
         },
         {
@@ -135,6 +142,14 @@ export default withMermaid({
             { text: 'Analytics', link: '/api/analytics' },
             { text: 'Analytics Query Engine', link: '/api/analytics-query' },
             { text: 'Analytics Funnel Engine', link: '/api/analytics-funnels' },
+          ],
+        },
+        {
+          text: 'Testing',
+          items: [
+            { text: 'Testers', link: '/api/testers' },
+            { text: 'Scenarios', link: '/api/scenarios' },
+            { text: 'Scenario Runs', link: '/api/scenario-runs' },
           ],
         },
         {

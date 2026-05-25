@@ -100,6 +100,16 @@ export class ContentModerationError extends Error {
 }
 
 /**
+ * Error thrown when a benchmark runner iteration fails
+ */
+export class BenchmarkExecutionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BenchmarkExecutionError';
+  }
+}
+
+/**
  * Error thrown when a rate limit has been exceeded
  */
 export class TooManyRequestsError extends Error {
@@ -116,6 +126,20 @@ export class UserBannedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'UserBannedError';
+  }
+}
+
+/**
+ * Error thrown when a conversation terminates (ends, is aborted, or fails) during automated test execution
+ */
+export class ConversationTerminatedError extends Error {
+  /** The conversation event type that caused termination (e.g. 'conversation_end', 'conversation_aborted', 'conversation_failed') */
+  readonly terminalEvent: string;
+
+  constructor(terminalEvent: string) {
+    super(`Conversation terminated with event: ${terminalEvent}`);
+    this.name = 'ConversationTerminatedError';
+    this.terminalEvent = terminalEvent;
   }
 }
 

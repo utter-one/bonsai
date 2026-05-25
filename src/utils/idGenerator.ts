@@ -32,6 +32,16 @@ export const ID_PREFIXES = {
   COPY_DECORATOR: 'cdec',
   SAVED_SLICE_QUERY: 'ssq',
   SAVED_FUNNEL_QUERY: 'sfq',
+  TESTER: 'tstr',
+  SCENARIO: 'scen',
+  SCENARIO_RUN: 'srun',
+  SCENARIO_CONVERSATION: 'scnv',
+  BENCHMARK_SUITE: 'bsui',
+  BENCHMARK_PROVIDER_CONFIG: 'bprc',
+  BENCHMARK_CONFIG: 'bcfg',
+  BENCHMARK_RUN: 'brun',
+  BENCHMARK_CONFIG_EXECUTION: 'bexc',
+  BENCHMARK_RESULT: 'bres',
 } as const;
 
 type EntityPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

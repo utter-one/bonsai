@@ -40,6 +40,7 @@ export const conversationEventTypeSchema = z.enum([
   'user_banned',
   'visibility_changed',
   'sample_copy_selection',
+  'turn_aborted',
 ]);
 
 export type ConversationEventType = z.infer<typeof conversationEventTypeSchema>;
@@ -344,6 +345,24 @@ export const sampleCopySelectionEventDataSchema = z.object({
 
 export type SampleCopySelectionEventData = z.infer<typeof sampleCopySelectionEventDataSchema>;
 
+/**
+ * Schema for turn aborted event data.
+ * Emitted when a user barge-in (voice interruption) aborts an ongoing AI generation turn.
+ */
+export const turnAbortedEventDataSchema = z.object({
+  /** The input turn that was being processed when the barge-in occurred */
+  inputTurnId: z.string().describe('Identifier of the input turn that was aborted'),
+  /** The output (AI generation) turn that was interrupted */
+  outputTurnId: z.string().describe('Identifier of the AI generation turn that was aborted'),
+  /** Full text generated and sent to TTS before the barge-in occurred */
+  accumulatedText: z.string().describe('Full text generated before the barge-in interruption'),
+  /** Unix timestamp in milliseconds when the barge-in was detected */
+  abortTimestampMs: z.number().describe('Unix timestamp in milliseconds when the generation was aborted'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type TurnAbortedEventData = z.infer<typeof turnAbortedEventDataSchema>;
+
 export const conversationEventDataSchema = z.union([
   messageEventDataSchema,
   classificationEventDataSchema,
@@ -365,6 +384,7 @@ export const conversationEventDataSchema = z.union([
   userBannedEventDataSchema,
   visibilityChangedEventDataSchema,
   sampleCopySelectionEventDataSchema,
+  turnAbortedEventDataSchema,
 ]);
 
 export type ConversationEventData = z.infer<typeof conversationEventDataSchema>;

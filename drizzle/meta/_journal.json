@@ -358,6 +358,55 @@
       "when": 1776759328395,
       "tag": "0050_cloudy_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1777051277198,
+      "tag": "0051_motionless_kat_farrell",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1777281869700,
+      "tag": "0052_steep_the_initiative",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1777304964513,
+      "tag": "0053_nosy_alex_wilder",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1777321760028,
+      "tag": "0054_oval_marten_broadcloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1777372472691,
+      "tag": "0055_lying_professor_monster",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1777381052652,
+      "tag": "0056_sour_naoko",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1777447650924,
+      "tag": "0057_nebulous_unicorn",
+      "breakpoints": true
     }
   ]
 }

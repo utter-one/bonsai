@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_BYTES = 12;
@@ -43,6 +43,19 @@ export function decryptSecret(encryptedValue: string, iv: string, tag: string, m
   decipher.setAuthTag(Buffer.from(tag, 'base64').subarray(0, TAG_BYTES));
   const decrypted = Buffer.concat([decipher.update(Buffer.from(encryptedValue, 'base64')), decipher.final()]);
   return decrypted.toString('utf8');
+}
+
+/** Fixed application-specific salt for bundle key derivation — prevents cross-application rainbow tables. */
+const BUNDLE_KEY_SALT = Buffer.from('bonsai-migration-bundle-v1');
+
+/**
+ * Derives a 32-byte AES-256-GCM key from an arbitrary-length bundle password using scrypt.
+ * Uses a fixed application-specific salt; security comes from the password itself.
+ * @param password - Bundle password provided by the caller (any non-empty string)
+ * @returns 32-byte Buffer suitable for use with encryptSecret / decryptSecret
+ */
+export function deriveBundleKey(password: string): Buffer {
+  return scryptSync(password, BUNDLE_KEY_SALT, 32) as Buffer;
 }
 
 /**

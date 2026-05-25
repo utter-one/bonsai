@@ -1,0 +1,4615 @@
+{
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  },
+  "dialect": "postgresql",
+  "enums": {},
+  "id": "2d290f62-6b2a-426a-be08-5c31a6f81b6c",
+  "policies": {},
+  "prevId": "9ce71e3d-9496-4c47-9c37-32482be1cd5b",
+  "roles": {},
+  "schemas": {},
+  "sequences": {},
+  "tables": {
+    "public.agents": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "filler_settings": {
+          "name": "filler_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt": {
+          "name": "prompt",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "tts_provider_id": {
+          "name": "tts_provider_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tts_settings": {
+          "name": "tts_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "agents_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "agents_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "agents_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "agents_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "agents",
+          "tableTo": "projects"
+        },
+        "agents_tts_provider_id_providers_id_fk": {
+          "columnsFrom": [
+            "tts_provider_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "agents_tts_provider_id_providers_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "agents",
+          "tableTo": "providers"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "agents",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.api_keys": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "is_active": {
+          "default": true,
+          "name": "is_active",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "key": {
+          "name": "key",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "key_settings": {
+          "name": "key_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "api_keys_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "api_keys_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "api_keys_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "api_keys_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "api_keys",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {
+        "idx_api_keys_project_is_active": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "is_active",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_api_keys_project_is_active",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "api_keys",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {
+        "api_keys_key_unique": {
+          "columns": [
+            "key"
+          ],
+          "name": "api_keys_key_unique",
+          "nullsNotDistinct": false
+        }
+      }
+    },
+    "public.audit_logs": {
+      "checkConstraints": {},
+      "columns": {
+        "action": {
+          "name": "action",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "new_entity": {
+          "name": "new_entity",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "old_entity": {
+          "name": "old_entity",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "user_id": {
+          "name": "user_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {},
+      "indexes": {
+        "idx_audit_logs_created_at": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "created_at",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_audit_logs_created_at",
+          "with": {}
+        },
+        "idx_audit_logs_project_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_audit_logs_project_id",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "audit_logs",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.benchmark_config_executions": {
+      "checkConstraints": {},
+      "columns": {
+        "completed_at": {
+          "name": "completed_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "config_id": {
+          "name": "config_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "error": {
+          "name": "error",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "run_id": {
+          "name": "run_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "started_at": {
+          "name": "started_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "stats": {
+          "name": "stats",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "status": {
+          "default": "'pending'",
+          "name": "status",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "benchmark_config_executions_config_id_benchmark_configs_id_fk": {
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_config_executions_config_id_benchmark_configs_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_config_executions",
+          "tableTo": "benchmark_configs"
+        },
+        "benchmark_config_executions_run_id_benchmark_runs_id_fk": {
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_config_executions_run_id_benchmark_runs_id_fk",
+          "onDelete": "cascade",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_config_executions",
+          "tableTo": "benchmark_runs"
+        }
+      },
+      "indexes": {
+        "idx_benchmark_config_executions_run_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "run_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "config_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_benchmark_config_executions_run_id",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "benchmark_config_executions",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.benchmark_configs": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "input_data": {
+          "name": "input_data",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "input_type": {
+          "name": "input_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "provider_config_id": {
+          "name": "provider_config_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "repeats": {
+          "default": 3,
+          "name": "repeats",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "suite_id": {
+          "name": "suite_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "benchmark_configs_provider_config_id_benchmark_provider_configs_id_fk": {
+          "columnsFrom": [
+            "provider_config_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_configs_provider_config_id_benchmark_provider_configs_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_configs",
+          "tableTo": "benchmark_provider_configs"
+        },
+        "benchmark_configs_suite_id_benchmark_suites_id_fk": {
+          "columnsFrom": [
+            "suite_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_configs_suite_id_benchmark_suites_id_fk",
+          "onDelete": "cascade",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_configs",
+          "tableTo": "benchmark_suites"
+        }
+      },
+      "indexes": {
+        "idx_benchmark_configs_suite_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "suite_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_benchmark_configs_suite_id",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "benchmark_configs",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.benchmark_provider_configs": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "provider_type": {
+          "name": "provider_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "settings": {
+          "name": "settings",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "benchmark_provider_configs_provider_id_providers_id_fk": {
+          "columnsFrom": [
+            "provider_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_provider_configs_provider_id_providers_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_provider_configs",
+          "tableTo": "providers"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "benchmark_provider_configs",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.benchmark_results": {
+      "checkConstraints": {},
+      "columns": {
+        "chunk_timings": {
+          "default": "'[]'::jsonb",
+          "name": "chunk_timings",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "config_execution_id": {
+          "name": "config_execution_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "error": {
+          "name": "error",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "iteration_index": {
+          "name": "iteration_index",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "output_data": {
+          "name": "output_data",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "started_at": {
+          "name": "started_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "time_to_first_chunk_ms": {
+          "name": "time_to_first_chunk_ms",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "benchmark_results_config_execution_id_benchmark_config_executions_id_fk": {
+          "columnsFrom": [
+            "config_execution_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_results_config_execution_id_benchmark_config_executions_id_fk",
+          "onDelete": "cascade",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_results",
+          "tableTo": "benchmark_config_executions"
+        }
+      },
+      "indexes": {
+        "idx_benchmark_results_config_execution_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "config_execution_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_benchmark_results_config_execution_id",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "benchmark_results",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.benchmark_runs": {
+      "checkConstraints": {},
+      "columns": {
+        "completed_at": {
+          "name": "completed_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "error": {
+          "name": "error",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "started_at": {
+          "name": "started_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "status": {
+          "default": "'pending'",
+          "name": "status",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "suite_id": {
+          "name": "suite_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "trigger": {
+          "name": "trigger",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "benchmark_runs_suite_id_benchmark_suites_id_fk": {
+          "columnsFrom": [
+            "suite_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_runs_suite_id_benchmark_suites_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_runs",
+          "tableTo": "benchmark_suites"
+        }
+      },
+      "indexes": {
+        "idx_benchmark_runs_status": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "status",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_benchmark_runs_status",
+          "with": {}
+        },
+        "idx_benchmark_runs_suite_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "suite_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_benchmark_runs_suite_id",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "benchmark_runs",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.benchmark_suites": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "created_by": {
+          "name": "created_by",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "cron_expression": {
+          "name": "cron_expression",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "is_active": {
+          "default": true,
+          "name": "is_active",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "benchmark_suites_created_by_operators_id_fk": {
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "benchmark_suites_created_by_operators_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "benchmark_suites",
+          "tableTo": "operators"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "benchmark_suites",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.classifiers": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_provider_id": {
+          "name": "llm_provider_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_settings": {
+          "name": "llm_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt": {
+          "name": "prompt",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "classifiers_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "classifiers_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "classifiers_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "classifiers_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "classifiers",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "classifiers",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.context_transformers": {
+      "checkConstraints": {},
+      "columns": {
+        "context_fields": {
+          "name": "context_fields",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_provider_id": {
+          "name": "llm_provider_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_settings": {
+          "name": "llm_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt": {
+          "name": "prompt",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "context_transformers_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "context_transformers_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "context_transformers_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "context_transformers_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "context_transformers",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "context_transformers",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.conversation_artifacts": {
+      "checkConstraints": {},
+      "columns": {
+        "artifact_type": {
+          "name": "artifact_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "conversation_id": {
+          "name": "conversation_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "data": {
+          "name": "data",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "event_id": {
+          "name": "event_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "file_size": {
+          "name": "file_size",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "input_turn_id": {
+          "name": "input_turn_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "output_turn_id": {
+          "name": "output_turn_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "storage_key": {
+          "name": "storage_key",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "storage_url": {
+          "name": "storage_url",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        }
+      },
+      "compositePrimaryKeys": {
+        "conversation_artifacts_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "conversation_artifacts_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "conversation_artifacts_project_id_conversation_id_conversations_project_id_id_fk": {
+          "columnsFrom": [
+            "project_id",
+            "conversation_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "name": "conversation_artifacts_project_id_conversation_id_conversations_project_id_id_fk",
+          "onDelete": "cascade",
+          "onUpdate": "no action",
+          "tableFrom": "conversation_artifacts",
+          "tableTo": "conversations"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "conversation_artifacts",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.conversation_events": {
+      "checkConstraints": {},
+      "columns": {
+        "conversation_id": {
+          "name": "conversation_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "event_data": {
+          "name": "event_data",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "event_type": {
+          "name": "event_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "stage_id": {
+          "name": "stage_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        }
+      },
+      "compositePrimaryKeys": {
+        "conversation_events_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "conversation_events_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "conversation_events_project_id_conversation_id_conversations_project_id_id_fk": {
+          "columnsFrom": [
+            "project_id",
+            "conversation_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "name": "conversation_events_project_id_conversation_id_conversations_project_id_id_fk",
+          "onDelete": "cascade",
+          "onUpdate": "no action",
+          "tableFrom": "conversation_events",
+          "tableTo": "conversations"
+        }
+      },
+      "indexes": {
+        "idx_conversation_events_project_conversation": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "conversation_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_conversation_events_project_conversation",
+          "with": {}
+        },
+        "idx_conversation_events_project_type_timestamp": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "event_type",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "timestamp",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_conversation_events_project_type_timestamp",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "conversation_events",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.conversations": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "direction": {
+          "default": "'incoming'",
+          "name": "direction",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "ending_stage_id": {
+          "name": "ending_stage_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "last_activity_at": {
+          "name": "last_activity_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "session_id": {
+          "name": "session_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "stage_id": {
+          "name": "stage_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "stage_vars": {
+          "name": "stage_vars",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "starting_stage_id": {
+          "name": "starting_stage_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "status": {
+          "default": "'initialized'",
+          "name": "status",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "status_reason": {
+          "default": null,
+          "name": "status_reason",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "user_id": {
+          "name": "user_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        }
+      },
+      "compositePrimaryKeys": {
+        "conversations_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "conversations_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "conversations_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "conversations_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "conversations",
+          "tableTo": "projects"
+        },
+        "conversations_project_id_user_id_users_project_id_id_fk": {
+          "columnsFrom": [
+            "project_id",
+            "user_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "name": "conversations_project_id_user_id_users_project_id_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "conversations",
+          "tableTo": "users"
+        }
+      },
+      "indexes": {
+        "idx_conversations_project_user": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "user_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_conversations_project_user",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "conversations",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.copy_decorators": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "template": {
+          "name": "template",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "copy_decorators_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "copy_decorators_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "copy_decorators_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "copy_decorators_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "copy_decorators",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {
+        "copy_decorators_project_id_name_unique": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "name",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": true,
+          "method": "btree",
+          "name": "copy_decorators_project_id_name_unique",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "copy_decorators",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.environments": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "description": {
+          "name": "description",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "login": {
+          "name": "login",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "password": {
+          "name": "password",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "url": {
+          "name": "url",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {},
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "environments",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.global_actions": {
+      "checkConstraints": {},
+      "columns": {
+        "classification_trigger": {
+          "name": "classification_trigger",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "condition": {
+          "name": "condition",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "effects": {
+          "default": "'[]'::jsonb",
+          "name": "effects",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "examples": {
+          "name": "examples",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "override_classifier_id": {
+          "name": "override_classifier_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "parameters": {
+          "default": "'[]'::jsonb",
+          "name": "parameters",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "trigger_on_client_command": {
+          "default": false,
+          "name": "trigger_on_client_command",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "trigger_on_user_input": {
+          "default": true,
+          "name": "trigger_on_user_input",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "global_actions_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "global_actions_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "global_actions_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "global_actions_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "global_actions",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "global_actions",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.guardrails": {
+      "checkConstraints": {},
+      "columns": {
+        "classification_trigger": {
+          "name": "classification_trigger",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "condition": {
+          "name": "condition",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "effects": {
+          "default": "'[]'::jsonb",
+          "name": "effects",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "examples": {
+          "name": "examples",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "guardrails_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "guardrails_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "guardrails_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "guardrails_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "guardrails",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "guardrails",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.issues": {
+      "checkConstraints": {},
+      "columns": {
+        "bug_description": {
+          "name": "bug_description",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "build_version": {
+          "name": "build_version",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "category": {
+          "name": "category",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "comments": {
+          "name": "comments",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "conversation_id": {
+          "name": "conversation_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "environment": {
+          "name": "environment",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "event_index": {
+          "name": "event_index",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "expected_behaviour": {
+          "name": "expected_behaviour",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "serial"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "severity": {
+          "name": "severity",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "stage": {
+          "name": "stage",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "status": {
+          "name": "status",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "user_id": {
+          "name": "user_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        }
+      },
+      "compositePrimaryKeys": {
+        "issues_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "issues_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "issues_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "issues_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "issues",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "issues",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.knowledge_categories": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "order": {
+          "default": 0,
+          "name": "order",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt_trigger": {
+          "name": "prompt_trigger",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "knowledge_categories_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "knowledge_categories_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "knowledge_categories_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "knowledge_categories_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "knowledge_categories",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "knowledge_categories",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.knowledge_items": {
+      "checkConstraints": {},
+      "columns": {
+        "answer": {
+          "name": "answer",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "category_id": {
+          "name": "category_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "order": {
+          "default": 0,
+          "name": "order",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "question": {
+          "name": "question",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "knowledge_items_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "knowledge_items_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "knowledge_items_project_id_category_id_knowledge_categories_project_id_id_fk": {
+          "columnsFrom": [
+            "project_id",
+            "category_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "name": "knowledge_items_project_id_category_id_knowledge_categories_project_id_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "knowledge_items",
+          "tableTo": "knowledge_categories"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "knowledge_items",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.operators": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "password": {
+          "name": "password",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "roles": {
+          "name": "roles",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {},
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "operators",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.projects": {
+      "checkConstraints": {},
+      "columns": {
+        "accept_voice": {
+          "default": true,
+          "name": "accept_voice",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "archived_by": {
+          "name": "archived_by",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "asr_config": {
+          "name": "asr_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "auto_create_users": {
+          "default": false,
+          "name": "auto_create_users",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "constants": {
+          "name": "constants",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "conversation_timeout_seconds": {
+          "name": "conversation_timeout_seconds",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "cost_management_config": {
+          "name": "cost_management_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "default_guardrail_classifier_id": {
+          "name": "default_guardrail_classifier_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "generate_voice": {
+          "default": true,
+          "name": "generate_voice",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "language_code": {
+          "name": "language_code",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "moderation_config": {
+          "name": "moderation_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "sample_copy_config": {
+          "name": "sample_copy_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "starting_stage_id": {
+          "name": "starting_stage_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "storage_config": {
+          "name": "storage_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "timezone": {
+          "name": "timezone",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "user_profile_variable_descriptors": {
+          "default": "'[]'::jsonb",
+          "name": "user_profile_variable_descriptors",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "projects_archived_by_operators_id_fk": {
+          "columnsFrom": [
+            "archived_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "projects_archived_by_operators_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "projects",
+          "tableTo": "operators"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "projects",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.providers": {
+      "checkConstraints": {},
+      "columns": {
+        "api_type": {
+          "name": "api_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "config": {
+          "name": "config",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "created_by": {
+          "name": "created_by",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "provider_type": {
+          "name": "provider_type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "name": "tags",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "providers_created_by_operators_id_fk": {
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "providers_created_by_operators_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "providers",
+          "tableTo": "operators"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "providers",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.sample_copies": {
+      "checkConstraints": {},
+      "columns": {
+        "agents": {
+          "name": "agents",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "amount": {
+          "default": 1,
+          "name": "amount",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "classifier_override_id": {
+          "name": "classifier_override_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "content": {
+          "default": "'[]'::jsonb",
+          "name": "content",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "decorator_id": {
+          "name": "decorator_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "mode": {
+          "default": "'regular'",
+          "name": "mode",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt_trigger": {
+          "name": "prompt_trigger",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "sampling_method": {
+          "default": "'random'",
+          "name": "sampling_method",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "stages": {
+          "name": "stages",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "sample_copies_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "sample_copies_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "sample_copies_project_id_decorator_id_copy_decorators_project_id_id_fk": {
+          "columnsFrom": [
+            "project_id",
+            "decorator_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "name": "sample_copies_project_id_decorator_id_copy_decorators_project_id_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "sample_copies",
+          "tableTo": "copy_decorators"
+        },
+        "sample_copies_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "sample_copies_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "sample_copies",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {
+        "sample_copies_project_id_name_unique": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "name",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": true,
+          "method": "btree",
+          "name": "sample_copies_project_id_name_unique",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "sample_copies",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.saved_funnel_queries": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "is_shared": {
+          "default": false,
+          "name": "is_shared",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "query": {
+          "name": "query",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "saved_funnel_queries_operator_id_operators_id_fk": {
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "saved_funnel_queries_operator_id_operators_id_fk",
+          "onDelete": "set null",
+          "onUpdate": "no action",
+          "tableFrom": "saved_funnel_queries",
+          "tableTo": "operators"
+        },
+        "saved_funnel_queries_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "saved_funnel_queries_project_id_projects_id_fk",
+          "onDelete": "cascade",
+          "onUpdate": "no action",
+          "tableFrom": "saved_funnel_queries",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {
+        "idx_saved_funnel_queries_operator_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "operator_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_saved_funnel_queries_operator_id",
+          "with": {}
+        },
+        "idx_saved_funnel_queries_project_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_saved_funnel_queries_project_id",
+          "with": {}
+        },
+        "saved_funnel_queries_project_id_name_unique": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "name",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": true,
+          "method": "btree",
+          "name": "saved_funnel_queries_project_id_name_unique",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "saved_funnel_queries",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.saved_slice_queries": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "is_shared": {
+          "default": false,
+          "name": "is_shared",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "query": {
+          "name": "query",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "saved_slice_queries_operator_id_operators_id_fk": {
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "saved_slice_queries_operator_id_operators_id_fk",
+          "onDelete": "set null",
+          "onUpdate": "no action",
+          "tableFrom": "saved_slice_queries",
+          "tableTo": "operators"
+        },
+        "saved_slice_queries_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "saved_slice_queries_project_id_projects_id_fk",
+          "onDelete": "cascade",
+          "onUpdate": "no action",
+          "tableFrom": "saved_slice_queries",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {
+        "idx_saved_slice_queries_operator_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "operator_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_saved_slice_queries_operator_id",
+          "with": {}
+        },
+        "idx_saved_slice_queries_project_id": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_saved_slice_queries_project_id",
+          "with": {}
+        },
+        "saved_slice_queries_project_id_name_unique": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "name",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": true,
+          "method": "btree",
+          "name": "saved_slice_queries_project_id_name_unique",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "saved_slice_queries",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.scenario_conversations": {
+      "checkConstraints": {},
+      "columns": {
+        "conversation_id": {
+          "name": "conversation_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "data_extraction_results": {
+          "name": "data_extraction_results",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "data_transformation_results": {
+          "name": "data_transformation_results",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "scenario_id": {
+          "name": "scenario_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "scenario_run_id": {
+          "name": "scenario_run_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "status": {
+          "default": "'queued'",
+          "name": "status",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tester_id": {
+          "name": "tester_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scenario_conversations_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "scenario_conversations_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "scenario_conversations_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "scenario_conversations_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "scenario_conversations",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {
+        "idx_scenario_conversations_project_run": {
+          "columns": [
+            {
+              "asc": true,
+              "expression": "project_id",
+              "isExpression": false,
+              "nulls": "last"
+            },
+            {
+              "asc": true,
+              "expression": "scenario_run_id",
+              "isExpression": false,
+              "nulls": "last"
+            }
+          ],
+          "concurrently": false,
+          "isUnique": false,
+          "method": "btree",
+          "name": "idx_scenario_conversations_project_run",
+          "with": {}
+        }
+      },
+      "isRLSEnabled": false,
+      "name": "scenario_conversations",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.scenario_runs": {
+      "name": "scenario_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scenario_id": {
+          "name": "scenario_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "testers": {
+          "name": "testers",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "total_conversations": {
+          "name": "total_conversations",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'queued'"
+        },
+        "status_details": {
+          "name": "status_details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_scenario_runs_project_scenario": {
+          "name": "idx_scenario_runs_project_scenario",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scenario_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "scenario_runs_project_id_projects_id_fk": {
+          "name": "scenario_runs_project_id_projects_id_fk",
+          "tableFrom": "scenario_runs",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scenario_runs_project_id_id_pk": {
+          "name": "scenario_runs_project_id_id_pk",
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.scenarios": {
+      "name": "scenarios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starting_stage_id": {
+          "name": "starting_stage_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_turns": {
+          "name": "max_turns",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ending_stage_ids": {
+          "name": "ending_stage_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "persona_can_hang_up": {
+          "name": "persona_can_hang_up",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "conversation_opener": {
+          "name": "conversation_opener",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_extraction": {
+          "name": "data_extraction",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "context_transformer_id": {
+          "name": "context_transformer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data_post_processing_expected": {
+          "name": "data_post_processing_expected",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "scenarios_project_id_projects_id_fk": {
+          "name": "scenarios_project_id_projects_id_fk",
+          "tableFrom": "scenarios",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "scenarios_project_id_id_pk": {
+          "name": "scenarios_project_id_id_pk",
+          "columns": [
+            "project_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.secrets": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "encrypted_value": {
+          "name": "encrypted_value",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "iv": {
+          "name": "iv",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tag": {
+          "name": "tag",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "foreignKeys": {},
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "secrets",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.stages": {
+      "checkConstraints": {},
+      "columns": {
+        "actions": {
+          "default": "'{}'::jsonb",
+          "name": "actions",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "default_classifier_id": {
+          "name": "default_classifier_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "enter_behavior": {
+          "default": "'generate_response'",
+          "name": "enter_behavior",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "global_actions": {
+          "default": "'[]'::jsonb",
+          "name": "global_actions",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "knowledge_tags": {
+          "default": "'[]'::jsonb",
+          "name": "knowledge_tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "llm_provider_id": {
+          "name": "llm_provider_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_settings": {
+          "name": "llm_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt": {
+          "name": "prompt",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "transformer_ids": {
+          "default": "'[]'::jsonb",
+          "name": "transformer_ids",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "use_global_actions": {
+          "default": true,
+          "name": "use_global_actions",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "use_knowledge": {
+          "default": false,
+          "name": "use_knowledge",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "variable_descriptors": {
+          "default": "'[]'::jsonb",
+          "name": "variable_descriptors",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "stages_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "stages_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "stages_project_id_agent_id_agents_project_id_id_fk": {
+          "columnsFrom": [
+            "project_id",
+            "agent_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "name": "stages_project_id_agent_id_agents_project_id_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "stages",
+          "tableTo": "agents"
+        },
+        "stages_project_id_default_classifier_id_classifiers_project_id_id_fk": {
+          "columnsFrom": [
+            "project_id",
+            "default_classifier_id"
+          ],
+          "columnsTo": [
+            "project_id",
+            "id"
+          ],
+          "name": "stages_project_id_default_classifier_id_classifiers_project_id_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "stages",
+          "tableTo": "classifiers"
+        },
+        "stages_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "stages_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "stages",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "stages",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.testers": {
+      "checkConstraints": {},
+      "columns": {
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "hang_up_prompt": {
+          "name": "hang_up_prompt",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_provider_id": {
+          "name": "llm_provider_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_settings": {
+          "name": "llm_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt": {
+          "name": "prompt",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "user_profile": {
+          "name": "user_profile",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "compositePrimaryKeys": {
+        "testers_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "testers_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "testers_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "testers_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "testers",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "testers",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.tools": {
+      "checkConstraints": {},
+      "columns": {
+        "code": {
+          "name": "code",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "input_type": {
+          "name": "input_type",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_provider_id": {
+          "name": "llm_provider_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "llm_settings": {
+          "name": "llm_settings",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "output_type": {
+          "name": "output_type",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "parameters": {
+          "default": "'[]'::jsonb",
+          "name": "parameters",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "prompt": {
+          "name": "prompt",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "tags": {
+          "default": "'[]'::jsonb",
+          "name": "tags",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "type": {
+          "default": "'smart_function'",
+          "name": "type",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "url": {
+          "name": "url",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "webhook_body": {
+          "name": "webhook_body",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "webhook_headers": {
+          "name": "webhook_headers",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "webhook_method": {
+          "name": "webhook_method",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        }
+      },
+      "compositePrimaryKeys": {
+        "tools_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "tools_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "tools_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "tools_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "tools",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "tools",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    },
+    "public.users": {
+      "checkConstraints": {},
+      "columns": {
+        "ban_reason": {
+          "name": "ban_reason",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "banned": {
+          "default": false,
+          "name": "banned",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "profile": {
+          "name": "profile",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "project_id": {
+          "name": "project_id",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        }
+      },
+      "compositePrimaryKeys": {
+        "users_project_id_id_pk": {
+          "columns": [
+            "project_id",
+            "id"
+          ],
+          "name": "users_project_id_id_pk"
+        }
+      },
+      "foreignKeys": {
+        "users_project_id_projects_id_fk": {
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "name": "users_project_id_projects_id_fk",
+          "onDelete": "no action",
+          "onUpdate": "no action",
+          "tableFrom": "users",
+          "tableTo": "projects"
+        }
+      },
+      "indexes": {},
+      "isRLSEnabled": false,
+      "name": "users",
+      "policies": {},
+      "schema": "",
+      "uniqueConstraints": {}
+    }
+  },
+  "version": "7",
+  "views": {
+    "public.active_projects": {
+      "columns": {
+        "accept_voice": {
+          "default": true,
+          "name": "accept_voice",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "archived_by": {
+          "name": "archived_by",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "asr_config": {
+          "name": "asr_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "auto_create_users": {
+          "default": false,
+          "name": "auto_create_users",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "constants": {
+          "name": "constants",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "conversation_timeout_seconds": {
+          "name": "conversation_timeout_seconds",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "cost_management_config": {
+          "name": "cost_management_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "default_guardrail_classifier_id": {
+          "name": "default_guardrail_classifier_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "generate_voice": {
+          "default": true,
+          "name": "generate_voice",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "language_code": {
+          "name": "language_code",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "moderation_config": {
+          "name": "moderation_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "sample_copy_config": {
+          "name": "sample_copy_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "starting_stage_id": {
+          "name": "starting_stage_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "storage_config": {
+          "name": "storage_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "timezone": {
+          "name": "timezone",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "user_profile_variable_descriptors": {
+          "default": "'[]'::jsonb",
+          "name": "user_profile_variable_descriptors",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "definition": "select \"id\", \"name\", \"description\", \"asr_config\", \"accept_voice\", \"generate_voice\", \"storage_config\", \"moderation_config\", \"cost_management_config\", \"constants\", \"metadata\", \"timezone\", \"language_code\", \"auto_create_users\", \"user_profile_variable_descriptors\", \"default_guardrail_classifier_id\", \"sample_copy_config\", \"starting_stage_id\", \"conversation_timeout_seconds\", \"version\", \"created_at\", \"updated_at\", \"archived_at\", \"archived_by\" from \"projects\" where \"projects\".\"archived_at\" is null",
+      "isExisting": false,
+      "materialized": false,
+      "name": "active_projects",
+      "schema": "public"
+    },
+    "public.archived_projects": {
+      "columns": {
+        "accept_voice": {
+          "default": true,
+          "name": "accept_voice",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "archived_by": {
+          "name": "archived_by",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "asr_config": {
+          "name": "asr_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "auto_create_users": {
+          "default": false,
+          "name": "auto_create_users",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "constants": {
+          "name": "constants",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "conversation_timeout_seconds": {
+          "name": "conversation_timeout_seconds",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "cost_management_config": {
+          "name": "cost_management_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "created_at": {
+          "default": "now()",
+          "name": "created_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "default_guardrail_classifier_id": {
+          "name": "default_guardrail_classifier_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "description": {
+          "name": "description",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "generate_voice": {
+          "default": true,
+          "name": "generate_voice",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "boolean"
+        },
+        "id": {
+          "name": "id",
+          "notNull": true,
+          "primaryKey": true,
+          "type": "text"
+        },
+        "language_code": {
+          "name": "language_code",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "metadata": {
+          "name": "metadata",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "moderation_config": {
+          "name": "moderation_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "name": {
+          "name": "name",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "sample_copy_config": {
+          "name": "sample_copy_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "starting_stage_id": {
+          "name": "starting_stage_id",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "storage_config": {
+          "name": "storage_config",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "timezone": {
+          "name": "timezone",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "text"
+        },
+        "updated_at": {
+          "default": "now()",
+          "name": "updated_at",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "timestamp"
+        },
+        "user_profile_variable_descriptors": {
+          "default": "'[]'::jsonb",
+          "name": "user_profile_variable_descriptors",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "jsonb"
+        },
+        "version": {
+          "default": 1,
+          "name": "version",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        }
+      },
+      "definition": "select \"id\", \"name\", \"description\", \"asr_config\", \"accept_voice\", \"generate_voice\", \"storage_config\", \"moderation_config\", \"cost_management_config\", \"constants\", \"metadata\", \"timezone\", \"language_code\", \"auto_create_users\", \"user_profile_variable_descriptors\", \"default_guardrail_classifier_id\", \"sample_copy_config\", \"starting_stage_id\", \"conversation_timeout_seconds\", \"version\", \"created_at\", \"updated_at\", \"archived_at\", \"archived_by\" from \"projects\" where \"projects\".\"archived_at\" is not null",
+      "isExisting": false,
+      "materialized": false,
+      "name": "archived_projects",
+      "schema": "public"
+    }
+  }
+}
