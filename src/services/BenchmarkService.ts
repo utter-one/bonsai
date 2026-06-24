@@ -87,11 +87,15 @@ export class BenchmarkService extends BaseService {
   async deleteSuite(id: string, context: RequestContext): Promise<void> {
     this.requirePermission(context, PERMISSIONS.BENCHMARK_WRITE);
     await this.getSuiteOrThrow(id);
+    const [existingConfig] = await db.select({ id: benchmarkConfigs.id }).from(benchmarkConfigs).where(eq(benchmarkConfigs.suiteId, id)).limit(1);
+    if (existingConfig) throw new ConflictError(`Benchmark suite ${id} cannot be deleted because it has existing configs. Delete all configs first.`);
     const [existingRun] = await db.select({ id: benchmarkRuns.id }).from(benchmarkRuns).where(eq(benchmarkRuns.suiteId, id)).limit(1);
     if (existingRun) throw new ConflictError(`Benchmark suite ${id} cannot be deleted because it has existing runs. Delete all runs first.`);
+    // Cancel the cron schedule before deleting the suite to prevent a race where the cron fires
+    // and tries to create a run for a suite that no longer exists.
+    this.executorService.refreshSuiteSchedule(id, null, false);
     logger.info({ id, operatorId: context.operatorId }, 'Deleting benchmark suite');
     await db.delete(benchmarkSuites).where(eq(benchmarkSuites.id, id));
-    this.executorService.refreshSuiteSchedule(id, null, false);
   }
 
   /**
@@ -100,8 +104,8 @@ export class BenchmarkService extends BaseService {
    * @param context - Optional request context for authorization
    * @returns The suite
    */
-  async getSuite(id: string, context?: RequestContext): Promise<BenchmarkSuiteResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async getSuite(id: string, context: RequestContext): Promise<BenchmarkSuiteResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
     const row = await this.getSuiteOrThrow(id);
     return this.mapSuiteResponse(row);
   }
@@ -109,11 +113,11 @@ export class BenchmarkService extends BaseService {
   /**
    * Lists all benchmark suites with pagination.
    * @param params - Pagination parameters (offset, limit)
-   * @param context - Optional request context for authorization
+   * @param context - Request context for authorization
    * @returns Paginated list of suites
    */
-  async listSuites(params?: ListParams, context?: RequestContext): Promise<BenchmarkSuiteListResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async listSuites(context: RequestContext, params?: ListParams): Promise<BenchmarkSuiteListResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
     const offset = params?.offset ?? 0;
     const limit = normalizeListLimit(params?.limit);
     const total = await countRows(benchmarkSuites);
@@ -195,8 +199,8 @@ export class BenchmarkService extends BaseService {
    * @param context - Optional request context for authorization
    * @returns The provider config
    */
-  async getProviderConfig(id: string, context?: RequestContext): Promise<BenchmarkProviderConfigResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async getProviderConfig(id: string, context: RequestContext): Promise<BenchmarkProviderConfigResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
     const row = await this.getProviderConfigOrThrow(id);
     return this.mapProviderConfigResponse(row);
   }
@@ -204,11 +208,11 @@ export class BenchmarkService extends BaseService {
   /**
    * Lists all benchmark provider configs with pagination.
    * @param params - Pagination parameters (offset, limit)
-   * @param context - Optional request context for authorization
+   * @param context - Request context for authorization
    * @returns Paginated list of provider configs
    */
-  async listProviderConfigs(params?: ListParams, context?: RequestContext): Promise<BenchmarkProviderConfigListResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async listProviderConfigs(context: RequestContext, params?: ListParams): Promise<BenchmarkProviderConfigListResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
     const offset = params?.offset ?? 0;
     const limit = normalizeListLimit(params?.limit);
     const total = await countRows(benchmarkProviderConfigs);
@@ -230,6 +234,8 @@ export class BenchmarkService extends BaseService {
     logger.info({ id, suiteId: input.suiteId, name: input.name, operatorId: context.operatorId }, 'Creating benchmark config');
 
     await this.getSuiteOrThrow(input.suiteId);
+    // Validate that the provider config exists before inserting to avoid a raw DB FK constraint error.
+    await this.getProviderConfigOrThrow(input.providerConfigId);
 
     const [row] = await db.insert(benchmarkConfigs).values({
       id,
@@ -265,7 +271,11 @@ export class BenchmarkService extends BaseService {
     };
     if (updateData.name !== undefined) updates.name = updateData.name;
     if (updateData.description !== undefined) updates.description = updateData.description ?? null;
-    if (updateData.providerConfigId !== undefined) updates.providerConfigId = updateData.providerConfigId;
+    // Validate that the provider config exists before updating to avoid a raw DB FK constraint error.
+    if (updateData.providerConfigId !== undefined) {
+      await this.getProviderConfigOrThrow(updateData.providerConfigId);
+      updates.providerConfigId = updateData.providerConfigId;
+    }
     if (updateData.inputType !== undefined) updates.inputType = updateData.inputType;
     if (updateData.inputData !== undefined) updates.inputData = updateData.inputData as Record<string, unknown>;
     if (updateData.repeats !== undefined) updates.repeats = updateData.repeats;
@@ -295,8 +305,8 @@ export class BenchmarkService extends BaseService {
    * @param context - Optional request context for authorization
    * @returns The config
    */
-  async getConfig(id: string, context?: RequestContext): Promise<BenchmarkConfigResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async getConfig(id: string, context: RequestContext): Promise<BenchmarkConfigResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
     const row = await this.getConfigOrThrow(id);
     return this.mapConfigResponse(row);
   }
@@ -305,11 +315,11 @@ export class BenchmarkService extends BaseService {
    * Lists all benchmark configs for a given suite with pagination.
    * @param suiteId - Suite ID to filter by
    * @param params - Pagination parameters (offset, limit)
-   * @param context - Optional request context for authorization
+   * @param context - Request context for authorization
    * @returns Paginated list of configs
    */
-  async listConfigsForSuite(suiteId: string, params?: ListParams, context?: RequestContext): Promise<BenchmarkConfigListResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async listConfigsForSuite(suiteId: string, context: RequestContext, params?: ListParams): Promise<BenchmarkConfigListResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
     const offset = params?.offset ?? 0;
     const limit = normalizeListLimit(params?.limit);
     const whereCondition = eq(benchmarkConfigs.suiteId, suiteId);

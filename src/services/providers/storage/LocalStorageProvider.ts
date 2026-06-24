@@ -42,9 +42,9 @@ export class LocalStorageProvider extends StorageProviderBase<LocalStorageProvid
   private settings: LocalStorageSettings;
   private signedUrlTokens: Map<string, SignedUrlToken> = new Map();
 
-  constructor(config: LocalStorageProviderConfig, settings: LocalStorageSettings) {
+  constructor(config: LocalStorageProviderConfig, settings?: LocalStorageSettings) {
     super(config);
-    this.settings = localStorageSettingsSchema.parse(settings);
+    this.settings = localStorageSettingsSchema.parse(settings || {});
   }
 
   async init(): Promise<void> {

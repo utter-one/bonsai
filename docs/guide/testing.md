@@ -54,6 +54,7 @@ A **Scenario** defines the parameters of a test: which stage to start from, how 
 | `startingStageId` | Stage where every test conversation begins |
 | `maxTurns` | Maximum allowed turns before the run is marked failed |
 | `endingStageIds` | Stage IDs that signal a successful conversation end |
+| `conversationOpener` | Optional opening message the tester sends when the first stage awaits user input (defaults to `"[Conversation begins.]"`) |
 | `personaCanHangUp` | Whether the tester persona may end the conversation using its `hangUpPrompt` |
 | `dataExtraction` | Variables to extract from stages at the end of the conversation |
 | `contextTransformerId` | Context transformer run against the final conversation state after the conversation ends |
@@ -145,9 +146,12 @@ A **Scenario Run** triggers execution of a scenario using one or more testers. I
 | `id` | Unique run identifier |
 | `projectId` | Parent project |
 | `scenarioId` | Scenario being executed |
-| `testerIds` | Testers assigned to this run |
+| `testers` | `Record<string, number>` mapping tester IDs to the number of conversations per tester |
 | `totalConversations` | Total conversations to execute across all testers |
-| `status` | Run status (`queued` → `in_progress` → `passed` / `failed`) |
+| `status` | Run status (`queued`, `in_progress`, `passed`, `failed`, `cancelled`, `error`) |
+| `statusDetails` | Human-readable details about the current status |
+| `errorCount` | Number of conversations that errored during execution |
+| `testStatistics` | Object with `passedTests` and `failedTests` totals |
 | `metadata` | Arbitrary metadata |
 
 After creation the run starts with status `queued`. The execution engine picks it up, distributes conversations across the assigned testers, and updates the status as work completes.
@@ -159,6 +163,8 @@ Both runs and individual conversations follow the same status progression:
 ```
 queued → in_progress → passed
                     ↘ failed
+                    ↘ cancelled
+                    ↘ error
 ```
 
 | Status | Description |
@@ -166,7 +172,9 @@ queued → in_progress → passed
 | `queued` | Created, awaiting execution |
 | `in_progress` | Currently executing |
 | `passed` | All conversations completed and all assertions passed |
-| `failed` | One or more conversations failed, or the run was aborted |
+| `failed` | One or more conversations failed |
+| `cancelled` | Run was cancelled mid-flight |
+| `error` | Run encountered an unrecoverable error |
 
 The run's final status rolls up from its conversations: if any conversation fails, the run is marked `failed`.
 
@@ -180,8 +188,11 @@ Each **Scenario Conversation** represents one individual conversation executed w
 | `scenarioRunId` | Parent scenario run |
 | `scenarioId` | Scenario being tested |
 | `testerId` | Tester used for this conversation |
+| `projectId` | Parent project |
 | `conversationId` | Linked conversation ID (set once the conversation starts) |
 | `status` | Conversation status |
+| `testRunStatus` | How the test ended: `conversation_ended`, `conversation_aborted`, `conversation_failed`, `max_turns_reached`, `tester_hung_up` |
+| `testStatistics` | Object with `passedTests` and `failedTests` counts |
 | `dataExtractionResults` | Variables extracted at conversation end |
 | `dataTransformationResults` | Results after any post-processing |
 
@@ -207,6 +218,10 @@ Use the `scenarioRunId` query parameter on the list endpoint to retrieve all con
 - Create: `POST /api/projects/:projectId/scenario-runs`
 - List: `GET /api/projects/:projectId/scenario-runs`
 - Get: `GET /api/projects/:projectId/scenario-runs/:id`
+- Cancel: `POST /api/projects/:projectId/scenario-runs/:id/cancel`
+- Delete: `DELETE /api/projects/:projectId/scenario-runs/:id`
+- Scheduler Status: `GET /api/scenario-runs/scheduler`
+- Scheduler Toggle: `PUT /api/scenario-runs/scheduler`
 
 **Scenario Conversations**
 - List: `GET /api/projects/:projectId/scenario-conversations`

@@ -39,6 +39,10 @@ export class EndUserVoiceInputHandler implements ClientMessageHandler<CALEndUser
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      if (!context.session.runner) {
+        throw new InvalidOperationError('No active conversation runner');
+      }
+
       await context.session.runner.stopUserVoiceInput(message.inputTurnId);
 
       const response: CALEndUserVoiceInputResponse = { 
@@ -53,13 +57,14 @@ export class EndUserVoiceInputHandler implements ClientMessageHandler<CALEndUser
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId }, 'User voice input ended successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to end user voice input';
+      const sanitizedError = 'Failed to end user voice input';
       logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to end user voice input');
       const response: CALEndUserVoiceInputResponse = { 
         type: 'end_user_voice_input', 
         conversationId: message.conversationId,
         correlationId: message.correlationId,
         success: false, 
-        error: errorMessage, 
+        error: sanitizedError, 
         inputTurnId: message.inputTurnId
       };
       context.send(response);

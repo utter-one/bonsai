@@ -35,8 +35,12 @@ export class GetVarHandler implements ClientMessageHandler<CALGetVarRequest> {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.session.runner.saveCommandEvent('get_var', { stageId: message.stageId, variableName: message.variableName });
+      if (!context.session.runner) {
+        throw new InvalidOperationError('No active conversation runner');
+      }
+
       const variableValue = await context.session.runner.getVariable(message.stageId, message.variableName);
+      await context.session.runner.saveCommandEvent('get_var', { stageId: message.stageId, variableName: message.variableName });
 
       const response: CALGetVarResponse = { type: 'get_var', conversationId: message.conversationId, correlationId: message.correlationId, success: true, variableName: message.variableName, variableValue };
       context.send(response);
@@ -44,8 +48,9 @@ export class GetVarHandler implements ClientMessageHandler<CALGetVarRequest> {
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Get variable completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get variable';
+      const sanitizedError = 'Failed to get variable';
       logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to get variable');
-      const response: CALGetVarResponse = { type: 'get_var', conversationId: message.conversationId, correlationId: message.correlationId, success: false, variableName: message.variableName, error: errorMessage };
+      const response: CALGetVarResponse = { type: 'get_var', conversationId: message.conversationId, correlationId: message.correlationId, success: false, variableName: message.variableName, error: sanitizedError };
       context.send(response);
     }
   }

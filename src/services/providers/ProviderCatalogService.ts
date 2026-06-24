@@ -11715,6 +11715,29 @@ export class ProviderCatalogService {
           { id: 'deepseek-r2:8b', displayName: 'DeepSeek R2 8B', description: 'DeepSeek R2 reasoning model (8B)', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsVision: false, supportsReasoning: true },
         ],
       },
+      {
+        apiType: 'ovh',
+        displayName: 'OVH',
+        description: 'OVH AI Endpoints offering open-source models via an OpenAI-compatible API. Available models depend on the endpoint — use GET /api/providers/:id/models for the live list.',
+        models: [
+          { id: 'llama-3.3-70b-instruct', displayName: 'Llama 3.3 70B Instruct', recommended: true, description: 'Latest Meta Llama 3.3 70B instruction-tuned model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 131072 },
+          { id: 'llama-3.1-70b-instruct', displayName: 'Llama 3.1 70B Instruct', description: 'Meta Llama 3.1 70B instruction-tuned model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 131072 },
+          { id: 'deepseek-r1-distill-qwen-14b', displayName: 'DeepSeek R1 Distill Qwen 14B', description: 'Distilled DeepSeek R1 reasoning model based on Qwen 14B', supportsToolCalling: false, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: true, contextWindow: 65536 },
+          { id: 'mistral-7b-instruct-v0.3', displayName: 'Mistral 7B Instruct v0.3', description: 'Mistral 7B instruction-tuned model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 32768 },
+        ],
+      },
+      {
+        apiType: 'scaleway',
+        displayName: 'Scaleway',
+        description: 'Scaleway Generative APIs offering open-source models via an OpenAI-compatible API. Available models depend on the endpoint — use GET /api/providers/:id/models for the live list.',
+        models: [
+          { id: 'llama-3.3-70b-instruct', displayName: 'Llama 3.3 70B Instruct', recommended: true, description: 'Latest Meta Llama 3.3 70B instruction-tuned model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 131072 },
+          { id: 'llama-3.1-70b-instruct', displayName: 'Llama 3.1 70B Instruct', description: 'Meta Llama 3.1 70B instruction-tuned model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 131072 },
+          { id: 'llama-3.1-8b-instruct', displayName: 'Llama 3.1 8B Instruct', description: 'Meta Llama 3.1 8B fast and cost-efficient model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 131072 },
+          { id: 'mistral-7b-instruct-v0.3', displayName: 'Mistral 7B Instruct v0.3', description: 'Mistral 7B instruction-tuned model', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 32768 },
+          { id: 'mixtral-8x7b-instruct-v0.1', displayName: 'Mixtral 8x7B Instruct', description: 'Mistral Mixtral MoE model for balanced performance', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 32768 },
+        ],
+      },
     ];
   }
 
@@ -11838,6 +11861,24 @@ export class ProviderCatalogService {
         displayName: 'Telegram (Bot API)',
         description: 'Telegram Bot API for text-based conversations via Telegram bots',
         features: ['Telegram messaging', 'Webhook support', 'Inbound/outbound text messages', 'Slash-command interface'],
+      },
+      // {
+      //   apiType: 'sendgrid',
+      //   displayName: 'SendGrid Email',
+      //   description: 'SendGrid Mail API for email-based conversations with threading support',
+      //   features: ['Email messaging', 'Inbound Parse webhook', 'Inbound/outbound emails', 'Thread continuity via Message-ID'],
+      // },
+      // {
+      //   apiType: 'ses',
+      //   displayName: 'AWS SES Email',
+      //   description: 'Amazon Simple Email Service for email-based conversations with SNS notification delivery',
+      //   features: ['Email messaging', 'SNS receipt webhook', 'Inbound/outbound emails', 'Thread continuity via Message-ID'],
+      // },
+      {
+        apiType: 'smtp_imap',
+        displayName: 'SMTP/IMAP Email',
+        description: 'Generic SMTP/IMAP for email-based conversations with outbound SMTP sending and inbound IMAP polling',
+        features: ['Email messaging', 'IMAP polling with IDLE support', 'Inbound/outbound emails', 'Thread continuity via Message-ID'],
       },
     ];
   }

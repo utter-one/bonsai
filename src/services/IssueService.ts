@@ -57,8 +57,9 @@ export class IssueService extends BaseService {
    * @returns The issue if found
    * @throws {NotFoundError} When issue is not found
    */
-  async getIssueById(id: number): Promise<IssueResponse> {
-    logger.debug({ issueId: id }, 'Fetching issue by ID');
+  async getIssueById(id: number, context: RequestContext): Promise<IssueResponse> {
+    this.requirePermission(context, PERMISSIONS.ISSUE_READ);
+    logger.debug({ issueId: id, operatorId: context.operatorId }, 'Fetching issue by ID');
 
     try {
       const issue = await db.query.issues.findFirst({ where: eq(issues.id, id) });
@@ -80,8 +81,9 @@ export class IssueService extends BaseService {
    *   Special filter: `filters.projectStatus` accepts `"active"` or `"archived"` to restrict issues to projects of that status.
    * @returns Paginated array of issues matching the criteria
    */
-  async listIssues(params?: ListParams): Promise<IssueListResponse> {
-    logger.debug({ params }, 'Listing issues');
+  async listIssues(context: RequestContext, params?: ListParams): Promise<IssueListResponse> {
+    this.requirePermission(context, PERMISSIONS.ISSUE_READ);
+    logger.debug({ params, operatorId: context.operatorId }, 'Listing issues');
 
     try {
       const conditions: SQL[] = [];
@@ -237,8 +239,9 @@ export class IssueService extends BaseService {
    * @param issueId - The unique identifier of the issue
    * @returns Array of audit log entries for the issue
    */
-  async getIssueAuditLogs(issueId: number): Promise<any[]> {
-    logger.debug({ issueId }, 'Fetching audit logs for issue');
+  async getIssueAuditLogs(issueId: number, context: RequestContext): Promise<any[]> {
+    this.requirePermission(context, PERMISSIONS.AUDIT_READ);
+    logger.debug({ issueId, operatorId: context.operatorId }, 'Fetching audit logs for issue');
 
     try {
       return await this.auditService.getEntityAuditLogs('issue', String(issueId));

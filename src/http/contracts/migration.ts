@@ -214,7 +214,7 @@ export const migrationPreviewSchema = z.object({
   tools: z.array(entityStubSchema).describe('Tool stubs that would be included'),
   globalActions: z.array(entityStubSchema).describe('Global action stubs that would be included'),
   knowledgeCategories: z.array(entityStubSchema).describe('Knowledge category stubs that would be included'),
-  knowledgeItems: z.array(entityStubSchema).describe('Knowledge item stubs that would be included — name is the question text'),
+  knowledgeItems: z.array(entityStubSchema).describe('Knowledge item stubs that would be included — name is the first question text'),
   guardrails: z.array(entityStubSchema).describe('Guardrail stubs that would be included'),
   copyDecorators: z.array(entityStubSchema).describe('Copy decorator stubs that would be included'),
   sampleCopies: z.array(entityStubSchema).describe('Sample copy stubs that would be included'),

@@ -25,7 +25,7 @@ Content-Type: application/json
 | `environment` | `string` (min 1) | Yes | Environment where issue occurred |
 | `buildVersion` | `string` (min 1) | Yes | Application build version |
 | `stage` | `string` | No | Stage identifier for tracking purposes |
-| `sessionId` | `string` | No | Related conversation session ID |
+| `conversationId` | `string` | No | Related conversation ID |
 | `eventIndex` | `integer` | No | Index of event in session |
 | `userId` | `string` | No | User ID who reported the issue |
 | `severity` | `string` (min 1) | Yes | `critical`, `high`, `medium`, or `low` |
@@ -109,9 +109,9 @@ Returns audit log entries for the specified issue. See [Audit Logs](./audit-logs
 | `environment` | `string` | No | Environment |
 | `buildVersion` | `string` | No | Build version |
 | `stage` | `string` | Yes | Stage identifier |
-| `sessionId` | `string` | Yes | Related session ID |
+| `conversationId` | `string` | Yes | Related conversation ID |
 | `eventIndex` | `integer` | Yes | Event index in session |
-| `userId` | `string` | Yes | Reporter user ID |
+| `userId` | `string` | Yes | Reporter user ID (nullable in update requests) |
 | `severity` | `string` | No | `critical`, `high`, `medium`, or `low` |
 | `category` | `string` | No | `bug`, `feature`, or `performance` |
 | `bugDescription` | `string` | No | Bug description |

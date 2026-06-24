@@ -232,13 +232,13 @@ Response includes `inputTurnId`.
 
 #### Server-Side VAD Mode (server-managed turns)
 
-When the project has `asrConfig.serverVad` configured, the server handles speech detection and turn lifecycle automatically using the [Silero VAD](https://github.com/snakers4/silero-vad) model.
+When the project has `asrConfig.serverVad` configured, the server handles speech detection and turn lifecycle automatically. Three VAD algorithms are available: **legacy**, **silero**, and **firered**. See [Server VAD Config](./projects#server-vad-config) for algorithm details and parameters.
 
 **How it works:**
 
 1. After connecting and starting a conversation, the client streams audio continuously via `send_user_voice_chunk` — no `start_user_voice_input` or `end_user_voice_input` calls are needed.
 2. When the server detects the start of speech, it generates a server-side `inputTurnId` and begins ASR recognition automatically.
-3. When silence exceeds `autoEndSilenceDurationMs`, the server finalises the utterance and processes the AI response.
+3. When silence exceeds the configured threshold, the server finalises the utterance. If [Smart Turn Detection](./projects#smart-turn-detection) is enabled, the server runs ONNX inference on the buffered audio to verify the speaker has actually finished their turn before ending the utterance.
 4. Once the AI response is complete and the conversation returns to `awaiting_user_input`, the VAD resets and is ready for the next utterance.
 
 **Client flow in VAD mode:**
@@ -279,6 +279,20 @@ During voice input, the server may send intermediate transcription updates:
   "isFinal": false
 }
 ```
+
+### User Speaking Started (Server Push)
+
+When server-side VAD detects the user speaking while the AI is generating a response (barge-in), the server pushes a `user_speaking_started` message. This signals the client that the AI's current turn is being interrupted.
+
+```json
+{
+  "type": "user_speaking_started",
+  "sessionId": "session-abc",
+  "conversationId": "conv-123"
+}
+```
+
+Upon receiving this message, the client should stop playing the AI's voice output and prepare for the new user utterance.
 
 ---
 
@@ -514,6 +528,15 @@ When `receiveEvents` is enabled, the server pushes conversation events:
 | `conversation_aborted` | Conversation aborted | `reason`, `stageId` |
 | `conversation_failed` | Conversation failed | `reason`, `stageId` |
 | `jump_to_stage` | Stage transition | `fromStageId`, `toStageId` |
+| `execution_plan` | Planned actions before execution | `stageId`, `actions[]` |
+| `moderation` | Content moderation decision | `action`, `reason` |
+| `variables_updated` | Stage variables modified | `stageId`, `variables` |
+| `user_profile_updated` | User profile fields changed | `profile` |
+| `user_input_modified` | User input altered by middleware | `originalText`, `modifiedText` |
+| `user_banned` | User banned during conversation | `reason` |
+| `visibility_changed` | Conversation visibility toggled | `isVisible` |
+| `sample_copy_selection` | Sample copy variant selected | `sampleCopyName`, `selection` |
+| `turn_aborted` | Current AI turn aborted | `reason` |
 
 The `eventData.metadata` object of `message`, `classification`, `transformation`, and `tool_call` events carries timing measurements. See [Event Metadata — Timing Fields](./conversations#event-metadata-timing-fields) for the full field reference.
 

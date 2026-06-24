@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { singleton, container } from "tsyringe";
 import type { ConversationRunner } from "../services/live/ConversationRunner";
 import type { IClientConnection } from './IClientConnection';
@@ -10,11 +11,11 @@ export type Session = {
   /** Unique identifier for the session. */
   id: string;
   /** ID of the project this session is authenticated for. */
-  projectId: string;
+  projectId: string | null;
   /** ID of the conversation currently active in this session, null if none. */
-  conversationId: string;
+  conversationId: string | null;
   /** Conversation runner instance for managing the conversation. */
-  runner: ConversationRunner;
+  runner: ConversationRunner | null;
   /** Communication channel used to send messages to this session. */
   clientConnection: IClientConnection;
   /** Session settings configured during authentication. */
@@ -62,7 +63,7 @@ export class SessionManager {
       throw new Error('Client connection is required to create a session');
     }
 
-    const sessionId = `session_${Math.random().toString(36).substr(2, 9)}`;
+    const sessionId = `session_${randomUUID()}`;
     const session: Session = {
       id: sessionId,
       projectId: null,
@@ -120,6 +121,14 @@ export class SessionManager {
       throw new Error('Session not found');
     }
 
+    if (session.runner) {
+      try {
+        await session.runner.cleanup();
+      } catch (error) {
+        logger.error({ sessionId, error: error instanceof Error ? error.message : String(error) }, 'Failed to clean up existing ConversationRunner before attaching new conversation');
+      }
+    }
+
     session.conversationId = conversationId;
     const { ConversationRunner } = await import('../services/live/ConversationRunner.js');
     session.runner = container.resolve(ConversationRunner);
@@ -132,10 +141,18 @@ export class SessionManager {
    * @param sessionId - The session ID to detach the conversation from.
    * @throws Error if the session is not found.
    */
-  detachConversationFromSession(sessionId: string) {
+  async detachConversationFromSession(sessionId: string) {
     const session = this.idMap.get(sessionId);
     if (!session) {
       throw new Error('Session not found');
+    }
+
+    if (session.runner) {
+      try {
+        await session.runner.cleanup();
+      } catch (error) {
+        logger.error({ sessionId, error: error instanceof Error ? error.message : String(error) }, 'Failed to clean up ConversationRunner during conversation detach');
+      }
     }
 
     session.conversationId = null;
@@ -148,9 +165,16 @@ export class SessionManager {
    * Used by background jobs (e.g. timeout) that abort a conversation without going through a single session.
    * @param conversationId - The conversation ID to detach from all sessions.
    */
-  detachConversationFromSessions(conversationId: string): void {
+  async detachConversationFromSessions(conversationId: string): Promise<void> {
     for (const [sessionId, session] of this.idMap.entries()) {
       if (session.conversationId === conversationId) {
+        if (session.runner) {
+          try {
+            await session.runner.cleanup();
+          } catch (error) {
+            logger.error({ sessionId, error: error instanceof Error ? error.message : String(error) }, 'Failed to clean up ConversationRunner during bulk conversation detach');
+          }
+        }
         session.conversationId = null;
         session.runner = null;
         this.idMap.set(sessionId, session);

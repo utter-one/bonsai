@@ -15,6 +15,10 @@ All analytics endpoints are scoped to a project and require the `analytics:read`
 | GET | `/api/projects/:projectId/analytics/latency/percentiles` | Get latency percentile distributions |
 | GET | `/api/projects/:projectId/analytics/latency/trend` | Get latency trend over time |
 | GET | `/api/projects/:projectId/analytics/conversations/:conversationId/timeline` | Get conversation timeline |
+| GET | `/api/projects/:projectId/analytics/usage` | Get aggregated token usage statistics |
+| GET | `/api/projects/:projectId/analytics/usage/trend` | Get token usage trend over time |
+| GET | `/api/projects/:projectId/analytics/sources` | Get available analytics sources, dimensions, and metrics |
+| GET | `/api/projects/:projectId/analytics/query` | Execute a slice-and-dice analytics query |
 
 ---
 
@@ -71,6 +75,9 @@ Each metric field in the response uses this structure:
 | `processingDurationMs` | `LatencyMetric` | Classification and transformation processing duration |
 | `actionsDurationMs` | `LatencyMetric` | Action execution duration |
 | `asrDurationMs` | `LatencyMetric` | ASR recognition duration (voice only) |
+| `ttsConnectDurationMs` | `LatencyMetric` | TTS WebSocket connection establishment duration (voice only) |
+| `stageTransitionDurationMs` | `LatencyMetric` | Stage transition duration when a `go_to_stage` effect fired |
+| `promptRenderDurationMs` | `LatencyMetric` | Prompt template rendering duration |
 
 ::: tip
 Voice-only metrics (`timeToFirstAudioMs`, `ttsDurationMs`, `asrDurationMs`) will be `null` for text-only turns.
@@ -266,6 +273,9 @@ Returns an ordered list of per-turn timing breakdowns for a specific conversatio
 | `llmDurationMs` | `number \| null` | Total LLM call duration |
 | `ttsDurationMs` | `number \| null` | TTS synthesis duration |
 | `totalTurnDurationMs` | `number \| null` | Total turn duration from start to completion |
+| `stageTransitionDurationMs` | `number \| null` | Stage transition duration (go_to_stage effect) |
+| `ttsConnectDurationMs` | `number \| null` | TTS connection establishment duration |
+| `promptRenderDurationMs` | `number \| null` | Prompt template rendering duration |
 
 ### Example
 

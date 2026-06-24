@@ -1,8 +1,5 @@
-import { singleton, inject } from 'tsyringe';
-import { eq } from 'drizzle-orm';
-import { db } from '../db';
-import { providers } from '../db/schema';
-import { LlmProviderFactory } from './providers/llm/LlmProviderFactory';
+import { singleton } from 'tsyringe';
+import type { ILlmProvider } from './providers/llm/ILlmProvider';
 import { logger } from '../utils/logger';
 
 export type ModerationConfig = {
@@ -28,30 +25,20 @@ export type ModerationResult = {
  */
 @singleton()
 export class ModerationService {
-  constructor(@inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory) {}
-
   /**
    * Moderates user input against the configured LLM provider's moderation API.
    * Fails open: if moderation is disabled, the provider is missing, or the provider
    * does not support moderation, the message is allowed through without blocking.
    * @param input - User input text to moderate
+   * @param provider - Pre-initialized LLM provider for moderation, or undefined if not configured
    * @param config - Moderation configuration from the project, or null/undefined if not configured
    * @param projectId - Project ID used for logging context
    * @returns Moderation result with flagged status, violated categories, and call duration
    */
-  async moderate(input: string, config: ModerationConfig | null | undefined, projectId: string): Promise<ModerationResult> {
-    if (!config || !config.enabled) {
+  async moderate(input: string, provider: ILlmProvider | undefined, config: ModerationConfig | null | undefined, projectId: string): Promise<ModerationResult> {
+    if (!config || !config.enabled || !provider) {
       return { flagged: false, blockingCategories: [], detectedCategories: [], durationMs: 0, startMs: 0 };
     }
-
-    const providerEntity = await db.query.providers.findFirst({ where: eq(providers.id, config.llmProviderId) });
-    if (!providerEntity) {
-      logger.warn({ projectId, llmProviderId: config.llmProviderId }, 'Moderation provider not found, allowing message through');
-      return { flagged: false, blockingCategories: [], detectedCategories: [], durationMs: 0, startMs: 0 };
-    }
-
-    const provider = await this.llmProviderFactory.createProviderForEnumeration(providerEntity);
-    await provider.init();
 
     const startMs = Date.now();
     try {

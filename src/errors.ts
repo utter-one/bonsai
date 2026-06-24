@@ -153,6 +153,16 @@ export class ConflictError extends Error {
   }
 }
 
+/**
+ * Error thrown when an OAuth2 token refresh fails for an SMTP/IMAP provider
+ */
+export class OAuthTokenRefreshError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OAuthTokenRefreshError';
+  }
+}
+
 /** A single field-level validation error detail, compatible with Zod issue format */
 export type ValidationErrorDetail = {
   code: string;

@@ -258,7 +258,6 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
 
       case 'partial_transcript':
         if (message.text) {
-          logger.info(`[ElevenLabs ASR] Partial transcript received: ${message.text}`);
           this.handleRecognizing(this.currentChunkId, message.text);
         }
         break;
@@ -268,7 +267,6 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         if (this.settings.includeTimestamps || this.settings.includeLanguageDetection) {
           logger.debug(`[ElevenLabs ASR] Received committed_transcript but Include Timestamps or Include Language Detection was set - ignoring in favor of committed_transcript_with_timestamps`);
         } else if (message.text) {
-          logger.info(`[ElevenLabs ASR] Committed transcript received: ${message.text}`);
           this.handleRecognized(this.currentChunkId, message.text);
           this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
         }
@@ -279,7 +277,6 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         if (!this.settings.includeTimestamps && !this.settings.includeLanguageDetection) {
           logger.debug(`[ElevenLabs ASR] Received committed_transcript_with_timestamps but Include Timestamps and Include Language Detection were not set - ignoring`);
         } else if (message.text) {
-          logger.info(`[ElevenLabs ASR] Committed transcript with timestamps received: ${message.text}`);
           this.handleRecognized(this.currentChunkId, message.text);
           this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
           if (message.language_code) {

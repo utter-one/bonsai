@@ -109,6 +109,29 @@ GET /api/environments/:id/migration/scope
 
 **Required permission:** `migration:import`
 
+**Query Parameters** (all optional)
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `projectIds` | `string \| string[]` | Specific project IDs |
+| `stageIds` | `string \| string[]` | Specific stage IDs |
+| `agentIds` | `string \| string[]` | Specific agent IDs |
+| `classifierIds` | `string \| string[]` | Specific classifier IDs |
+| `contextTransformerIds` | `string \| string[]` | Specific context transformer IDs |
+| `toolIds` | `string \| string[]` | Specific tool IDs |
+| `globalActionIds` | `string \| string[]` | Specific global action IDs |
+| `knowledgeCategoryIds` | `string \| string[]` | Specific knowledge category IDs |
+| `providerIds` | `string \| string[]` | Specific provider IDs |
+| `apiKeyIds` | `string \| string[]` | Specific API key IDs |
+| `testerIds` | `string \| string[]` | Specific tester IDs |
+| `scenarioIds` | `string \| string[]` | Specific scenario IDs |
+| `guardrailIds` | `string \| string[]` | Specific guardrail IDs |
+| `copyDecoratorIds` | `string \| string[]` | Specific copy decorator IDs |
+| `sampleCopyIds` | `string \| string[]` | Specific sample copy IDs |
+| `savedSliceQueryIds` | `string \| string[]` | Specific saved slice query IDs |
+| `savedFunnelQueryIds` | `string \| string[]` | Specific saved funnel query IDs |
+| `bundlePassword` | `string` | Password for encrypting the migration bundle |
+
 **Response** `200 OK`
 
 ```json
@@ -124,7 +147,14 @@ GET /api/environments/:id/migration/scope
   "knowledgeCategories": [...],
   "knowledgeItems": [...],
   "stages": [...],
-  "apiKeys": [...]
+  "apiKeys": [...],
+  "guardrails": [...],
+  "copyDecorators": [...],
+  "sampleCopies": [...],
+  "testers": [...],
+  "scenarios": [...],
+  "savedSliceQueries": [...],
+  "savedFunnelQueries": [...]
 }
 ```
 
@@ -187,6 +217,13 @@ GET /api/environments/:id/migration/jobs/:jobId
 | `knowledgeCategoryIds` | `string[]` | Knowledge category IDs (all child items included) |
 | `providerIds` | `string[]` | Explicit provider IDs |
 | `apiKeyIds` | `string[]` | API key IDs |
+| `testerIds` | `string[]` | Tester IDs |
+| `scenarioIds` | `string[]` | Scenario IDs |
+| `guardrailIds` | `string[]` | Guardrail IDs |
+| `copyDecoratorIds` | `string[]` | Copy decorator IDs |
+| `sampleCopyIds` | `string[]` | Sample copy IDs |
+| `savedSliceQueryIds` | `string[]` | Saved slice query IDs |
+| `savedFunnelQueryIds` | `string[]` | Saved funnel query IDs |
 
 All fields are optional. Omit the selection or pass `{}` to pull everything from the remote.
 

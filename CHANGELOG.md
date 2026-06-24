@@ -2,6 +2,95 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-06-24
+
+### Added
+
+- **Email channel** — a new communication channel for email with SMTP/IMAP support:
+  - SMTP outbound with OAuth2/XOAUTH2 authentication, connection timeouts, and configurable sender addresses.
+  - IMAP inbound with OAuth2 token refresh, secure TLS options, and robust `Message-ID` / `In-Reply-To` threading.
+  - Conversation ID extraction from email headers for seamless inbound reply handling.
+  - Connection verification and error propagation with failed conversation marking.
+  - SendGrid and SES channel hosts with OpenAPI registration.
+  - SES inbound email body via SNS or S3 receipt rule.
+  - References chain handling and header extraction for email processing.
+- **Knowledge base refactor** — knowledge item structure updated to support multiple questions per item.
+- **Audio recording and artifacts** — conversations can now record audio:
+  - Project-level recording configuration in schema and service.
+  - Conversation artifact management with CRUD endpoints, MIME type handling, and extension retrieval.
+  - Artifact download endpoints with project scoping.
+- **OVH and Scaleway LLM providers** — new provider implementations for OVH and Scaleway inference APIs.
+- **Smart Turn detection** — ONNX-based endpoint detection for identifying natural pause points in AI speech using Whisper feature extraction.
+- **FireRedVAD engine** — new server-side VAD algorithm option:
+  - ONNX-based inference with preloading and dynamic sample rate support.
+  - Audio ring buffer for pre-roll functionality.
+  - Kaldi-aligned fbank extraction with correct frame overlap and CMVN handling.
+  - Configurable `minSilenceFrame` (default 800ms) and `maxSpeechFrame` (default 60s).
+- **Enhanced barge-in handling**:
+  - `triggerBargeInSilenceResponse` for configurable post-barge-in behavior.
+  - `bargeInSilenceTimeout` and `bargeInSilencePlaceholder` in VAD configuration.
+  - Silence timer that stops ASR after user stops speaking.
+  - VAD speech start handling decoupled from abort AI generation logic.
+  - Ring buffer for buffered audio forwarding to ASR during VAD processing.
+- **VAD silence detection** — server-side silence detection with client playback feedback:
+  - Recent audio detection in `VadProcessor`.
+  - Silence timer triggered only on TTS playback end.
+  - Grace period configuration to suppress false positives during VAD initialization.
+- **Granular VAD configuration** — per-algorithm settings for legacy and Silero VAD:
+  - Configurable `frameSamples`, initialization logging, and algorithm-specific options.
+- **Speex resampler initialization** — resampler now initializes on application startup with error handling.
+- **Async tool calls** — tools can now be called asynchronously without blocking conversation flow.
+- **Stage initial variables** — ability to set initial stage variables via the `conversationStart` event.
+- **Extended script execution context** — `userId`, `channel`, and `project` are now available in script execution context.
+- **Channel in prompt builder context** — `channel` property added to prompt builder for channel-aware templates.
+- **Channel in `isActionActive` context** — `channel` property added to `rawContext` parameter of `isActionActive` function.
+- **Test statistics** — scenario runs and conversations now track test statistics (pass/fail counts, errored conversations).
+- **Twilio Voice REST API management** — `TwilioVoiceConnection` now supports call management via REST API.
+- **Twilio connection handling** — improved audio playback completion during connection closing.
+- **Models directory in Docker** — `models/` directory now included in Docker build for local ONNX models.
+
+### Improved
+
+- **VAD pipeline** — comprehensive refactor of voice activity detection handling:
+  - `SpeechCompletionDetector` and barge-in debounce logic removed in favor of new VAD scenarios.
+  - Ring buffer initialized with dynamic sample rate for improved audio handling.
+  - Buffered audio forwarded to ASR with proper buffer clearing.
+  - Simplified ASR pre-warm handling with enhanced logging for barge-in silence timer.
+  - User speaking signal separated from abort AI generation logic.
+  - Playback flag cleared after aborting current response.
+- **Logging** — removed unnecessary logging from TTS and ASR providers; database connection and chunk duration logging downgraded to debug level.
+- **Deepgram TTS** — removed `bitRate` and `container` settings; WebSocket URL now includes speed parameter.
+- **Conversation context building** — lifecycle action handling improved, unused code removed.
+- **SMTP OAuth2** — connection fetches OAuth2 token from DB on each send for reliable token freshness.
+- **App factory** — `createApp` and `startServer` made asynchronous for better error handling.
+
+### Fixed
+
+- **SQL injection vulnerabilities** — parameterized tag queries in `AgentService`, `ProviderService`, and `ContextTransformerService`.
+- **Permission enforcement** — added context parameters and permission checks across numerous services and controllers: `ApiKeyService`, `ProjectService`, `IssueService`, `UserService`, `ContextTransformerService`, `ClassifierService`, and all conversation WebSocket handlers.
+- **Provider impersonation** — `createdBy` removed from `createProviderSchema` to prevent operator impersonation.
+- **Sensitive data exposure** — sensitive fields excluded from operator responses; error messages sanitized in WebSocket handlers to prevent information leakage.
+- **Typed error handling** — plain `Error` throws replaced with typed errors (`InvalidOperationError`, `NotFoundError`, `ValidationError`) across `OperatorService`, `ConversationStorageService`, `BenchmarkService`, `ChannelCatalog`, and `ConversationRunner`.
+- **Conversation resuming** — empty `conversationId` no longer causes errors when resuming conversations.
+- **Conversation handlers** — null guards added for runner, session, and conversation ID mismatches across `StartUserVoiceInputHandler`, `EndUserVoiceInputHandler`, `EndConversationHandler`, `AbortAiGenerationHandler`, `ResumeConversationHandler`, `RunActionHandler`, `GoToStageHandler`, `SetVarHandler`, `GetVarHandler`, and `AuthHandler`.
+- **Email threading** — robust `Message-ID` parsing with timestamp for uniqueness; `In-Reply-To` conversation matching; double-email on inbound replies eliminated; new inbound emails use `startConversation` with welcome suppression.
+- **IMAP** — session management enhanced with reload and stop functionality; message marking logic improved; `tlsOptions` added for secure connections; parsed message fields used instead of empty headers map.
+- **OAuth2** — inline token refresh for SMTP/IMAP on expiration; circular dependency between `OAuth2TokenRefreshService` and `ImapInboundService` resolved; edge cases handled (missing `refresh_token`, provider error redirects, extra query params, scope encoding); native Nodemailer OAuth2 auth and `imap` library XOAUTH2 support used instead of manual workarounds.
+- **Twilio Voice** — webhook signature validation responses enabled for invalid requests; inactive sessions handled with new session creation; pending close resolution timeout increased from 5 to 60 seconds.
+- **Deepgram TTS** — invalid speed range in settings schema corrected.
+- **Azure ASR** — multiple recognition session starts prevented.
+- **Project export/import** — missing properties now included in export/import payloads.
+- **Tester user profile** — profile variables no longer persist between scenario runs.
+- **Scenario evaluation** — errored conversations now separated from failed tests.
+- **Filler messages** — `historyMessageCount` set to 0 now correctly includes all messages.
+- **Prefill response** — LLM provider now properly exported.
+- **VAD options** — `sampleRate` commented out in legacy and Silero VAD options to prevent conflicts.
+- **FireRedVAD** — streaming buffer rewrite to fix frame overlap; `silenceCnt` corrected for `POSSIBLE_SPEECH` to `SILENCE` transitions; audio normalization and feature extraction aligned with Kaldi; CMVN SOS indexing corrected.
+- **Metadata properties** — missing properties in first assistant message metadata restored.
+- **Funnel query** — `projectId` now parsed from `req.params` instead of query string.
+- **Webhook tools** — URLs validated and invalid responses handled gracefully.
+- **`SpeechCompletionDetector`** — regex for terminal punctuation corrected.
+
 ## [0.5.0] - 2026-05-25
 
 ### Added

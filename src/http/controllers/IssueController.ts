@@ -181,7 +181,7 @@ export class IssueController {
   private async getIssueById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ISSUE_READ]);
     const params = issueRouteParamsSchema.parse(req.params);
-    const issue = await this.issueService.getIssueById(parseInt(params.id, 10));
+    const issue = await this.issueService.getIssueById(parseInt(params.id, 10), req.context);
     res.status(200).json(issue);
   }
 
@@ -192,7 +192,7 @@ export class IssueController {
   private async listIssues(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ISSUE_READ]);
     const query = listParamsSchema.parse(req.query);
-    const issues = await this.issueService.listIssues(query);
+    const issues = await this.issueService.listIssues(req.context, query);
     res.status(200).json(issues);
   }
 
@@ -226,7 +226,7 @@ export class IssueController {
   private async getIssueAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = issueRouteParamsSchema.parse(req.params);
-    const logs = await this.issueService.getIssueAuditLogs(parseInt(params.id, 10));
+    const logs = await this.issueService.getIssueAuditLogs(parseInt(params.id, 10), req.context);
     res.status(200).json(logs);
   }
 }

@@ -6,6 +6,7 @@ import { ScenarioConversationService } from './ScenarioConversationService';
 import { ScenarioConversationEvaluator } from './ScenarioConversationEvaluator';
 import { TestRunner } from './TestRunner';
 import { ConversationService } from '../ConversationService';
+import { SYSTEM_CONTEXT } from '../RequestContext';
 import { UserService } from '../UserService';
 import { logger } from '../../utils/logger';
 import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
@@ -20,6 +21,13 @@ export type SchedulerStatus = {
 type ConversationSlot = {
   testerId: string;
   scenarioConversationId: string;
+};
+
+/** Result of executing a single conversation slot */
+type SlotResult = {
+  result: 'passed' | 'failed' | 'error' | 'cancelled';
+  passedTests: number;
+  failedTests: number;
 };
 
 /**
@@ -169,12 +177,15 @@ export class ScenarioRunExecutorService {
       if (this.cancelledRunIds.has(run.id)) {
         logger.info({ runId: run.id }, 'Scenario run was cancelled mid-flight, skipping final status update');
       } else {
-        const allPassed = results.every((r) => r);
-        const finalStatus = allPassed ? 'passed' : 'failed';
-        const failedCount = results.filter((r) => !r).length;
-        const statusDetails = allPassed ? null : `${failedCount} of ${results.length} conversation${results.length !== 1 ? 's' : ''} failed`;
-        await this.scenarioRunService.updateRunStatus(run.id, run.projectId, finalStatus, statusDetails);
-        logger.info({ runId: run.id, finalStatus }, 'Scenario run completed');
+        const passedCount = results.filter((r) => r.result === 'passed').length;
+        const failedCount = results.filter((r) => r.result === 'failed').length;
+        const errorCount = results.filter((r) => r.result === 'error').length;
+        const finalStatus = failedCount > 0 ? 'failed' : (passedCount > 0 ? 'passed' : 'failed');
+        const statusDetails = failedCount > 0 ? `${failedCount} of ${results.length} conversation${results.length !== 1 ? 's' : ''} failed` : null;
+        const runPassedTests = results.reduce((sum, r) => sum + r.passedTests, 0);
+        const runFailedTests = results.reduce((sum, r) => sum + r.failedTests, 0);
+        await this.scenarioRunService.updateRunStatus(run.id, run.projectId, finalStatus, statusDetails, errorCount, { passedTests: runPassedTests, failedTests: runFailedTests });
+        logger.info({ runId: run.id, finalStatus, passedCount, failedCount, errorCount, runPassedTests, runFailedTests }, 'Scenario run completed');
       }
     } catch (error) {
       logger.error({ error, runId: run.id }, 'Scenario run failed with error');
@@ -193,18 +204,18 @@ export class ScenarioRunExecutorService {
    * @param run - The parent scenario run
    * @param scenario - The scenario configuration
    * @param testerMap - Map of testerId to tester configuration
-   * @returns True if the conversation passed evaluation, false otherwise
+   * @returns SlotResult indicating passed, failed, error, or cancelled
    */
   private async executeSlot(
     slot: ConversationSlot,
     run: ScenarioRunResponse,
     scenario: Awaited<ReturnType<ScenarioService['getScenarioById']>>,
     testerMap: Map<string, Awaited<ReturnType<TesterService['getTesterById']>>>,
-  ): Promise<boolean> {
+  ): Promise<SlotResult> {
     if (this.cancelledRunIds.has(run.id)) {
       logger.info({ runId: run.id, scenarioConversationId: slot.scenarioConversationId }, 'Skipping slot — run was cancelled');
-      await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, 'cancelled').catch(() => {});
-      return false;
+        await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, 'cancelled').catch(() => {});
+      return { result: 'cancelled', passedTests: 0, failedTests: 0 };
     }
 
     await this.acquireSlot();
@@ -214,27 +225,33 @@ export class ScenarioRunExecutorService {
       const syntheticUserId = `tester_${slot.testerId}`;
 
       await this.userService.ensureUserExists(run.projectId, syntheticUserId);
+      await this.userService.resetUserProfile(run.projectId, syntheticUserId, tester.userProfile ?? {});
 
       const conversationId = generateId(ID_PREFIXES.CONVERSATION);
       const sessionId = generateId(ID_PREFIXES.SCENARIO_CONVERSATION);
 
-      await this.conversationService.createConversation({ id: conversationId, projectId: run.projectId, userId: syntheticUserId, sessionId, stageId: scenario.startingStageId, status: 'initialized' });
+      await this.conversationService.createConversation({ id: conversationId, projectId: run.projectId, userId: syntheticUserId, sessionId, stageId: scenario.startingStageId, status: 'initialized' }, SYSTEM_CONTEXT);
       await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, 'in_progress');
       await this.scenarioConversationService.linkConversation(slot.scenarioConversationId, run.projectId, conversationId);
 
       const testResult = await this.testRunner.run(conversationId, run.projectId, tester, scenario);
       logger.info({ runId: run.id, scenarioConversationId: slot.scenarioConversationId, testStatus: testResult.status, turnCount: testResult.turnCount }, 'Test conversation completed');
 
+      if (testResult.status === 'conversation_failed') {
+        await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, 'error', { testRunStatus: testResult.status });
+        return { result: 'error', passedTests: 0, failedTests: 0 };
+      }
+
       const evaluation = await this.evaluator.evaluate(conversationId, run.projectId, scenario);
       const conversationStatus = evaluation.passed ? 'passed' : 'failed';
 
-      await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, conversationStatus, { dataExtractionResults: evaluation.dataExtractionResults, dataTransformationResults: evaluation.dataTransformationResults ?? undefined });
+      await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, conversationStatus, { dataExtractionResults: evaluation.dataExtractionResults, dataTransformationResults: evaluation.dataTransformationResults ?? undefined, testRunStatus: testResult.status, testStatistics: { passedTests: evaluation.passedTests, failedTests: evaluation.failedTests } });
 
-      return evaluation.passed;
+      return { result: conversationStatus, passedTests: evaluation.passedTests, failedTests: evaluation.failedTests };
     } catch (error) {
       logger.error({ error, runId: run.id, scenarioConversationId: slot.scenarioConversationId }, 'Conversation slot failed');
-      await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, 'failed').catch(() => {});
-      return false;
+      await this.scenarioConversationService.updateScenarioConversationStatus(slot.scenarioConversationId, run.projectId, 'error').catch(() => {});
+      return { result: 'error', passedTests: 0, failedTests: 0 };
     } finally {
       this.releaseSlot();
     }

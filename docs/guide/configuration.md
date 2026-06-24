@@ -11,6 +11,7 @@ Bonsai Backend is configured through environment variables. Copy the `.env.examp
 | `PORT` | `3000` | HTTP server port |
 | `CORS_ORIGIN` | `*` | Allowed CORS origin(s). Set to a specific domain in production |
 | `NODE_ENV` | — | Set to `production` for production deployments |
+| `TRUST_PROXY` | `true` | Set to `false` to disable trust proxy |
 | `WS_MAX_PAYLOAD_BYTES` | `10485760` | Maximum WebSocket message payload size in bytes (default: 10 MB) |
 
 ### Database
@@ -44,6 +45,32 @@ Bonsai Backend is configured through environment variables. Copy the `.env.examp
 | Variable | Default | Description |
 |---|---|---|
 | `GIT_COMMIT` | — | Git commit hash, exposed via the version endpoint |
+| `SOURCE_COMMIT` | — | Alternative git commit hash (used when `GIT_COMMIT` is not set) |
+
+### Rate Limiting
+
+| Variable | Default | Description |
+|---|---|---|
+| `RATE_LIMIT_AUTH_WINDOW_MS` | `900000` | Time window for auth rate limiting in milliseconds (default: 15 min) |
+| `RATE_LIMIT_AUTH_MAX` | `10` | Max auth attempts per window per IP |
+| `RATE_LIMIT_WS_AUTH_WINDOW_MS` | `900000` | Time window for WebSocket auth rate limiting (default: 15 min) |
+| `RATE_LIMIT_WS_AUTH_MAX` | `10` | Max WebSocket auth attempts per window per IP |
+| `RATE_LIMIT_API_WINDOW_MS` | `60000` | Time window for API rate limiting (default: 1 min) |
+| `RATE_LIMIT_API_MAX` | `300` | Max API requests per window per operator (or IP if unauthenticated) |
+
+### WebRTC
+
+| Variable | Default | Description |
+|---|---|---|
+| `WEBRTC_ICE_GATHERING_TIMEOUT_MS` | `5000` | Max milliseconds to wait for ICE candidate gathering |
+| `WEBRTC_STUN_URL` | `stun:stun.l.google.com:19302` | STUN server URL for ICE gathering |
+
+### Testing
+
+| Variable | Default | Description |
+|---|---|---|
+| `TESTING_SCHEDULER_ENABLED` | `true` | Set to `false` to disable the scenario run scheduler |
+| `TESTING_MAX_PARALLEL_CONVERSATIONS` | `5` | Maximum number of parallel scenario run conversations |
 
 ## Docker Configuration
 

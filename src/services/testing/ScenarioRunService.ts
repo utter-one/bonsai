@@ -171,10 +171,16 @@ export class ScenarioRunService extends BaseService {
    * @param runId - The scenario run ID
    * @param projectId - The project the run belongs to
    * @param status - The new status to set
+   * @param statusDetails - Optional human-readable status details
+   * @param errorCount - Optional count of errored conversations
+   * @param testStatistics - Optional aggregated test statistics
    */
-  async updateRunStatus(runId: string, projectId: string, status: ScenarioRunStatus, statusDetails?: string | null): Promise<void> {
+  async updateRunStatus(runId: string, projectId: string, status: ScenarioRunStatus, statusDetails?: string | null, errorCount?: number, testStatistics?: { passedTests: number; failedTests: number }): Promise<void> {
     try {
-      await db.update(scenarioRuns).set({ status, statusDetails: statusDetails ?? null, updatedAt: new Date() }).where(and(eq(scenarioRuns.id, runId), eq(scenarioRuns.projectId, projectId)));
+      const updateData: Record<string, unknown> = { status, statusDetails: statusDetails ?? null, updatedAt: new Date() };
+      if (errorCount !== undefined) updateData.errorCount = errorCount;
+      if (testStatistics !== undefined) updateData.testStatistics = testStatistics;
+      await db.update(scenarioRuns).set(updateData).where(and(eq(scenarioRuns.id, runId), eq(scenarioRuns.projectId, projectId)));
       logger.info({ runId, status }, 'Scenario run status updated');
     } catch (error) {
       logger.error({ error, runId, status }, 'Failed to update scenario run status');
@@ -220,7 +226,7 @@ export class ScenarioRunService extends BaseService {
     try {
       const run = await db.query.scenarioRuns.findFirst({ where: and(eq(scenarioRuns.id, runId), eq(scenarioRuns.projectId, projectId)) });
       if (!run) throw new NotFoundError(`Scenario run with id ${runId} not found`);
-      if (!['passed', 'failed', 'cancelled'].includes(run.status)) {
+      if (!['passed', 'failed', 'cancelled', 'error'].includes(run.status)) {
         throw new ConflictError(`Scenario run ${runId} cannot be deleted in status '${run.status}'. Cancel it first.`);
       }
       await db.delete(scenarioConversations).where(and(eq(scenarioConversations.scenarioRunId, runId), eq(scenarioConversations.projectId, projectId)));

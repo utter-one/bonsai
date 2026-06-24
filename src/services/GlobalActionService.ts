@@ -3,10 +3,13 @@ import { eq, and, SQL, desc, sql } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { globalActions } from '../db/schema';
+import type { InferSelectModel } from 'drizzle-orm';
+type GlobalActionRow = InferSelectModel<typeof globalActions>;
 import type { CreateGlobalActionRequest, UpdateGlobalActionRequest, GlobalActionResponse, GlobalActionListResponse, CloneGlobalActionRequest } from '../http/contracts/globalAction';
 import type { ListParams } from '../http/contracts/common';
 import { globalActionResponseSchema, globalActionListResponseSchema } from '../http/contracts/globalAction';
 import { AuditService } from './AuditService';
+import type { AuditLog } from '../types/models';
 import { OptimisticLockError, NotFoundError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../utils/pagination';
@@ -175,7 +178,7 @@ export class GlobalActionService extends BaseService {
         throw new OptimisticLockError(`Global action version mismatch. Expected ${expectedVersion}, got ${existingGlobalAction.version}`);
       }
 
-      const updatePayload: any = { version: existingGlobalAction.version + 1, updatedAt: new Date() };
+      const updatePayload: Partial<GlobalActionRow> & { version: number; updatedAt: Date } = { version: existingGlobalAction.version + 1, updatedAt: new Date() };
       if (updateData.name !== undefined) updatePayload.name = updateData.name;
       if (updateData.condition !== undefined) updatePayload.condition = updateData.condition;
       if (updateData.triggerOnUserInput !== undefined) updatePayload.triggerOnUserInput = updateData.triggerOnUserInput;
@@ -266,7 +269,7 @@ export class GlobalActionService extends BaseService {
         throw new NotFoundError(`Global action with id ${id} not found`);
       }
 
-      return await this.createGlobalAction(projectId, { id: input.id, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, parameters: existingAction.parameters as any, effects: existingAction.effects as any, examples: existingAction.examples as string[] ?? undefined, tags: existingAction.tags as string[], metadata: existingAction.metadata ?? undefined }, context);
+      return await this.createGlobalAction(projectId, { id: input.id, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, parameters: existingAction.parameters, effects: existingAction.effects, examples: existingAction.examples ?? undefined, tags: existingAction.tags, metadata: existingAction.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone global action');
       throw error;
@@ -279,7 +282,7 @@ export class GlobalActionService extends BaseService {
    * @param projectId - The project ID the global action belongs to
    * @returns Array of audit log entries for the global action
    */
-  async getGlobalActionAuditLogs(globalActionId: string, projectId: string): Promise<any[]> {
+  async getGlobalActionAuditLogs(globalActionId: string, projectId: string): Promise<AuditLog[]> {
     logger.debug({ globalActionId, projectId }, 'Fetching audit logs for global action');
 
     try {

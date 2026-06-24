@@ -1,7 +1,7 @@
 import { singleton } from 'tsyringe';
-import { z } from 'zod';
 import type { ICommunicationChannel, ChannelCapabilities } from '../IChannelDescriptor';
 import type { ApiKeyChannel } from '../../apiKeyFeatures';
+import { twilioMessagingChannelProviderConfigSchema } from '../../services/providers/channel/TwilioMessagingChannelProvider';
 
 /**
  * ICommunicationChannel implementation for the Twilio Messaging transport.
@@ -22,8 +22,8 @@ export class TwilioMessagingCommunicationChannel implements ICommunicationChanne
   }
 
   /** @inheritdoc */
-  getConfigSchema(): z.ZodObject<any> {
-    return z.object({});
+  getConfigSchema() {
+    return twilioMessagingChannelProviderConfigSchema;
   }
 
   /** @inheritdoc */

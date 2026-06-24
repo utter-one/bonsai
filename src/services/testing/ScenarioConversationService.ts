@@ -2,7 +2,7 @@ import { injectable } from 'tsyringe';
 import { eq, and, SQL, desc, isNotNull } from 'drizzle-orm';
 import { db } from '../../db/index';
 import { scenarioConversations } from '../../db/schema';
-import type { ScenarioRunStatus } from '../../db/schema';
+import type { ScenarioRunStatus, TestRunStatus } from '../../db/schema';
 import type { ScenarioConversationResponse, ScenarioConversationListResponse, ScenarioConversationListParams } from '../../http/contracts/scenarioConversation';
 import { scenarioConversationResponseSchema, scenarioConversationListResponseSchema } from '../../http/contracts/scenarioConversation';
 import { NotFoundError } from '../../errors';
@@ -25,6 +25,8 @@ export type CreateScenarioConversationInput = {
 export type ScenarioConversationResults = {
   dataExtractionResults?: Record<string, unknown>;
   dataTransformationResults?: Record<string, unknown>;
+  testRunStatus?: TestRunStatus;
+  testStatistics?: { passedTests: number; failedTests: number };
 };
 
 /**
@@ -143,6 +145,8 @@ export class ScenarioConversationService extends BaseService {
       const updateData: Record<string, unknown> = { status, updatedAt: new Date() };
       if (results?.dataExtractionResults !== undefined) updateData.dataExtractionResults = results.dataExtractionResults;
       if (results?.dataTransformationResults !== undefined) updateData.dataTransformationResults = results.dataTransformationResults;
+      if (results?.testRunStatus !== undefined) updateData.testRunStatus = results.testRunStatus;
+      if (results?.testStatistics !== undefined) updateData.testStatistics = results.testStatistics;
       await db.update(scenarioConversations).set(updateData).where(and(eq(scenarioConversations.id, id), eq(scenarioConversations.projectId, projectId)));
       logger.info({ id, status }, 'Scenario conversation status updated');
     } catch (error) {

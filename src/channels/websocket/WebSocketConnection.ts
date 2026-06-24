@@ -13,7 +13,8 @@ import { logger } from '../../utils/logger';
 export class WebSocketConnection implements IClientConnection {
   readonly connectionType = 'websocket' as const;
 
-  private session: Session;
+  private session: Session | null = null;
+  private isClosed = false;
 
   constructor(
     private readonly ws: WebSocket,
@@ -24,11 +25,16 @@ export class WebSocketConnection implements IClientConnection {
    * Closes the connection.
    */
   async close(): Promise<void> {
+    if (this.isClosed) return;
+    this.isClosed = true;
+
     if (this.ws.readyState === WebSocket.OPEN) {
       this.ws.close();
     }
 
-    await this.sessionManager.unregisterSession(this.session.id);
+    if (this.session) {
+      await this.sessionManager.unregisterSession(this.session.id);
+    }
   }
 
   attachSession(session: Session): void {

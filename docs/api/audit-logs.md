@@ -10,17 +10,26 @@ In addition, most entity types expose audit logs at their own path:
 
 ```
 GET /api/operators/:id/audit-logs
+GET /api/projects/:id/audit-logs
 GET /api/projects/:projectId/stages/:id/audit-logs
 GET /api/projects/:projectId/agents/:id/audit-logs
 GET /api/projects/:projectId/classifiers/:id/audit-logs
 GET /api/projects/:projectId/context-transformers/:id/audit-logs
 GET /api/projects/:projectId/tools/:id/audit-logs
 GET /api/projects/:projectId/global-actions/:id/audit-logs
+GET /api/projects/:projectId/guardrails/:id/audit-logs
+GET /api/projects/:projectId/sample-copies/:id/audit-logs
+GET /api/projects/:projectId/copy-decorators/:id/audit-logs
 GET /api/projects/:projectId/conversations/:id/audit-logs
+GET /api/projects/:projectId/users/:id/audit-logs
+GET /api/projects/:projectId/api-keys/:id/audit-logs
+GET /api/projects/:projectId/scenarios/:id/audit-logs
+GET /api/projects/:projectId/testers/:id/audit-logs
+GET /api/projects/:projectId/knowledge/categories/:id/audit-logs
+GET /api/projects/:projectId/knowledge/items/:id/audit-logs
 GET /api/issues/:id/audit-logs
 GET /api/providers/:id/audit-logs
 GET /api/environments/:id/audit-logs
-GET /api/projects/:projectId/users/:id/audit-logs
 ```
 
 ## List Audit Logs

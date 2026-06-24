@@ -22,7 +22,7 @@ export const fillerSettingsSchema = z.object({
   llmProviderId: z.string().describe('ID of the LLM provider used to generate the filler sentence'),
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for filler generation'),
   prompt: z.string().min(1).describe('Prompt instructing the LLM to produce a short neutral filler sentence (e.g. "Generate a single short neutral sentence to fill silence while processing, like \"Hmm, let me think about that.\"")'),
-  historyMessageCount: z.number().int().min(0).default(0).describe('Number of recent conversation messages to include in the filler LLM call context (0 = no history)'),
+  historyMessageCount: z.number().int().min(-1).default(0).describe('Number of recent conversation messages to include in the filler LLM call context (0 = no history, -1 = all history, N > 0 = last N messages)'),
 }).openapi('FillerSettings');
 
 /** Settings controlling LLM-generated filler sentence playback at the start of each response turn */

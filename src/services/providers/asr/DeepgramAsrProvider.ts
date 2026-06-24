@@ -300,8 +300,6 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
 
     const isFinal = message.is_final === true;
 
-    logger.info(`[Deepgram ASR] Transcript: "${transcript}" (is_final=${isFinal})`);
-
     // Deepgram uses is_final flag to indicate finalized text
     // We ignore speech_final as it doesn't reliably indicate chunk completion
     if (isFinal) {

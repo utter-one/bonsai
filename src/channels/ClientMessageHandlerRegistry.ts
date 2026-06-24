@@ -34,7 +34,7 @@ export class ClientMessageHandlerRegistry {
    * @returns Array of handler class constructors.
    */
   static getAll() {
-    return this.handlers;
+    return new Map(this.handlers);
   }
 
   /**

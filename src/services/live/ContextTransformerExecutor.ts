@@ -61,7 +61,7 @@ export class ContextTransformerExecutor {
     @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
     @inject(ConversationService) private readonly conversationService: ConversationService,
     @inject(IsolatedScriptExecutor) private readonly scriptExecutor: IsolatedScriptExecutor,
-  ) {}
+  ) { }
 
   /**
    * Executes all context transformers for the current stage in parallel.
@@ -95,6 +95,7 @@ export class ContextTransformerExecutor {
         transformerData.transformer.contextFields ?? [],
         userInput,
         originalUserInput,
+        session.clientConnection.connectionType,
       );
       return this.executeTransformer(session, transformerData, context);
     });
@@ -148,7 +149,7 @@ export class ContextTransformerExecutor {
     }
 
     // Build a raw context with the updated stage vars for condition evaluation
-    const conditionContext = this.contextBuilder.buildRawContext(conversation, stage, {}, {});
+    const conditionContext = this.contextBuilder.buildRawContext(conversation, stage, {}, {}, undefined, session.clientConnection.connectionType);
 
     // Find and return stage actions triggered by variable changes
     const triggeredActions = await this.findTriggeredActions(session, variableChangeEvents, stage.actions || {}, conditionContext);
@@ -250,7 +251,7 @@ export class ContextTransformerExecutor {
       renderedPrompt = await this.templatingEngine.render(transformer.prompt, context);
       const text = context.userInput || '';
 
-      logger.info({ sessionId: session.id, transformerId: transformer.id }, `Rendering prompt for transformer:\n${renderedPrompt}\nWith input:\n${text}`);
+      logger.info({ sessionId: session.id, transformerId: transformer.id }, 'Executing context transformer');
 
       const messages = [
         { role: 'system' as const, content: renderedPrompt },

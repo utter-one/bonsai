@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction, Router } from 'express';
 import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ConversationService } from '../../services/ConversationService';
-import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema, conversationRouteParamsSchema, conversationEventRouteParamsSchema } from '../contracts/conversation';
+import { conversationResponseSchema, conversationListResponseSchema, conversationEventResponseSchema, conversationEventListResponseSchema, conversationRouteParamsSchema, conversationEventRouteParamsSchema, artifactResponseSchema, artifactListResponseSchema, conversationArtifactRouteParamsSchema, listArtifactsQuerySchema } from '../contracts/conversation';
 import { listParamsSchema, projectScopedParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -137,6 +137,66 @@ export class ConversationController {
           404: { description: 'Conversation not found' },
         },
       },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/conversations/{id}/artifacts',
+        tags: ['Conversations'],
+        summary: 'List conversation artifacts',
+        description: 'Retrieves a paginated list of artifacts for a specific conversation with optional filtering by type',
+        request: {
+          params: conversationRouteParamsSchema,
+          query: listArtifactsQuerySchema,
+        },
+        responses: {
+          200: {
+            description: 'List of conversation artifacts retrieved successfully',
+            content: {
+              'application/json': {
+                schema: artifactListResponseSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid query parameters' },
+          404: { description: 'Conversation not found' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/conversations/{id}/artifacts/{artifactId}',
+        tags: ['Conversations'],
+        summary: 'Get conversation artifact by ID',
+        description: 'Retrieves a specific artifact for a conversation by its unique identifier',
+        request: {
+          params: conversationArtifactRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Conversation artifact retrieved successfully',
+            content: {
+              'application/json': {
+                schema: artifactResponseSchema,
+              },
+            },
+          },
+          404: { description: 'Conversation or artifact not found' },
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/projects/{projectId}/conversations/{id}/artifacts/{artifactId}/download',
+        tags: ['Conversations'],
+        summary: 'Download conversation artifact',
+        description: 'Downloads the binary data for a specific artifact',
+        request: {
+          params: conversationArtifactRouteParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Artifact data downloaded successfully',
+          },
+          404: { description: 'Conversation or artifact not found' },
+        },
+      },
     ];
   }
 
@@ -150,6 +210,9 @@ export class ConversationController {
     router.get('/api/projects/:projectId/conversations/:id/events', asyncHandler(this.getConversationEvents.bind(this)));
     router.get('/api/projects/:projectId/conversations/:id/events/:eventId', asyncHandler(this.getConversationEventById.bind(this)));
     router.get('/api/projects/:projectId/conversations/:id/audit-logs', asyncHandler(this.getConversationAuditLogs.bind(this)));
+    router.get('/api/projects/:projectId/conversations/:id/artifacts', asyncHandler(this.listConversationArtifacts.bind(this)));
+    router.get('/api/projects/:projectId/conversations/:id/artifacts/:artifactId', asyncHandler(this.getConversationArtifactById.bind(this)));
+    router.get('/api/projects/:projectId/conversations/:id/artifacts/:artifactId/download', asyncHandler(this.downloadConversationArtifact.bind(this)));
   }
 
   /**
@@ -218,5 +281,41 @@ export class ConversationController {
     const params = conversationRouteParamsSchema.parse(req.params);
     const auditLogs = await this.conversationService.getConversationAuditLogs(params.id, params.projectId);
     res.status(200).json(auditLogs);
+  }
+
+  /**
+   * GET /api/conversations/:id/artifacts
+   * List artifacts for a conversation
+   */
+  private async listConversationArtifacts(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.CONVERSATION_READ]);
+    const params = conversationRouteParamsSchema.parse(req.params);
+    const query = listArtifactsQuerySchema.parse(req.query);
+    const artifacts = await this.conversationService.listConversationArtifacts(params.projectId, params.id, query);
+    res.status(200).json(artifacts);
+  }
+
+  /**
+   * GET /api/conversations/:id/artifacts/:artifactId
+   * Get a specific artifact by ID
+   */
+  private async getConversationArtifactById(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.CONVERSATION_READ]);
+    const params = conversationArtifactRouteParamsSchema.parse(req.params);
+    const artifact = await this.conversationService.getConversationArtifactById(params.projectId, params.id, params.artifactId);
+    res.status(200).json(artifact);
+  }
+
+  /**
+   * GET /api/conversations/:id/artifacts/:artifactId/download
+   * Download artifact binary data
+   */
+  private async downloadConversationArtifact(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.CONVERSATION_READ]);
+    const params = conversationArtifactRouteParamsSchema.parse(req.params);
+    const { data, mimeType } = await this.conversationService.downloadConversationArtifact(params.projectId, params.id, params.artifactId);
+    res.set('Content-Type', mimeType || 'application/octet-stream');
+    res.set('Content-Disposition', `attachment; filename="${params.artifactId}"`);
+    res.send(data);
   }
 }

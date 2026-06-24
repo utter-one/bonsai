@@ -8,7 +8,7 @@ extendZodWithOpenApi(z);
 export { listParamsSchema, type ListParams };
 
 /** Possible statuses for a scenario run or scenario conversation */
-export const scenarioRunStatusSchema = z.enum(['queued', 'in_progress', 'passed', 'failed', 'cancelled']).openapi('ScenarioRunStatus');
+export const scenarioRunStatusSchema = z.enum(['queued', 'in_progress', 'passed', 'failed', 'cancelled', 'error']).openapi('ScenarioRunStatus');
 
 /**
  * Schema for scenario run route params
@@ -38,6 +38,11 @@ export const scenarioRunResponseSchema = z.object({
   totalConversations: z.number().int().describe('Computed total number of conversations across all testers'),
   status: scenarioRunStatusSchema.describe('Current status of the scenario run'),
   statusDetails: z.string().nullable().describe('Human-readable details about the current status, e.g. failure reason or cancellation actor'),
+  errorCount: z.number().int().min(0).describe('Number of conversations that errored during execution (excluded from pass/fail evaluation)'),
+  testStatistics: z.object({
+    passedTests: z.number().int().min(0).describe('Total number of individual test assertions that passed across all conversations'),
+    failedTests: z.number().int().min(0).describe('Total number of individual test assertions that failed across all conversations'),
+  }).nullable().describe('Detailed test statistics for this run'),
   metadata: z.record(z.string(), z.unknown()).nullable().describe('Additional metadata'),
   version: z.number().int().describe('Version number for optimistic locking'),
   createdAt: z.coerce.date().describe('Timestamp when the run was created'),

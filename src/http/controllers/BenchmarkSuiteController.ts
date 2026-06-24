@@ -105,7 +105,7 @@ export class BenchmarkSuiteController {
   private async listSuites(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.BENCHMARK_READ]);
     const query = listParamsSchema.parse(req.query);
-    const result = await this.service.listSuites(query, req.context);
+    const result = await this.service.listSuites(req.context, query);
     res.status(200).json(result);
   }
 
@@ -142,7 +142,7 @@ export class BenchmarkSuiteController {
     checkPermissions(req, [PERMISSIONS.BENCHMARK_READ]);
     const params = benchmarkSuiteRouteParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const result = await this.service.listConfigsForSuite(params.id, query, req.context);
+    const result = await this.service.listConfigsForSuite(params.id, req.context, query);
     res.status(200).json(result);
   }
 }

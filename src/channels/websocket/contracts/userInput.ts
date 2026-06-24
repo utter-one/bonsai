@@ -9,6 +9,7 @@ import {
   calSendUserTextInputRequestSchema,
   calSendUserTextInputResponseSchema,
   calUserTranscribedChunkMessageSchema,
+  calAudioPlaybackEndedRequestSchema,
 } from '../../messages';
 
 /** Request to start voice input from the user. */
@@ -63,3 +64,7 @@ export type SendUserTextInputResponse = z.infer<typeof sendUserTextInputResponse
 /** Message sent when a user speech chunk has been transcribed. */
 export const userTranscribedChunkMessageSchema = calToWsOutput(calUserTranscribedChunkMessageSchema);
 export type UserTranscribedChunkMessage = z.infer<typeof userTranscribedChunkMessageSchema>;
+
+/** Request to signal that the client has finished playing back AI audio. */
+export const audioPlaybackEndedRequestSchema = calToWsInput(calAudioPlaybackEndedRequestSchema);
+export type AudioPlaybackEndedRequest = z.infer<typeof audioPlaybackEndedRequestSchema>;

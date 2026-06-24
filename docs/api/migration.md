@@ -28,6 +28,14 @@ GET /api/migration/preview
 | `knowledgeCategoryIds` | `string \| string[]` | Specific knowledge category IDs |
 | `providerIds` | `string \| string[]` | Specific provider IDs |
 | `apiKeyIds` | `string \| string[]` | Specific API key IDs |
+| `testerIds` | `string \| string[]` | Specific tester IDs |
+| `scenarioIds` | `string \| string[]` | Specific scenario IDs |
+| `guardrailIds` | `string \| string[]` | Specific guardrail IDs |
+| `copyDecoratorIds` | `string \| string[]` | Specific copy decorator IDs |
+| `sampleCopyIds` | `string \| string[]` | Specific sample copy IDs |
+| `savedSliceQueryIds` | `string \| string[]` | Specific saved slice query IDs |
+| `savedFunnelQueryIds` | `string \| string[]` | Specific saved funnel query IDs |
+| `bundlePassword` | `string` | Password for encrypting the migration bundle |
 
 **Response** `200 OK`
 
@@ -44,7 +52,14 @@ GET /api/migration/preview
   "knowledgeCategories": [...],
   "knowledgeItems": [...],
   "stages": [...],
-  "apiKeys": [...]
+  "apiKeys": [...],
+  "guardrails": [...],
+  "copyDecorators": [...],
+  "sampleCopies": [...],
+  "testers": [...],
+  "scenarios": [...],
+  "savedSliceQueries": [...],
+  "savedFunnelQueries": [...]
 }
 ```
 
@@ -85,7 +100,15 @@ Accepts the same query parameters as the preview endpoint.
   "knowledgeCategories": [...],
   "knowledgeItems": [...],
   "stages": [...],
-  "apiKeys": [...]
+  "apiKeys": [...],
+  "guardrails": [...],
+  "copyDecorators": [...],
+  "sampleCopies": [...],
+  "testers": [...],
+  "scenarios": [...],
+  "savedSliceQueries": [...],
+  "savedFunnelQueries": [...],
+  "bundleSecrets": [...]
 }
 ```
 
@@ -106,6 +129,14 @@ Accepts the same query parameters as the preview endpoint.
 | `knowledgeItems` | `array` | Full knowledge item records |
 | `stages` | `array` | Full stage records |
 | `apiKeys` | `array` | Full API key records |
+| `guardrails` | `array` | Full guardrail records |
+| `copyDecorators` | `array` | Full copy decorator records |
+| `sampleCopies` | `array` | Full sample copy records |
+| `testers` | `array` | Full tester records |
+| `scenarios` | `array` | Full scenario records |
+| `savedSliceQueries` | `array` | Full saved slice query records |
+| `savedFunnelQueries` | `array` | Full saved funnel query records |
+| `bundleSecrets` | `array` | Encrypted secrets for providers and environment variables |
 
 ::: warning
 Provider configurations and credentials are stripped from the export bundle for security. You'll need to reconfigure provider credentials after import.

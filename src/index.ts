@@ -39,7 +39,7 @@ async function main() {
   }
 
   const port = parseInt(process.env.PORT || "3000", 10);
-  startServer(port);
+  await startServer(port);
 
   logger.info("Bonsai Backend is running...");
 }

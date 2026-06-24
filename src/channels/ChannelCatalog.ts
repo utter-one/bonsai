@@ -1,4 +1,5 @@
 import { inject, singleton } from 'tsyringe';
+import { NotFoundError } from '../errors';
 import { z } from 'zod';
 import type { ICommunicationChannel } from './IChannelDescriptor';
 import { WebSocketCommunicationChannel } from './websocket/WebSocketCommunicationChannel';
@@ -7,6 +8,9 @@ import { TwilioMessagingCommunicationChannel } from './twilio-messaging/TwilioMe
 import { TwilioVoiceCommunicationChannel } from './twilio-voice/TwilioVoiceCommunicationChannel';
 import { WhatsAppCommunicationChannel } from './whatsapp/WhatsAppCommunicationChannel';
 import { TelegramCommunicationChannel } from './telegram/TelegramCommunicationChannel';
+// import { SendGridCommunicationChannel } from './email/sendgrid/SendGridCommunicationChannel';
+// import { SesCommunicationChannel } from './email/ses/SesCommunicationChannel';
+import { SmtpImapCommunicationChannel } from './email/smtp-imap/SmtpImapCommunicationChannel';
 
 /**
  * Catalog of available ICommunicationChannel implementations.
@@ -25,8 +29,11 @@ export class ChannelCatalog {
     @inject(TwilioVoiceCommunicationChannel) twilioVoice: TwilioVoiceCommunicationChannel,
     @inject(WhatsAppCommunicationChannel) whatsApp: WhatsAppCommunicationChannel,
     @inject(TelegramCommunicationChannel) telegram: TelegramCommunicationChannel,
+    // @inject(SendGridCommunicationChannel) sendgrid: SendGridCommunicationChannel,
+    // @inject(SesCommunicationChannel) ses: SesCommunicationChannel,
+    @inject(SmtpImapCommunicationChannel) smtpImap: SmtpImapCommunicationChannel,
   ) {
-    const entries: ICommunicationChannel[] = [websocket, webrtc, twilioMessaging, twilioVoice, whatsApp, telegram];
+    const entries: ICommunicationChannel[] = [websocket, webrtc, twilioMessaging, twilioVoice, whatsApp, telegram, smtpImap];
     this.channels = new Map(entries.map((c) => [c.getType(), c]));
   }
 
@@ -46,7 +53,7 @@ export class ChannelCatalog {
   getChannel(channelType: string): ICommunicationChannel {
     const channel = this.channels.get(channelType);
     if (!channel) {
-      throw new Error(`Unsupported channel type: ${channelType}`);
+      throw new NotFoundError(`Unsupported channel type: ${channelType}`);
     }
     return channel;
   }

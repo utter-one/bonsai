@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, SQL, desc, sql } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
-import { classifiers } from '../db/schema';
+import { classifiers, projects } from '../db/schema';
 import type { CreateClassifierRequest, UpdateClassifierRequest, ClassifierResponse, ClassifierListResponse, CloneClassifierRequest } from '../http/contracts/classifier';
 import type { ListParams } from '../http/contracts/common';
 import { classifierResponseSchema, classifierListResponseSchema } from '../http/contracts/classifier';
@@ -54,36 +54,59 @@ export class ClassifierService extends BaseService {
     }
   }
 
-  /**
-   * Retrieves a classifier by its unique identifier
-   * @param id - The unique identifier of the classifier
-   * @returns The classifier if found
-   * @throws {NotFoundError} When classifier is not found
-   */
-  async getClassifierById(projectId: string, id: string): Promise<ClassifierResponse> {
+ /**
+    * Retrieves a classifier by its unique identifier
+    * @param id - The unique identifier of the classifier
+    * @param context - Request context for auditing and authorization
+    * @returns The classifier if found
+    * @throws {NotFoundError} When classifier is not found
+    */
+  async getClassifierById(projectId: string, id: string, context: RequestContext): Promise<ClassifierResponse> {
+    this.requirePermission(context, PERMISSIONS.CLASSIFIER_READ);
     logger.debug({ classifierId: id }, 'Fetching classifier by ID');
 
     try {
-      const classifier = await db.query.classifiers.findFirst({ where: and(eq(classifiers.projectId, projectId), eq(classifiers.id, id)) });
+      const result = await db.select({
+        id: classifiers.id,
+        projectId: classifiers.projectId,
+        name: classifiers.name,
+        description: classifiers.description,
+        prompt: classifiers.prompt,
+        llmProviderId: classifiers.llmProviderId,
+        llmSettings: classifiers.llmSettings,
+        tags: classifiers.tags,
+        metadata: classifiers.metadata,
+        version: classifiers.version,
+        createdAt: classifiers.createdAt,
+        updatedAt: classifiers.updatedAt,
+        archived: sql<boolean>`${projects.archivedAt} IS NOT NULL`,
+      })
+        .from(classifiers)
+        .innerJoin(projects, eq(classifiers.projectId, projects.id))
+        .where(and(eq(classifiers.projectId, projectId), eq(classifiers.id, id)))
+        .limit(1);
 
-      if (!classifier) {
+      if (result.length === 0) {
         throw new NotFoundError(`Classifier with id ${id} not found`);
       }
 
-      const archived = !(await this.isProjectActive(projectId));
-      return classifierResponseSchema.parse({ ...classifier, archived });
+      return classifierResponseSchema.parse(result[0]);
     } catch (error) {
       logger.error({ error, classifierId: id }, 'Failed to fetch classifier');
       throw error;
     }
   }
 
-  /**
-   * Lists classifiers with flexible filtering, sorting, and pagination
-   * @param params - List parameters including filters, sorting, pagination, and text search
-   * @returns Paginated array of classifiers matching the criteria
-   */
-  async listClassifiers(projectId: string, params?: ListParams): Promise<ClassifierListResponse> {
+/**
+    * Lists classifiers with flexible filtering, sorting, and pagination
+    * @param params - List parameters including filters, sorting, pagination, and text search
+    * @param context - Request context for auditing and authorization
+    * @returns Paginated array of classifiers matching the criteria
+    */
+  async listClassifiers(projectId: string, params?: ListParams, context?: RequestContext): Promise<ClassifierListResponse> {
+    if (context) {
+      this.requirePermission(context, PERMISSIONS.CLASSIFIER_READ);
+    }
     logger.debug({ params }, 'Listing classifiers');
 
     try {
@@ -129,17 +152,31 @@ export class ClassifierService extends BaseService {
 
       const total = await countRows(classifiers, whereCondition);
 
-      // Get paginated results
-      const classifierList = await db.query.classifiers.findMany({
-        where: whereCondition,
-        orderBy: orderByClause.length > 0 ? orderByClause : [desc(classifiers.createdAt)],
-        limit,
-        offset,
-      });
+      // Get paginated results with archived status from joined projects table
+      const classifierList = await db.select({
+        id: classifiers.id,
+        projectId: classifiers.projectId,
+        name: classifiers.name,
+        description: classifiers.description,
+        prompt: classifiers.prompt,
+        llmProviderId: classifiers.llmProviderId,
+        llmSettings: classifiers.llmSettings,
+        tags: classifiers.tags,
+        metadata: classifiers.metadata,
+        version: classifiers.version,
+        createdAt: classifiers.createdAt,
+        updatedAt: classifiers.updatedAt,
+        archived: sql<boolean>`${projects.archivedAt} IS NOT NULL`,
+      })
+        .from(classifiers)
+        .innerJoin(projects, eq(classifiers.projectId, projects.id))
+        .where(whereCondition)
+        .orderBy(...(orderByClause.length > 0 ? orderByClause : [desc(classifiers.createdAt)]) as any[])
+        .limit(limit)
+        .offset(offset);
 
-      const archived = !(await this.isProjectActive(projectId));
       return classifierListResponseSchema.parse({
-        items: classifierList.map(c => ({ ...c, archived })),
+        items: classifierList,
         total,
         offset,
         limit,
@@ -270,13 +307,15 @@ export class ClassifierService extends BaseService {
     }
   }
 
-  /**
-   * Retrieves all audit log entries for a specific classifier
-   * @param classifierId - The unique identifier of the classifier
-   * @param projectId - The project ID the classifier belongs to
-   * @returns Array of audit log entries for the classifier
-   */
-  async getClassifierAuditLogs(classifierId: string, projectId: string): Promise<any[]> {
+/**
+    * Retrieves all audit log entries for a specific classifier
+    * @param classifierId - The unique identifier of the classifier
+    * @param projectId - The project ID the classifier belongs to
+    * @param context - Request context for auditing and authorization
+    * @returns Array of audit log entries for the classifier
+    */
+  async getClassifierAuditLogs(classifierId: string, projectId: string, context: RequestContext): Promise<any[]> {
+    this.requirePermission(context, PERMISSIONS.AUDIT_READ);
     logger.debug({ classifierId, projectId }, 'Fetching audit logs for classifier');
 
     try {

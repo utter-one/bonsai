@@ -59,8 +59,8 @@ export class BenchmarkRunService extends BaseService {
    * @param context - Optional request context for authorization
    * @returns Paginated list of runs
    */
-  async listRuns(query: BenchmarkRunListParams, context?: RequestContext): Promise<BenchmarkRunListResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async listRuns(query: BenchmarkRunListParams, context: RequestContext): Promise<BenchmarkRunListResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
     const offset = query.offset ?? 0;
     const limit = normalizeListLimit(query.limit);
 
@@ -80,8 +80,8 @@ export class BenchmarkRunService extends BaseService {
    * @param context - Optional request context for authorization
    * @returns The run with embedded executions
    */
-  async getRunById(id: string, context?: RequestContext): Promise<BenchmarkRunResponse> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async getRunById(id: string, context: RequestContext): Promise<BenchmarkRunResponse> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
 
     const [run] = await db.select().from(benchmarkRuns).where(eq(benchmarkRuns.id, id)).limit(1);
     if (!run) throw new NotFoundError(`Benchmark run ${id} not found`);
@@ -100,8 +100,8 @@ export class BenchmarkRunService extends BaseService {
    * @param context - Optional request context for authorization
    * @returns Array of iteration results
    */
-  async getRunResults(configExecutionId: string, context?: RequestContext): Promise<BenchmarkResultResponse[]> {
-    if (context) this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
+  async getRunResults(configExecutionId: string, context: RequestContext): Promise<BenchmarkResultResponse[]> {
+    this.requirePermission(context, PERMISSIONS.BENCHMARK_READ);
 
     const rows = await db.select().from(benchmarkResults).where(eq(benchmarkResults.configExecutionId, configExecutionId)).orderBy(benchmarkResults.iterationIndex);
     return rows.map((r) => this.mapResultResponse(r));

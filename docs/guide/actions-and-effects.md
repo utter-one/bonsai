@@ -186,13 +186,19 @@ Invokes a tool. The tool's `type` determines both its execution behaviour and wh
 }
 ```
 
+| Field | Description |
+|---|---|
+| `toolId` | ID of the tool to invoke |
+| `parameters` | Handlebars template parameters passed to the tool |
+| `asynchronous` | When `true`, the tool runs in the background without blocking the conversation. Results are not stored in context and flow control signals are discarded. Use for fire-and-forget operations (default: `false`) |
+
 Results are stored differently depending on the tool type:
 - **`smart_function`** and **`script`** tools — stored under `context.results.tools.<toolId>`
 - **`webhook`** tools — stored under `context.results.webhooks.<toolId>`
 
 ### `generate_response`
 
-Explicitly triggers AI response generation. Two modes:
+Explicitly triggers AI response generation. Three modes:
 
 **Generated** (LLM produces the response):
 ```json
@@ -208,8 +214,16 @@ Explicitly triggers AI response generation. Two modes:
   "prescriptedSelectionStrategy": "random"
 }
 ```
-
 Selection strategies: `random` (pick randomly) or `round_robin` (cycle through).
+
+**Best Match** (LLM chooses the best response from predefined options):
+```json
+{
+  "type": "generate_response",
+  "responseMode": "best_match",
+  "prescriptedResponses": ["Welcome! How can I help?", "Hi there! What can I do for you?"]
+}
+```
 
 ### `change_visibility`
 
@@ -218,16 +232,12 @@ Sets the visibility of the current turn's messages (both the user input and the 
 ```json
 {
   "type": "change_visibility",
-  "target": "action",
-  "id": "collect-payment-info",
   "visibility": "never"
 }
 ```
 
 | Field | Description |
 |---|---|
-| `target` | `"action"` or `"stage"` — what the `id` refers to |
-| `id` | ID of the action or stage this effect belongs to |
 | `visibility` | `"always"`, `"stage"`, `"never"`, or `"conditional"` (see [Message Visibility](#message-visibility)) |
 | `condition` | JavaScript expression evaluated against the conversation context — required when `visibility` is `"conditional"` |
 
@@ -296,8 +306,6 @@ The `conditional` value supports an arbitrary JavaScript expression evaluated ag
 ```json
 {
   "type": "change_visibility",
-  "target": "action",
-  "id": "my-action",
   "visibility": "conditional",
   "condition": "vars.includeHistory === true"
 }

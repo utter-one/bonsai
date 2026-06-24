@@ -44,6 +44,7 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 - [Context Transformers](./context-transformers) — Context transformation pipelines
 - [Tools](./tools) — LLM tool definitions
 - [Global Actions](./global-actions) — Global action handlers
+- [Guardrails](./guardrails) — Always-active safety and behavioral rules
 
 ### Data & Content
 - [Knowledge](./knowledge) — Knowledge base categories and items
@@ -58,13 +59,25 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 - [Scenarios](./scenarios) — Automated conversation test definitions
 - [Scenario Runs & Conversations](./scenario-runs) — Execution tracking for scenario tests
 
+### Analytics
+- [Analytics](./analytics) — Conversation analytics and reporting
+- [Analytics Query](./analytics-query) — Slice-and-dice analytics engine
+- [Analytics Funnel Engine](./analytics-funnels) — Sequential user journey funnels
+
 ### Infrastructure
 - [Providers](./providers) — Provider configuration (LLM, TTS, ASR, Storage)
 - [Provider Catalog](./provider-catalog) — Available provider catalog
+- [Secrets](./secrets) — Encrypted secret storage
 - [API Keys](./api-keys) — API key management
 - [Environments](./environments) — Environment and migration management
 - [Migration](./migration) — Configuration export/import
 - [Audit Logs](./audit-logs) — Audit trail
+
+### Channels
+- [Twilio Voice](./twilio-voice) — Twilio Voice channel integration
+- [Twilio Messaging](./twilio-messaging) — Twilio SMS/MMS channel integration
+- [WhatsApp](./whatsapp) — WhatsApp Business API channel integration
+- [SES Email](./ses-email) — AWS SES email channel integration
 
 ### Real-time
 - [WebSocket](./websocket) — Real-time conversational AI protocol (WebSocket)

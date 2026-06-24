@@ -24,6 +24,7 @@ Each project includes:
 | `timezone` | Default IANA timezone for the project (e.g. `America/New_York`) |
 | `languageCode` | Optional ISO language code for the project (e.g. `en-US`, `pl-PL`). Exposed in conversation context as `project.languageCode` and `project.language`. |
 | `startingStageId` | Optional default starting stage ID. Used as fallback when the client omits `stageId` in the `startConversation` WebSocket message. Set to `null` to clear. |
+| `recordingConfig` | Audio recording configuration for conversation debugging |
 | `userProfileVariableDescriptors` | Typed schema describing the fields expected on a user's profile |
 | `version` | Optimistic locking version number |
 
@@ -36,14 +37,31 @@ The `asrConfig` object configures automatic speech recognition for the entire pr
   "asrProviderId": "azure-speech-provider",
   "settings": { ... },
   "unintelligiblePlaceholder": "[unintelligible]",
-  "voiceActivityDetection": true
+  "voiceActivityDetection": true,
+  "serverVad": {
+    "algorithm": "firered",
+    "speechThreshold": 0.5,
+    "smartTurn": {
+      "enabled": true,
+      "threshold": 0.5
+    }
+  }
 }
 ```
 
 - **`asrProviderId`** — References a registered ASR provider
 - **`settings`** — Provider-specific settings (e.g., language, model)
 - **`unintelligiblePlaceholder`** — Text inserted when speech cannot be transcribed
-- **`voiceActivityDetection`** — Enables automatic detection of when the user starts/stops speaking
+- **`voiceActivityDetection`** — Server VAD hint. When `true`, the client should be prepared for VAD before sending audio (cont. stream).
+- **`serverVad`** — Server-side VAD configuration. When set, the server manages the turn lifecycle automatically — clients send continuous audio without calling `start_user_voice_input` or `end_user_voice_input`. Supports three algorithms:
+
+  - **Legacy** (`algorithm: "legacy"`) — Original millisecond-based parameters with mode-based thresholds (0–3 aggressiveness)
+  - **Silero** (`algorithm: "silero"`) — Frame-based parameters with fine-grained control over speech/silence thresholds
+  - **FireRed** (`algorithm: "firered"`) — ONNX-based streaming VAD with state-of-the-art multilingual performance
+
+  See [Server VAD Config](../api/projects#server-vad-config) for full parameter tables.
+
+- **`serverVad.smartTurn`** — Optional post-VAD endpoint detection. Runs ONNX inference on buffered audio after VAD detects silence to verify the speaker has finished their turn, reducing false turn endings. See [Smart Turn Detection](../api/projects#smart-turn-detection).
 
 ## Storage Configuration
 
@@ -91,6 +109,34 @@ When a conversation is timed out:
 ```
 
 This example aborts any conversation that has been inactive for 5 minutes.
+
+## Recording Configuration
+
+The optional `recordingConfig` enables per-project audio recording of conversation sessions. When enabled, both user voice input and AI voice output are accumulated throughout the conversation and saved as separate audio files to the project's configured storage provider.
+
+```json
+{
+  "recordingConfig": {
+    "enabled": true,
+    "recordInput": true,
+    "recordOutput": true,
+    "format": "pcm_16000"
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | `boolean` | — | Whether recording is active for the project |
+| `recordInput` | `boolean` | `true` | Record user voice input |
+| `recordOutput` | `boolean` | `true` | Record AI voice output |
+| `format` | `string` | `pcm_16000` | Target audio format for saved recordings |
+
+Two separate files are produced per conversation: one for the user's voice (`user_voice`) and one for the AI's voice (`ai_voice`). This avoids format conflicts when input and output use different sample rates or encodings.
+
+The source audio (which may be any format from the ASR/TTS providers) is automatically converted to the configured recording format. If the source format already matches the target, no conversion is performed.
+
+Recordings are uploaded as conversation artifacts to the project's storage provider (S3, GCS, Azure Blob, or Local). If no storage provider is configured, recordings are skipped with a warning log.
 
 ## User Profile Variable Descriptors
 

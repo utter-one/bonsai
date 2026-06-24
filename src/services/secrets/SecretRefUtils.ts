@@ -20,6 +20,17 @@ export const SENSITIVE_PROVIDER_CONFIG_FIELDS = new Set([
 ]);
 
 /**
+ * Dot-notation paths to nested sensitive fields (e.g. "smtp.auth.pass").
+ */
+const SENSITIVE_NESTED_PATHS = [
+  'smtp.auth.pass',
+  'imap.auth.pass',
+  'oauth2.clientSecret',
+  'oauth2.refreshToken',
+  'oauth2.accessToken',
+];
+
+/**
  * Utility service for secretizing and resolving secret references within plain objects.
  * Operates on arbitrary JSON-serializable objects, replacing sensitive string values
  * with `@sec:name:id` references and vice-versa.
@@ -30,20 +41,44 @@ export class SecretRefUtils {
 
   /**
    * Traverses a plain object and replaces string values at the given sensitive keys
-   * with `@sec:name:id` references. Already-referenced values are skipped.
+   * with `@sec:name:id` references. Also handles known nested paths (e.g. smtp.auth.pass).
+   * Already-referenced values are skipped.
    * @param obj - The source object (not mutated)
    * @param sensitiveFields - Set of top-level key names to secretize
    * @returns A new object with secret references in place of plaintext values
    */
   async secretizeObject<T extends Record<string, unknown>>(obj: T, sensitiveFields: Set<string>): Promise<T> {
-    const result: Record<string, unknown> = { ...obj };
+    const result: Record<string, unknown> = this.deepClone(obj);
     const managerName = this.registry.defaultManagerName;
+
     for (const key of sensitiveFields) {
       const value = result[key];
       if (typeof value === 'string' && value.length > 0 && !this.registry.isSecretReference(value)) {
         result[key] = await this.registry.storeSecret(managerName, value);
       }
     }
+
+    for (const path of SENSITIVE_NESTED_PATHS) {
+      const parts = path.split('.');
+      let current: Record<string, unknown> = result;
+      let found = true;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (current[parts[i]] && typeof current[parts[i]] === 'object' && !Array.isArray(current[parts[i]])) {
+          current = current[parts[i]] as Record<string, unknown>;
+        } else {
+          found = false;
+          break;
+        }
+      }
+      if (found) {
+        const leafKey = parts[parts.length - 1]!;
+        const value = current[leafKey];
+        if (typeof value === 'string' && value.length > 0 && !this.registry.isSecretReference(value)) {
+          current[leafKey] = await this.registry.storeSecret(managerName, value);
+        }
+      }
+    }
+
     return result as T;
   }
 
@@ -86,5 +121,9 @@ export class SecretRefUtils {
     } else if (value !== null && typeof value === 'object') {
       for (const v of Object.values(value as Record<string, unknown>)) this.collectRefsRecursive(v, refs);
     }
+  }
+
+  private deepClone<T>(obj: T): T {
+    return JSON.parse(JSON.stringify(obj));
   }
 }

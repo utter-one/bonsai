@@ -28,6 +28,7 @@ COPY drizzle.config.ts ./
 COPY drizzle/ ./drizzle/
 COPY schemas/ ./schemas/
 COPY llms.txt ./
+COPY models/ ./models/
 
 # Expose the application port
 EXPOSE 3000

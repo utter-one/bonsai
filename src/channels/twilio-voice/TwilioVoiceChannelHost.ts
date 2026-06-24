@@ -21,6 +21,7 @@ import type { ApiKeySettings } from '../../apiKeyFeatures';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { ConversationService } from '../../services/ConversationService';
+import { SYSTEM_CONTEXT } from '../../services/RequestContext';
 import { ProjectService } from '../../services/ProjectService';
 import { UserService } from '../../services/UserService';
 import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
@@ -255,11 +256,10 @@ export class TwilioVoiceChannelHost {
     const twilioSignature = req.headers['x-twilio-signature'] as string | undefined;
     const fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
     const isValid = validateRequest(authToken, twilioSignature ?? '', fullUrl, req.body as Record<string, string>);
-    //logger.info({ authToken, twilioSignature, fullUrl }, 'TwilioVoice webhook: validating request signature');
     if (!isValid) {
       logger.warn({ ip, projectId }, 'TwilioVoice webhook: invalid request signature');
-      //res.status(403).send();
-      //return;
+      res.status(403).send();
+      return;
     }
 
     const callDirection = (req.body as Record<string, string>)?.Direction ?? 'inbound';
@@ -327,6 +327,7 @@ export class TwilioVoiceChannelHost {
 
     // Per-connection mutable state.
     let session: Session | null = null;
+    let connection: TwilioVoiceConnection | null = null;
     let inputTurnId: string | null = null;
     const pendingMarkCallbacks = new Map<string, () => Promise<void>>();
 
@@ -411,7 +412,8 @@ export class TwilioVoiceChannelHost {
             const registerMarkCallback = (name: string, cb: () => Promise<void>) => { pendingMarkCallbacks.set(name, cb); };
             const clearMarkCallbacks = () => { pendingMarkCallbacks.clear(); };
 
-            const connection = new TwilioVoiceConnection(ws, startData.streamSid, this.sessionManager, onAiTurnEnd, registerMarkCallback, clearMarkCallbacks);
+            const conn = new TwilioVoiceConnection(ws, startData.streamSid, startData.callSid, config.accountSid, config.authToken, this.sessionManager, onAiTurnEnd, registerMarkCallback, clearMarkCallbacks);
+            connection = conn;
             const sessionId = this.sessionManager.registerSession(connection);
             const newSession = this.sessionManager.getSession(sessionId);
             connection.attachSession(newSession);
@@ -443,10 +445,15 @@ export class TwilioVoiceChannelHost {
           case 'mark': {
             const markName = msg.mark?.name;
             if (markName) {
-              const cb = pendingMarkCallbacks.get(markName);
-              if (cb) {
-                pendingMarkCallbacks.delete(markName);
-                await cb();
+              if (connection?.isClosing) {
+                connection.handleMarkEcho(markName);
+              } else {
+                session?.runner?.notifyAudioPlaybackEnded();
+                const cb = pendingMarkCallbacks.get(markName);
+                if (cb) {
+                  pendingMarkCallbacks.delete(markName);
+                  await cb();
+                }
               }
             }
             break;
@@ -533,7 +540,7 @@ export class TwilioVoiceChannelHost {
     // Resolve stageId: body overrides project default
     let resolvedStageId = body.stageId;
     if (!resolvedStageId) {
-      const project = await this.projectService.getProjectById(projectId);
+      const project = await this.projectService.getProjectById(projectId, SYSTEM_CONTEXT);
       resolvedStageId = project.startingStageId ?? undefined;
       if (!resolvedStageId) {
         res.status(422).json({ error: 'No stageId provided and project has no default starting stage' });
@@ -559,7 +566,7 @@ export class TwilioVoiceChannelHost {
       status: 'initialized',
       direction: 'outgoing',
       metadata: body.metadata ?? null,
-    });
+    }, SYSTEM_CONTEXT);
 
     // Place the outbound call via Twilio REST API
     // Build the webhook URL from the incoming request so Twilio can reach our handler when
@@ -623,7 +630,7 @@ export class TwilioVoiceChannelHost {
     let capturedInputTurnId: string | null = null;
     const context: ClientMessageHandlerContext = {
       session,
-      send: (msg: any) => {
+      send: (msg) => {
         if (msg.type === 'start_user_voice_input' && msg.success && msg.inputTurnId) {
           capturedInputTurnId = msg.inputTurnId;
         }

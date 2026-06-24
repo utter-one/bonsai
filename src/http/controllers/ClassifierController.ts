@@ -224,7 +224,7 @@ export class ClassifierController {
   private async getClassifierById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_READ]);
     const params = classifierRouteParamsSchema.parse(req.params);
-    const classifier = await this.classifierService.getClassifierById(params.projectId, params.id);
+    const classifier = await this.classifierService.getClassifierById(params.projectId, params.id, req.context);
     res.status(200).json(classifier);
   }
 
@@ -236,7 +236,7 @@ export class ClassifierController {
     checkPermissions(req, [PERMISSIONS.CLASSIFIER_READ]);
     const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const classifiers = await this.classifierService.listClassifiers(projectId, query);
+    const classifiers = await this.classifierService.listClassifiers(projectId, query, req.context);
     res.status(200).json(classifiers);
   }
 
@@ -271,7 +271,7 @@ export class ClassifierController {
   private async getClassifierAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = classifierRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.classifierService.getClassifierAuditLogs(params.id, params.projectId);
+    const auditLogs = await this.classifierService.getClassifierAuditLogs(params.id, params.projectId, req.context);
     res.status(200).json(auditLogs);
   }
 

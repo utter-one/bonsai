@@ -228,6 +228,10 @@ Send over the `control` channel:
 
 Voice input uses the `control` channel for signaling. The audio itself flows automatically over the native audio media track that was set up during connection (via `getUserMedia()` and `addTrack()`). The server captures it through an RTCAudioSink and routes it to ASR.
 
+**Standard Mode:** Use `start_user_voice_input` and `end_user_voice_input` on the `control` channel to manage turn boundaries.
+
+**Server-Side VAD Mode:** When the project has `serverVad` configured, the server manages speech detection automatically. Simply keep the microphone stream flowing — no `start_user_voice_input` or `end_user_voice_input` calls are needed. The server handles turn boundaries, ASR lifecycle, and barge-in detection. The `user_speaking_started` message is pushed over the `control` channel when the user speaks during AI generation. See [Server VAD Config](../api/projects#server-vad-config) for algorithm options.
+
 **1. Signal start (control channel):**
 
 ```json

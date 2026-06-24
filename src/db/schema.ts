@@ -85,16 +85,41 @@ export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
-  asrConfig: jsonb('asr_config').$type<{
+asrConfig: jsonb('asr_config').$type<{
     asrProviderId?: string;
     settings?: unknown;
     unintelligiblePlaceholder?: string;
     voiceActivityDetection?: boolean;
+    silenceTimeoutMs?: number;
+    maxSilences?: number;
+    silencePlaceholder?: string;
     serverVad?: {
+      algorithm?: 'legacy' | 'silero' | 'firered';
       mode?: number;
       frameDurationMs?: 10 | 20 | 30;
       silencePaddingMs?: number;
       autoEndSilenceDurationMs?: number;
+      gracePeriodMs?: number;
+      model?: 'v5' | 'legacy';
+      positiveSpeechThreshold?: number;
+      negativeSpeechThreshold?: number;
+      frameSamples?: number;
+      redemptionFrames?: number;
+      preSpeechPadFrames?: number;
+      minSpeechFrames?: number;
+      submitUserSpeechOnPause?: boolean;
+      speechThreshold?: number;
+      smoothWindowSize?: number;
+      minSpeechFrame?: number;
+      maxSpeechFrame?: number;
+      minSilenceFrame?: number;
+      padStartFrame?: number;
+      smartTurn?: {
+        enabled?: boolean;
+        threshold?: number;
+      };
+      bargeInSilenceTimeout?: number;
+      bargeInSilencePlaceholder?: string;
     };
   }>(),
   acceptVoice: boolean('accept_voice').notNull().default(true),
@@ -127,6 +152,7 @@ export const projects = pgTable('projects', {
   }>(),
   startingStageId: text('starting_stage_id'),
   conversationTimeoutSeconds: integer('conversation_timeout_seconds'),
+  recordingConfig: jsonb('recording_config').$type<{ enabled: boolean; recordInput?: boolean; recordOutput?: boolean; format?: string }>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -290,7 +316,7 @@ export const knowledgeItems = pgTable('knowledge_items', {
   id: text('id').notNull(),
   projectId: text('project_id').notNull(),
   categoryId: text('category_id').notNull(),
-  question: text('question').notNull(),
+  questions: text('questions').array().notNull().default([]),
   answer: text('answer').notNull(),
   order: integer('order').notNull().default(0),
   version: integer('version').notNull().default(1),
@@ -552,7 +578,16 @@ export type DataExtractionEntry = {
 };
 
 /** Status of a scenario run or scenario conversation */
-export type ScenarioRunStatus = 'queued' | 'in_progress' | 'passed' | 'failed' | 'cancelled';
+export type ScenarioRunStatus = 'queued' | 'in_progress' | 'passed' | 'failed' | 'cancelled' | 'error';
+
+/** Possible outcomes for a single test run conversation (persisted on scenarioConversations) */
+export type TestRunStatus = 'conversation_ended' | 'conversation_aborted' | 'conversation_failed' | 'max_turns_reached' | 'tester_hung_up';
+
+/** Detailed test statistics for a scenario run or scenario conversation */
+export type TestStatistics = {
+  passedTests: number;
+  failedTests: number;
+};
 
 // Tester table — persona that acts as a user in scenario testing
 export const testers = pgTable('testers', {
@@ -607,6 +642,8 @@ export const scenarioRuns = pgTable('scenario_runs', {
   totalConversations: integer('total_conversations').notNull(),
   status: text('status').notNull().$type<ScenarioRunStatus>().default('queued'),
   statusDetails: text('status_details'),
+  errorCount: integer('error_count').notNull().default(0),
+  testStatistics: jsonb('test_statistics').$type<TestStatistics>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -625,8 +662,10 @@ export const scenarioConversations = pgTable('scenario_conversations', {
   testerId: text('tester_id').notNull(),
   conversationId: text('conversation_id'),
   status: text('status').notNull().$type<ScenarioRunStatus>().default('queued'),
+  testRunStatus: text('test_run_status').$type<TestRunStatus>(),
   dataExtractionResults: jsonb('data_extraction_results').$type<Record<string, unknown>>(),
   dataTransformationResults: jsonb('data_transformation_results').$type<Record<string, unknown>>(),
+  testStatistics: jsonb('test_statistics').$type<TestStatistics>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

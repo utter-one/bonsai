@@ -20,7 +20,7 @@ const GRAPH_API_BASE = 'https://graph.facebook.com/v17.0';
 export class WhatsAppConnection implements IClientConnection {
   readonly connectionType = 'whatsapp' as const;
 
-  private session: Session;
+  private session: Session | null = null;
 
   constructor(
     /** The sender's WhatsApp number in E.164 format, used as the recipient for outbound messages. */
@@ -45,7 +45,9 @@ export class WhatsAppConnection implements IClientConnection {
    * Closes the connection and unregisters the associated session.
    */
   async close(): Promise<void> {
-    await this.sessionManager.unregisterSession(this.session.id);
+    if (this.session) {
+      await this.sessionManager.unregisterSession(this.session.id);
+    }
   }
 
   /**
@@ -87,6 +89,7 @@ export class WhatsAppConnection implements IClientConnection {
       logger.info({ to: this.senderNumber, sessionId: this.session?.id }, 'WhatsApp message sent');
     } catch (error) {
       logger.error({ error, to: this.senderNumber, sessionId: this.session?.id }, 'Failed to send WhatsApp message');
+      throw error;
     }
   }
 }

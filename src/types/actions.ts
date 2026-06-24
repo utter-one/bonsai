@@ -86,6 +86,7 @@ export const callToolEffectSchema = z.object({
   type: z.literal('call_tool').describe('Effect type'),
   toolId: z.string().min(1).describe('ID of the tool to call'),
   parameters: z.record(z.string(), z.unknown()).describe('Parameters to pass to the tool'),
+  asynchronous: z.boolean().optional().default(false).describe('When true, the tool runs in the background without blocking the conversation. The result is not stored in context and flow control signals (go_to_stage, end_conversation, etc.) are discarded. Use for fire-and-forget operations such as logging or saving data.'),
 }).openapi('CallToolEffect');
 
 /**

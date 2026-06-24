@@ -65,10 +65,17 @@ Runs an ad-hoc funnel query and returns per-step conversion metrics.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `steps` | `FunnelStep[]` | Yes | Ordered funnel steps (2–15) |
+| `steps` | `FunnelStep[]` | Yes | Ordered funnel steps (min 2, max 15) |
 | `relativeTime` | `RelativeTime` | No | Relative time window (mutually exclusive with `from`/`to`) |
+| `scenarioRunId` | `string` | No | Filter to conversations used by this scenario run |
 | `from` | `string` (ISO 8601) | No | Start of the absolute date range (inclusive) |
 | `to` | `string` (ISO 8601) | No | End of the absolute date range (inclusive) |
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `scenarioRunId` | `string` | Filter funnels to conversations used by this scenario run |
 
 #### Funnel Step
 
@@ -168,10 +175,7 @@ Returns all saved funnel queries visible to the requesting operator: their own q
 
 ### Response `200 OK`
 
-```json
-{
-  "items": [SavedFunnelQueryResponse]
-}
+Returns a flat array of [Saved Funnel Query Response](#saved-funnel-query-response) objects.
 ```
 
 ---
@@ -217,7 +221,7 @@ Content-Type: application/json
 
 **Response** `200 OK` — [Saved Funnel Query Response](#saved-funnel-query-response)
 
-**Errors:** `404` Not found | `409` Version conflict
+**Errors:** `403` Not the owner | `404` Not found | `409` Version conflict
 
 ---
 
@@ -238,7 +242,7 @@ Content-Type: application/json
 
 **Response** `204 No Content`
 
-**Errors:** `404` Not found | `409` Version conflict
+**Errors:** `403` Not the owner | `404` Not found | `409` Version conflict
 
 ---
 

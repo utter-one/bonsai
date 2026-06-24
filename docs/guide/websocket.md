@@ -25,7 +25,7 @@ After connecting, the client must authenticate with an API key:
     "sendTextInput": true,
     "receiveVoiceOutput": true,
     "receiveTranscriptionUpdates": true,
-    "receiveEvents": false
+    "receiveEvents": true
   }
 }
 ```
@@ -195,6 +195,59 @@ Voice input uses a three-step streaming protocol:
   "conversationId": "conv-uuid",
   "inputTurnId": "turn-uuid"
 }
+```
+
+### Server-Side VAD Mode
+
+When the project has `serverVad` configured in its `asrConfig`, the server manages speech detection and turn boundaries automatically. The client simply streams audio continuously without calling `start_user_voice_input` or `end_user_voice_input`.
+
+**Client flow:**
+
+```json
+{
+  "type": "send_user_voice_chunk",
+  "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
+  "audioData": "<base64-encoded-audio>",
+  "ordinal": 0
+}
+```
+
+The `inputTurnId` field is optional in VAD mode — the server assigns it automatically and includes it in all downstream events.
+
+**Three VAD algorithms are available:**
+
+- **Legacy** — millisecond-based parameters with mode-based thresholds (0–3 aggressiveness)
+- **Silero** — frame-based parameters with fine-grained control over speech/silence thresholds
+- **FireRed** — ONNX-based streaming VAD with state-of-the-art multilingual performance
+
+See [Server VAD Config](../api/projects#server-vad-config) for algorithm details and parameter tables.
+
+**Smart Turn Detection** is an optional feature that runs after VAD detects silence. It uses an ONNX model to verify whether the speaker has actually finished their turn or is pausing mid-sentence, reducing false turn endings.
+
+**Barge-in:** When the user speaks while the AI is generating a response, the server sends a `user_speaking_started` message. The client should stop playing AI voice output and prepare for the new user utterance.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: start_conversation
+    S->>C: start_conversation { conversationId }
+    Note over C,S: Server enters VAD mode
+    loop Continuous audio streaming
+        C->>S: send_user_voice_chunk { audioData }
+        Note over S: VAD detects speech start
+        S-->>C: user_transcribed_chunk { chunkText }
+        Note over S: VAD detects silence (+ Smart Turn check)
+    end
+    S->>C: start_ai_generation_output
+    S-->>C: ai_transcribed_chunk (xN streamed)
+    S-->>C: send_ai_voice_chunk (xN streamed)
+    Note over S: User speaks during AI generation
+    S-->>C: user_speaking_started
+    Note over C: Stop AI audio playback
+    Note over S: VAD detects new utterance
+    S->>C: end_ai_generation_output
 ```
 
 ```mermaid

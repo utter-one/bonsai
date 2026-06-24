@@ -1,4 +1,5 @@
 import { injectable, inject } from 'tsyringe';
+import { count } from 'drizzle-orm';
 import { db } from '../db/index';
 import { operators } from '../db/schema';
 import type { InitialOperatorSetupRequest, InitialOperatorSetupResponse, SetupStatusResponse } from '../http/contracts/setup';
@@ -22,11 +23,11 @@ export class SetupService {
     logger.debug('Checking system setup status');
 
     try {
-      const operatorCount = await db.query.operators.findMany({ limit: 1 });
+      const [{ count: operatorCount }] = await db.select({ count: count() }).from(operators);
 
-      const isSetup = operatorCount.length > 0;
+      const isSetup = operatorCount > 0;
 
-      logger.debug({ isSetup, operatorCount: operatorCount.length }, 'System setup status checked');
+      logger.debug({ isSetup, operatorCount }, 'System setup status checked');
 
       return {
         isSetup,
@@ -47,24 +48,29 @@ export class SetupService {
   async createInitialOperator(input: InitialOperatorSetupRequest): Promise<InitialOperatorSetupResponse> {
     logger.info({ operatorId: input.id, name: input.name }, 'Creating initial operator account');
 
+    // Hash password outside the transaction to avoid holding a transaction for crypto work
+    const hashedPassword = await this.authService.hashPassword(input.password);
+
     try {
-      // Check if any operator accounts exist
-      const existingOperators = await db.query.operators.findMany({ limit: 1 });
+      let createdOperator: typeof operators.$inferSelect;
 
-      if (existingOperators.length > 0) {
-        logger.warn({ operatorId: input.id, existingOperatorCount: existingOperators.length }, 'Attempted initial operator creation when system is already set up');
-        throw new InvalidOperationError('System is already configured. Use regular operator creation endpoint instead.');
-      }
+      await db.transaction(
+        async (tx) => {
+          const [{ count: operatorCount }] = await tx.select({ count: count() }).from(operators);
 
-      // Hash password before storing
-      const hashedPassword = await this.authService.hashPassword(input.password);
+          if (operatorCount > 0) {
+            logger.warn({ operatorId: input.id }, 'Attempted initial operator creation when system is already set up');
+            throw new InvalidOperationError('System is already configured. Use regular operator creation endpoint instead.');
+          }
 
-      // Create operator with super_admin role (all permissions)
-      const operator = await db.insert(operators).values({ id: input.id, name: input.name, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
+          const operator = await tx.insert(operators).values({ id: input.id, name: input.name, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
 
-      const createdOperator = operator[0];
+          createdOperator = operator[0];
+        },
+        { isolationLevel: 'serializable' },
+      );
 
-      // Generate authentication tokens for immediate login
+      // Generate authentication tokens for immediate login (outside transaction)
       const loginResponse = await this.authService.login(input.id, input.password);
 
       logger.info({ operatorId: createdOperator.id, roles: createdOperator.roles }, 'Initial operator account created successfully');

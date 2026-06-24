@@ -35,17 +35,22 @@ export class SetVarHandler implements ClientMessageHandler<CALSetVarRequest> {
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.session.runner.saveCommandEvent('set_var', { stageId: message.stageId, variableName: message.variableName, variableValue: message.variableValue });
-      await context.session.runner.setVariable(message.stageId, message.variableName, message.variableValue);
+      if (!context.session.runner) {
+        throw new InvalidOperationError('No active conversation runner');
+      }
 
-      const response: CALSetVarResponse = { type: 'set_var_result', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
+      await context.session.runner.setVariable(message.stageId, message.variableName, message.variableValue);
+      await context.session.runner.saveCommandEvent('set_var', { stageId: message.stageId, variableName: message.variableName, variableValue: message.variableValue });
+
+      const response: CALSetVarResponse = { type: 'set_var', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
       context.send(response);
 
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Set variable completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to set variable';
+      const sanitizedError = 'Failed to set variable';
       logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId, variableName: message.variableName }, 'Failed to set variable');
-      const response: CALSetVarResponse = { type: 'set_var_result', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
+      const response: CALSetVarResponse = { type: 'set_var', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: sanitizedError };
       context.send(response);
     }
   }

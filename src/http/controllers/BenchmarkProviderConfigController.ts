@@ -92,7 +92,7 @@ export class BenchmarkProviderConfigController {
   private async listProviderConfigs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.BENCHMARK_READ]);
     const query = listParamsSchema.parse(req.query);
-    const result = await this.service.listProviderConfigs(query, req.context);
+    const result = await this.service.listProviderConfigs(req.context, query);
     res.status(200).json(result);
   }
 

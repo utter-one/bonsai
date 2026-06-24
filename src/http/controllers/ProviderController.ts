@@ -226,7 +226,7 @@ export class ProviderController {
   private async listProviders(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.PROVIDER_READ]);
     const query = listParamsSchema.parse(req.query);
-    const providers = await this.providerService.listProviders(query, req.context);
+    const providers = await this.providerService.listProviders(req.context, query);
     res.status(200).json(providers);
   }
 

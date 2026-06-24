@@ -18,6 +18,10 @@ export type EvaluationResult = {
   dataTransformationResults: Record<string, unknown> | null;
   /** Whether the evaluation passed. True when no expectedValue is defined or all match. */
   passed: boolean;
+  /** Number of individual test assertions that passed */
+  passedTests: number;
+  /** Number of individual test assertions that failed */
+  failedTests: number;
 };
 
 /**
@@ -43,7 +47,7 @@ export class ScenarioConversationEvaluator {
 
     if (!conversation) {
       logger.warn({ conversationId }, 'Conversation not found during evaluation, returning empty results');
-      return { dataExtractionResults: {}, dataTransformationResults: null, passed: false };
+      return { dataExtractionResults: {}, dataTransformationResults: null, passed: false, passedTests: 0, failedTests: 0 };
     }
 
     const stageVars: Record<string, Record<string, unknown>> = (conversation.stageVars as Record<string, Record<string, unknown>>) ?? {};
@@ -65,11 +69,14 @@ export class ScenarioConversationEvaluator {
       return acc;
     }, {} as Record<string, { value?: unknown; mode?: EvaluationComparisonMode }>);
 
-    const passed = this.checkExpectedValues(dataExtractionResults, extractionExpectations)
-      && this.checkExpectedValues(dataTransformationResults ?? {}, scenario.dataPostProcessingExpected ?? {});
+    const extractionStats = this.checkExpectedValues(dataExtractionResults, extractionExpectations);
+    const transformationStats = this.checkExpectedValues(dataTransformationResults ?? {}, scenario.dataPostProcessingExpected ?? {});
+    const passedTests = extractionStats.passed + transformationStats.passed;
+    const failedTests = extractionStats.failed + transformationStats.failed;
+    const passed = failedTests === 0;
 
-    logger.info({ conversationId, scenarioId: scenario.id, passed }, 'Scenario conversation evaluation complete');
-    return { dataExtractionResults, dataTransformationResults, passed };
+    logger.info({ conversationId, scenarioId: scenario.id, passed, passedTests, failedTests }, 'Scenario conversation evaluation complete');
+    return { dataExtractionResults, dataTransformationResults, passed, passedTests, failedTests };
   }
 
   /**
@@ -128,40 +135,43 @@ export class ScenarioConversationEvaluator {
 
   /**
    * Checks whether the actual results match the expected values using mode-aware comparison.
-   * Returns true if no expected values are configured or all defined expected values pass their assertions.
+   * Evaluates all assertions and returns per-test pass/fail counts.
    * @param actual - Actual results (transformed or extracted)
    * @param expected - Expected values with optional mode from scenario configuration
-   * @returns True if all expected values match or no expected values are defined
+   * @returns Counts of passed and failed assertions
    */
-  private checkExpectedValues(actual: Record<string, unknown>, expected: Record<string, { value?: unknown; mode?: EvaluationComparisonMode }> | null): boolean {
-    if (!expected || Object.keys(expected).length === 0) return true;
+  private checkExpectedValues(actual: Record<string, unknown>, expected: Record<string, { value?: unknown; mode?: EvaluationComparisonMode }> | null): { passed: number; failed: number } {
+    if (!expected || Object.keys(expected).length === 0) return { passed: 0, failed: 0 };
+
+    let passed = 0;
+    let failed = 0;
 
     for (const [key, expectation] of Object.entries(expected)) {
       const { value: expectedValue, mode = 'eq' } = expectation;
       const actualValue = actual[key];
 
+      let result = false;
+
       if (mode === 'exists') {
-        if (actualValue == null) {
-          logger.debug({ key, mode }, 'Expected value to exist but was null');
-          return false;
-        }
+        result = actualValue != null;
       } else if (mode === 'not_exists') {
-        if (actualValue != null) {
-          logger.debug({ key, mode }, 'Expected value not to exist but was found');
-          return false;
+        result = actualValue == null;
+      } else {
+        if (!comparisonModes.includes(mode)) {
+          logger.warn({ key, mode }, `Unknown comparison mode "${mode}", falling back to eq`);
         }
-      } else if (!comparisonModes.includes(mode)) {
-        logger.warn({ key, mode }, `Unknown comparison mode "${mode}", falling back to eq`);
+        result = this.compareValue(actualValue, expectedValue, mode);
       }
 
-      const result = this.compareValue(actualValue, expectedValue, mode);
-      if (!result) {
+      if (result) {
+        passed++;
+      } else {
+        failed++;
         logger.debug({ key, expectedValue, actualValue, mode }, 'Expected value mismatch');
-        return false;
       }
     }
 
-    return true;
+    return { passed, failed };
   }
 
   /**

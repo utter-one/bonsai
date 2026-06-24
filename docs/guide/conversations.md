@@ -153,3 +153,18 @@ A background job runs every minute and checks all active conversations (`initial
 The connected client receives a `conversation_aborted` WebSocket event with the reason `"Conversation timed out due to inactivity"`.
 
 See [Projects — Conversation Timeout](./projects#conversation-timeout) for configuration details.
+
+## Audio Recordings
+
+If the project has `recordingConfig` enabled, the conversation will record both user voice input and AI voice output as separate audio files. The recordings are accumulated throughout the entire conversation and flushed to storage when the conversation reaches a terminal state (`finished`, `aborted`, or `failed`).
+
+Two artifacts are produced:
+
+| Artifact Type | Description |
+|---|---|
+| `user_voice` | Combined audio of all user voice input during the conversation |
+| `ai_voice` | Combined audio of all AI voice output during the conversation |
+
+The audio is automatically converted from the source format (ASR input format for user voice, TTS output format for AI voice) to the configured recording format. Recordings are stored as conversation artifacts via the project's storage provider.
+
+See [Projects — Recording Configuration](./projects#recording-configuration) for details.

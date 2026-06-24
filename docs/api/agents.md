@@ -139,6 +139,7 @@ When configured, an LLM generates a short neutral sentence at the very start of 
 | `llmProviderId` | `string` | Yes | ID of the LLM provider used to generate the filler sentence |
 | `llmSettings` | `object` | Yes | LLM provider-specific settings (model, temperature, etc.) |
 | `prompt` | `string` | Yes | System prompt instructing the LLM to produce a single short neutral filler sentence |
+| `historyMessageCount` | `number` | No | Number of recent conversation messages to include in filler context. `0` = no history (default), `-1` = all history, `N > 0` = last N messages |
 
 The `prompt` field supports the same [template variables](../guide/templating) as stage prompts, with the following available at filler-generation time:
 

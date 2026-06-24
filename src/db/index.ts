@@ -27,7 +27,7 @@ pool.on('connect', (client) => {
 });
 
 pool.on('connect', () => {
-  logger.info('✅ Database connected successfully');
+  logger.debug('✅ Database connected successfully');
 });
 
 pool.on('error', (err) => {

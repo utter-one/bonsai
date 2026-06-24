@@ -155,6 +155,10 @@ Voice input combines control-channel signaling with audio-channel binary streami
 
 See [WebSocket API — Voice Input Flow](./websocket#voice-input-flow) for the signaling message schemas (identical for WebRTC).
 
+### Server-Side VAD Mode
+
+When the project has `serverVad` configured, the server manages speech detection and turn lifecycle automatically. The client keeps the audio stream flowing without signaling start/end. See [WebSocket API — Voice Input Flow](./websocket#voice-input-flow) for VAD mode details and [Server VAD Config](./projects#server-vad-config) for algorithm options.
+
 ---
 
 ## Environment Variables

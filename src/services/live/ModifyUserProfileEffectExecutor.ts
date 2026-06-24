@@ -33,7 +33,7 @@ export class ModifyUserProfileEffectExecutor {
     try {
       for (const modification of effect.modifications) {
         let { fieldName, value } = modification;
-        logger.info({ conversationId: context.conversationId, fieldName, operation: modification.operation, value }, `Processing user profile modification`);
+        logger.info({ conversationId: context.conversationId, fieldName, operation: modification.operation }, `Processing user profile modification`);
         value = await transformEffectValue(value, context, this.scriptRunner, this.templatingEngine);
 
         switch (modification.operation) {
@@ -69,7 +69,13 @@ export class ModifyUserProfileEffectExecutor {
             if (!Array.isArray(currentValue)) {
               logger.warn({ conversationId: context.conversationId, fieldName, currentValue }, `User profile field ${fieldName} is not an array, cannot remove value`);
             } else {
-              const newValue = currentValue.filter(item => JSON.stringify(item) !== JSON.stringify(value));
+              const newValue = currentValue.filter(item => {
+                try {
+                  return JSON.stringify(item) !== JSON.stringify(value);
+                } catch {
+                  return item !== value;
+                }
+              });
               context.userProfile[fieldName] = newValue;
               hasModifiedUserProfile = true;
               logger.debug({ conversationId: context.conversationId, fieldName, value, removedCount: currentValue.length - newValue.length }, `Removed from user profile array field: ${fieldName}`);

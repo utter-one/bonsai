@@ -14,6 +14,8 @@ import { perplexityLlmSettingsSchema } from '../../services/providers/llm/Perple
 import { cohereLlmSettingsSchema } from '../../services/providers/llm/CohereLlmProvider';
 import { xAILlmSettingsSchema } from '../../services/providers/llm/XAILlmProvider';
 import { ollamaLlmSettingsSchema } from '../../services/providers/llm/OllamaLlmProvider';
+import { ovhLlmSettingsSchema } from '../../services/providers/llm/OVHLlmProvider';
+import { scalewayLlmSettingsSchema } from '../../services/providers/llm/ScalewayLlmProvider';
 import { elevenLabsTtsSettingsSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
@@ -21,6 +23,7 @@ import { cartesiaTtsSettingsSchema } from '../../services/providers/tts/Cartesia
 import { azureTtsSettingsSchema } from '../../services/providers/tts/AzureTtsProvider';
 import { amazonPollyTtsSettingsSchema } from '../../services/providers/tts/AmazonPollyTtsProvider';
 import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from '../../utils/pagination';
+import { legacyVadConfigSchema, sileroVadConfigSchema, fireredVadConfigSchema } from './vad';
 
 extendZodWithOpenApi(z);
 
@@ -125,6 +128,8 @@ export const llmSettingsSchema = z.union([
   cohereLlmSettingsSchema.catchall(z.unknown()),
   xAILlmSettingsSchema.catchall(z.unknown()),
   ollamaLlmSettingsSchema.catchall(z.unknown()),
+  ovhLlmSettingsSchema.catchall(z.unknown()),
+  scalewayLlmSettingsSchema.catchall(z.unknown()),
 ]).openapi('LlmSettings').nullable().optional().describe('LLM provider-specific settings for this stage');
 
 // ====================
@@ -147,3 +152,20 @@ export const ttsSettingsSchema = z.discriminatedUnion('provider', [
 ]).openapi('TtsSettings').nullable().optional().describe('TTS provider-specific settings');
 
 export type TtsSettings = z.infer<typeof ttsSettingsSchema>;
+
+// ====================
+// VAD Settings Schemas
+// ====================
+
+/**
+ * Discriminated union of all VAD settings types.
+ * Each settings object contains algorithm-specific configuration for voice activity detection.
+ * Uses an 'algorithm' discriminator field to identify the correct schema.
+ */
+export const vadSettingsSchema = z.discriminatedUnion('algorithm', [
+  legacyVadConfigSchema,
+  sileroVadConfigSchema,
+  fireredVadConfigSchema,
+]).openapi('VadSettings').nullable().optional().describe('VAD algorithm-specific settings for voice activity detection');
+
+export type VadSettings = z.infer<typeof vadSettingsSchema>;

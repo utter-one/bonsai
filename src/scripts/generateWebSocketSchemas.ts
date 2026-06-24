@@ -39,7 +39,8 @@ import {
   endUserVoiceInputResponseSchema,
   sendUserTextInputRequestSchema,
   sendUserTextInputResponseSchema,
-  userTranscribedChunkMessageSchema
+  userTranscribedChunkMessageSchema,
+  audioPlaybackEndedRequestSchema
 } from '../channels/websocket/contracts/userInput';
 
 import {
@@ -119,6 +120,7 @@ function generateWebSocketSchemas(): void {
   registry.register('send-user-text-input-request', sendUserTextInputRequestSchema);
   registry.register('send-user-text-input-response', sendUserTextInputResponseSchema);
   registry.register('user-transcribed-chunk', userTranscribedChunkMessageSchema);
+  registry.register('audio-playback-ended-request', audioPlaybackEndedRequestSchema);
   registry.register('go-to-stage-request', goToStageRequestSchema);
   registry.register('go-to-stage-response', goToStageResponseSchema);
   registry.register('set-var-request', setVarRequestSchema);

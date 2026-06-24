@@ -5,6 +5,7 @@ import { calStartConversationRequestSchema } from '../messages';
 import type { CALStartConversationRequest, CALStartConversationResponse } from '../messages';
 import { SessionManager } from '../SessionManager';
 import { ConversationService } from '../../services/ConversationService';
+import { SYSTEM_CONTEXT } from '../../services/RequestContext';
 import { StageService } from '../../services/StageService';
 import { ProjectService } from '../../services/ProjectService';
 import { NotFoundError, InvalidOperationError, UserBannedError } from '../../errors';
@@ -59,17 +60,19 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
         const errorMessage = error instanceof Error ? error.message : 'Failed to start outgoing conversation';
         logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId }, 'Failed to start outgoing conversation');
         if (conversationAttached && conversationId) {
-          this.sessionManager.detachConversationFromSession(context.session.id);
+          await this.sessionManager.detachConversationFromSession(context.session!.id);
         }
-        const response: CALStartConversationResponse = { type: 'start_conversation', conversationId: conversationId ?? '', correlationId: message.correlationId, success: false, error: errorMessage };
-        context.send(response);
+        try {
+          const response: CALStartConversationResponse = { type: 'start_conversation', conversationId: conversationId ?? '', correlationId: message.correlationId, success: false, error: errorMessage };
+          context.send(response);
+        } catch { /* send failure, session will be cleaned up on disconnect */ }
       }
       return;
     }
 
     try {
       // Get project first to check autoCreateUsers flag and resolve timezone later
-      const project = await this.projectService.getProjectById(context.session.projectId);
+      const project = await this.projectService.getProjectById(context.session.projectId, SYSTEM_CONTEXT);
 
       // Look up the user; auto-create if the project allows it
       let user;
@@ -111,7 +114,10 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
       const profileTimezone = user.profile.timezone as string | undefined;
       const resolvedTimezone = message.timezone ?? profileTimezone ?? project.timezone ?? null;
 
-      const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: resolvedStageId, sessionId: context.session.id, status: 'initialized', metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null });
+      const initialStageVars = message.stageVariables && Object.keys(message.stageVariables).length > 0
+        ? { [resolvedStageId]: message.stageVariables }
+        : undefined;
+      const conversation = await this.conversationService.createConversation({ projectId: stage.projectId, userId: message.userId, stageId: resolvedStageId, sessionId: context.session.id, status: 'initialized', stageVars: initialStageVars, metadata: resolvedTimezone ? { timezone: resolvedTimezone } : null }, SYSTEM_CONTEXT);
       conversationId = conversation.id;
 
       await this.sessionManager.attachConversationToSession(context.session.id, conversationId);
@@ -131,17 +137,22 @@ export class StartConversationHandler implements ClientMessageHandler<CALStartCo
       if (conversationAttached && conversationId) {
         const failedEventData: ConversationFailedEventData = { reason: errorMessage, stageId: message.stageId };
         try {
-          await this.conversationService.failConversation(context.session!.projectId, conversationId, errorMessage);
-          await this.conversationService.saveConversationEvent(context.session!.projectId, conversationId, 'conversation_failed', failedEventData, message.stageId);
-          await context.session!.clientConnection?.sendMessage({ type: 'conversation_event', conversationId, eventType: 'conversation_failed', eventData: failedEventData });
+          const session = context.session;
+          if (session) {
+            await this.conversationService.failConversation(session.projectId, conversationId, errorMessage);
+            await this.conversationService.saveConversationEvent(session.projectId, conversationId, 'conversation_failed', failedEventData, message.stageId);
+            await session.clientConnection?.sendMessage({ type: 'conversation_event', conversationId, eventType: 'conversation_failed', eventData: failedEventData });
+          }
         } catch (cleanupError) {
           logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId }, 'Failed to save conversation_failed event during cleanup');
         }
-        this.sessionManager.detachConversationFromSession(context.session.id);
+        await this.sessionManager.detachConversationFromSession(context.session!.id);
       }
 
-      const response: CALStartConversationResponse = { type: 'start_conversation', conversationId: conversationId ?? '', correlationId: message.correlationId, success: false, error: errorMessage };
-      context.send(response);
+      try {
+        const response: CALStartConversationResponse = { type: 'start_conversation', conversationId: conversationId ?? '', correlationId: message.correlationId, success: false, error: errorMessage };
+        context.send(response);
+      } catch { /* send failure, session will be cleaned up on disconnect */ }
     }
   }
 }

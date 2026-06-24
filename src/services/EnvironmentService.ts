@@ -42,9 +42,18 @@ export class EnvironmentService extends BaseService {
     const environmentId = input.id ?? generateId(ID_PREFIXES.ENVIRONMENT);
     logger.info({ environmentId, description: input.description, operatorId: context?.operatorId }, 'Creating environment');
 
+    let newSecretRef: string | undefined;
     try {
-      const passwordToStore = this.secretsRegistry.isSecretReference(input.password) ? input.password : await this.secretsRegistry.storeSecret(this.secretsRegistry.defaultManagerName, input.password);
+      const passwordToStore = this.secretsRegistry.isSecretReference(input.password)
+        ? input.password
+        : await this.secretsRegistry.storeSecret(this.secretsRegistry.defaultManagerName, input.password);
+      if (!this.secretsRegistry.isSecretReference(input.password)) {
+        newSecretRef = passwordToStore;
+      }
+
       const environment = await db.insert(environments).values({ id: environmentId, description: input.description, url: input.url, login: input.login, password: passwordToStore, version: 1 }).returning();
+
+      newSecretRef = undefined;
 
       const createdEnvironment = environment[0];
 
@@ -55,6 +64,11 @@ export class EnvironmentService extends BaseService {
 
       return environmentResponseSchema.parse(createdEnvironment);
     } catch (error) {
+      if (newSecretRef) {
+        await this.secretsRegistry.deleteSecret(newSecretRef).catch(cleanupError => {
+          logger.error({ error: cleanupError, secretRef: newSecretRef }, 'Failed to clean up orphaned secret after environment creation failure');
+        });
+      }
       logger.error({ error, environmentId: input.id }, 'Failed to create environment');
       throw error;
     }
@@ -163,6 +177,7 @@ export class EnvironmentService extends BaseService {
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ environmentId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating environment');
 
+    let newSecretRef: string | undefined;
     try {
       const existingEnvironment = await db.query.environments.findFirst({ where: eq(environments.id, id) });
 
@@ -179,10 +194,18 @@ export class EnvironmentService extends BaseService {
       if (updateData.url !== undefined) updatePayload.url = updateData.url;
       if (updateData.login !== undefined) updatePayload.login = updateData.login;
       if (updateData.password !== undefined) {
-        updatePayload.password = this.secretsRegistry.isSecretReference(updateData.password) ? updateData.password : await this.secretsRegistry.storeSecret(this.secretsRegistry.defaultManagerName, updateData.password);
+        const passwordToStore = this.secretsRegistry.isSecretReference(updateData.password)
+          ? updateData.password
+          : await this.secretsRegistry.storeSecret(this.secretsRegistry.defaultManagerName, updateData.password);
+        updatePayload.password = passwordToStore;
+        if (!this.secretsRegistry.isSecretReference(updateData.password)) {
+          newSecretRef = passwordToStore;
+        }
       }
 
       const updatedEnvironment = await db.update(environments).set(updatePayload).where(and(eq(environments.id, id), eq(environments.version, expectedVersion))).returning();
+
+      newSecretRef = undefined;
 
       if (updatedEnvironment.length === 0) {
         throw new OptimisticLockError(`Failed to update environment due to version conflict`);
@@ -198,6 +221,11 @@ export class EnvironmentService extends BaseService {
 
       return environmentResponseSchema.parse(environment);
     } catch (error) {
+      if (newSecretRef) {
+        await this.secretsRegistry.deleteSecret(newSecretRef).catch(cleanupError => {
+          logger.error({ error: cleanupError, secretRef: newSecretRef }, 'Failed to clean up orphaned secret after environment update failure');
+        });
+      }
       logger.error({ error, environmentId: id }, 'Failed to update environment');
       throw error;
     }

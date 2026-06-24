@@ -90,12 +90,19 @@ Permissions follow the `entity:action` pattern:
 | Tool | `tool:read` | `tool:write` | `tool:delete` |
 | Global Action | `global_action:read` | `global_action:write` | `global_action:delete` |
 | Guardrail | `guardrail:read` | `guardrail:write` | `guardrail:delete` |
+| Sample Copy | `sample_copy:read` | `sample_copy:write` | `sample_copy:delete` |
+| Copy Decorator | `copy_decorator:read` | `copy_decorator:write` | `copy_decorator:delete` |
 | Knowledge | `knowledge:read` | `knowledge:write` | `knowledge:delete` |
 | Conversation | `conversation:read` | `conversation:write` | `conversation:delete` |
 | Issue | `issue:read` | `issue:write` | `issue:delete` |
 | Provider | `provider:read` | `provider:write` | `provider:delete` |
 | API Key | `api_key:read` | `api_key:write` | `api_key:delete` |
 | Environment | `environment:read` | `environment:write` | `environment:delete` |
+| Secrets | `secrets:read` | `secrets:reveal` | `secrets:delete` |
+| Tester | `tester:read` | `tester:write` | `tester:delete` |
+| Scenario | `scenario:read` | `scenario:write` | `scenario:delete` |
+| Scenario Run | `scenario_run:read` | `scenario_run:write` | — |
+| Benchmark | `benchmark:read` | `benchmark:write` | `benchmark:run` |
 | Migration | `migration:export` | `migration:import` | — |
 | System | `system:config` | — | — |
 | Audit | `audit:read` | — | — |

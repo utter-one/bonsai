@@ -213,7 +213,7 @@ export class ApiKeyController {
   private async getApiKey(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.API_KEY_READ]);
     const params = apiKeyRouteParamsSchema.parse(req.params);
-    const result = await this.apiKeyService.getApiKeyById(params.projectId, params.id);
+    const result = await this.apiKeyService.getApiKeyById(params.projectId, params.id, req.context);
     res.status(200).json(result);
   }
 
@@ -224,7 +224,7 @@ export class ApiKeyController {
     checkPermissions(req, [PERMISSIONS.API_KEY_READ]);
     const { projectId } = projectScopedParamsSchema.parse(req.params);
     const query = listParamsSchema.parse(req.query);
-    const result = await this.apiKeyService.listApiKeys(projectId, query);
+    const result = await this.apiKeyService.listApiKeys(req.context, projectId, query);
     res.status(200).json(result);
   }
 
@@ -234,7 +234,7 @@ export class ApiKeyController {
   private async listAllApiKeys(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.API_KEY_READ]);
     const query = listParamsSchema.parse(req.query);
-    const result = await this.apiKeyService.listApiKeys(undefined, query);
+    const result = await this.apiKeyService.listApiKeys(req.context, undefined, query);
     res.status(200).json(result);
   }
 
@@ -267,7 +267,7 @@ export class ApiKeyController {
   private async getApiKeyAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = apiKeyRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.apiKeyService.getApiKeyAuditLogs(params.id, params.projectId);
+    const auditLogs = await this.apiKeyService.getApiKeyAuditLogs(params.id, params.projectId, req.context);
     res.status(200).json(auditLogs);
   }
 }

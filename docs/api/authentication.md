@@ -48,6 +48,7 @@ Content-Type: application/json
 | `operatorId` | `string` | Operator user ID |
 | `displayName` | `string` | Operator display name |
 | `roles` | `string[]` | Array of role identifiers |
+| `permissions` | `string[]` | Effective permissions derived from assigned roles (deduplicated union) |
 
 **Error Responses**
 
@@ -99,6 +100,8 @@ Content-Type: application/json
 |-------|------|-------------|
 | `accessToken` | `string` | New JWT access token |
 | `expiresIn` | `integer` | Access token expiry in seconds |
+| `roles` | `string[]` | Up-to-date array of role identifiers (re-fetched from database) |
+| `permissions` | `string[]` | Up-to-date effective permissions derived from current roles |
 
 **Error Responses**
 
@@ -173,14 +176,23 @@ Has every permission in the system.
 | `context_transformer` | `read`, `write`, `delete` |
 | `tool` | `read`, `write`, `delete` |
 | `global_action` | `read`, `write`, `delete` |
+| `guardrail` | `read`, `write`, `delete` |
+| `sample_copy` | `read`, `write`, `delete` |
+| `copy_decorator` | `read`, `write`, `delete` |
 | `environment` | `read`, `write`, `delete` |
 | `knowledge` | `read`, `write`, `delete` |
 | `issue` | `read`, `write`, `delete` |
 | `provider` | `read`, `write`, `delete` |
 | `api_key` | `read`, `write`, `delete` |
+| `secrets` | `read`, `delete`, `reveal` |
+| `tester` | `read`, `write`, `delete` |
+| `scenario` | `read`, `write`, `delete` |
+| `scenario_run` | `read`, `write` |
+| `benchmark` | `read`, `write`, `run` |
 | `migration` | `export`, `import` |
 | `system` | `config` |
 | `audit` | `read` |
+| `analytics` | `read` |
 
 #### `content_manager`
 
@@ -197,10 +209,18 @@ Manages content entities. Has read/write across most entities but cannot delete 
 | `context_transformer` | `read`, `write` |
 | `tool` | `read`, `write` |
 | `global_action` | `read`, `write` |
+| `guardrail` | `read`, `write` |
+| `sample_copy` | `read`, `write` |
+| `copy_decorator` | `read`, `write` |
 | `knowledge` | `read`, `write` |
 | `provider` | `read`, `write` |
 | `api_key` | `read`, `write`, `delete` |
+| `secrets` | `read`, `delete` |
+| `tester` | `read`, `write`, `delete` |
+| `scenario` | `read`, `write`, `delete` |
+| `scenario_run` | `read`, `write` |
 | `audit` | `read` |
+| `analytics` | `read` |
 
 #### `support`
 
@@ -229,12 +249,19 @@ Read-only access across all technical entities plus system configuration. No wri
 | `context_transformer` | `read` |
 | `tool` | `read` |
 | `global_action` | `read` |
+| `guardrail` | `read` |
+| `sample_copy` | `read` |
+| `copy_decorator` | `read` |
 | `knowledge` | `read` |
 | `issue` | `read` |
 | `provider` | `read` |
 | `api_key` | `read` |
+| `tester` | `read` |
+| `scenario` | `read` |
+| `scenario_run` | `read` |
 | `system` | `config` |
 | `audit` | `read` |
+| `analytics` | `read` |
 
 #### `viewer`
 
@@ -251,8 +278,15 @@ Strictly read-only access. Same entity coverage as `developer` but without `syst
 | `context_transformer` | `read` |
 | `tool` | `read` |
 | `global_action` | `read` |
+| `guardrail` | `read` |
+| `sample_copy` | `read` |
+| `copy_decorator` | `read` |
 | `knowledge` | `read` |
 | `issue` | `read` |
 | `provider` | `read` |
 | `api_key` | `read` |
+| `tester` | `read` |
+| `scenario` | `read` |
+| `scenario_run` | `read` |
 | `audit` | `read` |
+| `analytics` | `read` |

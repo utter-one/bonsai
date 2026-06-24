@@ -1,8 +1,10 @@
 import { injectable, inject } from 'tsyringe';
 import { eq, ilike, or, and, SQL, desc, sql } from 'drizzle-orm';
+import type { InferSelectModel } from 'drizzle-orm';
 import { parseTextSearch } from '../utils/textSearch';
 import { db } from '../db/index';
 import { operators } from '../db/schema';
+type OperatorRow = InferSelectModel<typeof operators>;
 import type { CreateOperatorRequest, UpdateOperatorRequest, OperatorResponse, OperatorListResponse, UpdateProfileRequest, ProfileResponse } from '../http/contracts/operator';
 import type { ListParams } from '../http/contracts/common';
 import { operatorResponseSchema, operatorListResponseSchema, profileResponseSchema } from '../http/contracts/operator';
@@ -59,7 +61,7 @@ export class OperatorService extends BaseService {
 
       logger.info({ operatorId: createdOperator.id }, 'Operator created successfully');
 
-      return operatorResponseSchema.parse(createdOperator);
+      return operatorResponseSchema.parse(safeCreatedOperator);
     } catch (error) {
       logger.error({ error, operatorId: input.id }, 'Failed to create operator');
       throw error;
@@ -82,7 +84,8 @@ export class OperatorService extends BaseService {
         throw new NotFoundError(`Operator with id ${id} not found`);
       }
 
-      return operatorResponseSchema.parse(operator);
+      const { password: _pw, ...safeOperator } = operator;
+      return operatorResponseSchema.parse(safeOperator);
     } catch (error) {
       logger.error({ error, operatorId: id }, 'Failed to fetch operator');
       throw error;
@@ -152,7 +155,7 @@ export class OperatorService extends BaseService {
       });
 
       return operatorListResponseSchema.parse({
-        items: operatorList,
+        items: operatorList.map(({ password: _pw, ...op }) => op),
         total,
         offset,
         limit,
@@ -194,7 +197,7 @@ export class OperatorService extends BaseService {
       }
 
       // Hash password if it's being updated
-      const updatePayload: any = {
+      const updatePayload: Partial<OperatorRow> = {
         name: updateData.name,
         roles: updateData.roles ? Array.from(new Set(updateData.roles)) : undefined,
         metadata: updateData.metadata,
@@ -220,7 +223,7 @@ export class OperatorService extends BaseService {
 
       logger.info({ operatorId: operator.id, newVersion: operator.version }, 'Operator updated successfully');
 
-      return operatorResponseSchema.parse(operator);
+      return operatorResponseSchema.parse(safeOperator);
     } catch (error) {
       logger.error({ error, operatorId: id }, 'Failed to update operator');
       throw error;
@@ -291,7 +294,7 @@ export class OperatorService extends BaseService {
     const invalidRoles = roles.filter(role => !(role in ROLES));
 
     if (invalidRoles.length > 0) {
-      throw new Error(`Invalid roles: ${invalidRoles.join(', ')}. Valid roles are: ${validRoles.join(', ')}`);
+      throw new ValidationError('Invalid roles', [{ code: 'custom', path: ['roles'], message: `Invalid roles: ${invalidRoles.join(', ')}. Valid roles are: ${validRoles.join(', ')}` }]);
     }
   }
 
@@ -311,7 +314,8 @@ export class OperatorService extends BaseService {
         throw new NotFoundError(`Operator with id ${context.operatorId} not found`);
       }
 
-      return profileResponseSchema.parse(operator);
+      const { password: _pw, ...safeOperator } = operator;
+      return profileResponseSchema.parse(safeOperator);
     } catch (error) {
       logger.error({ error, operatorId: context.operatorId }, 'Failed to fetch profile');
       throw error;
@@ -351,7 +355,7 @@ export class OperatorService extends BaseService {
       }
 
       // Build update data
-      const updateData: any = {
+      const updateData: Partial<OperatorRow> = {
         version: existingOperator.version + 1,
         updatedAt: new Date(),
       };
@@ -366,9 +370,9 @@ export class OperatorService extends BaseService {
 
       const updatedOperator = await db.update(operators).set(updateData).where(eq(operators.id, context.operatorId)).returning();
 
-      if (updatedOperator.length === 0) {
-        throw new Error('Failed to update profile');
-      }
+    if (updatedOperator.length === 0) {
+      throw new NotFoundError(`Operator with id ${context.operatorId} not found`);
+    }
 
       const operator = updatedOperator[0];
 
@@ -382,7 +386,7 @@ export class OperatorService extends BaseService {
 
       logger.info({ operatorId: operator.id, newVersion: operator.version }, 'Profile updated successfully');
 
-      return profileResponseSchema.parse(operator);
+      return profileResponseSchema.parse(safeOperator);
     } catch (error) {
       logger.error({ error, operatorId: context.operatorId }, 'Failed to update profile');
       throw error;

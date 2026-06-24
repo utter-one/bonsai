@@ -3,7 +3,7 @@ import { z } from "zod";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { Tool } from "../../types/models";
 import { db } from "../../db";
-import { NotFoundError } from "../../errors";
+import { NotFoundError, InvalidOperationError, RemoteConnectionError } from "../../errors";
 import { llmContentSchema, LlmGenerationOptions, LlmMessage, MessageContent } from "../providers/llm/ILlmProvider";
 import { buildLlmUsage, llmUsageMetadataSchema } from '../../utils/llmUsage';
 import { TemplatingEngine } from "./TemplatingEngine";
@@ -74,7 +74,7 @@ export class ToolExecutor {
    */
   private async executeSmartFunctionTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>, costManagementConfig?: CostManagementConfig | null): Promise<ToolExecutionResult> {
     if (!tool.llmProviderId) {
-      throw new Error(`Tool "${tool.name}" does not have an associated LLM provider`);
+      throw new InvalidOperationError(`Tool "${tool.name}" does not have an associated LLM provider`);
     }
     const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, tool.llmProviderId) });
     if (!llmProviderEntity) {
@@ -87,7 +87,7 @@ export class ToolExecutor {
       const actualContext = { ...context, tool: { parameters } };
       await llmProvider.init();
       const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);
-      logger.debug({ toolId: tool.id, renderedPrompt }, `Rendered prompt for tool "${tool.name}"`);
+      logger.debug({ toolId: tool.id }, `Rendered prompt for tool "${tool.name}"`);
 
       const messages: LlmMessage[] = [{ role: 'system' as const, content: renderedPrompt }];
       const imageMessages = this.extractImageMessages(parameters);
@@ -96,7 +96,7 @@ export class ToolExecutor {
 
       const toolModel = tool.llmSettings?.model;
       const toolLimits = resolveProviderModelLimits(costManagementConfig, llmProviderEntity.id, toolModel);
-      const toolMaxTokens = resolveOutputCap((tool.llmSettings as any)?.defaultMaxTokens, toolLimits, 'tool');
+      const toolMaxTokens = resolveOutputCap(tool.llmSettings?.defaultMaxTokens, toolLimits, 'tool');
       const toolInputCap = toolLimits?.inputTokensLimits?.tool;
       const { messages: truncatedToolMessages, ...toolTruncation } = truncateMessagesToTokenBudget(messages, toolInputCap, toolModel);
       const toolOptions = { outputFormat: this.getOutputFormat(tool), ...(toolMaxTokens !== undefined ? { maxTokens: toolMaxTokens } : {}) };
@@ -117,7 +117,7 @@ export class ToolExecutor {
    */
   private async executeWebhookTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
     if (!tool.url) {
-      throw new Error(`Webhook tool "${tool.name}" does not have a URL configured`);
+      throw new InvalidOperationError(`Webhook tool "${tool.name}" does not have a URL configured`);
     }
 
     const toolStartMs = Date.now();
@@ -125,6 +125,16 @@ export class ToolExecutor {
       const templateContext = { ...context, tool: { parameters } };
 
       const renderedUrl = await this.templatingEngine.render(tool.url, templateContext);
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(renderedUrl);
+      } catch {
+        throw new InvalidOperationError(`Webhook tool "${tool.name}" rendered to an invalid URL`);
+      }
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        throw new InvalidOperationError(`Webhook tool "${tool.name}" URL scheme "${parsedUrl.protocol}" is not allowed. Only http and https are permitted.`);
+      }
 
       const renderedHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
       if (tool.webhookHeaders) {
@@ -142,7 +152,14 @@ export class ToolExecutor {
 
       logger.debug({ toolId: tool.id, url: renderedUrl, method }, `Executing webhook tool "${tool.name}"`);
 
-      const response = await fetch(renderedUrl, fetchOptions);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      let response: Response;
+      try {
+        response = await fetch(renderedUrl, { ...fetchOptions, signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       let data: unknown;
       const contentType = response.headers.get('content-type');
@@ -158,6 +175,11 @@ export class ToolExecutor {
       const result = { status: response.status, statusText: response.statusText, headers: headersObj, data };
       const endMs = Date.now();
       const durationMs = endMs - toolStartMs;
+
+      if (!response.ok) {
+        return { success: false, toolId: tool.id, parameters, failureReason: `HTTP ${response.status}: ${response.statusText}`, result, durationMs, startMs: toolStartMs, endMs };
+      }
+
       return { success: true, toolId: tool.id, parameters, result, durationMs, startMs: toolStartMs, endMs };
     } catch (error) {
       logger.error({ toolId: tool.id, url: tool.url, error }, `Error executing webhook tool "${tool.name}"`);
@@ -172,7 +194,7 @@ export class ToolExecutor {
    */
   private async executeScriptTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>): Promise<ToolExecutionResult> {
     if (!tool.code) {
-      throw new Error(`Script tool "${tool.name}" does not have code configured`);
+      throw new InvalidOperationError(`Script tool "${tool.name}" does not have code configured`);
     }
 
     const toolStartMs = Date.now();
@@ -220,10 +242,9 @@ export class ToolExecutor {
       if (this.isImageParameter(value)) {
         imageMessages.push({ role: 'user', content: [this.convertImageToContent(value)] });
       } else if (Array.isArray(value) && value.length > 0) {
-        const arrayValue = value as any[];
-        const allImages = arrayValue.every(v => this.isImageParameter(v));
+        const allImages = value.every(v => this.isImageParameter(v));
         if (allImages) {
-          imageMessages.push({ role: 'user', content: arrayValue.map(img => this.convertImageToContent(img as ImageParameterValue)) });
+          imageMessages.push({ role: 'user', content: value.map(img => this.convertImageToContent(img)) });
         }
       }
     }
@@ -231,8 +252,8 @@ export class ToolExecutor {
     return imageMessages;
   }
 
-  private isImageParameter(value: any): value is ImageParameterValue {
-    return typeof value === 'object' && value !== null && typeof value.data === 'string' && typeof value.mimeType === 'string' && value.mimeType.startsWith('image/');
+  private isImageParameter(value: ParameterValue): value is ImageParameterValue {
+    return typeof value === 'object' && !Array.isArray(value) && value !== null && 'data' in value && 'mimeType' in value && typeof value.data === 'string' && typeof value.mimeType === 'string' && value.mimeType.startsWith('image/');
   }
 
   private convertImageToContent(image: ImageParameterValue): MessageContent {

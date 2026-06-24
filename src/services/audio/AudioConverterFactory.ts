@@ -41,12 +41,6 @@ export class AudioConverterFactory {
       case 'speex':
         return SpeexPcmResampler.create(from, to);
 
-      // case 'opus': {
-      //   const direction = from === 'opus' ? 'decode' : 'encode';
-      //   const pcmFormat = direction === 'decode' ? to : from;
-      //   return OpusConverter.create(direction, pcmFormat);
-      // }
-
       case 'g711':
         return G711Converter.create(from, to);
 

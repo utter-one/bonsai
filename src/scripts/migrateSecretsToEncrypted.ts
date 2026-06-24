@@ -22,6 +22,11 @@ import { LocalSecretsManager, LOCAL_SECRETS_MANAGER_NAME } from '../services/sec
 import { SENSITIVE_PROVIDER_CONFIG_FIELDS } from '../services/secrets/SecretRefUtils';
 import { logger } from '../utils/logger';
 
+const NESTED_SENSITIVE_PATHS = [
+  'smtp.auth.pass',
+  'imap.auth.pass',
+];
+
 /** Scans sensitive fields in an object and returns plain-text field names (no DB writes). */
 function scanObject(obj: Record<string, unknown>, registry: SecretsManagerRegistry): string[] {
   const fields: string[] = [];
@@ -31,7 +36,40 @@ function scanObject(obj: Record<string, unknown>, registry: SecretsManagerRegist
       fields.push(key);
     }
   }
+  for (const path of NESTED_SENSITIVE_PATHS) {
+    const parts = path.split('.');
+    let current: Record<string, unknown> = obj;
+    let found = true;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (current[parts[i]] && typeof current[parts[i]] === 'object' && !Array.isArray(current[parts[i]])) {
+        current = current[parts[i]] as Record<string, unknown>;
+      } else {
+        found = false;
+        break;
+      }
+    }
+    if (found) {
+      const leafKey = parts[parts.length - 1]!;
+      const value = current[leafKey];
+      if (typeof value === 'string' && value.length > 0 && !registry.isSecretReference(value)) {
+        fields.push(path);
+      }
+    }
+  }
   return fields;
+}
+
+/** Sets a value at a dot-notation path in an object, creating intermediate objects if needed. */
+function setNested(obj: Record<string, unknown>, path: string, value: unknown): void {
+  const parts = path.split('.');
+  let current: Record<string, unknown> = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!current[parts[i]] || typeof current[parts[i]] !== 'object') {
+      current[parts[i]] = {};
+    }
+    current = current[parts[i]] as Record<string, unknown>;
+  }
+  current[parts[parts.length - 1]!] = value;
 }
 
 /**
@@ -70,9 +108,20 @@ export async function migrateSecretsToEncrypted(registry: SecretsManagerRegistry
   logger.info({ providers: pendingProviders.length, environments: pendingEnvs.length, totalFields: totalChanges }, 'Secrets migration: encrypting plain-text secrets');
 
   for (const p of pendingProviders) {
-    const updated = { ...p.config };
+    const updated = JSON.parse(JSON.stringify(p.config));
     for (const key of p.fields) {
-      updated[key] = await registry.storeSecret(LOCAL_SECRETS_MANAGER_NAME, updated[key] as string);
+      if (key.includes('.')) {
+        const parts = key.split('.');
+        let current: Record<string, unknown> = updated;
+        for (let i = 0; i < parts.length - 1; i++) {
+          current = current[parts[i]] as Record<string, unknown>;
+        }
+        const leafKey = parts[parts.length - 1]!;
+        const ref = await registry.storeSecret(LOCAL_SECRETS_MANAGER_NAME, current[leafKey] as string);
+        setNested(updated, key, ref);
+      } else {
+        updated[key] = await registry.storeSecret(LOCAL_SECRETS_MANAGER_NAME, updated[key] as string);
+      }
     }
     await db.update(providers).set({ config: updated }).where(eq(providers.id, p.id));
     logger.info({ providerId: p.id, providerName: p.name, fields: p.fields }, 'Secrets migration: provider fields encrypted');

@@ -271,7 +271,7 @@ export class ContextTransformerController {
   private async getContextTransformerAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = contextTransformerRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.contextTransformerService.getContextTransformerAuditLogs(params.id, params.projectId);
+    const auditLogs = await this.contextTransformerService.getContextTransformerAuditLogs(params.id, params.projectId, req.context);
     res.status(200).json(auditLogs);
   }
 

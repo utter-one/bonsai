@@ -247,7 +247,7 @@ export class ProjectController {
   private async getProjectById(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.PROJECT_READ]);
     const params = projectRouteParamsSchema.parse(req.params);
-    const project = await this.projectService.getProjectById(params.id);
+    const project = await this.projectService.getProjectById(params.id, req.context);
     res.status(200).json(project);
   }
 
@@ -260,7 +260,7 @@ export class ProjectController {
     checkPermissions(req, [PERMISSIONS.PROJECT_READ]);
     const query = listProjectsQuerySchema.parse(req.query);
     logger.info({ parsedQuery: query }, 'Parsed query parameters for listing projects');
-    const projects = await this.projectService.listProjects(query);
+    const projects = await this.projectService.listProjects(req.context, query);
     res.status(200).json(projects);
   }
 
@@ -318,7 +318,7 @@ export class ProjectController {
   private async getProjectAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = projectRouteParamsSchema.parse(req.params);
-    const auditLogs = await this.projectService.getProjectAuditLogs(params.id);
+    const auditLogs = await this.projectService.getProjectAuditLogs(params.id, req.context);
     res.status(200).json(auditLogs);
   }
 }

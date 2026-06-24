@@ -120,7 +120,7 @@ export class KnowledgeService extends BaseService {
           conditions.push(sql`${knowledgeCategories.tags} @> ${JSON.stringify([parsed.value])}::jsonb`);
         } else {
           const searchTerm = `%${parsed.value}%`;
-          const itemSubQuery = db.select({ id: knowledgeItems.categoryId }).from(knowledgeItems).where(and(eq(knowledgeItems.projectId, projectId), or(ilike(knowledgeItems.question, searchTerm), ilike(knowledgeItems.answer, searchTerm))!));
+          const itemSubQuery = db.select({ id: knowledgeItems.categoryId }).from(knowledgeItems).where(and(eq(knowledgeItems.projectId, projectId), or(sql`EXISTS (SELECT 1 FROM unnest(${knowledgeItems.questions}) AS q WHERE q ILIKE ${searchTerm})`, ilike(knowledgeItems.answer, searchTerm))!));
           conditions.push(or(ilike(knowledgeCategories.name, searchTerm), ilike(knowledgeCategories.promptTrigger, searchTerm), inArray(knowledgeCategories.id, itemSubQuery))!);
         }
       }
@@ -172,11 +172,15 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Failed to update knowledge category due to version conflict`);
       }
 
-      const category = await db.query.knowledgeCategories.findFirst({ where: eq(knowledgeCategories.id, id), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
+      const category = await db.query.knowledgeCategories.findFirst({ where: and(eq(knowledgeCategories.projectId, projectId), eq(knowledgeCategories.id, id)), with: { items: { orderBy: (items, { asc }) => [asc(items.order)] } } });
 
-      await this.auditService.logUpdate('knowledge_category', id, existingCategory, category!, context?.operatorId, projectId);
+      if (!category) {
+        throw new NotFoundError(`Knowledge category with id ${id} not found after update`);
+      }
 
-      logger.info({ categoryId: category!.id, newVersion: category!.version }, 'Knowledge category updated successfully');
+      await this.auditService.logUpdate('knowledge_category', id, existingCategory, category, context?.operatorId, projectId);
+
+      logger.info({ categoryId: category.id, newVersion: category.version }, 'Knowledge category updated successfully');
 
       return knowledgeCategoryResponseSchema.parse(category);
     } catch (error) {
@@ -241,7 +245,7 @@ export class KnowledgeService extends BaseService {
     logger.info({ itemId, categoryId: input.categoryId, operatorId: context?.operatorId }, 'Creating knowledge item');
 
     try {
-      const item = await db.insert(knowledgeItems).values({ id: itemId, projectId, categoryId: input.categoryId, question: input.question, answer: input.answer, order: input.order ?? 0, version: 1 }).returning();
+      const item = await db.insert(knowledgeItems).values({ id: itemId, projectId, categoryId: input.categoryId, questions: input.questions, answer: input.answer, order: input.order ?? 0, version: 1 }).returning();
 
       const createdItem = item[0];
 
@@ -297,7 +301,7 @@ export class KnowledgeService extends BaseService {
         id: knowledgeItems.id,
         projectId: knowledgeItems.projectId,
         categoryId: knowledgeItems.categoryId,
-        question: knowledgeItems.question,
+        questions: knowledgeItems.questions,
         answer: knowledgeItems.answer,
         order: knowledgeItems.order,
         version: knowledgeItems.version,
@@ -316,7 +320,7 @@ export class KnowledgeService extends BaseService {
 
       if (params?.textSearch) {
         const searchTerm = `%${params.textSearch}%`;
-        conditions.push(like(knowledgeItems.question, searchTerm));
+        conditions.push(sql`EXISTS (SELECT 1 FROM unnest(${knowledgeItems.questions}) AS q WHERE q ILIKE ${searchTerm})`);
       }
 
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
@@ -360,7 +364,7 @@ export class KnowledgeService extends BaseService {
         throw new OptimisticLockError(`Knowledge item version mismatch. Expected ${expectedVersion}, got ${existingItem.version}`);
       }
 
-      const updatedItem = await db.update(knowledgeItems).set({ categoryId: updateData.categoryId, question: updateData.question, answer: updateData.answer, order: updateData.order, version: existingItem.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
+      const updatedItem = await db.update(knowledgeItems).set({ categoryId: updateData.categoryId, questions: updateData.questions, answer: updateData.answer, order: updateData.order, version: existingItem.version + 1, updatedAt: new Date() }).where(and(eq(knowledgeItems.projectId, projectId), eq(knowledgeItems.id, id), eq(knowledgeItems.version, expectedVersion))).returning();
 
       if (updatedItem.length === 0) {
         throw new OptimisticLockError(`Failed to update knowledge item due to version conflict`);

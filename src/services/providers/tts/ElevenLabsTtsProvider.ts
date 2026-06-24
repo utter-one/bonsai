@@ -198,11 +198,8 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
    */
   async sendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
-      logger.info(`[ElevenLabs] Adding text to sentence splitter: "${text}"`);
-      // Add text to sentence splitter - it will automatically call sendTextToSocket for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
-      logger.info(`[ElevenLabs] Streaming text without flush: "${text}"`);
       // Stream text to ElevenLabs without flushing - audio generation will be triggered on end()
       await this.sendTextToSocket(text, false);
     }
@@ -273,7 +270,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
         this.audioDurationMs += chunkDuration;
         this.audioChunks = [];
 
-        logger.info(`[ElevenLabs] Chunk #${this.chunkOrdinal} duration: ${chunkDuration}ms`);
+        logger.debug(`[ElevenLabs] Chunk #${this.chunkOrdinal} duration: ${chunkDuration}ms`);
 
         const chunk: GeneratedAudioChunk = {
           chunkId: this.generateChunkId(),
@@ -368,8 +365,6 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     if (this.settings.removeExclamationMarks) {
       text = text.replace(/!/g, '.');
     }
-
-    logger.info(`[ElevenLabs] Sending${flush ? ' and flushing' : ''} text: "${text}"`);
 
     const textMessage = {
       text: text,

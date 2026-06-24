@@ -135,7 +135,6 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
    * @param text The partial recognized text
    */
   protected handleRecognizing(chunkId: string, text: string): void {
-    logger.debug(`ASR recognizing: chunkId=${chunkId}, text="${text}"`);
     if (this.onRecognizingCallback) {
       this.onRecognizingCallback(chunkId, text);
     }
@@ -148,7 +147,6 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
    * @param text The final recognized text
    */
   protected handleRecognized(chunkId: string, text: string): void {
-    logger.info(`ASR recognized: chunkId=${chunkId}, text="${text}"`);
     const chunk: TextChunk = { chunkId, text, timestamp: new Date() };
     this.textChunks.push(chunk);
     if (this.onRecognizedCallback) {

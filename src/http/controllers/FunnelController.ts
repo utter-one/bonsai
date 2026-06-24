@@ -176,7 +176,8 @@ export class FunnelController {
 
   private async runFunnelQuery(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.ANALYTICS_READ]);
-    const { projectId, scenarioRunId } = funnelQueryParamsSchema.parse(req.query);
+    const { projectId } = projectScopedParamsSchema.parse(req.params);
+    const { scenarioRunId } = funnelQueryParamsSchema.parse(req.query);
     const body = funnelQuerySchema.parse(req.body);
     const result = await this.funnelQueryService.runQuery(projectId, body, req.context, scenarioRunId);
     res.status(200).json(result);

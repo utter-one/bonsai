@@ -288,8 +288,6 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
    */
   async sendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
-      logger.info(`[Cartesia] Adding text to sentence splitter: "${text}"`);
-      // Add text to sentence splitter - it will automatically call sendTextToSocket for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
       // Use streaming with continuations: buffer text and flush with timer
@@ -522,9 +520,6 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
     if (!text.trim()) {
       return;
     }
-
-    const isContinuation = !this.sentenceSplitter && !this.isFirstRequest;
-    logger.info(`[Cartesia] Sending text${isContinuation ? ' (continuation)' : ''}: "${text}"`);
 
     // Build voice configuration
     const voice: CartesiaVoiceConfig = {

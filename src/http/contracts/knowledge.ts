@@ -73,7 +73,7 @@ export const knowledgeItemInCategorySchema = z.object({
   id: z.string().describe('Unique identifier for the knowledge item'),
   projectId: z.string().describe('ID of the project this item belongs to'),
   categoryId: z.string().describe('ID of the category this item belongs to'),
-  question: z.string().describe('Question text for this knowledge item'),
+  questions: z.array(z.string()).describe('Array of question texts for this knowledge item'),
   answer: z.string().describe('Answer text for this knowledge item'),
   order: z.number().int().describe('Display order within the category'),
   version: z.number().int().describe('Version number for optimistic locking'),
@@ -130,25 +130,25 @@ export type KnowledgeCategoryListResponse = z.infer<typeof knowledgeCategoryList
 
 /**
  * Schema for creating a new knowledge item
- * Required fields: id, categoryId, question, answer
+ * Required fields: id, categoryId, questions, answer
  * Optional fields: order
  */
 export const createKnowledgeItemSchema = z.object({
   id: z.string().min(1).optional().describe('Unique identifier for the knowledge item (auto-generated if not provided)'),
   categoryId: z.string().min(1).describe('ID of the category this item belongs to'),
-  question: z.string().min(1).describe('Question text for this knowledge item'),
+  questions: z.array(z.string().min(1)).min(1).describe('Array of question texts for this knowledge item'),
   answer: z.string().min(1).describe('Answer text for this knowledge item'),
   order: z.number().int().min(0).optional().describe('Display order within the category (default: 0)'),
 });
 
 /**
  * Schema for updating a knowledge item
- * Optional fields: categoryId, question, answer, order, version
+ * Optional fields: categoryId, questions, answer, order, version
  * Version is required for optimistic locking
  */
 export const updateKnowledgeItemBodySchema = z.object({
   categoryId: z.string().min(1).optional().describe('Updated category ID'),
-  question: z.string().min(1).optional().describe('Updated question text'),
+  questions: z.array(z.string().min(1)).min(1).optional().describe('Updated array of question texts'),
   answer: z.string().min(1).optional().describe('Updated answer text'),
   order: z.number().int().min(0).optional().describe('Updated display order'),
   version: z.number().int().min(1).describe('Current version number for optimistic locking'),
@@ -164,13 +164,13 @@ export const deleteKnowledgeItemBodySchema = z.object({
 
 /**
  * Schema for knowledge item response
- * Includes: id, categoryId, question, answer, order, version, createdAt, updatedAt
+ * Includes: id, categoryId, questions, answer, order, version, createdAt, updatedAt
  */
 export const knowledgeItemResponseSchema = z.object({
   id: z.string().describe('Unique identifier for the knowledge item'),
   projectId: z.string().describe('ID of the project this item belongs to'),
   categoryId: z.string().describe('ID of the category this item belongs to'),
-  question: z.string().describe('Question text for this knowledge item'),
+  questions: z.array(z.string()).describe('Array of question texts for this knowledge item'),
   answer: z.string().describe('Answer text for this knowledge item'),
   order: z.number().int().describe('Display order within the category'),
   version: z.number().int().describe('Version number for optimistic locking'),

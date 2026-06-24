@@ -25,7 +25,7 @@ import { conversationEventTypeSchema, conversationEventDataSchema } from '../typ
  * Base fields shared by all inbound (input) messages.
  */
 export const calBaseInputMessageSchema = z.object({
-  conversationId: z.string().describe('Unique identifier of the conversation'),
+  conversationId: z.string().min(1).describe('Unique identifier of the conversation'),
   correlationId: z.string().optional().describe('Optional caller-supplied identifier echoed back in the corresponding result message'),
 });
 
@@ -51,6 +51,7 @@ export const calStartConversationRequestSchema = calBaseInputMessageSchema.omit(
   direction: z.enum(['incoming', 'outgoing']).optional().describe('Direction of the conversation. Defaults to incoming when not specified.'),
   existingConversationId: z.string().optional().describe('When set, the handler attaches to this pre-created conversation instead of creating a new one. Used for outgoing call flows where the conversation record is created at call initiation time.'),
   userProfile: z.record(z.string(), z.unknown()).optional().describe('Optional user profile data to inject and deep-merge into the user\'s existing profile on the users table.'),
+  stageVariables: z.record(z.string(), z.unknown()).optional().describe('Optional initial stage variable values to set for the starting stage when the conversation is created. Merged into stageVars for the resolved starting stage.'),
 });
 
 /**
@@ -154,6 +155,24 @@ export const calAbortAiGenerationRequestSchema = calBaseInputMessageSchema.exten
 });
 
 /**
+ * Signals that the client has finished playing back the AI's audio output.
+ * Used to trigger the silence timer after the user has fully heard the response.
+ */
+export const calAudioPlaybackEndedRequestSchema = calBaseInputMessageSchema.extend({
+  type: z.literal('audio_playback_ended'),
+  outputTurnId: z.string().optional().describe('Identifier of the output turn whose playback has completed'),
+});
+
+/**
+ * Result of an abort_ai_generation command.
+ */
+export const calAbortAiGenerationResponseSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('abort_ai_generation'),
+  success: z.boolean().describe('Whether the AI generation was successfully aborted'),
+  error: z.string().optional().describe('Error message if abort failed'),
+});
+
+/**
  * Discriminated union of all inbound message types accepted by a communication channel.
  */
 export const calInputMessageSchema = z.discriminatedUnion('type', [
@@ -170,6 +189,7 @@ export const calInputMessageSchema = z.discriminatedUnion('type', [
   calRunActionRequestSchema,
   calCallToolRequestSchema,
   calAbortAiGenerationRequestSchema,
+  calAudioPlaybackEndedRequestSchema,
 ]);
 
 // Output result message schemas
@@ -247,7 +267,7 @@ export const calGoToStageResponseSchema = calBaseOutputMessageSchema.extend({
  * Result of a set_var command.
  */
 export const calSetVarResponseSchema = calBaseOutputMessageSchema.extend({
-  type: z.literal('set_var_result'),
+  type: z.literal('set_var'),
   success: z.boolean().describe('Whether the variable was successfully set'),
   error: z.string().optional().describe('Error message if setting the variable failed'),
 });
@@ -451,6 +471,7 @@ export const calOutputMessageSchema = z.discriminatedUnion('type', [
   calGetAllVarsResponseSchema,
   calRunActionResponseSchema,
   calCallToolResponseSchema,
+  calAbortAiGenerationResponseSchema,
   calStartAiGenerationOutputMessageSchema,
   calSendAiVoiceChunkMessageSchema,
   calAbortAiGenerationOutputMessageSchema,
@@ -482,6 +503,7 @@ export type CALGetAllVarsRequest = z.infer<typeof calGetAllVarsRequestSchema>;
 export type CALRunActionRequest = z.infer<typeof calRunActionRequestSchema>;
 export type CALCallToolRequest = z.infer<typeof calCallToolRequestSchema>;
 export type CALAbortAiGenerationRequest = z.infer<typeof calAbortAiGenerationRequestSchema>;
+export type CALAudioPlaybackEndedRequest = z.infer<typeof calAudioPlaybackEndedRequestSchema>;
 export type CALInputMessage = z.infer<typeof calInputMessageSchema>;
 
 export type CALStartConversationResponse = z.infer<typeof calStartConversationResponseSchema>;
@@ -496,6 +518,7 @@ export type CALGetVarResponse = z.infer<typeof calGetVarResponseSchema>;
 export type CALGetAllVarsResponse = z.infer<typeof calGetAllVarsResponseSchema>;
 export type CALRunActionResponse = z.infer<typeof calRunActionResponseSchema>;
 export type CALCallToolResponse = z.infer<typeof calCallToolResponseSchema>;
+export type CALAbortAiGenerationResponse = z.infer<typeof calAbortAiGenerationResponseSchema>;
 
 export type CALStartAiGenerationOutputMessage = z.infer<typeof calStartAiGenerationOutputMessageSchema>;
 export type CALSendAiVoiceChunkMessage = z.infer<typeof calSendAiVoiceChunkMessageSchema>;

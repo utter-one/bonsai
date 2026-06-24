@@ -27,12 +27,11 @@ export const deepgramTtsSettingsSchema = z.object({
   voiceId: z.string().optional().describe('Voice ID to use for speech synthesis (e.g., "thalia-en", "andromeda-en"). Combined with model to form full model string (e.g., "aura-2-thalia-en")'),
   audioFormat: z.enum(['pcm_8000', 'pcm_16000', 'pcm_24000', 'pcm_48000', 'mulaw', 'alaw']).optional().describe('Preferred audio output format. Defaults to "pcm_16000"'),
   sampleRate: z.number().int().positive().optional().describe('Sample rate for audio output in Hz (e.g., 8000, 16000, 24000, 48000). Availability depends on audio format'),
-  bitRate: z.number().int().positive().optional().describe('Bit rate for audio output (e.g., 32000, 64000, 128000). Applies to certain formats like mp3, opus, aac'),
-  container: z.enum(['none', 'wav', 'ogg']).optional().describe('Audio container format. Use "none" for raw audio, "wav" for WAV container, "ogg" for Ogg container'),
   noSpeechMarkers: z.array(z.object({ start: z.string(), end: z.string() })).optional().describe('Markers to identify sections of text that should not be spoken'),
   removeExclamationMarks: z.boolean().optional().describe('Whether to replace exclamation marks with periods'),
   useSentenceSplitter: z.boolean().optional().describe('Whether to use sentence splitter for text processing, defaults to true'),
-}).openapi('DeepgramTtsSettings');
+  speed: z.number().min(0.75).max(1.5).optional().describe('Speaking rate multiplier (0.75 to 1.5, default: 1.0)'),
+}).loose().openapi('DeepgramTtsSettings');
 
 export type DeepgramTtsSettings = z.infer<typeof deepgramTtsSettingsSchema>;
 
@@ -42,8 +41,6 @@ export type DeepgramTtsSettings = z.infer<typeof deepgramTtsSettingsSchema>;
 export type DeepgramAudioChunk = GeneratedAudioChunk & {
   /** Sample rate in Hz for this audio chunk */
   sampleRate: number;
-  /** Bit rate in bits per second for this audio chunk */
-  bitRate?: number;
 };
 
 /**
@@ -89,12 +86,6 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
 
   /** Sample rate for audio output */
   private sampleRate: number = 24000;
-
-  /** Bit rate for audio output (optional) */
-  private bitRate?: number;
-
-  /** Container format (optional) */
-  private container?: string;
 
   /** Buffer for the first audio chunk to avoid playback timing issues */
   private firstChunkBuffer: DeepgramAudioChunk | null = null;
@@ -274,8 +265,6 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
    */
   async sendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
-      logger.info(`[Deepgram] Adding text to sentence splitter: "${text}"`);
-      // Add text to sentence splitter - it will automatically call sendTextToSocket for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
       logger.debug(`[Deepgram] Buffering text: "${text}"`);
@@ -341,7 +330,6 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
       durationMs: 0, // Deepgram doesn't provide duration in the stream
       isFinal: false,
       sampleRate: this.sampleRate,
-      bitRate: this.bitRate,
     };
 
     // Buffer the first chunk to avoid playback timing issues
@@ -460,8 +448,6 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
       throw new Error('WebSocket is not open');
     }
 
-    logger.info(`[Deepgram] Sending text: "${text}"`);
-
     const speakMessage: DeepgramSpeakMessage = {
       type: 'Speak',
       text: text,
@@ -558,14 +544,10 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   private resolveAudioFormatAndEncoding(): void {
     const requestedAudioFormat = this.settings.audioFormat;
     const requestedSampleRate = this.settings.sampleRate;
-    const requestedBitRate = this.settings.bitRate;
-    const requestedContainer = this.settings.container;
 
     // Default values for streaming WebSocket
     this.audioFormat = requestedAudioFormat ?? 'pcm_16000';
     this.sampleRate = requestedSampleRate || this.getDefaultSampleRate(this.audioFormat);
-    this.bitRate = requestedBitRate;
-    this.container = requestedContainer;
 
     // Validate audio format is supported
     const supportedFormats = this.getSupportedFormats();
@@ -673,12 +655,11 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
 
     // Map pcm_* formats to Deepgram's API encoding name 'linear16' (sample rate is set separately)
     const deepgramEncoding = this.audioFormat.startsWith('pcm_') ? 'linear16' : this.audioFormat;
-    let wsUrl = `wss://api.deepgram.com/v1/speak?model=${effectiveModel}&encoding=${deepgramEncoding}`;
+    let wsUrl = `wss://api.deepgram.com/v1/speak?model=${effectiveModel}&encoding=${deepgramEncoding}&mip_opt_out=true`;
     if (this.sampleRate) wsUrl += `&sample_rate=${this.sampleRate}`;
-    if (this.bitRate) wsUrl += `&bit_rate=${this.bitRate}`;
-    if (this.container) wsUrl += `&container=${this.container}`;
+    if (this.settings.speed) wsUrl += `&speed=${this.settings.speed}`;
 
-    logger.info(`[Deepgram] Connecting with model: ${effectiveModel}, encoding: ${this.audioFormat}, sample_rate: ${this.sampleRate}`);
+    logger.info(`[Deepgram] Connecting with model: ${effectiveModel}, encoding: ${this.audioFormat}, sample_rate: ${this.sampleRate}, speed: ${this.settings.speed ?? 1}`);
 
     // Close any existing non-open socket before creating a new one
     if (this.socket) {
@@ -739,8 +720,6 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
     this.isActiveGeneration = false;
     this.pendingGenerationEnd = false;
     this.pendingFlushCount = 0;
-    this.bitRate = undefined;
-    this.container = undefined;
     this.textBuffer = '';
 
     await super.cleanup();

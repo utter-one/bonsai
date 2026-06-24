@@ -35,6 +35,10 @@ export class RunActionHandler implements ClientMessageHandler<CALRunActionReques
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      if (!context.session.runner) {
+        throw new InvalidOperationError('No active conversation runner');
+      }
+
       await context.session.runner.saveCommandEvent('run_action', { actionName: message.actionName, parameters: message.parameters });
       const result = await context.session.runner.runAction(message.actionName, message.parameters);
 
@@ -43,13 +47,20 @@ export class RunActionHandler implements ClientMessageHandler<CALRunActionReques
       const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: true, result };
       context.send(response);
 
-      await context.session.runner.executePendingTerminalAction();
+      // Best-effort: success response already sent, so we can't undo it.
+      // If this fails, log and continue — the conversation may be left in an inconsistent state.
+      try {
+        await context.session.runner.executePendingTerminalAction();
+      } catch (terminalError) {
+        logger.error({ error: terminalError instanceof Error ? terminalError.message : String(terminalError), sessionId: context.session.id, conversationId: message.conversationId }, 'Failed to execute pending terminal action after run_action');
+      }
 
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Run action completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to run action';
+      const sanitizedError = 'Failed to run action';
       logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId, actionName: message.actionName }, 'Failed to run action');
-      const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
+      const response: CALRunActionResponse = { type: 'run_action', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: sanitizedError };
       context.send(response);
     }
   }

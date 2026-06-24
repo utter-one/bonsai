@@ -73,6 +73,8 @@ Content-Type: application/json
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `profile` | `object` | No | Updated profile data (merges with existing) |
+| `banned` | `boolean` | No | Whether the user is banned from starting conversations |
+| `banReason` | `string` or `null` | No | Reason for banning the user (null to clear) |
 
 **Response** `200 OK` — [User Response](#user-response)
 
@@ -107,7 +109,10 @@ Returns audit log entries for the specified user. See [Audit Logs](./audit-logs)
 | Field | Type | Nullable | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | No | Unique identifier |
+| `projectId` | `string` | No | Project this user belongs to |
 | `profile` | `object` | No | User profile data |
+| `banned` | `boolean` | No | Whether the user is banned from starting conversations |
+| `banReason` | `string` | Yes | Reason the user was banned |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
 | `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |

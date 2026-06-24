@@ -33,7 +33,7 @@ export function buildTextSearchCondition(textSearch: string, textColumns: Column
 
   if (parsed.type === 'tag') {
     if (!tagsColumn) return undefined;
-    return sql`${tagsColumn} @> ${JSON.stringify([parsed.value])}::jsonb`;
+    return sql`${tagsColumn} @> ${sql.param(JSON.stringify([parsed.value]))}::jsonb`;
   }
 
   const searchTerm = `%${parsed.value}%`;

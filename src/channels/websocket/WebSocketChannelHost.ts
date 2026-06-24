@@ -27,7 +27,7 @@ export class WebSocketChannelHost {
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
     @inject(SessionManager) private readonly sessionManager: SessionManager,
     @inject(IpRateLimiter) private readonly rateLimiter: IpRateLimiter,
-  ) {}
+  ) { }
 
   /**
    * Initializes the WebSocket server and attaches it to an HTTP server.
@@ -61,11 +61,15 @@ export class WebSocketChannelHost {
       this.sessionMap.set(sessionId, ws);
 
       ws.on('message', (data: Buffer) => {
-        this.handleMessage(ws, data);
+        this.handleMessage(ws, data).catch((err) => {
+          logger.error({ error: err.message }, 'WebSocket handleMessage unhandled rejection');
+        });
       });
 
       ws.on('close', () => {
-        this.handleDisconnect(ws);
+        this.handleDisconnect(ws).catch((err) => {
+          logger.error({ error: err.message }, 'WebSocket handleDisconnect unhandled rejection');
+        });
       });
 
       ws.on('error', (error: Error) => {
@@ -141,17 +145,22 @@ export class WebSocketChannelHost {
 
     const session = this.getSessionForWebSocket(ws);
 
-    // Translate WS wire format → CAL format: map requestId → correlationId, resolve conversationId from session
+    // Translate WS wire format → CAL format: map requestId → correlationId, resolve conversationId from session.
+    // Session conversationId is authoritative when a conversation is active. For resume_conversation the session
+    // has no conversation attached yet, so the client-provided conversationId must be used instead.
+    const conversationId = wsMessage.type === 'resume_conversation'
+      ? (wsMessage as Record<string, unknown>).conversationId
+      : session?.conversationId ?? '';
     const calMessage = {
       ...wsMessage,
       correlationId: wsMessage.requestId,
-      conversationId: session?.conversationId ?? '',
+      conversationId,
     } as CALInputMessage;
 
     const context: ClientMessageHandlerContext = {
       session,
       // Translate CAL response → WS wire format: map correlationId → requestId and inject sessionId
-      send: (msg: any) => {
+      send: (msg) => {
         const wsMsg: Record<string, unknown> = { ...msg };
         if (!wsMsg.requestId && wsMsg.correlationId) wsMsg.requestId = wsMsg.correlationId;
         if (!wsMsg.sessionId && session?.id) wsMsg.sessionId = session.id;
@@ -196,6 +205,7 @@ export class WebSocketChannelHost {
    * @param requestId - Optional request ID for correlation.
    */
   private sendError(ws: WebSocket, error: string, requestId?: string): void {
+    if (ws.readyState !== WebSocket.OPEN) return;
     const message = { type: 'error', error, requestId };
     ws.send(JSON.stringify(message));
   }

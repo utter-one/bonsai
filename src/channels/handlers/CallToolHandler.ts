@@ -35,8 +35,8 @@ export class CallToolHandler implements ClientMessageHandler<CALCallToolRequest>
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.session.runner.saveCommandEvent('call_tool', { toolId: message.toolId, parameters: message.parameters });
       const result = await context.session.runner.callTool(message.toolId, message.parameters);
+      await context.session.runner.saveCommandEvent('call_tool', { toolId: message.toolId, parameters: message.parameters });
 
       const response: CALCallToolResponse = { 
         type: 'call_tool', 

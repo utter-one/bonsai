@@ -1,4 +1,5 @@
 export { AbortAiGenerationHandler } from './AbortAiGenerationHandler';
+export { AudioPlaybackEndedHandler } from './AudioPlaybackEndedHandler';
 export { AuthHandler } from './AuthHandler';
 export { CallToolHandler } from './CallToolHandler';
 export { EndConversationHandler } from './EndConversationHandler';

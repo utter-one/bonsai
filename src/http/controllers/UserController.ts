@@ -232,7 +232,7 @@ export class UserController {
   private async getUserAuditLogs(req: Request, res: Response): Promise<void> {
     checkPermissions(req, [PERMISSIONS.AUDIT_READ]);
     const params = userRouteParamsSchema.parse(req.params);
-    const logs = await this.userService.getUserAuditLogs(params.id, params.projectId);
+    const logs = await this.userService.getUserAuditLogs(params.id, params.projectId, req.context);
     res.status(200).json(logs);
   }
 }

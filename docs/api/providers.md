@@ -1,6 +1,6 @@
 # Providers
 
-Providers configure external service integrations for LLM, TTS, ASR, and storage backends.
+Providers configure external service integrations for LLM, TTS, ASR, storage, and channel backends.
 
 **Tag:** `Providers`
 
@@ -22,10 +22,9 @@ Content-Type: application/json
 | `id` | `string` (min 1) | No | Unique identifier (auto-generated if omitted) |
 | `name` | `string` (min 1) | Yes | Human-readable name |
 | `description` | `string` | No | Detailed description |
-| `providerType` | `string` | Yes | `asr`, `tts`, `llm`, `embeddings`, or `storage` |
+| `providerType` | `string` | Yes | `asr`, `tts`, `llm`, `embeddings`, `storage`, or `channel` |
 | `apiType` | `string` | Yes | Specific provider implementation (see below) |
 | `config` | `object` | Yes | Provider-specific configuration (see [Provider Config](#provider-config)) |
-| `createdBy` | `string` | No | Operator user ID who created |
 | `tags` | `string[]` | No | Searchable tags |
 
 **Response** `201 Created` — [Provider Response](#provider-response)
@@ -142,7 +141,7 @@ Queries the provider's API to return a live list of available models. Falls back
 | `id` | `string` | No | Unique identifier |
 | `name` | `string` | No | Human-readable name |
 | `description` | `string` | Yes | Description |
-| `providerType` | `string` | No | `asr`, `tts`, `llm`, `embeddings`, or `storage` |
+| `providerType` | `string` | No | `asr`, `tts`, `llm`, `embeddings`, `storage`, or `channel` |
 | `apiType` | `string` | No | Provider implementation type |
 | `config` | `object` | No | Provider configuration |
 | `createdBy` | `string` | Yes | Creator's operator ID |
@@ -173,6 +172,8 @@ Configuration varies by provider type and API type:
 | `cohere` | `apiKey`, `baseUrl` (optional) |
 | `xai` | `apiKey`, `baseUrl` (optional) |
 | `ollama` | `baseUrl` (optional, default `http://localhost:11434`), `apiKey` (optional, default `"ollama"`) |
+| `ovh` | `apiKey`, `baseUrl` (optional) |
+| `scaleway` | `apiKey`, `baseUrl` (optional) |
 
 ### TTS Providers
 
@@ -202,3 +203,13 @@ Configuration varies by provider type and API type:
 | `azure-blob` | `connectionString`, `containerName` |
 | `gcs` | `bucket`, `projectId`, `credentials` |
 | `local` | `basePath` |
+
+### Channel Providers
+
+| API Type | Key Config Fields |
+|----------|------------------|
+| `telegram` | `botToken`, `webhookUrl` (optional) |
+| `twilio_messaging` | `accountSid`, `authToken`, `messagingServiceSid` |
+| `twilio_voice` | `accountSid`, `authToken`, `phoneNumber` |
+| `whatsapp` | `accountSid`, `authToken`, `messagingServiceSid` |
+| `smtp_imap` | `smtpHost`, `smtpPort`, `smtpUser`, `smtpPassword`, `imapHost`, `imapPort`, `imapUser`, `imapPassword`, `fromAddress` |

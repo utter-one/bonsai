@@ -81,6 +81,16 @@ Content-Type: application/json
 
 **Response** `204 No Content`
 
+## Get Category Audit Logs
+
+```http
+GET /api/projects/:projectId/knowledge/categories/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified knowledge category. See [Audit Logs](./audit-logs) for response format.
+
 ---
 
 ## Create Item
@@ -167,6 +177,16 @@ Content-Type: application/json
 | `version` | `integer` (min 1) | Yes | Current version for optimistic locking |
 
 **Response** `204 No Content`
+
+## Get Item Audit Logs
+
+```http
+GET /api/projects/:projectId/knowledge/items/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified knowledge item. See [Audit Logs](./audit-logs) for response format.
 
 ---
 

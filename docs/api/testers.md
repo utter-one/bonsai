@@ -17,9 +17,9 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | `string` | No | Unique identifier (auto-generated if omitted) |
+| `id` | `string` (min 1) | No | Unique identifier (auto-generated if omitted) |
 | `name` | `string` (min 1) | Yes | Display name |
-| `description` | `string` | No | Detailed description |
+| `description` | `string` | No | Detailed description (nullable) |
 | `prompt` | `string` (min 1) | Yes | Prompt that drives the tester's conversational behaviour |
 | `hangUpPrompt` | `string` | No | Mini-prompt evaluated each turn to decide whether the tester should hang up (used when `personaCanHangUp` is enabled on the scenario); must return `true` to continue or `false` to hang up |
 | `llmProviderId` | `string` | No | LLM provider ID |

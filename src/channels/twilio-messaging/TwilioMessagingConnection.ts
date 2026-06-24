@@ -20,7 +20,8 @@ const TwilioClient = _twilioModule.Twilio as typeof import('twilio').Twilio;
 export class TwilioMessagingConnection implements IClientConnection {
   readonly connectionType = 'twilio_messaging' as const;
 
-  private session: Session;
+  private session: Session | null = null;
+  private twilioClient: any = null;
 
   constructor(
     /** The originating phone number (E.164), used as the "To" address for outbound messages. */
@@ -45,7 +46,9 @@ export class TwilioMessagingConnection implements IClientConnection {
    * Closes the connection and unregisters the associated session.
    */
   async close(): Promise<void> {
-    await this.sessionManager.unregisterSession(this.session.id);
+    if (this.session) {
+      await this.sessionManager.unregisterSession(this.session.id);
+    }
   }
 
   /**
@@ -62,8 +65,10 @@ export class TwilioMessagingConnection implements IClientConnection {
     if (!body) return;
 
     try {
-      const client = new TwilioClient(this.accountSid, this.authToken);
-      await client.messages.create({ body, from: this.toNumber, to: this.fromNumber });
+      if (!this.twilioClient) {
+        this.twilioClient = new TwilioClient(this.accountSid, this.authToken);
+      }
+      await this.twilioClient.messages.create({ body, from: this.toNumber, to: this.fromNumber });
       logger.info({ to: this.fromNumber, sessionId: this.session?.id }, 'Twilio message sent');
     } catch (error) {
       logger.error({ error, to: this.fromNumber, sessionId: this.session?.id }, 'Failed to send Twilio message');

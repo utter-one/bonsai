@@ -10,6 +10,8 @@ import { openAILegacyLlmProviderConfigSchema } from '../../services/providers/ll
 import { anthropicLlmProviderConfigSchema } from '../../services/providers/llm/AnthropicLlmProvider';
 import { geminiLlmProviderConfigSchema } from '../../services/providers/llm/GeminiLlmProvider';
 import { ollamaLlmProviderConfigSchema } from '../../services/providers/llm/OllamaLlmProvider';
+import { ovhLlmProviderConfigSchema } from '../../services/providers/llm/OVHLlmProvider';
+import { scalewayLlmProviderConfigSchema } from '../../services/providers/llm/ScalewayLlmProvider';
 import { elevenLabsTtsProviderConfigSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsProviderConfigSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsProviderConfigSchema } from '../../services/providers/tts/DeepgramTtsProvider';
@@ -28,6 +30,9 @@ import { telegramChannelProviderConfigSchema } from '../../services/providers/ch
 import { twilioMessagingChannelProviderConfigSchema } from '../../services/providers/channel/TwilioMessagingChannelProvider';
 import { twilioVoiceChannelProviderConfigSchema } from '../../services/providers/channel/TwilioVoiceChannelProvider';
 import { whatsAppChannelProviderConfigSchema } from '../../services/providers/channel/WhatsAppChannelProvider';
+// import { sendGridChannelProviderConfigSchema } from '../../services/providers/channel/SendGridChannelProvider';
+// import { sesChannelProviderConfigSchema } from '../../services/providers/channel/SesChannelProvider';
+import { smtpImapChannelProviderConfigSchema } from '../../services/providers/channel/SmtpImapChannelProvider';
 
 extendZodWithOpenApi(z);
 
@@ -42,6 +47,8 @@ export const llmProviderConfigSchema = z.union([
   anthropicLlmProviderConfigSchema,
   geminiLlmProviderConfigSchema,
   ollamaLlmProviderConfigSchema,
+  ovhLlmProviderConfigSchema,
+  scalewayLlmProviderConfigSchema,
 ]).describe('LLM provider configuration');
 
 /**
@@ -86,6 +93,9 @@ export const channelProviderConfigSchema = z.union([
   twilioMessagingChannelProviderConfigSchema,
   twilioVoiceChannelProviderConfigSchema,
   whatsAppChannelProviderConfigSchema,
+  // sendGridChannelProviderConfigSchema,
+  // sesChannelProviderConfigSchema,
+  smtpImapChannelProviderConfigSchema,
 ]).describe('Channel provider configuration');
 
 export type ChannelProviderConfig = z.infer<typeof channelProviderConfigSchema>;
@@ -130,7 +140,6 @@ export const createProviderSchema = z.object({
   providerType: providerTypeSchema.describe('Provider category: asr, tts, llm, or embeddings'),
   apiType: providerNameSchema.describe('Specific provider implementation (e.g., openai, anthropic, azure, elevenlabs)'),
   config: providerConfigSchema.describe('Provider-specific configuration object (varies by providerType and apiType)'),
-  createdBy: z.string().optional().describe('Operator user ID who created the provider'),
   tags: z.array(z.string()).optional().describe('Searchable tags for organization (e.g., ["production", "low-latency"])'),
 });
 

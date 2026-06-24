@@ -1,5 +1,5 @@
 import { singleton, inject } from 'tsyringe';
-import { eq, inArray, and, sql } from 'drizzle-orm';
+import { eq, inArray, and, asc, sql } from 'drizzle-orm';
 import { schedule } from 'node-cron';
 import type { ScheduledTask } from 'node-cron';
 import { db } from '../db/index';
@@ -113,7 +113,8 @@ export class BenchmarkExecutorService {
 
   private async processNextPendingRun(): Promise<void> {
     while (true) {
-      const [run] = await db.select().from(benchmarkRuns).where(eq(benchmarkRuns.status, 'pending')).limit(1);
+      // Order by creation time so the oldest pending run is always picked first across competing processes.
+      const [run] = await db.select().from(benchmarkRuns).where(eq(benchmarkRuns.status, 'pending')).orderBy(asc(benchmarkRuns.createdAt)).limit(1);
       if (!run) return;
 
       logger.info({ runId: run.id, suiteId: run.suiteId }, 'Processing benchmark run');
@@ -121,10 +122,30 @@ export class BenchmarkExecutorService {
       await db.update(benchmarkRuns).set({ status: 'in_progress', startedAt: new Date(), updatedAt: new Date() }).where(eq(benchmarkRuns.id, run.id));
 
       try {
-        const configs = await db.select().from(benchmarkConfigs).where(eq(benchmarkConfigs.suiteId, run.suiteId));
+        // Order by creation time so configs execute in deterministic creation order.
+        const configs = await db.select().from(benchmarkConfigs).where(eq(benchmarkConfigs.suiteId, run.suiteId)).orderBy(asc(benchmarkConfigs.createdAt));
+
+        // Batch-fetch provider configs and providers in two IN-clause queries instead of N+1 per-config lookups.
+        const providerConfigIds = [...new Set(configs.map((c) => c.providerConfigId))];
+        const providerConfigs = await db.select().from(benchmarkProviderConfigs).where(inArray(benchmarkProviderConfigs.id, providerConfigIds));
+        const providerConfigMap = new Map(providerConfigs.map((pc) => [pc.id, pc]));
+
+        const providerIds = [...new Set(providerConfigs.map((pc) => pc.providerId))];
+        const providerRows = await db.select().from(providers).where(inArray(providers.id, providerIds));
+        const providerMap = new Map(providerRows.map((p) => [p.id, p]));
 
         for (const config of configs) {
-          await this.processConfigExecution(run.id, config);
+          const providerConfig = providerConfigMap.get(config.providerConfigId);
+          if (!providerConfig) {
+            logger.error({ configId: config.id, providerConfigId: config.providerConfigId }, 'Benchmark provider config not found — skipping config');
+            continue;
+          }
+          const providerRow = providerMap.get(providerConfig.providerId);
+          if (!providerRow) {
+            logger.error({ configId: config.id, providerId: providerConfig.providerId }, 'Benchmark provider not found — skipping config');
+            continue;
+          }
+          await this.processConfigExecution(run.id, config, providerConfig, providerRow);
         }
 
         await db.update(benchmarkRuns).set({ status: 'completed', completedAt: new Date(), updatedAt: new Date() }).where(eq(benchmarkRuns.id, run.id));
@@ -137,18 +158,18 @@ export class BenchmarkExecutorService {
     }
   }
 
-  private async processConfigExecution(runId: string, config: typeof benchmarkConfigs.$inferSelect): Promise<void> {
+  private async processConfigExecution(
+    runId: string,
+    config: typeof benchmarkConfigs.$inferSelect,
+    providerConfigRow: typeof benchmarkProviderConfigs.$inferSelect,
+    providerRow: typeof providers.$inferSelect,
+  ): Promise<void> {
     const executionId = generateId(ID_PREFIXES.BENCHMARK_CONFIG_EXECUTION);
     const now = new Date();
 
     await db.insert(benchmarkConfigExecutions).values({ id: executionId, runId, configId: config.id, status: 'in_progress', startedAt: now });
 
     try {
-      const providerConfigRow = await db.query.benchmarkProviderConfigs.findFirst({ where: eq(benchmarkProviderConfigs.id, config.providerConfigId) });
-      if (!providerConfigRow) throw new Error(`Benchmark provider config ${config.providerConfigId} not found`);
-
-      const providerRow = await db.query.providers.findFirst({ where: eq(providers.id, providerConfigRow.providerId) });
-      if (!providerRow) throw new Error(`Provider ${providerConfigRow.providerId} not found`);
 
       const iterationResults: BenchmarkIterationResult[] = [];
 

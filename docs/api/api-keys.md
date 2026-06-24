@@ -21,6 +21,7 @@ Content-Type: application/json
 |-------|------|----------|-------------|
 | `name` | `string` (min 1, max 255) | Yes | Descriptive name for the API key |
 | `metadata` | `object` | No | Additional metadata |
+| `keySettings` | [`ApiKeySettings`](#api-key-settings) | No | Security settings controlling permitted channels and features. If absent, all channels and features are allowed. |
 
 **Response** `201 Created` — [API Key Response](#api-key-response)
 
@@ -77,6 +78,7 @@ Content-Type: application/json
 | `name` | `string` (min 1, max 255) | No | Updated name |
 | `isActive` | `boolean` | No | Enable or disable the key |
 | `metadata` | `object` | No | Updated metadata |
+| `keySettings` | [`ApiKeySettings`](#api-key-settings) | No | Updated security settings. If absent, existing settings are preserved. |
 
 **Response** `200 OK` — [API Key Response](#api-key-response)
 
@@ -97,6 +99,16 @@ Content-Type: application/json
 
 **Response** `204 No Content`
 
+## Get Audit Logs
+
+```http
+GET /api/projects/:projectId/api-keys/:id/audit-logs
+```
+
+**Required permission:** `audit:read`
+
+Returns audit log entries for the specified API key. See [Audit Logs](./audit-logs) for response format.
+
 ---
 
 ## API Key Response
@@ -111,6 +123,15 @@ Content-Type: application/json
 | `lastUsedAt` | `string` | Yes | ISO 8601 timestamp of last use |
 | `isActive` | `boolean` | No | Whether the key is active |
 | `metadata` | `object` | Yes | Additional metadata |
+| `keySettings` | [`ApiKeySettings`](#api-key-settings) | Yes | Security settings controlling permitted channels and features |
 | `version` | `integer` | No | Version number |
 | `createdAt` | `string` | No | ISO 8601 creation timestamp |
 | `updatedAt` | `string` | No | ISO 8601 last update timestamp |
+| `archived` | `boolean` | Yes | Whether this entity belongs to an archived project |
+
+## API Key Settings
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `allowedChannels` | `string[]` | No | Permitted transport channels: `"websocket"`, `"webrtc"`. If absent, all channels are allowed. |
+| `allowedFeatures` | `string[]` | No | Permitted feature capabilities. If absent, all features are allowed. |

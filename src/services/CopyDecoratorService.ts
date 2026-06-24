@@ -121,7 +121,7 @@ export class CopyDecoratorService extends BaseService {
       }
 
       const orderByClause = buildOrderBy(params?.orderBy, columnMap);
-      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+      const whereCondition = and(...conditions);
 
       const total = await countRows(copyDecorators, whereCondition);
 
@@ -161,17 +161,13 @@ export class CopyDecoratorService extends BaseService {
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ copyDecoratorId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating copy decorator');
 
+    let existing = await db.query.copyDecorators.findFirst({ where: and(eq(copyDecorators.projectId, projectId), eq(copyDecorators.id, id)) });
+
+    if (!existing) {
+      throw new NotFoundError(`Copy decorator with id ${id} not found`);
+    }
+
     try {
-      const existing = await db.query.copyDecorators.findFirst({ where: and(eq(copyDecorators.projectId, projectId), eq(copyDecorators.id, id)) });
-
-      if (!existing) {
-        throw new NotFoundError(`Copy decorator with id ${id} not found`);
-      }
-
-      if (existing.version !== expectedVersion) {
-        throw new OptimisticLockError(`Copy decorator version mismatch. Expected ${expectedVersion}, got ${existing.version}`);
-      }
-
       const updatePayload: any = { version: existing.version + 1, updatedAt: new Date() };
       if (updateData.name !== undefined) updatePayload.name = updateData.name;
       if (updateData.template !== undefined) updatePayload.template = updateData.template;
@@ -191,7 +187,8 @@ export class CopyDecoratorService extends BaseService {
       return copyDecoratorResponseSchema.parse(copyDecorator);
     } catch (error: any) {
       if (error?.code === '23505' || error?.cause?.code === '23505') {
-        throw new ConflictError(`A copy decorator named '${updateData.name}' already exists in this project`);
+        const name = updateData.name ?? existing?.name ?? 'unknown';
+        throw new ConflictError(`A copy decorator named '${name}' already exists in this project`);
       }
       logger.error({ error, copyDecoratorId: id }, 'Failed to update copy decorator');
       throw error;
@@ -217,10 +214,6 @@ export class CopyDecoratorService extends BaseService {
 
       if (!existing) {
         throw new NotFoundError(`Copy decorator with id ${id} not found`);
-      }
-
-      if (existing.version !== expectedVersion) {
-        throw new OptimisticLockError(`Copy decorator version mismatch. Expected ${expectedVersion}, got ${existing.version}`);
       }
 
       const deleted = await db.delete(copyDecorators).where(and(eq(copyDecorators.projectId, projectId), eq(copyDecorators.id, id), eq(copyDecorators.version, expectedVersion))).returning();

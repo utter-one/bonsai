@@ -39,6 +39,10 @@ export class StartUserVoiceInputHandler implements ClientMessageHandler<CALStart
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      if (!context.session.runner) {
+        throw new InvalidOperationError('No active conversation runner');
+      }
+
       const inputTurnId = await context.session.runner.startUserVoiceInput();
 
       const response: CALStartUserVoiceInputResponse = {
@@ -48,20 +52,30 @@ export class StartUserVoiceInputHandler implements ClientMessageHandler<CALStart
         success: true,
         inputTurnId
       };
-      context.send(response);
+      try {
+        context.send(response);
+      } catch (sendError) {
+        logger.error({ error: sendError instanceof Error ? sendError.message : String(sendError), sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to send start user voice input response');
+        throw sendError;
+      }
 
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId }, 'User voice input started successfully');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to start user voice input';
-      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to start user voice input');
-      const response: CALStartUserVoiceInputResponse = {
-        type: 'start_user_voice_input',
-        conversationId: message.conversationId,
-        correlationId: message.correlationId,
-        success: false,
-        error: errorMessage
-      };
-      context.send(response);
+      if (error instanceof NotFoundError || error instanceof InvalidOperationError) {
+        const errorMessage = error.message;
+        logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to start user voice input');
+        const response: CALStartUserVoiceInputResponse = {
+          type: 'start_user_voice_input',
+          conversationId: message.conversationId,
+          correlationId: message.correlationId,
+          success: false,
+          error: errorMessage
+        };
+        context.send(response);
+      } else {
+        logger.error({ error: error instanceof Error ? error.message : String(error), sessionId: context.session?.id, conversationId: message.conversationId }, 'Unexpected error starting user voice input');
+        throw error;
+      }
     }
   }
 }

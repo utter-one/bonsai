@@ -18,8 +18,7 @@ export abstract class BaseService {
    * @param permission - Permission to check
    * @returns True if the user has the permission
    */
-  protected hasPermission(context: RequestContext | undefined, permission: Permission): boolean {
-    if (!context) return false;
+  protected hasPermission(context: RequestContext, permission: Permission): boolean {
     return hasAllPermissions(context.roles, [permission]);
   }
 
@@ -29,11 +28,7 @@ export abstract class BaseService {
    * @param permissions - Required permissions
    * @throws {ForbiddenError} When user lacks required permissions
    */
-  protected requirePermission(context: RequestContext | undefined, ...permissions: Permission[]): void {
-    if (!context) {
-      throw new ForbiddenError('Authentication required');
-    }
-
+  protected requirePermission(context: RequestContext, ...permissions: Permission[]): void {
     const hasRequired = hasAllPermissions(context.roles, permissions);
     if (!hasRequired) {
       logger.warn({ operatorId: context.operatorId, roles: context.roles, requiredPermissions: permissions }, 'Permission denied');
@@ -47,8 +42,8 @@ export abstract class BaseService {
    * @param operation - Operation name
    * @param details - Additional details to log
    */
-  protected logOperation(context: RequestContext | undefined, operation: string, details: Record<string, any> = {}): void {
-    logger.info({ operatorId: context?.operatorId, ip: context?.ip, requestId: context?.requestId, operation, ...details }, `Operation: ${operation}`);
+  protected logOperation(context: RequestContext, operation: string, details: Record<string, any> = {}): void {
+    logger.info({ operatorId: context.operatorId, ip: context.ip, requestId: context.requestId, operation, ...details }, `Operation: ${operation}`);
   }
 
   /**
@@ -58,7 +53,6 @@ export abstract class BaseService {
    */
   protected async requireProjectNotArchived(projectId: string): Promise<void> {
     const result = await db.select({ id: archivedProjects.id }).from(archivedProjects).where(eq(archivedProjects.id, projectId)).limit(1);
-    logger.info({ projectId, isArchived: JSON.stringify(result) }, 'Checked if project is archived');
     if (result.length > 0) {
       throw new ArchivedProjectError(`Project ${projectId} is archived and cannot be modified`);
     }

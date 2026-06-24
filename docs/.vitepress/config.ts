@@ -65,6 +65,7 @@ export default withMermaid({
             { text: 'Twilio Messaging Channel', link: '/guide/twilio-messaging' },
             { text: 'Twilio Voice Channel', link: '/guide/twilio-voice' },
             { text: 'WhatsApp Channel', link: '/guide/whatsapp' },
+            { text: 'SES Email Channel', link: '/guide/ses-email' },
             { text: 'Templating', link: '/guide/templating' },
             { text: 'Scripting', link: '/guide/scripting' },
           ],
@@ -118,6 +119,7 @@ export default withMermaid({
             { text: 'Tools', link: '/api/tools' },
             { text: 'Global Actions', link: '/api/global-actions' },
             { text: 'Guardrails', link: '/api/guardrails' },
+            { text: 'Project Exchange', link: '/api/project-exchange' },
           ],
         },
         {
@@ -142,6 +144,7 @@ export default withMermaid({
             { text: 'Analytics', link: '/api/analytics' },
             { text: 'Analytics Query Engine', link: '/api/analytics-query' },
             { text: 'Analytics Funnel Engine', link: '/api/analytics-funnels' },
+            { text: 'Saved Slice Queries', link: '/api/saved-slice-queries' },
           ],
         },
         {
@@ -150,16 +153,19 @@ export default withMermaid({
             { text: 'Testers', link: '/api/testers' },
             { text: 'Scenarios', link: '/api/scenarios' },
             { text: 'Scenario Runs', link: '/api/scenario-runs' },
+            { text: 'Benchmark', link: '/api/benchmark' },
           ],
         },
         {
           text: 'Real-time',
           items: [
+            { text: 'Channel Catalog', link: '/api/channel-catalog' },
             { text: 'WebSocket', link: '/api/websocket' },
             { text: 'WebRTC', link: '/api/webrtc' },
             { text: 'Twilio Messaging', link: '/api/twilio-messaging' },
             { text: 'Twilio Voice', link: '/api/twilio-voice' },
             { text: 'WhatsApp', link: '/api/whatsapp' },
+            { text: 'SES Email', link: '/api/ses-email' },
           ],
         },
       ],

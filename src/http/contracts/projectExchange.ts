@@ -5,6 +5,8 @@ import { asrSettingsSchema } from './project';
 import { serverVadConfigSchema } from './vad';
 import { effectSchema, stageActionSchema, stageActionParameterSchema, toolParameterSchema, filterDeprecatedEffects } from '../../types/actions';
 import { fieldDescriptorSchema, parameterValueSchema } from '../../types/parameters';
+import { requestTypeLimitsSchema, providerModelLimitsSchema } from './costManagement';
+import { audioFormatValues } from '../../types/audio';
 
 extendZodWithOpenApi(z);
 
@@ -42,6 +44,9 @@ export const asrConfigExchangeV1Schema = z.object({
   settings: asrSettingsSchema.optional().describe('ASR-specific settings including model, language preferences, etc.'),
   unintelligiblePlaceholder: z.string().optional().describe('Placeholder text to use when speech is unintelligible or cannot be transcribed'),
   voiceActivityDetection: z.boolean().optional().describe('Whether to enable voice activity detection'),
+  silenceTimeoutMs: z.number().int().min(0).optional().describe('Timeout in milliseconds before silence triggers an AI response'),
+  maxSilences: z.number().int().min(0).optional().describe('Maximum consecutive silence-triggered responses before ending conversation'),
+  silencePlaceholder: z.string().optional().describe('Text sent as user input when silence is detected'),
   serverVad: serverVadConfigSchema.optional().describe('Server-side VAD configuration'),
 }).openapi('AsrConfigExchangeV1').optional().describe('ASR configuration with provider hint instead of provider UUID');
 
@@ -79,11 +84,52 @@ export const fillerSettingsExchangeV1Schema = z.object({
   llmHint: providerHintSchema.describe('Provider hint identifying the LLM provider used to generate filler sentences'),
   llmSettings: llmSettingsSchema.describe('LLM provider-specific settings for filler generation'),
   prompt: z.string().min(1).describe('Prompt instructing the LLM to produce a short neutral filler sentence'),
-  historyMessageCount: z.number().int().min(0).default(0).describe('Number of recent conversation messages to include in the filler LLM call context (0 = no history)'),
+  historyMessageCount: z.number().int().min(-1).default(0).describe('Number of recent conversation messages to include in the filler LLM call context (0 = no history, -1 = all history, N > 0 = last N messages)'),
 }).openapi('FillerSettingsExchangeV1').describe('Filler response settings with provider hint instead of provider UUID');
 
 /** Filler settings for the exchange format */
 export type FillerSettingsExchangeV1 = z.infer<typeof fillerSettingsExchangeV1Schema>;
+
+/**
+ * Cost management configuration for the exchange format.
+ * Provider IDs are replaced by provider hints so the bundle is portable.
+ */
+export const costManagementConfigExchangeV1Schema = z.object({
+  limits: z.record(
+    z.string().describe('Provider hint key (type:apiType) or "*" for any provider'),
+    z.record(
+      z.string().describe('Model name (e.g. "gpt-4o") or "*" for any model'),
+      providerModelLimitsSchema,
+    ),
+  ).describe('Token cap definitions keyed by provider hint and model name'),
+}).openapi('CostManagementConfigExchangeV1').optional().describe('Project-level LLM cost management configuration with provider hints instead of provider IDs');
+
+/** Cost management config for the exchange format */
+export type CostManagementConfigExchangeV1 = z.infer<typeof costManagementConfigExchangeV1Schema>;
+
+/**
+ * Sample copy configuration for the exchange format.
+ * The classifier reference remains as a local document ID (remapped on import).
+ */
+export const sampleCopyConfigExchangeV1Schema = z.object({
+  defaultClassifierId: z.string().optional().describe('Local document ID of the classifier used to evaluate sample copy prompt triggers; remapped on import'),
+}).openapi('SampleCopyConfigExchangeV1').optional().describe('Sample copy configuration settings for the exchange format');
+
+/** Sample copy config for the exchange format */
+export type SampleCopyConfigExchangeV1 = z.infer<typeof sampleCopyConfigExchangeV1Schema>;
+
+/**
+ * Audio recording configuration for the exchange format.
+ */
+export const recordingConfigExchangeV1Schema = z.object({
+  enabled: z.boolean().describe('Whether audio recording is enabled for this project'),
+  recordInput: z.boolean().optional().default(true).describe('Whether to record user voice input. Defaults to true.'),
+  recordOutput: z.boolean().optional().default(true).describe('Whether to record AI voice output. Defaults to true.'),
+  format: z.enum(audioFormatValues).optional().default('pcm_16000').describe('Audio format for saved recordings. Defaults to pcm_16000.'),
+}).openapi('RecordingConfigExchangeV1').optional().describe('Audio recording configuration for conversation debugging');
+
+/** Recording config for the exchange format */
+export type RecordingConfigExchangeV1 = z.infer<typeof recordingConfigExchangeV1Schema>;
 
 // ====================
 // Entity exchange schemas
@@ -112,7 +158,11 @@ export const projectExchangeV1Schema = z.object({
   autoCreateUsers: z.boolean().optional().describe('When enabled, users are automatically created on first WebSocket connection'),
   userProfileVariableDescriptors: z.array(fieldDescriptorSchema).optional().describe('Descriptors defining the data schema for user profile variables'),
   defaultGuardrailClassifierId: z.string().nullable().optional().describe('Local document ID of the classifier used to evaluate guardrails; remapped on import'),
+  sampleCopyConfig: sampleCopyConfigExchangeV1Schema.describe('Sample copy configuration including the default classifier used to evaluate prompt triggers'),
+  startingStageId: z.string().nullable().optional().describe('Local document ID of the stage to start new conversations at; remapped on import'),
   conversationTimeoutSeconds: z.number().int().min(0).nullable().optional().describe('Timeout in seconds for active conversations with no activity'),
+  recordingConfig: recordingConfigExchangeV1Schema.describe('Audio recording configuration for conversation debugging'),
+  costManagementConfig: costManagementConfigExchangeV1Schema.describe('Project-level LLM token cost management configuration with provider hints'),
 }).openapi('ProjectExchangeV1').describe('Project entity in the exchange format');
 
 /** Project entity in the exchange format */
@@ -298,7 +348,7 @@ export type KnowledgeCategoryExchangeV1 = z.infer<typeof knowledgeCategoryExchan
 export const knowledgeItemExchangeV1Schema = z.object({
   id: z.string().describe('Local document ID; remapped to a fresh UUID on import'),
   categoryId: z.string().describe('Local document ID of the parent knowledge category; remapped on import'),
-  question: z.string().describe('Question text for this knowledge item'),
+  questions: z.array(z.string()).describe('Array of question texts for this knowledge item'),
   answer: z.string().describe('Answer text for this knowledge item'),
   order: z.number().int().min(0).optional().describe('Display order within the category'),
 }).openapi('KnowledgeItemExchangeV1').describe('Knowledge item entity in the exchange format');

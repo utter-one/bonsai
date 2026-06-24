@@ -62,6 +62,7 @@ export type ScriptExecutionResult = {
  * Read-only context:
  * - `conversationId` - ID of the current conversation
  * - `projectId` - ID of the current project
+ * - `userId` - ID of the user associated with this conversation
  * - `stageId` - ID of the current stage in the conversation
  * - `stage` - Full stage object: id, name, availableActions, metadata, enterBehavior, useKnowledge
  * - `history` - Array of conversation messages with role and content
@@ -71,6 +72,8 @@ export type ScriptExecutionResult = {
  * - `time` - Rich time context: iso, date, time, dayOfWeek, timezone, calendar, anchor, etc.
  * - `userInputSource` - Input channel: 'text' | 'voice' | null
  * - `stageVars` - Variables for all stages keyed by stage id
+ * - `channel` - Communication channel: 'websocket' | 'webrtc' | 'twilio_voice' | 'twilio_messaging' | 'whatsapp' | 'telegram' | 'testing'
+ * - `project` - Project settings: { timezone, languageCode, language }
  *
  * Mutable context (changes persist after script execution):
  * - `vars` - Current stage variables; supports full replacement including key deletion
@@ -165,6 +168,9 @@ export class IsolatedScriptExecutor {
       await jail.set('stageVars', new ivm.ExternalCopy(context.stageVars || null).copyInto());
       await jail.set('events', new ivm.ExternalCopy(context.events).copyInto());
       await jail.set('consts', new ivm.ExternalCopy(context.consts || null).copyInto());
+      await jail.set('userId', new ivm.ExternalCopy(context.userId).copyInto());
+      await jail.set('channel', new ivm.ExternalCopy(context.channel || null).copyInto());
+      await jail.set('project', new ivm.ExternalCopy(context.project).copyInto());
 
       // Inject mutable objects that scripts can modify
       await jail.set('vars', new ivm.ExternalCopy(context.vars).copyInto());

@@ -48,6 +48,14 @@ export class AuditService {
         })
         .returning();
 
+      if (!auditLog.length) {
+        logger.error(
+          { action: input.action, entityType: input.entityType, entityId: input.entityId },
+          'Audit log insert returned no rows'
+        );
+        throw new Error('Failed to create audit log: database returned no rows');
+      }
+
       logger.debug(
         { auditLogId: auditLog[0].id },
         'Audit log created successfully'

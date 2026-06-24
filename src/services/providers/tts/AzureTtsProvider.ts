@@ -193,8 +193,6 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
     }
 
     if (this.sentenceSplitter) {
-      logger.debug(`[Azure TTS] Adding text to sentence splitter: "${text}"`);
-      // Add text to sentence splitter - it will automatically call synthesizeSentence for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
       logger.debug(`[Azure TTS] Buffering text: "${text}"`);
@@ -234,8 +232,6 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
       return;
     }
 
-    logger.info(`[Azure TTS] Queueing sentence for synthesis: "${text}"`);
-
     // Add to queue and start processing if not already running
     this.synthesisQueue.push(text);
     if (!this.isProcessing) {
@@ -257,10 +253,8 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
     while (this.synthesisQueue.length > 0) {
       const text = this.synthesisQueue.shift();
       if (text) {
-        logger.info(`[Azure TTS] Processing synthesis for queued sentence: "${text}"`);
         try {
           await this.performSynthesis(text);
-          logger.info(`[Azure TTS] Finished synthesis for queued sentence: "${text}"`);
         } catch (error) {
           logger.error(`[Azure TTS] Error processing queued synthesis: ${error}`);
           await this.handleError(error instanceof Error ? error : new Error(String(error)));

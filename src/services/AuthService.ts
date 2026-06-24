@@ -26,7 +26,7 @@ export type LoginResponse = {
   refreshToken: string;
   expiresIn: number;
   operatorId: string;
-  name: string;
+  displayName: string;
   roles: string[];
   permissions: string[];
 };
@@ -119,7 +119,7 @@ export class AuthService {
         refreshToken,
         expiresIn: this.jwtTimeToSeconds(ACCESS_TOKEN_EXPIRY),
         operatorId: operator.id,
-        name: operator.name,
+        displayName: operator.name,
         roles: operator.roles,
         permissions: getPermissionsForRoles(operator.roles),
       };

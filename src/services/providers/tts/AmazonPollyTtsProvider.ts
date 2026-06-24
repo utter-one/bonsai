@@ -185,7 +185,6 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
     }
 
     if (this.sentenceSplitter) {
-      logger.debug(`[Amazon Polly TTS] Adding text to sentence splitter: "${text}"`);
       await this.sentenceSplitter.addText(text);
     } else {
       logger.debug(`[Amazon Polly TTS] Buffering text: "${text}"`);
@@ -221,8 +220,6 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
       return;
     }
 
-    logger.info(`[Amazon Polly TTS] Queuing sentence for synthesis: "${text}"`);
-
     // Chain request to ensure sequential audio chunk delivery
     this.requestQueue = this.requestQueue.then(async () => {
       try {
@@ -247,8 +244,6 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
     const effectiveVoice = this.settings.voiceId ?? 'Joanna';
     const effectiveEngine = this.settings.engine ?? 'neural';
     const { outputFormat, sampleRate } = this.mapAudioFormat(this.audioFormat);
-
-    logger.info(`[Amazon Polly TTS] Calling SynthesizeSpeech for: "${text}"`);
 
     const command = new SynthesizeSpeechCommand({
       Text: text,

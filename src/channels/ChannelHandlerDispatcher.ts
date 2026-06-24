@@ -34,10 +34,14 @@ export class ChannelHandlerDispatcher {
 
     for (const messageType of registryItems.keys()) {
       const registryItem = registryItems.get(messageType);
-      const handler = registryItem.handlerFactory();
-      if (handler) {
-        this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth, schema: registryItem.schema, requiredFeature: registryItem.requiredFeature });
-        logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth, requiredFeature: registryItem.requiredFeature }, 'Registered message handler');
+      try {
+        const handler = registryItem.handlerFactory();
+        if (handler) {
+          this.handlers.set(messageType, { instance: handler, requiresAuth: registryItem.requiresAuth, schema: registryItem.schema, requiredFeature: registryItem.requiredFeature });
+          logger.debug({ messageType: messageType, requiresAuth: registryItem.requiresAuth, requiredFeature: registryItem.requiredFeature }, 'Registered message handler');
+        }
+      } catch (error) {
+        logger.error({ error, messageType }, 'Failed to register message handler');
       }
     }
 
@@ -52,44 +56,45 @@ export class ChannelHandlerDispatcher {
    * @param context - The handler context supplied by the transport layer.
    */
   async dispatch(message: CALInputMessage, context: ClientMessageHandlerContext): Promise<void> {
+    const correlationId = message.correlationId;
     try {
-      logger.debug({ messageType: message.type, correlationId: message.correlationId }, 'Dispatching message');
+      logger.debug({ messageType: message.type, correlationId }, 'Dispatching message');
 
       const handler = this.handlers.get(message.type);
       if (!handler) {
         logger.warn({ messageType: message.type }, 'Unknown message type received');
-        context.sendError('Unknown message type', message.correlationId);
+        context.sendError('Unknown message type', correlationId);
         return;
       }
 
       const validation = handler.schema.safeParse(message);
       if (!validation.success) {
         const errorDetails = validation.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');
-        logger.warn({ messageType: message.type, correlationId: message.correlationId, issues: validation.error.issues }, 'Invalid message format received');
-        context.sendError(`Invalid message: ${errorDetails}`, message.correlationId);
+        logger.warn({ messageType: message.type, correlationId, issues: validation.error.issues }, 'Invalid message format received');
+        context.sendError(`Invalid message: ${errorDetails}`, correlationId);
         return;
       }
 
       // Check if handler requires authentication
       if (handler.requiresAuth && (!context.session || !context.session.id)) {
-        context.sendError('Authentication required', message.correlationId);
+        context.sendError('Authentication required', correlationId);
         return;
       }
 
       // Check if handler requires a specific API key feature
       if (handler.requiredFeature && context.session) {
         if (!isFeatureAllowed(context.session, handler.requiredFeature)) {
-          logger.warn({ messageType: message.type, correlationId: message.correlationId, requiredFeature: handler.requiredFeature }, 'Message rejected: required feature not permitted by API key');
-          context.sendError(`Feature '${handler.requiredFeature}' is not permitted by this API key`, message.correlationId);
+          logger.warn({ messageType: message.type, correlationId, requiredFeature: handler.requiredFeature }, 'Message rejected: required feature not permitted by API key');
+          context.sendError(`Feature '${handler.requiredFeature}' is not permitted by this API key`, correlationId);
           return;
         }
       }
 
-      await handler.instance.handle(context, message as any);
+      await handler.instance.handle(context, message);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error({ error: errorMessage }, 'Failed to dispatch message');
-      context.sendError(errorMessage);
+      logger.error({ error: errorMessage, correlationId }, 'Failed to dispatch message');
+      context.sendError(errorMessage, correlationId);
     }
   }
 }

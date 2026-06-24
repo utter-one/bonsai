@@ -5,6 +5,8 @@ import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationService } from "../ConversationService";
+import { MAX_LIST_LIMIT } from "../../utils/pagination";
+import { InvalidOperationError } from "../../errors";
 import { KnowledgeService } from "../KnowledgeService";
 import { ClassificationEventData, SampleCopySelectionEventData } from "../../types/conversationEvents";
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
@@ -72,7 +74,7 @@ export class UserInputProcessor {
         const knowledgeStartMs = Date.now();
         knowledgeCategories = stage.knowledgeTags.length > 0
           ? await this.knowledgeService.getCategoriesByTags(conversation.projectId, stage.knowledgeTags)
-          : (await this.knowledgeService.listKnowledgeCategories(conversation.projectId, { offset: 0, limit: 100 })).items;
+          : (await this.knowledgeService.listKnowledgeCategories(conversation.projectId, { offset: 0, limit: MAX_LIST_LIMIT })).items;
         const knowledgeEndMs = Date.now();
         knowledgeRetrievalDurationMs = knowledgeEndMs - knowledgeStartMs;
         knowledgeRetrievalStartMs = knowledgeStartMs;
@@ -91,7 +93,8 @@ export class UserInputProcessor {
           classifier.classifier.id,
           userInput,
           originalUserInput,
-          classifierKnowledgeCategories
+          classifierKnowledgeCategories,
+          session.clientConnection.connectionType,
         );
         return this.classifyTextInput(session, classifier, classifierContext);
       });
@@ -99,7 +102,7 @@ export class UserInputProcessor {
       // Build guardrail classification promise if a guardrail classifier is configured and there are active guardrails
       const guardrailPromise = guardrailClassifier && guardrails.length > 0
         ? (async () => {
-          const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput);
+          const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput, session.clientConnection.connectionType);
           return this.classifyTextInput(session, guardrailClassifier, guardrailContext);
         })()
         : Promise.resolve(null);
@@ -107,7 +110,7 @@ export class UserInputProcessor {
       // Build sample copy classification promise if a classifier is configured and there are applicable sample copies for this stage
       const sampleCopyPromise = sampleCopyClassifier && sampleCopies.length > 0
         ? (async () => {
-          const sampleCopyContext = await this.contextBuilder.buildContextForSampleCopyClassifier(conversation, stage, sampleCopies, userInput, originalUserInput);
+          const sampleCopyContext = await this.contextBuilder.buildContextForSampleCopyClassifier(conversation, stage, sampleCopies, userInput, originalUserInput, session.clientConnection.connectionType);
           return this.classifyCopyForInput(session, sampleCopyContext);
         })()
         : Promise.resolve(null);
@@ -166,13 +169,13 @@ export class UserInputProcessor {
       }
 
       // Register sample copy selection event
-      if (sampleCopyResult) {
+      if (sampleCopyResult && sampleCopyClassifier) {
         const eventData: SampleCopySelectionEventData = {
-          classifierId: sampleCopyClassifier!.classifier.id,
+          classifierId: sampleCopyClassifier.classifier.id,
           input: userInput || '',
           sampleCopy: sampleCopyResult.sampleCopy,
           metadata: {
-            classifierName: sampleCopyClassifier!.classifier.name,
+            classifierName: sampleCopyClassifier.classifier.name,
             systemPrompt: sampleCopyResult.renderedPrompt,
             result: sampleCopyResult.result,
             llmUsage: sampleCopyResult.llmUsage,
@@ -207,7 +210,7 @@ export class UserInputProcessor {
           ?? stageActionsMap.get(action.name);
 
         if (!actionDef) {
-          logger.warn({ actions: stage.actions, conversationId: session.id, actionName: action.name }, `Received action ${action.name} from classifier which does not exist in global actions, guardrails, or stage actions. Ignoring.`);
+          logger.warn({ actions: stage.actions, conversationId: conversation.id, actionName: action.name }, `Received action ${action.name} from classifier which does not exist in global actions, guardrails, or stage actions. Ignoring.`);
           return false;
         }
 
@@ -215,7 +218,7 @@ export class UserInputProcessor {
         if ('parameters' in actionDef) {
           const missingRequiredParams = (actionDef.parameters || []).filter(p => p.required && action.parameters[p.name] == null).map(p => p.name);
           if (missingRequiredParams.length > 0) {
-            logger.warn({ conversationId: session.id, actionName: action.name, missingParameters: missingRequiredParams }, `Received incomplete action ${action.name} from classifier. Missing required parameters: ${missingRequiredParams.join(', ')}. Ignoring.`);
+            logger.warn({ conversationId: conversation.id, actionName: action.name, missingParameters: missingRequiredParams }, `Received incomplete action ${action.name} from classifier. Missing required parameters: ${missingRequiredParams.join(', ')}. Ignoring.`);
             return false;
           }
         }
@@ -235,7 +238,7 @@ export class UserInputProcessor {
     try {
       const classifierData = session.runner.getRuntimeData().sampleCopyClassifier;
       if (!classifierData) {
-        throw new Error('No sample copy classifier configured for this stage');
+        throw new InvalidOperationError('No sample copy classifier configured for this stage');
       }
       logger.debug({ sessionId: session.id, classifierId: classifierData.classifier.id }, 'Classifying sample copy for text input using sample copy classifier');
       const llmProvider = classifierData.llmProvider;
@@ -256,7 +259,7 @@ export class UserInputProcessor {
 
       const copyModel = classifierData.classifier.llmSettings?.model;
       const copyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, copyModel);
-      const copyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, copyLimits, 'classification');
+      const copyMaxTokens = resolveOutputCap(classifierData.classifier.llmSettings?.defaultMaxTokens, copyLimits, 'classification');
       const copyInputCap = copyLimits?.inputTokensLimits?.classification;
       const { messages: truncatedCopyMessages, ...copyTruncation } = truncateMessagesToTokenBudget(messages, copyInputCap, copyModel);
       const result = await llmProvider.generate(truncatedCopyMessages, copyMaxTokens !== undefined ? { maxTokens: copyMaxTokens } : undefined);
@@ -311,7 +314,7 @@ export class UserInputProcessor {
 
       const classifyModel = classifierData.classifier.llmSettings?.model;
       const classifyLimits = resolveProviderModelLimits(session.runner.getRuntimeData().costManagementConfig, classifierData.llmProviderInfo.id, classifyModel);
-      const classifyMaxTokens = resolveOutputCap((classifierData.classifier.llmSettings as any)?.defaultMaxTokens, classifyLimits, 'classification');
+      const classifyMaxTokens = resolveOutputCap(classifierData.classifier.llmSettings?.defaultMaxTokens, classifyLimits, 'classification');
       const classifyInputCap = classifyLimits?.inputTokensLimits?.classification;
       const { messages: truncatedClassifyMessages, ...classifyTruncation } = truncateMessagesToTokenBudget(messages, classifyInputCap, classifyModel);
       const result = await llmProvider.generate(truncatedClassifyMessages, classifyMaxTokens !== undefined ? { maxTokens: classifyMaxTokens } : undefined);

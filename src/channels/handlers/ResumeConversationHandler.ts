@@ -35,6 +35,10 @@ export class ResumeConversationHandler implements ClientMessageHandler<CALResume
       throw new InvalidOperationError('A conversation is already active in this session');
     }
 
+    if (!message.conversationId) {
+      throw new InvalidOperationError('conversationId is required to resume a conversation');
+    }
+
     const conversation = await this.conversationService.getConversationById(context.session.projectId, message.conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation not found');
@@ -46,30 +50,43 @@ export class ResumeConversationHandler implements ClientMessageHandler<CALResume
     }
 
     if (conversation.archived) {
-      throw new ArchivedProjectError('Cannot resume a conversation belonging to an archived project');
+      throw new ArchivedProjectError('Cannot resume an archived conversation');
     }
 
-    await this.sessionManager.attachConversationToSession(context.session.id, message.conversationId);
+    try {
+      await this.sessionManager.attachConversationToSession(context.session.id, message.conversationId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to attach conversation to session';
+      logger.error({ error: errorMessage, sessionId: context.session.id, conversationId: message.conversationId }, 'Failed to attach conversation to session');
+      throw error;
+    }
 
-    // Return success response
-    const response: CALResumeConversationResponse = { type: 'resume_conversation', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
-    context.send(response);
+    if (!context.session.runner) {
+      throw new InvalidOperationError('No active conversation runner');
+    }
 
     // Resume the conversation
     try {
       await context.session.runner.resumeConversation();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to resume conversation';
-      logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to resume conversation');
+      logger.error({ error: errorMessage, sessionId: context.session.id, conversationId: message.conversationId }, 'Failed to resume conversation');
       const failedEventData: ConversationFailedEventData = { reason: errorMessage, stageId: conversation.stageId };
+      const clientEventData: ConversationFailedEventData = { reason: 'Failed to resume conversation', stageId: conversation.stageId };
       try {
-        await this.conversationService.failConversation(context.session!.projectId, message.conversationId, errorMessage);
-        await this.conversationService.saveConversationEvent(context.session!.projectId, message.conversationId, 'conversation_failed', failedEventData, conversation.stageId);
-        await context.session!.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_failed', eventData: failedEventData });
+        await this.conversationService.failConversation(context.session.projectId, message.conversationId, errorMessage);
+        await this.conversationService.saveConversationEvent(context.session.projectId, message.conversationId, 'conversation_failed', failedEventData, conversation.stageId);
+        await context.session.clientConnection?.sendMessage({ type: 'conversation_event', conversationId: message.conversationId, eventType: 'conversation_failed', eventData: clientEventData });
       } catch (cleanupError) {
         logger.error({ error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError), conversationId: message.conversationId }, 'Failed to save conversation_failed event during cleanup');
       }
-      this.sessionManager.detachConversationFromSession(context.session.id);
+      await this.sessionManager.detachConversationFromSession(context.session.id);
+      const response: CALResumeConversationResponse = { type: 'resume_conversation', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: 'Failed to resume conversation' };
+      context.send(response);
+      return;
     }
+
+    const response: CALResumeConversationResponse = { type: 'resume_conversation', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
+    context.send(response);
   }
 }

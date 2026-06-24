@@ -2,7 +2,7 @@ import { injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { calAbortAiGenerationRequestSchema } from '../messages';
-import type { CALAbortAiGenerationRequest } from '../messages';
+import type { CALAbortAiGenerationRequest, CALAbortAiGenerationResponse } from '../messages';
 import { NotFoundError, InvalidOperationError } from '../../errors';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
@@ -36,16 +36,20 @@ export class AbortAiGenerationHandler implements ClientMessageHandler<CALAbortAi
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      if (!context.session.runner) {
+        throw new InvalidOperationError('No active conversation runner');
+      }
+
       await context.session.runner.abortCurrentResponse();
 
-      const response = { type: 'abort_ai_generation', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
+      const response: CALAbortAiGenerationResponse = { type: 'abort_ai_generation', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
       context.send(response);
 
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId }, 'AI generation aborted successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to abort AI generation';
       logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to abort AI generation');
-      const response = { type: 'abort_ai_generation', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
+      const response: CALAbortAiGenerationResponse = { type: 'abort_ai_generation', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
       context.send(response);
     }
   }

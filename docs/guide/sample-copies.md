@@ -19,8 +19,8 @@ Add <code v-pre>{{copy}}</code> to your stage prompt to enable sample copy injec
 
 | Variable | Type | Description |
 |---|---|---|
-| <code v-pre>{{copy}}</code> | `string` | The selected copy content, joined by newlines. Empty string if no copy was matched. |
-| <code v-pre>{{copyContent}}</code> | `string` | Same as `copy` — raw selected content before any decorator is applied. |
+| <code v-pre>{{copy}}</code> | `string` | The selected copy content after any copy decorator template is applied. Empty string if no copy was matched. |
+| <code v-pre>{{copyContent}}</code> | `string` | Raw selected content before any decorator is applied. |
 | <code v-pre>{{sampleCopy}}</code> | `SampleCopyItem[]` | All sample copies active for this stage, exposing `name`, `trigger`, and `content`. |
 
 Example stage prompt usage:
@@ -70,7 +70,7 @@ Sample copy classification requires a classifier to be configured at the project
 
 - Go to **Project settings** → `sampleCopyConfig.defaultClassifierId`.
 - This classifier receives a list of all active sample copies and their `promptTrigger` descriptions, then returns the name of the best match (or `null` if none apply).
-- Individual sample copies can override the project classifier by setting `classifierOverrideId`.
+- The `classifierOverrideId` field on individual sample copies exists in the schema but is not used at runtime — only the project-level classifier is consulted.
 
 ## Copy Decorators
 
@@ -89,6 +89,7 @@ When a sample copy is selected (or not selected) on a turn, a `sample_copy_selec
 | `classifierId` | ID of the classifier that performed selection |
 | `input` | The user input text that triggered classification |
 | `sampleCopy` | Name of the selected sample copy, or `null` if none was matched |
+| `metadata` | Optional timing and context: `classifierName`, `systemPrompt`, `result`, `llmUsage`, `currentVariables`, `stageName`, `durationMs`, `startMs`, `endMs` |
 
 ## Example
 

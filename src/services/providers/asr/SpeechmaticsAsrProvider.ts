@@ -310,7 +310,6 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
       const partialText = message.metadata.transcript;
 
       if (partialText) {
-        logger.debug(`[Speechmatics ASR] Partial transcript: "${partialText}"`);
         this.handleRecognizing(this.currentChunkId, partialText);
       }
     } catch (error) {
@@ -327,7 +326,6 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
       const finalText = message.metadata.transcript;
 
       if (finalText) {
-        logger.info(`[Speechmatics ASR] Final transcript: "${finalText}"`);
         this.handleRecognized(this.currentChunkId, finalText);
         // Generate new chunk ID for next transcript
         this.currentChunkId = generateId(ID_PREFIXES.CHUNK);

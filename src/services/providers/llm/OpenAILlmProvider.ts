@@ -51,49 +51,6 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
   }
 
   /**
-   * Convert message content to Response API input format
-   */
-  private convertContentToInput(content: string | (TextContent | ImageContent | { type: 'json'; data: Record<string, any> })[]) {
-    if (typeof content === 'string') {
-      return content;
-    }
-
-    // Multi-modal content array
-    return content.map((item) => {
-      if (item.type === 'text') {
-        return {
-          type: 'input_text' as const,
-          text: (item as TextContent).text,
-        };
-      }
-      if (item.type === 'image') {
-        const imageContent = item as ImageContent;
-        if (imageContent.source.type === 'url' && imageContent.source.url) {
-          return {
-            type: 'input_image' as const,
-            image_url: imageContent.source.url,
-          };
-        } else if (imageContent.source.type === 'base64' && imageContent.source.data) {
-          const mimeType = imageContent.source.mimeType || 'image/jpeg';
-          const dataUrl = `data:${mimeType};base64,${imageContent.source.data}`;
-          return {
-            type: 'input_image' as const,
-            image_url: dataUrl,
-          };
-        }
-        throw new Error('Invalid image content: missing url or data');
-      }
-      if (item.type === 'json') {
-        return {
-          type: 'input_text' as const,
-          text: JSON.stringify((item as any).data),
-        };
-      }
-      throw new Error(`Unsupported content type: ${(item as any).type}`);
-    });
-  }
-
-  /**
    * Convert our message format to simple text input (for now)
    * TODO: Support multi-modal input array format
    */
@@ -279,7 +236,7 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
       if (item.type === 'message' && item.role === 'assistant') {
 
         // Skip commentary items if present
-        if (item.phase && item.phase === 'commentary') continue; 
+        if (item.phase && item.phase === 'commentary') continue;
 
         for (const contentItem of item.content || []) {
           if (contentItem.type === 'output_text') {

@@ -28,10 +28,7 @@ export type GoToStageResponse = z.infer<typeof goToStageResponseSchema>;
 export const setVarRequestSchema = calToWsInput(calSetVarRequestSchema);
 export type SetVarRequest = z.infer<typeof setVarRequestSchema>;
 
-/**
- * Response to set variable request.
- * Note: the response type is `set_var_result` (not `set_var`) to distinguish it from the request.
- */
+/** Response to set variable request. */ 
 export const setVarResponseSchema = calToWsOutput(calSetVarResponseSchema);
 export type SetVarResponse = z.infer<typeof setVarResponseSchema>;
 

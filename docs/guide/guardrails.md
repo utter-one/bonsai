@@ -70,6 +70,10 @@ Guardrails support all the same effects as stage actions and global actions:
 - `modify_user_input`, `modify_variables`, `modify_user_profile`
 - `call_tool`
 - `generate_response`
+- `change_visibility`
+- `ban_user`
+
+Two deprecated effects (`call_webhook`, `run_script`) are not available.
 
 See [Actions & Effects](./actions-and-effects) for details on each effect type.
 

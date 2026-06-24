@@ -16,9 +16,11 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { ConversationService } from '../../services/ConversationService';
+import { SYSTEM_CONTEXT } from '../../services/RequestContext';
 import { ProjectService } from '../../services/ProjectService';
 import { UserService } from '../../services/UserService';
 import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
+import { NotFoundError } from '../../errors';
 import { twilioMessagingSendBodySchema, twilioMessagingSendResponseSchema } from '../../http/contracts/twilio-messaging-outgoing';
 import type { TwilioMessagingSendResponse } from '../../http/contracts/twilio-messaging-outgoing';
 import * as _twilio from 'twilio';
@@ -62,7 +64,7 @@ export class TwilioMessagingChannelHost {
   /** Maps sessionId → active inactivity timer handle. */
   private readonly sessionTimeoutMap = new Map<string, NodeJS.Timeout>();
 
-  private readonly timeoutMs = parseInt(process.env.TWILIO_MESSAGING_SESSION_TIMEOUT_MS ?? String(DEFAULT_SESSION_TIMEOUT_MS), 10);
+  private readonly timeoutMs = parseInt(process.env.TWILIO_MESSAGING_SESSION_TIMEOUT_MS ?? String(DEFAULT_SESSION_TIMEOUT_MS), 10) || DEFAULT_SESSION_TIMEOUT_MS;
 
   constructor(
     @inject(SessionManager) private readonly sessionManager: SessionManager,
@@ -200,9 +202,22 @@ export class TwilioMessagingChannelHost {
     const phoneKey = `${projectId}:${senderNumber}`;
     const existingSessionId = this.phoneSessionMap.get(phoneKey);
 
-    if (existingSessionId) {
-      this.scheduleTimeout(existingSessionId, phoneKey);
-      await this.dispatchTextInput(existingSessionId, messageText);
+    let sessionId = existingSessionId;
+    if (sessionId) {
+      const existing = this.sessionManager.getSession(sessionId);
+      if (!existing?.conversationId) {
+        logger.info({ sessionId }, 'Twilio Messaging: existing session inactive, creating new session');
+        this.phoneSessionMap.delete(phoneKey);
+        const timer = this.sessionTimeoutMap.get(sessionId);
+        if (timer) clearTimeout(timer);
+        this.sessionTimeoutMap.delete(sessionId);
+        sessionId = undefined;
+      }
+    }
+
+    if (sessionId) {
+      this.scheduleTimeout(sessionId, phoneKey);
+      await this.dispatchTextInput(sessionId, messageText);
     } else {
       const connection = new TwilioMessagingConnection(senderNumber, recipientNumber, accountSid, authToken, this.sessionManager);
       const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
@@ -218,7 +233,6 @@ export class TwilioMessagingChannelHost {
       const startMsg: CALInputMessage = { type: 'start_conversation', userId: senderNumber, stageId, agentId, correlationId: undefined };
       const startContext = this.buildContext(sessionId);
       await this.dispatcher.dispatch(startMsg, startContext);
-
       await this.dispatchTextInput(sessionId, messageText);
     }
 
@@ -283,7 +297,7 @@ export class TwilioMessagingChannelHost {
     // Resolve stageId: body overrides query param, then project default
     let resolvedStageId = body.stageId ?? queryStageId;
     if (!resolvedStageId) {
-      const project = await this.projectService.getProjectById(projectId);
+      const project = await this.projectService.getProjectById(projectId, SYSTEM_CONTEXT);
       resolvedStageId = project.startingStageId ?? undefined;
       if (!resolvedStageId) {
         res.status(422).json({ error: 'No stageId provided and project has no default starting stage' });
@@ -292,8 +306,21 @@ export class TwilioMessagingChannelHost {
     }
     const resolvedAgentId = body.agentId ?? queryAgentId;
 
-    // Ensure the user exists (create if not)
-    await this.userService.ensureUserExists(projectId, body.to);
+    // Ensure the user exists (create if not, only if project allows it)
+    try {
+      await this.userService.getUserById(projectId, body.to);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        const project = await this.projectService.getProjectById(projectId, SYSTEM_CONTEXT);
+        if (!project.autoCreateUsers) {
+          res.status(422).json({ error: 'User not found and project does not allow auto-creating users' });
+          return;
+        }
+        await this.userService.ensureUserExists(projectId, body.to);
+      } else {
+        throw err;
+      }
+    }
 
     // Deep-merge injected userProfile into existing user profile
     if (body.userProfile && Object.keys(body.userProfile).length > 0) {
@@ -324,7 +351,7 @@ export class TwilioMessagingChannelHost {
       status: 'initialized',
       direction: 'outgoing',
       metadata: body.metadata ?? null,
-    });
+    }, SYSTEM_CONTEXT);
 
     const startMsg: CALInputMessage = { type: 'start_conversation', userId: body.to, stageId: resolvedStageId, agentId: resolvedAgentId, correlationId: undefined, existingConversationId: conversation.id };
     await this.dispatcher.dispatch(startMsg, this.buildContext(sessionId));

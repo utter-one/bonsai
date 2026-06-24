@@ -187,8 +187,6 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
     }
 
     if (this.sentenceSplitter) {
-      logger.debug(`[OpenAI TTS] Adding text to sentence splitter: "${text}"`);
-      // Add text to sentence splitter - it will automatically call synthesizeSentence for each complete sentence
       await this.sentenceSplitter.addText(text);
     } else {
       logger.debug(`[OpenAI TTS] Buffering text: "${text}"`);
@@ -227,8 +225,6 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
     if (!text.trim()) {
       return;
     }
-
-    logger.info(`[OpenAI TTS] Synthesizing sentence: "${text}"`);
 
     // Create abort controller for this request
     const abortController = new AbortController();

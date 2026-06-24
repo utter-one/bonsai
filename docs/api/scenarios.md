@@ -17,17 +17,18 @@ Content-Type: application/json
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | `string` | No | Unique identifier (auto-generated if omitted) |
+| `id` | `string` (min 1) | No | Unique identifier (auto-generated if omitted) |
 | `name` | `string` (min 1) | Yes | Display name |
-| `description` | `string` | No | Detailed description |
+| `description` | `string` | No | Detailed description (nullable) |
 | `language` | `string` (min 1) | Yes | Language code for the conversation (e.g. `en`) |
 | `startingStageId` | `string` (min 1) | Yes | Stage ID where the conversation begins |
 | `maxTurns` | `integer` (min 1) | Yes | Maximum number of conversation turns before the run is marked failed |
 | `endingStageIds` | `string[]` | No | Stage IDs that signal a successful conversation end |
 | `personaCanHangUp` | `boolean` | No | Whether the tester persona is allowed to end the conversation (default: `false`) |
+| `conversationOpener` | `string` | No | Opening message sent by the tester when the first stage awaits user input |
 | `dataExtraction` | `DataExtractionEntry[]` | No | Variables to extract and optionally validate at the end of the conversation |
 | `contextTransformerId` | `string` | No | ID of a context transformer applied before each tester turn |
-| `dataPostProcessingExpected` | `object` | No | Expected result shape after any post-processing step |
+| `dataPostProcessingExpected` | `Record<string, ExpectedValueEntry>` | No | Expected result shape after any post-processing step |
 | `tags` | `string[]` | No | Tags for categorizing and filtering |
 | `metadata` | `object` | No | Additional metadata |
 
@@ -38,6 +39,31 @@ Content-Type: application/json
 | `stageId` | `string` | Yes | Stage from which to extract the variable |
 | `varName` | `string` | Yes | Variable name to extract |
 | `expectedValue` | `any` | No | Optional expected value for pass/fail comparison |
+| `expectedMode` | `EvaluationComparisonMode` | No | Comparison mode for the expected value (default: `eq`) |
+
+**`ExpectedValueEntry` object**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `value` | `any` | No | Expected value for comparison |
+| `mode` | `EvaluationComparisonMode` | No | Comparison mode (default: `eq`) |
+
+**`EvaluationComparisonMode` enum**
+
+| Value | Description |
+|-------|-------------|
+| `exists` | Value is non-null |
+| `not_exists` | Value is null/undefined |
+| `eq` | Strict equality (default) |
+| `contains` | String contains substring |
+| `includes` | Array includes item |
+| `matches` | Regex pattern match |
+| `gt` | Greater than |
+| `gte` | Greater than or equal |
+| `lt` | Less than |
+| `lte` | Less than or equal |
+| `in` | Actual value is in expected array |
+| `nin` | Actual value not in expected array |
 
 **Response** `201 Created` — [Scenario Response](#scenario-response)
 
@@ -126,9 +152,10 @@ GET /api/projects/:projectId/scenarios/:id/audit-logs
 | `maxTurns` | `integer` | No | Maximum turn count |
 | `endingStageIds` | `string[]` | No | Stage IDs that end the scenario successfully |
 | `personaCanHangUp` | `boolean` | No | Whether the tester persona may hang up |
+| `conversationOpener` | `string` | Yes | Opening message sent by the tester |
 | `dataExtraction` | `DataExtractionEntry[]` | Yes | Data extraction configuration |
 | `contextTransformerId` | `string` | Yes | Context transformer ID |
-| `dataPostProcessingExpected` | `object` | Yes | Expected post-processing result |
+| `dataPostProcessingExpected` | `Record<string, ExpectedValueEntry>` | Yes | Expected post-processing result |
 | `tags` | `string[]` | No | Tags |
 | `metadata` | `object` | Yes | Additional metadata |
 | `version` | `integer` | No | Optimistic locking version |

@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, SQL, desc, and, isNull, isNotNull } from 'drizzle-orm';
+import { eq, SQL, desc, and, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
 import { projects, providers, apiKeys, stages, knowledgeCategories, knowledgeItems, globalActions, tools, contextTransformers, classifiers, agents, conversations, issues, users, guardrails } from '../db/schema';
@@ -45,7 +45,7 @@ export class ProjectService extends BaseService {
 
     try {
       const id = generateId(ID_PREFIXES.PROJECT);
-      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, costManagementConfig: input.costManagementConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, languageCode: input.languageCode, autoCreateUsers: input.autoCreateUsers ?? false, userProfileVariableDescriptors: input.userProfileVariableDescriptors ?? [], defaultGuardrailClassifierId: input.defaultGuardrailClassifierId ?? null, sampleCopyConfig: input.sampleCopyConfig ?? null, startingStageId: input.startingStageId ?? null, conversationTimeoutSeconds: input.conversationTimeoutSeconds ?? null, version: 1 }).returning();
+      const project = await db.insert(projects).values({ id, name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice ?? true, generateVoice: input.generateVoice ?? true, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, costManagementConfig: input.costManagementConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, languageCode: input.languageCode, autoCreateUsers: input.autoCreateUsers ?? false, userProfileVariableDescriptors: input.userProfileVariableDescriptors ?? [], defaultGuardrailClassifierId: input.defaultGuardrailClassifierId ?? null, sampleCopyConfig: input.sampleCopyConfig ?? null, startingStageId: input.startingStageId ?? null, conversationTimeoutSeconds: input.conversationTimeoutSeconds ?? null, recordingConfig: input.recordingConfig ?? null, version: 1 }).returning();
 
       const createdProject = project[0];
 
@@ -66,8 +66,9 @@ export class ProjectService extends BaseService {
    * @returns The project if found
    * @throws {NotFoundError} When project is not found
    */
-  async getProjectById(id: string): Promise<ProjectResponse> {
-    logger.debug({ projectId: id }, 'Fetching project by ID');
+  async getProjectById(id: string, context: RequestContext): Promise<ProjectResponse> {
+    this.requirePermission(context, PERMISSIONS.PROJECT_READ);
+    logger.debug({ projectId: id, operatorId: context.operatorId }, 'Fetching project by ID');
 
     try {
       const project = await db.query.projects.findFirst({ where: eq(projects.id, id) });
@@ -88,8 +89,9 @@ export class ProjectService extends BaseService {
    * @param params - List parameters including filters, sorting, pagination, text search, and archived flag
    * @returns Paginated array of projects matching the criteria
    */
-  async listProjects(params?: ListProjectsQuery): Promise<ProjectListResponse> {
-    logger.debug({ params }, 'Listing projects');
+  async listProjects(context: RequestContext, params?: ListProjectsQuery): Promise<ProjectListResponse> {
+    this.requirePermission(context, PERMISSIONS.PROJECT_READ);
+    logger.debug({ params, operatorId: context.operatorId }, 'Listing projects');
 
     try {
       const conditions: SQL[] = [];
@@ -173,7 +175,7 @@ export class ProjectService extends BaseService {
         throw new InvalidOperationError('asrConfig is required when acceptVoice is enabled');
       }
 
-      const updateData = { name: input.name, description: input.description, asrConfig: input.asrConfig, acceptVoice: input.acceptVoice, generateVoice: input.generateVoice, storageConfig: input.storageConfig, moderationConfig: input.moderationConfig, costManagementConfig: input.costManagementConfig, constants: input.constants, metadata: input.metadata, timezone: input.timezone, languageCode: input.languageCode, autoCreateUsers: input.autoCreateUsers, userProfileVariableDescriptors: input.userProfileVariableDescriptors, defaultGuardrailClassifierId: input.defaultGuardrailClassifierId, sampleCopyConfig: input.sampleCopyConfig, startingStageId: input.startingStageId, conversationTimeoutSeconds: input.conversationTimeoutSeconds ?? null, version: existingProject.version + 1, updatedAt: new Date() };
+      const updateData = { name: input.name !== undefined ? input.name : existingProject.name, description: input.description !== undefined ? input.description : existingProject.description, asrConfig: input.asrConfig !== undefined ? input.asrConfig : existingProject.asrConfig, acceptVoice: input.acceptVoice !== undefined ? input.acceptVoice : existingProject.acceptVoice, generateVoice: input.generateVoice !== undefined ? input.generateVoice : existingProject.generateVoice, storageConfig: input.storageConfig !== undefined ? input.storageConfig : existingProject.storageConfig, moderationConfig: input.moderationConfig !== undefined ? input.moderationConfig : existingProject.moderationConfig, costManagementConfig: input.costManagementConfig !== undefined ? input.costManagementConfig : existingProject.costManagementConfig, constants: input.constants !== undefined ? input.constants : existingProject.constants, metadata: input.metadata !== undefined ? input.metadata : existingProject.metadata, timezone: input.timezone !== undefined ? input.timezone : existingProject.timezone, languageCode: input.languageCode !== undefined ? input.languageCode : existingProject.languageCode, autoCreateUsers: input.autoCreateUsers !== undefined ? input.autoCreateUsers : existingProject.autoCreateUsers, userProfileVariableDescriptors: input.userProfileVariableDescriptors !== undefined ? input.userProfileVariableDescriptors : existingProject.userProfileVariableDescriptors, defaultGuardrailClassifierId: input.defaultGuardrailClassifierId !== undefined ? input.defaultGuardrailClassifierId : existingProject.defaultGuardrailClassifierId, sampleCopyConfig: input.sampleCopyConfig !== undefined ? input.sampleCopyConfig : existingProject.sampleCopyConfig, startingStageId: input.startingStageId !== undefined ? input.startingStageId : existingProject.startingStageId, conversationTimeoutSeconds: input.conversationTimeoutSeconds !== undefined ? input.conversationTimeoutSeconds : existingProject.conversationTimeoutSeconds, recordingConfig: input.recordingConfig !== undefined ? input.recordingConfig : existingProject.recordingConfig, version: existingProject.version + 1, updatedAt: new Date() };
       const updatedProject = await db.update(projects).set(updateData).where(eq(projects.id, id)).returning();
 
       if (!updatedProject[0]) {
@@ -208,114 +210,151 @@ export class ProjectService extends BaseService {
         throw new NotFoundError(`Project with id ${id} not found`);
       }
 
-      // Use transaction to ensure atomicity - all or nothing
+     // Use transaction to ensure atomicity - all or nothing
       await db.transaction(async (tx) => {
         // Delete in FK-safe order (reverse of import order from MigrationService)
 
-        // 1. Delete apiKeys
+        // 1. Delete apiKeys (batch)
         const apiKeyRecords = await tx.query.apiKeys.findMany({ where: eq(apiKeys.projectId, id) });
-        for (const apiKey of apiKeyRecords) {
-          const { key: _key, ...safeApiKey } = apiKey;
-          await tx.delete(apiKeys).where(and(eq(apiKeys.projectId, id), eq(apiKeys.id, apiKey.id)));
-          await this.auditService.logDelete('api_key', apiKey.id, safeApiKey, context?.operatorId);
+        if (apiKeyRecords.length > 0) {
+          const apiKeyIds = apiKeyRecords.map(apiKey => apiKey.id);
+          await tx.delete(apiKeys).where(and(eq(apiKeys.projectId, id), inArray(apiKeys.id, apiKeyIds)));
+          for (const apiKey of apiKeyRecords) {
+            const { key: _key, ...safeApiKey } = apiKey;
+            await this.auditService.logDelete('api_key', apiKey.id, safeApiKey, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: apiKeyRecords.length }, 'Deleted apiKeys');
 
-        // 2. Delete stages (must be before agents/classifiers due to FK references)
+        // 2. Delete stages (must be before agents/classifiers due to FK references) (batch)
         const stageRecords = await tx.query.stages.findMany({ where: eq(stages.projectId, id) });
-        for (const stage of stageRecords) {
-          await tx.delete(stages).where(and(eq(stages.projectId, id), eq(stages.id, stage.id)));
-          await this.auditService.logDelete('stage', stage.id, stage, context?.operatorId);
+        if (stageRecords.length > 0) {
+          const stageIds = stageRecords.map(stage => stage.id);
+          await tx.delete(stages).where(and(eq(stages.projectId, id), inArray(stages.id, stageIds)));
+          for (const stage of stageRecords) {
+            await this.auditService.logDelete('stage', stage.id, stage, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: stageRecords.length }, 'Deleted stages');
 
-        // 3. Delete knowledgeItems (children of knowledgeCategories)
+        // 3. Delete knowledgeItems (children of knowledgeCategories) (batch)
         const categoryRecords = await tx.query.knowledgeCategories.findMany({ where: eq(knowledgeCategories.projectId, id) });
-        for (const category of categoryRecords) {
-          const itemRecords = await tx.query.knowledgeItems.findMany({ where: and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.categoryId, category.id)) });
+        const itemRecords = await tx.query.knowledgeItems.findMany({ where: eq(knowledgeItems.projectId, id) });
+        if (itemRecords.length > 0) {
+          const itemIds = itemRecords.map(item => item.id);
+          await tx.delete(knowledgeItems).where(and(eq(knowledgeItems.projectId, id), inArray(knowledgeItems.id, itemIds)));
           for (const item of itemRecords) {
-            await tx.delete(knowledgeItems).where(and(eq(knowledgeItems.projectId, id), eq(knowledgeItems.id, item.id)));
             await this.auditService.logDelete('knowledge_item', item.id, item, context?.operatorId, id);
           }
         }
         logger.debug({ projectId: id, categoryCount: categoryRecords.length }, 'Deleted knowledgeItems');
 
-        // 4. Delete knowledgeCategories
-        for (const category of categoryRecords) {
-          await tx.delete(knowledgeCategories).where(and(eq(knowledgeCategories.projectId, id), eq(knowledgeCategories.id, category.id)));
-          await this.auditService.logDelete('knowledge_category', category.id, category, context?.operatorId);
+        // 4. Delete knowledgeCategories (batch)
+        if (categoryRecords.length > 0) {
+          const categoryIds = categoryRecords.map(category => category.id);
+          await tx.delete(knowledgeCategories).where(and(eq(knowledgeCategories.projectId, id), inArray(knowledgeCategories.id, categoryIds)));
+          for (const category of categoryRecords) {
+            await this.auditService.logDelete('knowledge_category', category.id, category, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: categoryRecords.length }, 'Deleted knowledgeCategories');
 
-        // 5. Delete globalActions
+        // 5. Delete globalActions (batch)
         const globalActionRecords = await tx.query.globalActions.findMany({ where: eq(globalActions.projectId, id) });
-        for (const action of globalActionRecords) {
-          await tx.delete(globalActions).where(and(eq(globalActions.projectId, id), eq(globalActions.id, action.id)));
-          await this.auditService.logDelete('global_action', action.id, action, context?.operatorId);
+        if (globalActionRecords.length > 0) {
+          const globalActionIds = globalActionRecords.map(action => action.id);
+          await tx.delete(globalActions).where(and(eq(globalActions.projectId, id), inArray(globalActions.id, globalActionIds)));
+          for (const action of globalActionRecords) {
+            await this.auditService.logDelete('global_action', action.id, action, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: globalActionRecords.length }, 'Deleted globalActions');
 
-        // 6. Delete tools
+        // 6. Delete tools (batch)
         const toolRecords = await tx.query.tools.findMany({ where: eq(tools.projectId, id) });
-        for (const tool of toolRecords) {
-          await tx.delete(tools).where(and(eq(tools.projectId, id), eq(tools.id, tool.id)));
-          await this.auditService.logDelete('tool', tool.id, tool, context?.operatorId);
+        if (toolRecords.length > 0) {
+          const toolIds = toolRecords.map(tool => tool.id);
+          await tx.delete(tools).where(and(eq(tools.projectId, id), inArray(tools.id, toolIds)));
+          for (const tool of toolRecords) {
+            await this.auditService.logDelete('tool', tool.id, tool, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: toolRecords.length }, 'Deleted tools');
 
-        // 7. Delete contextTransformers
+        // 7. Delete contextTransformers (batch)
         const transformerRecords = await tx.query.contextTransformers.findMany({ where: eq(contextTransformers.projectId, id) });
-        for (const transformer of transformerRecords) {
-          await tx.delete(contextTransformers).where(and(eq(contextTransformers.projectId, id), eq(contextTransformers.id, transformer.id)));
-          await this.auditService.logDelete('context_transformer', transformer.id, transformer, context?.operatorId);
+        if (transformerRecords.length > 0) {
+          const transformerIds = transformerRecords.map(transformer => transformer.id);
+          await tx.delete(contextTransformers).where(and(eq(contextTransformers.projectId, id), inArray(contextTransformers.id, transformerIds)));
+          for (const transformer of transformerRecords) {
+            await this.auditService.logDelete('context_transformer', transformer.id, transformer, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: transformerRecords.length }, 'Deleted contextTransformers');
 
-        // 8. Delete classifiers
+        // 8. Delete classifiers (batch)
         const classifierRecords = await tx.query.classifiers.findMany({ where: eq(classifiers.projectId, id) });
-        for (const classifier of classifierRecords) {
-          await tx.delete(classifiers).where(and(eq(classifiers.projectId, id), eq(classifiers.id, classifier.id)));
-          await this.auditService.logDelete('classifier', classifier.id, classifier, context?.operatorId);
+        if (classifierRecords.length > 0) {
+          const classifierIds = classifierRecords.map(classifier => classifier.id);
+          await tx.delete(classifiers).where(and(eq(classifiers.projectId, id), inArray(classifiers.id, classifierIds)));
+          for (const classifier of classifierRecords) {
+            await this.auditService.logDelete('classifier', classifier.id, classifier, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: classifierRecords.length }, 'Deleted classifiers');
 
-        // 9. Delete agents
+        // 9. Delete agents (batch)
         const agentRecords = await tx.query.agents.findMany({ where: eq(agents.projectId, id) });
-        for (const agent of agentRecords) {
-          await tx.delete(agents).where(and(eq(agents.projectId, id), eq(agents.id, agent.id)));
-          await this.auditService.logDelete('agent', agent.id, agent, context?.operatorId);
+        if (agentRecords.length > 0) {
+          const agentIds = agentRecords.map(agent => agent.id);
+          await tx.delete(agents).where(and(eq(agents.projectId, id), inArray(agents.id, agentIds)));
+          for (const agent of agentRecords) {
+            await this.auditService.logDelete('agent', agent.id, agent, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: agentRecords.length }, 'Deleted agents');
 
-        // 10. Delete conversations (auto-cascades to conversationEvents and conversationArtifacts via DB constraints)
+        // 10. Delete conversations (auto-cascades to conversationEvents and conversationArtifacts via DB constraints) (batch)
         const conversationRecords = await tx.query.conversations.findMany({ where: eq(conversations.projectId, id) });
-        for (const conversation of conversationRecords) {
-          await tx.delete(conversations).where(and(eq(conversations.projectId, id), eq(conversations.id, conversation.id)));
-          await this.auditService.logDelete('conversation', conversation.id, conversation, context?.operatorId);
+        if (conversationRecords.length > 0) {
+          const conversationIds = conversationRecords.map(conversation => conversation.id);
+          await tx.delete(conversations).where(and(eq(conversations.projectId, id), inArray(conversations.id, conversationIds)));
+          for (const conversation of conversationRecords) {
+            await this.auditService.logDelete('conversation', conversation.id, conversation, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: conversationRecords.length }, 'Deleted conversations');
 
-        // 11. Delete users (must come after conversations due to composite FK from conversations to users)
+        // 11. Delete users (must come after conversations due to composite FK from conversations to users) (batch)
         const userRecords = await tx.query.users.findMany({ where: eq(users.projectId, id) });
-        for (const user of userRecords) {
-          await tx.delete(users).where(and(eq(users.projectId, id), eq(users.id, user.id)));
-          await this.auditService.logDelete('user', user.id, user, context?.operatorId, id);
+        if (userRecords.length > 0) {
+          const userIds = userRecords.map(user => user.id);
+          await tx.delete(users).where(and(eq(users.projectId, id), inArray(users.id, userIds)));
+          for (const user of userRecords) {
+            await this.auditService.logDelete('user', user.id, user, context?.operatorId, id);
+          }
         }
         logger.debug({ projectId: id, count: userRecords.length }, 'Deleted users');
 
-        // 12. Delete guardrails
+        // 12. Delete guardrails (batch)
         const guardrailRecords = await tx.query.guardrails.findMany({ where: eq(guardrails.projectId, id) });
-        for (const guardrail of guardrailRecords) {
-          await tx.delete(guardrails).where(and(eq(guardrails.projectId, id), eq(guardrails.id, guardrail.id)));
-          await this.auditService.logDelete('guardrail', guardrail.id, guardrail, context?.operatorId, id);
+        if (guardrailRecords.length > 0) {
+          const guardrailIds = guardrailRecords.map(guardrail => guardrail.id);
+          await tx.delete(guardrails).where(and(eq(guardrails.projectId, id), inArray(guardrails.id, guardrailIds)));
+          for (const guardrail of guardrailRecords) {
+            await this.auditService.logDelete('guardrail', guardrail.id, guardrail, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: guardrailRecords.length }, 'Deleted guardrails');
 
-        // 13. Delete issues
+        // 13. Delete issues (batch)
         const issueRecords = await tx.query.issues.findMany({ where: eq(issues.projectId, id) });
-        for (const issue of issueRecords) {
-          await tx.delete(issues).where(and(eq(issues.projectId, id), eq(issues.id, issue.id)));
-          await this.auditService.logDelete('issue', String(issue.id), issue, context?.operatorId);
+        if (issueRecords.length > 0) {
+          const issueIds = issueRecords.map(issue => issue.id);
+          await tx.delete(issues).where(and(eq(issues.projectId, id), inArray(issues.id, issueIds)));
+          for (const issue of issueRecords) {
+            await this.auditService.logDelete('issue', String(issue.id), issue, context?.operatorId);
+          }
         }
         logger.debug({ projectId: id, count: issueRecords.length }, 'Deleted issues');
 
@@ -428,8 +467,9 @@ export class ProjectService extends BaseService {
    * @param projectId - The unique identifier of the project
    * @returns Array of audit log entries for the project
    */
-  async getProjectAuditLogs(projectId: string): Promise<any[]> {
-    logger.debug({ projectId }, 'Fetching audit logs for project');
+  async getProjectAuditLogs(projectId: string, context: RequestContext): Promise<any[]> {
+    this.requirePermission(context, PERMISSIONS.AUDIT_READ);
+    logger.debug({ projectId, operatorId: context.operatorId }, 'Fetching audit logs for project');
 
     try {
       return await this.auditService.getEntityAuditLogs('project', projectId);

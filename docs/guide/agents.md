@@ -132,6 +132,11 @@ Set `fillerSettings` on the agent:
 }
 ```
 
+The `historyMessageCount` field controls how much conversation history is included in the filler LLM context:
+- `0` = no history (default) — only the current user input is sent
+- `-1` = all history — include the entire conversation history
+- `N > 0` = last N messages — include only the most recent N conversation messages
+
 Remove filler responses by setting `fillerSettings` to `null` in an update request.
 
 ### Available template variables
@@ -154,7 +159,8 @@ The `prompt` supports [Handlebars templates](./templating). The following variab
 - Keep the filler prompt strict: instruct the LLM to produce **one sentence only**, with no extra commentary or punctuation.
 - Use a fast, cheap LLM (e.g. `gpt-4o-mini`) since latency here directly affects when the user first hears audio.
 - You can reference <code v-pre>{{userInput}}</code> in the prompt to make fillers slightly context-aware (e.g. different fillers for questions vs statements).
-- Set `historyMessageCount` to include recent conversation messages in the filler LLM context, enabling more natural responses that acknowledge what was just discussed (e.g. "I see you're asking about pricing — let me check that for you.").
+- Set `historyMessageCount` to a positive number (e.g. `4`) to include recent conversation messages in the filler LLM context, enabling more natural responses that acknowledge what was just discussed (e.g. "I see you're asking about pricing — let me check that for you.").
+- Set `historyMessageCount` to `-1` to include the entire conversation history, or `0` to include no history at all (fastest, lowest cost).
 
 ## Usage in Stages
 

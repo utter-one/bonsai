@@ -16,3 +16,16 @@ export type RequestContext = {
   /** Timestamp when the request was received */
   timestamp: Date;
 };
+
+/**
+ * Pre-built context for system-internal calls (background services, channel hosts).
+ * Grants all permissions via super_admin role.
+ */
+export const SYSTEM_CONTEXT: RequestContext = {
+  operatorId: 'system',
+  roles: ['super_admin'],
+  ip: '127.0.0.1',
+  userAgent: 'system',
+  requestId: 'system',
+  timestamp: new Date(),
+};

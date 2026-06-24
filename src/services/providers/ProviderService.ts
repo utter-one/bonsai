@@ -12,6 +12,7 @@ import { buildFilterCondition, buildOrderBy } from '../../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../../utils/pagination';
 import { logger } from '../../utils/logger';
 import { BaseService } from '../BaseService';
+import { ImapInboundService } from '../ImapInboundService';
 import type { RequestContext } from '../RequestContext';
 import { PERMISSIONS } from '../../permissions';
 import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
@@ -28,6 +29,7 @@ export class ProviderService extends BaseService {
     @inject(AuditService) private readonly auditService: AuditService,
     @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(ImapInboundService) private readonly imapInboundService: ImapInboundService,
   ) {
     super();
   }
@@ -43,22 +45,17 @@ export class ProviderService extends BaseService {
     const providerId = input.id ?? generateId(ID_PREFIXES.PROVIDER);
     logger.info({ providerId, name: input.name, providerType: input.providerType, apiType: input.apiType, operatorId: context?.operatorId }, 'Creating provider');
 
-    try {
-      const secretizedConfig = await this.secretRefUtils.secretizeObject(input.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS);
-      const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: secretizedConfig as typeof input.config, createdBy: input.createdBy || context?.operatorId, tags: input.tags, version: 1 }).returning();
+    const secretizedConfig = await this.secretRefUtils.secretizeObject(input.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS);
+    const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: secretizedConfig as typeof input.config, createdBy: context?.operatorId, tags: input.tags, version: 1 }).returning();
 
-      const createdProvider = provider[0];
+    const createdProvider = provider[0];
 
-      const { config: _config, ...safeCreatedProvider } = createdProvider;
-      await this.auditService.logCreate('provider', createdProvider.id, safeCreatedProvider, context?.operatorId);
+    const { config: _config, ...safeCreatedProvider } = createdProvider;
+    await this.auditService.logCreate('provider', createdProvider.id, safeCreatedProvider, context?.operatorId);
 
-      logger.info({ providerId: createdProvider.id }, 'Provider created successfully');
+    logger.info({ providerId: createdProvider.id }, 'Provider created successfully');
 
-      return providerResponseSchema.parse(createdProvider);
-    } catch (error) {
-      logger.error({ error, providerId: input.id }, 'Failed to create provider');
-      throw error;
-    }
+    return providerResponseSchema.parse(createdProvider);
   }
 
   /**
@@ -68,24 +65,17 @@ export class ProviderService extends BaseService {
    * @returns The provider if found
    * @throws {NotFoundError} When provider is not found
    */
-  async getProviderById(id: string, context?: RequestContext): Promise<ProviderResponse> {
-    if (context) {
-      this.requirePermission(context, PERMISSIONS.PROVIDER_READ);
-    }
+  async getProviderById(id: string, context: RequestContext): Promise<ProviderResponse> {
+    this.requirePermission(context, PERMISSIONS.PROVIDER_READ);
     logger.debug({ providerId: id }, 'Fetching provider by ID');
 
-    try {
-      const provider = await db.query.providers.findFirst({ where: eq(providers.id, id) });
+    const provider = await db.query.providers.findFirst({ where: eq(providers.id, id) });
 
-      if (!provider) {
-        throw new NotFoundError(`Provider with id ${id} not found`);
-      }
-
-      return providerResponseSchema.parse(provider);
-    } catch (error) {
-      logger.error({ error, providerId: id }, 'Failed to fetch provider');
-      throw error;
+    if (!provider) {
+      throw new NotFoundError(`Provider with id ${id} not found`);
     }
+
+    return providerResponseSchema.parse(provider);
   }
 
   /**
@@ -94,74 +84,67 @@ export class ProviderService extends BaseService {
    * @param context - Request context for authorization
    * @returns Paginated array of providers matching the criteria
    */
-  async listProviders(params?: ListParams, context?: RequestContext): Promise<ProviderListResponse> {
-    if (context) {
-      this.requirePermission(context, PERMISSIONS.PROVIDER_READ);
-    }
+  async listProviders(context: RequestContext, params?: ListParams): Promise<ProviderListResponse> {
+    this.requirePermission(context, PERMISSIONS.PROVIDER_READ);
     logger.debug({ params }, 'Listing providers');
 
-    try {
-      const conditions: SQL[] = [];
-      const offset = params?.offset ?? 0;
-      const limit = normalizeListLimit(params?.limit);
+    const conditions: SQL[] = [];
+    const offset = params?.offset ?? 0;
+    const limit = normalizeListLimit(params?.limit);
 
-      // Column map for filter and order by operations
-      const columnMap = {
-        id: providers.id,
-        name: providers.name,
-        providerType: providers.providerType,
-        apiType: providers.apiType,
-        createdBy: providers.createdBy,
-        version: providers.version,
-        createdAt: providers.createdAt,
-        updatedAt: providers.updatedAt,
-      };
+    // Column map for filter and order by operations
+    const columnMap = {
+      id: providers.id,
+      name: providers.name,
+      providerType: providers.providerType,
+      apiType: providers.apiType,
+      createdBy: providers.createdBy,
+      version: providers.version,
+      createdAt: providers.createdAt,
+      updatedAt: providers.updatedAt,
+    };
 
-      // Apply filters
-      if (params?.filters) {
-        for (const [field, filter] of Object.entries(params.filters)) {
-          if (field === 'tags') {
-            const tagsArray = Array.isArray(filter) ? filter as string[] : [filter as string];
-            conditions.push(sql`${providers.tags} @> ${JSON.stringify(tagsArray)}::jsonb`);
-            continue;
-          }
-          const condition = buildFilterCondition(field, filter, columnMap, logger);
-          if (condition) {
-            conditions.push(condition);
-          }
+    // Apply filters
+    if (params?.filters) {
+      for (const [field, filter] of Object.entries(params.filters)) {
+        if (field === 'tags') {
+          const tagsArray = Array.isArray(filter) ? filter as string[] : [filter as string];
+          conditions.push(sql`${providers.tags} @> ${sql.param(JSON.stringify(tagsArray))}::jsonb`);
+          continue;
+        }
+        const condition = buildFilterCondition(field, filter, columnMap, logger);
+        if (condition) {
+          conditions.push(condition);
         }
       }
-
-      // Apply text search (searches name, id, providerType, apiType — or tag JSONB containment for "tag:" prefix)
-      if (params?.textSearch) {
-        const searchCondition = buildTextSearchCondition(params.textSearch, [providers.name, providers.id, providers.providerType, providers.apiType], providers.tags);
-        if (searchCondition) conditions.push(searchCondition);
-      }
-
-      // Build order by clause
-      const orderByClause = buildOrderBy(params?.orderBy, columnMap);
-      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
-
-      const total = await countRows(providers, whereCondition);
-
-      // Get paginated results
-      const providerList = await db.query.providers.findMany({
-        where: whereCondition,
-        orderBy: orderByClause.length > 0 ? orderByClause : [desc(providers.createdAt)],
-        limit,
-        offset,
-      });
-
-      return providerListResponseSchema.parse({
-        items: providerList,
-        total,
-        offset,
-        limit,
-      });
-    } catch (error) {
-      logger.error({ error, params }, 'Failed to list providers');
-      throw error;
     }
+
+    // Apply text search (searches name, id, providerType, apiType — or tag JSONB containment for "tag:" prefix)
+    if (params?.textSearch) {
+      const searchCondition = buildTextSearchCondition(params.textSearch, [providers.name, providers.id, providers.providerType, providers.apiType], providers.tags);
+      if (searchCondition) conditions.push(searchCondition);
+    }
+
+    // Build order by clause
+    const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const total = await countRows(providers, whereCondition);
+
+    // Get paginated results
+    const providerList = await db.query.providers.findMany({
+      where: whereCondition,
+      orderBy: orderByClause.length > 0 ? orderByClause : [desc(providers.createdAt)],
+      limit,
+      offset,
+    });
+
+    return providerListResponseSchema.parse({
+      items: providerList,
+      total,
+      offset,
+      limit,
+    });
   }
 
   /**
@@ -178,47 +161,48 @@ export class ProviderService extends BaseService {
     const { version: expectedVersion, ...updateData } = input;
     logger.info({ providerId: id, expectedVersion, operatorId: context?.operatorId }, 'Updating provider');
 
-    try {
-      const existingProvider = await db.query.providers.findFirst({ where: eq(providers.id, id) });
+    const existingProvider = await db.query.providers.findFirst({ where: eq(providers.id, id) });
 
-      if (!existingProvider) {
-        throw new NotFoundError(`Provider with id ${id} not found`);
-      }
-
-      if (existingProvider.version !== expectedVersion) {
-        throw new OptimisticLockError(`Provider version mismatch. Expected ${expectedVersion}, got ${existingProvider.version}`);
-      }
-
-      const updatePayload: any = {
-        name: updateData.name,
-        description: updateData.description,
-        providerType: updateData.providerType,
-        apiType: updateData.apiType,
-        config: updateData.config ? await this.secretRefUtils.secretizeObject(updateData.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS) : updateData.config,
-        tags: updateData.tags,
-        version: existingProvider.version + 1,
-        updatedAt: new Date(),
-      };
-
-      const updatedProvider = await db.update(providers).set(updatePayload).where(and(eq(providers.id, id), eq(providers.version, expectedVersion))).returning();
-
-      if (updatedProvider.length === 0) {
-        throw new OptimisticLockError(`Failed to update provider due to version conflict`);
-      }
-
-      const provider = updatedProvider[0];
-
-      const { config: _oldConfig, ...safeExistingProvider } = existingProvider;
-      const { config: _newConfig, ...safeProvider } = provider;
-      await this.auditService.logUpdate('provider', provider.id, safeExistingProvider, safeProvider, context?.operatorId);
-
-      logger.info({ providerId: provider.id, newVersion: provider.version }, 'Provider updated successfully');
-
-      return providerResponseSchema.parse(provider);
-    } catch (error) {
-      logger.error({ error, providerId: id }, 'Failed to update provider');
-      throw error;
+    if (!existingProvider) {
+      throw new NotFoundError(`Provider with id ${id} not found`);
     }
+
+    if (existingProvider.version !== expectedVersion) {
+      throw new OptimisticLockError(`Provider version mismatch. Expected ${expectedVersion}, got ${existingProvider.version}`);
+    }
+
+    const updatePayload: any = {
+      name: updateData.name,
+      description: updateData.description,
+      providerType: updateData.providerType,
+      apiType: updateData.apiType,
+      config: updateData.config ? await this.secretRefUtils.secretizeObject(updateData.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS) : updateData.config,
+      tags: updateData.tags,
+      version: existingProvider.version + 1,
+      updatedAt: new Date(),
+    };
+
+    const updatedProvider = await db.update(providers).set(updatePayload).where(and(eq(providers.id, id), eq(providers.version, expectedVersion))).returning();
+
+    if (updatedProvider.length === 0) {
+      throw new OptimisticLockError(`Failed to update provider due to version conflict`);
+    }
+
+    const provider = updatedProvider[0];
+
+    const { config: _oldConfig, ...safeExistingProvider } = existingProvider;
+    const { config: _newConfig, ...safeProvider } = provider;
+    await this.auditService.logUpdate('provider', provider.id, safeExistingProvider, safeProvider, context?.operatorId);
+
+    logger.info({ providerId: provider.id, newVersion: provider.version }, 'Provider updated successfully');
+
+    if (provider.apiType === 'smtp_imap') {
+      this.imapInboundService.reload(provider.id).catch((error) => {
+        logger.error({ error, providerId: provider.id }, 'Failed to reload IMAP session after provider update');
+      });
+    }
+
+    return providerResponseSchema.parse(provider);
   }
 
   /**
@@ -233,30 +217,31 @@ export class ProviderService extends BaseService {
     this.requirePermission(context, PERMISSIONS.PROVIDER_DELETE);
     logger.info({ providerId: id, expectedVersion, operatorId: context?.operatorId }, 'Deleting provider');
 
-    try {
-      const existingProvider = await db.query.providers.findFirst({ where: eq(providers.id, id) });
+    const existingProvider = await db.query.providers.findFirst({ where: eq(providers.id, id) });
 
-      if (!existingProvider) {
-        throw new NotFoundError(`Provider with id ${id} not found`);
-      }
+    if (!existingProvider) {
+      throw new NotFoundError(`Provider with id ${id} not found`);
+    }
 
-      if (existingProvider.version !== expectedVersion) {
-        throw new OptimisticLockError(`Provider version mismatch. Expected ${expectedVersion}, got ${existingProvider.version}`);
-      }
+    if (existingProvider.version !== expectedVersion) {
+      throw new OptimisticLockError(`Provider version mismatch. Expected ${expectedVersion}, got ${existingProvider.version}`);
+    }
 
-      const deleted = await db.delete(providers).where(and(eq(providers.id, id), eq(providers.version, expectedVersion))).returning();
+    const deleted = await db.delete(providers).where(and(eq(providers.id, id), eq(providers.version, expectedVersion))).returning();
 
-      if (deleted.length === 0) {
-        throw new OptimisticLockError(`Failed to delete provider due to version conflict`);
-      }
+    if (deleted.length === 0) {
+      throw new OptimisticLockError(`Failed to delete provider due to version conflict`);
+    }
 
-      const { config: _config, ...safeExistingProvider } = existingProvider;
-      await this.auditService.logDelete('provider', id, safeExistingProvider, context?.operatorId);
+    const { config: _config, ...safeExistingProvider } = existingProvider;
+    await this.auditService.logDelete('provider', id, safeExistingProvider, context?.operatorId);
 
-      logger.info({ providerId: id }, 'Provider deleted successfully');
-    } catch (error) {
-      logger.error({ error, providerId: id }, 'Failed to delete provider');
-      throw error;
+    logger.info({ providerId: id }, 'Provider deleted successfully');
+
+    if (existingProvider.apiType === 'smtp_imap') {
+      this.imapInboundService.stopSession(id).catch((error) => {
+        logger.error({ error, providerId: id }, 'Failed to stop IMAP session after provider deletion');
+      });
     }
   }
 
@@ -298,17 +283,10 @@ export class ProviderService extends BaseService {
    * @param context - Request context for authorization
    * @returns Array of audit log entries for the provider
    */
-  async getProviderAuditLogs(providerId: string, context?: RequestContext): Promise<any[]> {
-    if (context) {
-      this.requirePermission(context, PERMISSIONS.AUDIT_READ);
-    }
+  async getProviderAuditLogs(providerId: string, context: RequestContext): Promise<any[]> {
+    this.requirePermission(context, PERMISSIONS.AUDIT_READ);
     logger.debug({ providerId }, 'Fetching audit logs for provider');
 
-    try {
-      return await this.auditService.getEntityAuditLogs('provider', providerId);
-    } catch (error) {
-      logger.error({ error, providerId }, 'Failed to fetch provider audit logs');
-      throw error;
-    }
+    return await this.auditService.getEntityAuditLogs('provider', providerId);
   }
 }

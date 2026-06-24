@@ -1,11 +1,12 @@
 import { inject, injectable } from 'tsyringe';
 import type { ClientMessageHandler } from '../ClientMessageHandler';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
-import { authRequestSchema } from '../websocket/contracts/auth';
+import { authRequestSchema, sessionSettingsSchema } from '../websocket/contracts/auth';
 import type { AuthRequest, AuthResponse } from '../websocket/contracts/auth';
 import { SessionManager } from '../SessionManager';
 import { ApiKeyService } from '../../services/ApiKeyService';
 import { ProjectService } from '../../services/ProjectService';
+import { SYSTEM_CONTEXT } from '../../services/RequestContext';
 import { logger } from '../../utils/logger';
 import { ChannelMessageHandler } from '../ClientMessageHandlerRegistry';
 import type { ApiKeySettings } from '../../apiKeyFeatures';
@@ -39,70 +40,72 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
       return;
     }
 
+    let apiKey;
     try {
-      const apiKey = await this.apiKeyService.getApiKeyByKey(message.apiKey);
-
-      if (!apiKey || !apiKey.isActive) {
-        logger.warn({ requestId: message.requestId }, 'Authentication failed: invalid or inactive API key');
-        const response: AuthResponse = { type: 'auth', success: false, error: 'Invalid or inactive API key', requestId: message.requestId };
-        context.send(response);
-        return;
-      }
-
-      const keySettings: ApiKeySettings | null = apiKey.keySettings ?? null;
-
-      // Check channel permission (websocket vs webrtc)
-      if (keySettings?.allowedChannels) {
-        const connectionType = context.session!.clientConnection.connectionType;
-        if (!keySettings.allowedChannels.includes(connectionType)) {
-          logger.warn({ requestId: message.requestId, connectionType, allowedChannels: keySettings.allowedChannels }, 'Authentication failed: channel type not permitted by API key');
-          const response: AuthResponse = { type: 'auth', success: false, error: `Connection type '${connectionType}' is not permitted by this API key`, requestId: message.requestId };
-          context.send(response);
-          return;
-        }
-      }
-
-      // Check output feature permissions against explicitly requested session settings
-      if (keySettings?.allowedFeatures && message.sessionSettings) {
-        const { receiveVoiceOutput, receiveTranscriptionUpdates, receiveEvents } = message.sessionSettings;
-        if (receiveVoiceOutput === true && !keySettings.allowedFeatures.includes('voice_output')) {
-          logger.warn({ requestId: message.requestId }, 'Authentication failed: voice_output not permitted by API key');
-          const response: AuthResponse = { type: 'auth', success: false, error: 'API key does not permit voice output', requestId: message.requestId };
-          context.send(response);
-          return;
-        }
-        if (receiveTranscriptionUpdates === true && !keySettings.allowedFeatures.includes('text_output')) {
-          logger.warn({ requestId: message.requestId }, 'Authentication failed: text_output not permitted by API key');
-          const response: AuthResponse = { type: 'auth', success: false, error: 'API key does not permit text output', requestId: message.requestId };
-          context.send(response);
-          return;
-        }
-        if (receiveEvents === true && !keySettings.allowedFeatures.includes('events')) {
-          logger.warn({ requestId: message.requestId }, 'Authentication failed: events not permitted by API key');
-          const response: AuthResponse = { type: 'auth', success: false, error: 'API key does not permit conversation events', requestId: message.requestId };
-          context.send(response);
-          return;
-        }
-      }
-
-      this.sessionManager.setSessionProjectAndSettings(context.session!.id, apiKey.projectId, message.sessionSettings, keySettings);
-      logger.info({ sessionId: context.session!.id, projectId: apiKey.projectId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
-
-      const project = await this.projectService.getProjectById(apiKey.projectId);
-      const sendVoiceInput = message.sessionSettings?.sendVoiceInput !== false;
-      const projectSettings = {
-        projectId: project.id,
-        acceptVoice: project.acceptVoice && sendVoiceInput,
-        generateVoice: project.generateVoice,
-        asrConfig: project.asrConfig && sendVoiceInput ? project.asrConfig : null,
-      };
-
-      const response: AuthResponse = { type: 'auth', success: true, sessionId: context.session!.id, projectSettings, requestId: message.requestId };
-      context.send(response);
+      apiKey = await this.apiKeyService.getApiKeyByKey(message.apiKey);
     } catch (error) {
       logger.error({ error, requestId: message.requestId }, 'Authentication failed: error validating API key');
       const response: AuthResponse = { type: 'auth', success: false, error: 'Invalid API key', requestId: message.requestId };
       context.send(response);
+      return;
     }
+
+    if (!apiKey || !apiKey.isActive) {
+      logger.warn({ requestId: message.requestId }, 'Authentication failed: invalid or inactive API key');
+      const response: AuthResponse = { type: 'auth', success: false, error: 'Invalid or inactive API key', requestId: message.requestId };
+      context.send(response);
+      return;
+    }
+
+    const keySettings: ApiKeySettings | null = apiKey.keySettings ?? null;
+
+    // Check channel permission (websocket vs webrtc)
+    if (keySettings?.allowedChannels) {
+      const connectionType = context.session!.clientConnection.connectionType;
+      if (!keySettings.allowedChannels.includes(connectionType)) {
+        logger.warn({ requestId: message.requestId, connectionType, allowedChannels: keySettings.allowedChannels }, 'Authentication failed: channel type not permitted by API key');
+        const response: AuthResponse = { type: 'auth', success: false, error: `Connection type '${connectionType}' is not permitted by this API key`, requestId: message.requestId };
+        context.send(response);
+        return;
+      }
+    }
+
+    // Check output feature permissions against explicitly requested session settings
+    if (keySettings?.allowedFeatures && message.sessionSettings) {
+      const { receiveVoiceOutput, receiveTranscriptionUpdates, receiveEvents } = message.sessionSettings;
+      if (receiveVoiceOutput === true && !keySettings.allowedFeatures.includes('voice_output')) {
+        logger.warn({ requestId: message.requestId }, 'Authentication failed: voice_output not permitted by API key');
+        const response: AuthResponse = { type: 'auth', success: false, error: 'API key does not permit voice output', requestId: message.requestId };
+        context.send(response);
+        return;
+      }
+      if (receiveTranscriptionUpdates === true && !keySettings.allowedFeatures.includes('text_output')) {
+        logger.warn({ requestId: message.requestId }, 'Authentication failed: text_output not permitted by API key');
+        const response: AuthResponse = { type: 'auth', success: false, error: 'API key does not permit text output', requestId: message.requestId };
+        context.send(response);
+        return;
+      }
+      if (receiveEvents === true && !keySettings.allowedFeatures.includes('events')) {
+        logger.warn({ requestId: message.requestId }, 'Authentication failed: events not permitted by API key');
+        const response: AuthResponse = { type: 'auth', success: false, error: 'API key does not permit conversation events', requestId: message.requestId };
+        context.send(response);
+        return;
+      }
+    }
+
+    this.sessionManager.setSessionProjectAndSettings(context.session!.id, apiKey.projectId, sessionSettingsSchema.parse(message.sessionSettings ?? {}), keySettings);
+    logger.info({ sessionId: context.session!.id, projectId: apiKey.projectId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
+
+    const project = await this.projectService.getProjectById(apiKey.projectId, SYSTEM_CONTEXT);
+    const sendVoiceInput = message.sessionSettings?.sendVoiceInput !== false;
+    const projectSettings = {
+      projectId: project.id,
+      acceptVoice: project.acceptVoice && sendVoiceInput,
+      generateVoice: project.generateVoice,
+      asrConfig: project.asrConfig && sendVoiceInput ? project.asrConfig : null,
+    };
+
+    const response: AuthResponse = { type: 'auth', success: true, sessionId: context.session!.id, projectSettings, requestId: message.requestId };
+    context.send(response);
   }
 }

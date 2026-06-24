@@ -4,6 +4,7 @@ import type { ChildProcess } from 'child_process';
 import type { IAudioConverter } from './IAudioConverter';
 import type { AudioFormat } from '../../types/audio';
 import { buildFfmpegArgs } from './AudioFormatUtils';
+import logger from '../../utils/logger';
 
 /**
  * Audio converter that uses a spawned ffmpeg process for format pairs not
@@ -62,8 +63,9 @@ export class FfmpegAudioConverter extends EventEmitter implements IAudioConverte
       this.emit('data', chunk);
     });
 
-    this.process.stderr?.on('data', () => {
+    this.process.stderr?.on('data', (chunk: Buffer) => {
       // Suppress ffmpeg diagnostic output; errors are surfaced via exit code
+      logger.debug(`ffmpeg stderr: ${chunk.toString()}`);
     });
 
     this.process.on('error', (err: Error) => {

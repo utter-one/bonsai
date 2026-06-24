@@ -35,8 +35,16 @@ export class GoToStageHandler implements ClientMessageHandler<CALGoToStageReques
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
-      await context.session.runner.saveCommandEvent('go_to_stage', { stageId: message.stageId });
+      if (!message.stageId) {
+        throw new InvalidOperationError('Stage ID is required');
+      }
+
+      if (!context.session.runner) {
+        throw new InvalidOperationError('No active conversation runner');
+      }
+
       await context.session.runner.goToStage(message.stageId);
+      await context.session.runner.saveCommandEvent('go_to_stage', { stageId: message.stageId });
 
       const response: CALGoToStageResponse = { type: 'go_to_stage', conversationId: message.conversationId, correlationId: message.correlationId, success: true };
       context.send(response);
@@ -44,8 +52,9 @@ export class GoToStageHandler implements ClientMessageHandler<CALGoToStageReques
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId }, 'Go to stage completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to navigate to stage';
+      const sanitizedError = 'Failed to navigate to stage';
       logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId, stageId: message.stageId }, 'Failed to go to stage');
-      const response: CALGoToStageResponse = { type: 'go_to_stage', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: errorMessage };
+      const response: CALGoToStageResponse = { type: 'go_to_stage', conversationId: message.conversationId, correlationId: message.correlationId, success: false, error: sanitizedError };
       context.send(response);
     }
   }

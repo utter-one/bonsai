@@ -40,6 +40,10 @@ export class SendUserTextInputHandler implements ClientMessageHandler<CALSendUse
         throw new InvalidOperationError('Conversation ID mismatch');
       }
 
+      if (!context.session.runner) {
+        throw new InvalidOperationError('Conversation runner not initialized');
+      }
+
       inputTurnId = await context.session.runner.receiveUserTextInput(message.text);
 
       const response: CALSendUserTextInputResponse = { 
@@ -53,14 +57,15 @@ export class SendUserTextInputHandler implements ClientMessageHandler<CALSendUse
 
       logger.info({ sessionId: context.session?.id, conversationId: message.conversationId }, 'User text input received successfully');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to process text input';
+   const errorMessage = error instanceof Error ? error.message : 'Failed to process text input';
+      const sanitizedError = 'Failed to process text input';
       logger.error({ error: errorMessage, sessionId: context.session?.id, conversationId: message.conversationId }, 'Failed to process text input');
-      const response: CALSendUserTextInputResponse = { 
-        type: 'send_user_text_input', 
+      const response: CALSendUserTextInputResponse = {
+        type: 'send_user_text_input',
         conversationId: message.conversationId,
         correlationId: message.correlationId,
-        success: false, 
-        error: errorMessage, 
+        success: false,
+        error: sanitizedError,
         inputTurnId
       };
       context.send(response);

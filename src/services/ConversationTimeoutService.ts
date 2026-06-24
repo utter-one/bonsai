@@ -1,5 +1,6 @@
 import { inject, singleton } from 'tsyringe';
 import { schedule } from 'node-cron';
+import type { ScheduledTask } from 'node-cron';
 import { and, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { conversations, projects } from '../db/schema';
@@ -16,23 +17,37 @@ const TIMEOUT_REASON = 'Conversation timed out due to inactivity';
 /**
  * Background service that periodically checks for conversations that have exceeded
  * their project-configured inactivity timeout and aborts them.
- * Runs every minute via a cron schedule.
+ * Runs every minute via an in-process timer.
  */
 @singleton()
 export class ConversationTimeoutService {
+  private scheduledTask: ScheduledTask | null = null;
+  private isProcessing = false;
+
   constructor(
     @inject(ConversationService) private readonly conversationService: ConversationService,
     @inject(SessionManager) private readonly sessionManager: SessionManager,
   ) { }
 
   /**
-   * Starts the cron job that runs conversation timeout checks every minute.
+   * Starts the timer that runs conversation timeout checks every minute.
    */
   start(): void {
     logger.info('Starting ConversationTimeoutService (runs every 1 minute)');
-    schedule('* * * * *', () => {
+    this.scheduledTask = schedule('* * * * *', () => {
       this.processTimeouts().catch((error) => logger.error({ error }, 'Unhandled error in ConversationTimeoutService.processTimeouts'));
     });
+  }
+
+  /**
+   * Stops the timer. Call this during graceful shutdown.
+   */
+  stop(): void {
+    if (this.scheduledTask) {
+      this.scheduledTask.destroy();
+      this.scheduledTask = null;
+    }
+    logger.info('ConversationTimeoutService stopped');
   }
 
   /**
@@ -40,39 +55,49 @@ export class ConversationTimeoutService {
    * and aborts each one, saving a conversation_aborted event and notifying connected clients.
    */
   async processTimeouts(): Promise<void> {
-    logger.debug('Running conversation timeout check');
+    if (this.isProcessing) {
+      logger.debug('ConversationTimeoutService: previous run still in progress, skipping');
+      return;
+    }
 
-    let timedOut: { id: string; projectId: string; stageId: string }[];
-
+    this.isProcessing = true;
     try {
-      timedOut = await db
-        .select({ id: conversations.id, projectId: conversations.projectId, stageId: conversations.stageId })
-        .from(conversations)
-        .innerJoin(projects, and(
-          sql`${conversations.projectId} = ${projects.id}`,
-        ))
-        .where(
-          and(
-            inArray(conversations.status, [...ACTIVE_STATUSES]),
-            isNull(projects.archivedAt),
-            sql`${projects.conversationTimeoutSeconds} > 0`,
-            sql`COALESCE(${conversations.lastActivityAt}, ${conversations.updatedAt}) < NOW() - (${projects.conversationTimeoutSeconds} * INTERVAL '1 second')`,
-          ),
-        );
-    } catch (error) {
-      logger.error({ error }, 'Failed to query timed-out conversations');
-      return;
-    }
+      logger.debug('Running conversation timeout check');
 
-    if (timedOut.length === 0) {
-      logger.debug('No conversations to time out');
-      return;
-    }
+      let timedOut: { id: string; projectId: string; stageId: string }[];
 
-    logger.info({ count: timedOut.length }, 'Aborting timed-out conversations');
+      try {
+        timedOut = await db
+          .select({ id: conversations.id, projectId: conversations.projectId, stageId: conversations.stageId })
+          .from(conversations)
+          .innerJoin(projects, and(
+            sql`${conversations.projectId} = ${projects.id}`,
+          ))
+          .where(
+            and(
+              inArray(conversations.status, [...ACTIVE_STATUSES]),
+              isNull(projects.archivedAt),
+              sql`${projects.conversationTimeoutSeconds} > 0`,
+              sql`COALESCE(${conversations.lastActivityAt}, ${conversations.updatedAt}) < NOW() - (${projects.conversationTimeoutSeconds} * INTERVAL '1 second')`,
+            ),
+          );
+      } catch (error) {
+        logger.error({ error }, 'Failed to query timed-out conversations');
+        return;
+      }
 
-    for (const conversation of timedOut) {
-      await this.abortTimedOutConversation(conversation);
+      if (timedOut.length === 0) {
+        logger.debug('No conversations to time out');
+        return;
+      }
+
+      logger.info({ count: timedOut.length }, 'Aborting timed-out conversations');
+
+      for (const conversation of timedOut) {
+        await this.abortTimedOutConversation(conversation);
+      }
+    } finally {
+      this.isProcessing = false;
     }
   }
 

@@ -243,6 +243,11 @@ export class WebRTCChannelHost {
     const webrtcConnection = new WebRTCConnection(controlChannel, audioSource, this.sessionManager);
     const sessionId = this.sessionManager.registerSession(webrtcConnection);
     const session = this.sessionManager.getSession(sessionId);
+    if (!session) {
+      logger.error({ sessionId }, 'WebRTC: session not found after registration');
+      pc.close();
+      return;
+    }
     webrtcConnection.attachSession(session);
 
     const audioSink: RTCAudioSinkType | null = inboundAudioTrack ? new NodeRTCAudioSink(inboundAudioTrack) : null;
@@ -251,22 +256,26 @@ export class WebRTCChannelHost {
     logger.info({ sessionId, ip: clientIp, hasAudioTrack: !!inboundAudioTrack }, 'WebRTC control channel open, session created');
 
     if (audioSink) {
+      const sessionIdRef = session.id;
       audioSink.ondata = (data: RTCAudioSinkData) => {
-        if (!session?.conversationId || !session?.runner) return;
+        const currentSession = this.sessionManager.getSession(sessionIdRef);
+        if (!currentSession?.conversationId || !currentSession?.runner) return;
         // In VAD mode the runner manages turn lifecycle internally and must receive audio
         // continuously. In non-VAD mode only forward when the client has an active voice
         // input turn; forwarding without one would throw inside the runner (wrong state).
         const activeInputTurnId = webrtcConnection.getActiveInputTurnId();
-        if (activeInputTurnId === null && !session.runner.isVadMode) return;
+        if (activeInputTurnId === null && !currentSession.runner.isVadMode) return;
         const pcmBuffer = Buffer.from(data.samples.buffer, data.samples.byteOffset, data.samples.byteLength);
-        session.runner.receiveUserVoiceData(activeInputTurnId ?? '', pcmBuffer).catch((err) => {
-          logger.error({ err, sessionId: session?.id }, 'WebRTC failed to process inbound audio frame');
+        currentSession.runner.receiveUserVoiceData(activeInputTurnId ?? '', pcmBuffer).catch((err) => {
+          logger.error({ err, sessionId: sessionIdRef }, 'WebRTC failed to process inbound audio frame');
         });
       };
     }
 
     controlChannel.onmessage = (event: MessageEvent) => {
-      this.handleControlMessage(webrtcConnection, session, event.data as string, clientIp);
+      this.handleControlMessage(webrtcConnection, session, event.data as string, clientIp).catch((err) => {
+        logger.error({ error: err, sessionId: session.id }, 'WebRTC handleControlMessage unhandled rejection');
+      });
     };
 
     controlChannel.onclose = () => {
@@ -305,7 +314,7 @@ export class WebRTCChannelHost {
 
     const context: ClientMessageHandlerContext = {
       session,
-      send: (msg: any) => {
+      send: (msg) => {
         const outMsg: Record<string, unknown> = { ...msg };
         if (!outMsg.requestId && outMsg.correlationId) outMsg.requestId = outMsg.correlationId;
         if (!outMsg.sessionId && session?.id) outMsg.sessionId = session.id;
@@ -358,6 +367,9 @@ export class WebRTCChannelHost {
       if (entry.pc === pc) {
         entry.audioSink?.stop();
         this.peerConnections.delete(sessionId);
+        this.sessionManager.unregisterSession(sessionId).catch((err) => {
+          logger.error({ error: err, sessionId }, 'WebRTC cleanupPeerConnection failed to unregister session');
+        });
         break;
       }
     }

@@ -67,6 +67,7 @@ Both are resolved from the IoC container and started via `.start()`.
 - Use `types` over `interfaces`; never `require()` for types; always top-level `import`
 - Private methods after public ones
 - Add new errors to `/src/errors.ts` (extends Error); use existing ones where applicable
+- Split long lines into more readable format
 
 ## Security Pattern — Defense in Depth
 
@@ -116,6 +117,11 @@ Uses **pino** logger. `LOG_LEVEL` env var controls verbosity (default: `info`). 
 6. Verify with `npm run build`
 
 Migrations run automatically on container startup via Drizzle migrator (SSL from `DB_SSL` env var). Migration files in `/drizzle/` are copied to the Docker image.
+
+### Drizzle Behavior
+
+- **`undefined` values are filtered out** — `mapUpdateSet()` in Drizzle filters out `undefined` values. Passing `{ name: undefined }` to `.set()` will NOT set the column to NULL; it will be ignored. Only explicitly provided values are included in the SQL UPDATE statement.
+- **Partial updates are safe** — you can pass all fields to `.set()` and Drizzle will only update the ones that are defined. No need for conditional update payloads.
 
 ## WebSocket Contracts
 

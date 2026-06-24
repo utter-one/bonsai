@@ -103,6 +103,7 @@ Returns the full catalog of available analytics sources with their queryable dim
 | `id` | `string` | Metric identifier (used after the colon in metric specs) |
 | `label` | `string` | Human-readable label |
 | `unit` | `string` | Unit of measurement: `ms`, `tokens`, `count`, or `boolean` |
+| `aggregateFunctions` | `string[]` | Aggregation functions available for this metric (e.g. `["count", "avg", "sum", "min", "max", "p50", "p75", "p90", "p95", "p99"]`) |
 
 ### Example
 
@@ -169,6 +170,8 @@ Executes a slice-and-dice query against the specified source. Returns flat rows 
 | `interval` | `string` | No | — | Time bucket interval: `hour`, `day`, `week`, `month` |
 | `from` | `string` (ISO 8601) | No | — | Start of the date range (inclusive) |
 | `to` | `string` (ISO 8601) | No | — | End of the date range (inclusive) |
+| `relativeTime` | `object` | No | — | Relative time range, e.g. `{ amount: 7, unit: "days" }`. Mutually exclusive with `from`/`to` — takes precedence if both are provided |
+| `scenarioRunId` | `string` | No | — | Filter to conversations used by this scenario run |
 | `conversationId` | `string` | No | — | Filter to a single conversation |
 | `filters[dimId]` | `string` | No | — | Equality filter on a dimension |
 | `limit` | `integer` | No | `1000` | Maximum rows to return (1–10,000) |

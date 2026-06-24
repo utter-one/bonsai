@@ -277,8 +277,6 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
     // Store the latest transcript for this turn in case we need to finalize it later
     this.turnTranscripts.set(turn_order, transcript);
 
-    logger.info(`[AssemblyAI ASR] Turn ${turn_order}: "${transcript}" (end_of_turn=${end_of_turn}, formatted=${turn_is_formatted}, confidence=${end_of_turn_confidence})`);
-
     // Determine if this is a partial or final result
     // Partial: turn is not ended OR turn is ended but not yet formatted (if formatting is enabled)
     // Final: turn is ended AND (formatted OR formatting is disabled)

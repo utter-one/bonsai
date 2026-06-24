@@ -13,6 +13,7 @@ import { speechmaticsAsrSettingsSchema } from '../../services/providers/asr/Spee
 import { listParamsSchema } from './common';
 import { serverVadConfigSchema } from './vad';
 import { costManagementConfigSchema } from './costManagement';
+import { audioFormatValues } from '../../types/audio';
 
 extendZodWithOpenApi(z);
 
@@ -74,6 +75,18 @@ export const sampleCopyConfigSchema = z.object({
 export type SampleCopyConfig = z.infer<typeof sampleCopyConfigSchema>;
 
 /**
+ * Schema for recording configuration
+ */
+export const recordingConfigSchema = z.object({
+  enabled: z.boolean().describe('Whether audio recording is enabled for this project'),
+  recordInput: z.boolean().optional().default(true).describe('Whether to record user voice input. Defaults to true.'),
+  recordOutput: z.boolean().optional().default(true).describe('Whether to record AI voice output. Defaults to true.'),
+  format: z.enum(audioFormatValues).optional().default('pcm_16000').describe('Audio format for saved recordings. Defaults to pcm_16000.'),
+}).openapi('RecordingConfig').optional().describe('Audio recording configuration for conversation debugging. When enabled, records full conversation audio to project storage.');
+
+export type RecordingConfig = z.infer<typeof recordingConfigSchema>;
+
+/**
  * Schema for ASR provider settings (union of all ASR provider settings)
  */
 export const asrSettingsSchema = z.union([
@@ -89,6 +102,9 @@ export const asrConfigSchema = z.object({
   settings: asrSettingsSchema.optional().describe('ASR-specific settings including model, language preferences, etc.'),
   unintelligiblePlaceholder: z.string().optional().describe('Placeholder text to use when speech is unintelligible or cannot be transcribed'),
   voiceActivityDetection: z.boolean().optional().describe('Whether to enable voice activity detection to automatically start/stop recording based on speech presence'),
+  silenceTimeoutMs: z.number().int().min(0).optional().describe('Milliseconds of user silence in voice conversations before triggering an AI response. Set to 0 or omit to disable.'),
+  maxSilences: z.number().int().min(0).optional().describe('Maximum number of consecutive silence responses before ending the conversation. Set to 0 or omit for unlimited.'),
+  silencePlaceholder: z.string().nullable().optional().describe('Text fed to the AI as user input when silence is detected. The stage prompt can reference this text to generate an appropriate response.'),
   serverVad: serverVadConfigSchema.optional().describe('Server-side VAD configuration. When set, the server autonomously detects speech boundaries — clients send continuous audio without calling start/end_user_voice_input.'),
 }).openapi('AsrConfig').optional().describe('ASR configuration settings');
 
@@ -117,6 +133,7 @@ export const createProjectSchema = z.object({
   sampleCopyConfig: sampleCopyConfigSchema.describe('Sample copy configuration including the default classifier used to evaluate prompt triggers.'),
   startingStageId: z.string().nullable().optional().describe('ID of the stage to start new conversations at when no stageId is provided at conversation start time. Acts as the project-level default starting stage.'),
   conversationTimeoutSeconds: z.number().int().min(0).optional().describe('Timeout in seconds for active conversations with no activity. Set to 0 or omit to disable. Conversations that have been inactive for longer than this value will be automatically aborted.'),
+  recordingConfig: recordingConfigSchema.describe('Audio recording configuration for conversation debugging'),
 });
 
 export type CreateProjectRequest = z.infer<typeof createProjectSchema>;
@@ -145,6 +162,7 @@ export const updateProjectSchema = z.object({
   sampleCopyConfig: sampleCopyConfigSchema.nullable().describe('Updated sample copy configuration. Set to null to clear.'),
   startingStageId: z.string().nullable().optional().describe('Updated ID of the stage to start new conversations at when no stageId is provided at conversation start time. Set to null to remove the default starting stage.'),
   conversationTimeoutSeconds: z.number().int().min(0).nullable().optional().describe('Timeout in seconds for active conversations with no activity. Set to 0 or null to disable. Conversations that have been inactive for longer than this value will be automatically aborted.'),
+  recordingConfig: recordingConfigSchema.nullable().describe('Updated audio recording configuration. Set to null to disable.'),
   version: z.number().describe('The current version number for optimistic locking'),
 });
 
@@ -173,6 +191,7 @@ export const projectResponseSchema = z.object({
   sampleCopyConfig: sampleCopyConfigSchema.nullable().describe('Sample copy configuration including the default classifier used to evaluate prompt triggers.'),
   startingStageId: z.string().nullable().describe('ID of the stage to start new conversations at when no stageId is provided at conversation start time. Null means no default is set.'),
   conversationTimeoutSeconds: z.number().int().nullable().describe('Timeout in seconds for active conversations with no activity. Null or 0 means no timeout.'),
+  recordingConfig: recordingConfigSchema.nullable().describe('Audio recording configuration for conversation debugging'),
   version: z.number().describe('The version number of the project'),
   createdAt: z.coerce.date().describe('The timestamp when the project was created'),
   updatedAt: z.coerce.date().describe('The timestamp when the project was last updated'),
