@@ -11,6 +11,7 @@ import { ConversationEventData, ConversationEventType } from '../types/conversat
 import { FillerSettings } from '../http/contracts/agent';
 import type { ApiKeySettings } from '../http/contracts/apiKey';
 import type { IterationResultData } from '../types/benchmark';
+import type { AsyncReplyConfig } from '../http/contracts/tool';
 
 
 export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig | ChannelProviderConfig;
@@ -85,7 +86,7 @@ export const projects = pgTable('projects', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
-asrConfig: jsonb('asr_config').$type<{
+  asrConfig: jsonb('asr_config').$type<{
     asrProviderId?: string;
     settings?: unknown;
     unintelligiblePlaceholder?: string;
@@ -254,6 +255,8 @@ export const tools = pgTable('tools', {
   webhookBody: text('webhook_body'),
   // script fields
   code: text('code'),
+  // Async reply configuration — when set, webhook tools can defer their response
+  asyncReply: jsonb('async_reply').$type<AsyncReplyConfig>().default(null),
   parameters: jsonb('parameters').notNull().default([]).$type<ToolParameter[]>(),
   tags: jsonb('tags').notNull().default([]).$type<string[]>(),
   metadata: jsonb('metadata').$type<Record<string, any>>(),
@@ -265,6 +268,31 @@ export const tools = pgTable('tools', {
 ]);
 
 export type StageEnterBehavior = 'generate_response' | 'await_user_input';
+
+/** Status of a pending tool reply */
+export type PendingToolReplyStatus = 'pending' | 'replied' | 'timed_out' | 'expired' | 'failed_validation' | 'discarded';
+
+// PendingToolReply table — tracks deferred webhook tool calls awaiting external service replies
+export const pendingToolReplies = pgTable('pending_tool_replies', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  conversationId: text('conversation_id').notNull(),
+  toolId: text('tool_id').notNull(),
+  requestId: text('request_id').notNull(),
+  status: text('status').notNull().$type<PendingToolReplyStatus>().default('pending'),
+  /** Tool result data submitted by the external service */
+  replyData: jsonb('reply_data').$type<Record<string, unknown>>(),
+  /** Flow-control effects submitted by the external service */
+  replyEffects: jsonb('reply_effects').$type<Effect[]>(),
+  /** Expiration time after which the reply is no longer accepted */
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('idx_pending_tool_replies_request_id').on(table.requestId),
+  index('idx_pending_tool_replies_project_conversation').on(table.projectId, table.conversationId),
+  index('idx_pending_tool_replies_status_expires').on(table.status, table.expiresAt),
+]);
 
 // Stage table
 export const stages = pgTable('stages', {
@@ -712,6 +740,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   classifiers: many(classifiers),
   contextTransformers: many(contextTransformers),
   tools: many(tools),
+  pendingToolReplies: many(pendingToolReplies),
   knowledgeCategories: many(knowledgeCategories),
   globalActions: many(globalActions),
   guardrails: many(guardrails),
@@ -764,6 +793,13 @@ export const contextTransformersRelations = relations(contextTransformers, ({ on
 export const toolsRelations = relations(tools, ({ one }) => ({
   project: one(projects, {
     fields: [tools.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const pendingToolRepliesRelations = relations(pendingToolReplies, ({ one }) => ({
+  project: one(projects, {
+    fields: [pendingToolReplies.projectId],
     references: [projects.id],
   }),
 }));

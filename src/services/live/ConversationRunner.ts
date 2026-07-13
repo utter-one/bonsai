@@ -1,12 +1,11 @@
-import { z } from "zod";
 import { inject, injectable } from "tsyringe";
 import { NotFoundError, InvalidOperationError } from "../../errors";
-import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, SampleCopy, Stage, Tool } from "../../types/models";
+import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, SampleCopy, Stage } from "../../types/models";
 import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS } from "../../types/actions";
-import type { LifecycleContext } from "../../types/actions";
+import type { Effect } from "../../types/actions";
 import { db } from "../../db";
-import { conversations, users, sampleCopies } from "../../db/schema";
-import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility, VariablesUpdatedEventData, TurnAbortedEventData } from "../../types/conversationEvents";
+import { conversations, users } from "../../db/schema";
+import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, ConversationState, MessageVisibility, VariablesUpdatedEventData, TurnAbortedEventData } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { ConversationStorageService } from "../ConversationStorageService";
 import { ConversationRecorder } from "./ConversationRecorder";
@@ -24,8 +23,7 @@ import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { UserInputProcessor } from "./UserInputProcessor";
-import { TtsSettings } from "../providers/tts/TtsProviderFactory";
-import { ActionsExecutionOutcome, ActionsExecutor, EffectEventCallback } from "./ActionsExecutor";
+import { ActionsExecutionOutcome, ActionsExecutor } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { and, eq, notInArray } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
@@ -42,6 +40,7 @@ import type { AgentResponse } from "../../http/contracts/agent";
 import type { CostManagementConfig } from "../../http/contracts/costManagement";
 import { resolveProviderModelLimits, resolveOutputCap } from "../../utils/costManagement";
 import { truncateMessagesToTokenBudget, type TruncationInfo } from "../../utils/contextTruncation";
+import { ToolReplyService } from '../ToolReplyService';
 import type { IAudioConverter } from '../audio/IAudioConverter';
 import type { AudioFormat } from '../../types/audio';
 import { AudioConverterFactory } from '../audio/AudioConverterFactory';
@@ -49,7 +48,18 @@ import { VadProcessor } from '../audio/VadProcessor';
 import smartTurnDetector from '../audio/SmartTurnDetector';
 import type { ServerVadConfig } from '../../http/contracts/vad';
 import { SampleCopyDistributor } from "./SampleCopyDistributor";
+import type { QueuedInputMessageType } from "../../channels/ChannelHandlerDispatcher";
 
+/** Operation types that can be enqueued for serialized processing */
+export type OperationType = QueuedInputMessageType | 'tool_reply';
+
+/** Queue entry for serialized operation processing */
+type OperationQueueEntry<T> = {
+  type: OperationType;
+  handler: () => Promise<T>;
+  resolve: (value: T | Promise<T>) => void;
+  reject: (reason: unknown) => void;
+};
 
 /** Buffer holding the last converted audio chunk, used by the last-chunk-buffer pattern. */
 type PendingOutboundChunk = { chunkId: string; ordinal: number; audio: Buffer };
@@ -237,6 +247,19 @@ export class ConversationRunner {
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, moderationStartMs: null, moderationEndMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null, completionTruncationInfo: null, accumulatedText: null };
 
+  /** Deferred tool tracking — requestId → toolId, supports multiple concurrent deferred tools */
+  private deferredTools: Map<string, string> = new Map();
+
+  /** Buffered tool replies awaiting a natural checkpoint for effect processing */
+  private bufferedToolReplies: Array<{ requestId: string; toolId: string; replyData: Record<string, unknown> | null; replyEffects: Effect[] }> = [];
+
+  /** Completed tool results stored for later context injection when flushing buffered replies */
+  private completedToolResults: Record<string, any> = {};
+
+  /** Per-runner FIFO operation queue — serializes all state-mutating operations */
+  private operationQueue: OperationQueueEntry<unknown>[] = [];
+  private processingQueue = false;
+
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
     @inject(AsrProviderFactory) private asrProviderFactory: AsrProviderFactory,
@@ -252,10 +275,63 @@ export class ConversationRunner {
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
     @inject(ModerationService) private moderationService: ModerationService,
     @inject(ConversationStorageService) private conversationStorageService: ConversationStorageService,
+    @inject(ToolReplyService) private toolReplyService: ToolReplyService,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
     return this.stageData;
+  }
+
+  /**
+   * Enqueue an operation for serialized execution.
+   * Returns a promise that resolves when the operation completes in queue order.
+   */
+  public enqueueOperation<T = void>(type: OperationType, handler: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.operationQueue.push({ type, handler, resolve, reject } as OperationQueueEntry<T>);
+      logger.debug({ type, queueDepth: this.operationQueue.length, conversationId: this.conversation?.id ?? 'unknown' }, 'Operation enqueued');
+      this.drainQueue();
+    });
+  }
+
+  /**
+   * Drain the operation queue sequentially. Idempotent — only one drain runs at a time.
+   */
+  private async drainQueue(): Promise<void> {
+    if (this.processingQueue) return;
+    this.processingQueue = true;
+
+    try {
+      while (this.operationQueue.length > 0) {
+        const entry = this.operationQueue.shift()!;
+        try {
+          const result = await entry.handler();
+          (entry as any).resolve(result);
+        } catch (error) {
+          (entry as any).reject(error);
+        }
+      }
+    } finally {
+      this.processingQueue = false;
+    }
+  }
+
+  /** Returns current queue depth for monitoring */
+  public getQueueDepth(): number {
+    return this.operationQueue.length;
+  }
+
+  /** Clear the queue and reject all pending operations. Called on runner cleanup. */
+  private clearQueue(): void {
+    const depth = this.operationQueue.length;
+    if (depth > 0) {
+      logger.warn({ depth, conversationId: this.conversation?.id ?? 'unknown' }, 'Clearing operation queue on runner cleanup');
+    }
+    for (const entry of this.operationQueue) {
+      entry.reject(new InvalidOperationError('Conversation ended'));
+    }
+    this.operationQueue.length = 0;
+    this.processingQueue = false;
   }
 
   async prepareConversation(conversationId: string, session: Session, channel: IClientConnection): Promise<void> {
@@ -352,7 +428,7 @@ export class ConversationRunner {
     }
 
     // Collect classifierIds from action overrides
-    for (const [actionKey, action] of Object.entries(stage.actions)) {
+    for (const [, action] of Object.entries(stage.actions)) {
       if (action.overrideClassifierId) {
         classifierIds.add(action.overrideClassifierId);
       }
@@ -863,7 +939,6 @@ export class ConversationRunner {
         const timeToFirstAudioMs = this.turnData.firstAudioMs !== null && this.turnData.startMs !== null ? this.turnData.firstAudioMs - this.turnData.startMs : undefined;
         const ttsConnectDurationMs = this.turnData.ttsConnectStartMs !== null && this.turnData.ttsConnectEndMs !== null ? this.turnData.ttsConnectEndMs - this.turnData.ttsConnectStartMs : undefined;
         const promptRenderDurationMs = this.turnData.promptRenderStartMs !== null && this.turnData.promptRenderEndMs !== null ? this.turnData.promptRenderEndMs - this.turnData.promptRenderStartMs : undefined;
-        const stageTransitionDurationMs = this.turnData.stageTransitionStartMs !== null && this.turnData.stageTransitionEndMs !== null ? this.turnData.stageTransitionEndMs - this.turnData.stageTransitionStartMs : undefined;
         // For the text-only path, total turn duration is known now; for the TTS path it will be updated in setOnGenerationEnded
         const totalTurnDurationMs = !ttsProvider && this.turnData.startMs !== null ? llmEndMs - this.turnData.startMs : undefined;
         const turnEndMs = !ttsProvider ? llmEndMs : undefined;
@@ -1040,7 +1115,9 @@ export class ConversationRunner {
         success: true,
         shouldAbortConversation: false,
         shouldEndConversation: false,
-        shouldGenerateResponse: true
+        shouldGenerateResponse: true,
+        hasDeferredTool: false,
+        deferredTools: [],
       };
       await this.generateResponse(context, outcome);
     } else {
@@ -1268,6 +1345,10 @@ export class ConversationRunner {
     const conversationId = this.stageData?.conversation?.id ?? 'unknown';
     logger.info({ conversationId }, 'Cleaning up ConversationRunner resources');
 
+    // Clear operation queue first to prevent new operations from being processed
+    this.clearQueue();
+    this.deferredTools.clear();
+
     const cleanupProvider = async (provider: { cleanup(): Promise<void> } | undefined, label: string) => {
       if (!provider) return;
       try {
@@ -1455,7 +1536,9 @@ export class ConversationRunner {
           success: true,
           shouldAbortConversation: false,
           shouldEndConversation: false,
-          shouldGenerateResponse: true
+          shouldGenerateResponse: true,
+          hasDeferredTool: false,
+          deferredTools: [],
         };
         await this.generateResponse(enterContext, executionOutcome);
       } else {
@@ -1704,25 +1787,43 @@ export class ConversationRunner {
       this.sampleCopyDistributor.getOriginalCopies(), '', '', undefined, getEffectiveChannelType(this.session));
 
     // Execute the tool
-    const executeResult = await this.toolExecutor.executeTool(tool, context, parameters, this.stageData.costManagementConfig);
+    const executeResult = await this.toolExecutor.executeTool(tool, context, parameters, this.conversation.id, this.conversation.projectId, this.stageData.costManagementConfig);
 
     // Save tool call event
-    const eventData: ToolCallEventData = {
-      toolId: tool.id,
-      toolName: tool.name,
-      toolType: tool.type,
-      parameters,
-      success: executeResult.success,
-      result: executeResult.result,
-      error: executeResult.failureReason,
-      metadata: {
-        systemPrompt: executeResult.renderedPrompt,
-        llmUsage: executeResult.llmUsage,
-        durationMs: executeResult.durationMs,
-        startMs: executeResult.startMs,
-        endMs: executeResult.endMs,
+    const eventData: ToolCallEventData = tool.type === 'webhook'
+      ? {
+        toolId: tool.id,
+        toolName: tool.name,
+        toolType: 'webhook' as const,
+        parameters,
+        status: !executeResult.success ? 'failed' : executeResult.isDeferred ? 'deferred' : 'completed',
+        requestId: executeResult.requestId ?? '',
+        result: executeResult.result,
+        error: executeResult.failureReason,
+        metadata: {
+          systemPrompt: executeResult.renderedPrompt,
+          llmUsage: executeResult.llmUsage,
+          durationMs: executeResult.durationMs,
+          startMs: executeResult.startMs,
+          endMs: executeResult.endMs,
+        },
       }
-    };
+      : {
+        toolId: tool.id,
+        toolName: tool.name,
+        toolType: tool.type as 'smart_function' | 'script',
+        parameters,
+        status: executeResult.success ? 'completed' : 'failed',
+        result: executeResult.result,
+        error: executeResult.failureReason,
+        metadata: {
+          systemPrompt: executeResult.renderedPrompt,
+          llmUsage: executeResult.llmUsage,
+          durationMs: executeResult.durationMs,
+          startMs: executeResult.startMs,
+          endMs: executeResult.endMs,
+        },
+      };
     await this.saveAndSendEvent('tool_call', eventData);
 
     logger.info({ conversationId: this.conversation.id, toolId, success: executeResult.success, result: executeResult.result }, `Tool ${tool.name} executed`);
@@ -1781,6 +1882,14 @@ export class ConversationRunner {
       logger.info({ conversationId }, `Conversation marked for ending by action execution`);
       this.stageData.shouldEndConversation = true; // Flag to indicate conversation should end after current processing completes
       return true;
+    }
+
+    // Handle deferred tools — store tracking info, conversation continues normally
+    if (outcome.hasDeferredTool && outcome.deferredTools?.length) {
+      for (const { toolId, requestId } of outcome.deferredTools) {
+        this.deferredTools.set(requestId, toolId);
+        logger.info({ conversationId, toolId, requestId }, `Tool execution deferred — conversation continues, awaiting external reply`);
+      }
     }
 
     logger.debug({ conversationId, hasModifiedVars: outcome.hasModifiedVars, hasModifiedUserInput: outcome.hasModifiedUserInput, hasModifiedUserProfile: outcome.hasModifiedUserProfile, shouldEndConversation: outcome.shouldEndConversation, shouldAbortConversation: outcome.shouldAbortConversation }, `Action outcome applied successfully`);
@@ -2820,6 +2929,11 @@ export class ConversationRunner {
       return;
     }
 
+    // Flush buffered tool replies before executing terminal action
+    if (this.bufferedToolReplies.length > 0) {
+      await this.flushBufferedToolReplies(action.context);
+    }
+
     if (action.type === 'end_conversation') {
       const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
       if (onConversationEndAction) {
@@ -3153,6 +3267,22 @@ export class ConversationRunner {
         });
       }
     }
+
+    if (newState === 'awaiting_user_input' && this.bufferedToolReplies.length > 0) {
+      const flushContext = await this.contextBuilder.buildContextForUserInput(
+        this.stageData.conversation,
+        this.stageData.stage,
+        [],
+        '',
+        '',
+        this.sampleCopyDistributor.getOriginalCopies(),
+        '',
+        '',
+        undefined,
+        this.channel?.connectionType,
+      );
+      await this.flushBufferedToolReplies(flushContext);
+    }
   }
 
   /**
@@ -3179,5 +3309,311 @@ export class ConversationRunner {
     };
     await this.channel.sendMessage(eventMessage);
     return eventId;
+  }
+
+  /**
+      * Handle an incoming tool reply from an external service.
+      * Buffers the reply data and effects for processing at the next natural checkpoint
+      * (after response/audio delivery completes, or before the next user input is classified).
+      * This prevents effects like go_to_stage or end_conversation from firing mid-turn.
+      * When preValidationError is provided, the reply failed server-side validation
+      * and only a failed event is emitted — no buffering occurs.
+      * @param requestId The request ID of the deferred tool call
+      * @param replyData The tool result data from the external service
+      * @param replyEffects Optional flow-control effects from the external service
+      * @param preValidationError Error message from server-side validation failure
+      */
+  async handleToolReplyReceived(
+    requestId: string,
+    replyData: Record<string, unknown> | null,
+    replyEffects?: Effect[] | null,
+    preValidationError?: string,
+  ): Promise<void> {
+    if (this.conversation.status === 'finished' || this.conversation.status === 'aborted' || this.conversation.status === 'failed') {
+      logger.warn(
+        { conversationId: this.conversation.id, requestId, status: this.conversation.status },
+        `Cannot process tool reply — conversation is in terminal state`,
+      );
+      this.deferredTools.delete(requestId);
+      return;
+    }
+
+    // Pre-validation error: skip buffering, emit failure event immediately
+    if (preValidationError) {
+      logger.warn(
+        { conversationId: this.conversation.id, requestId, error: preValidationError },
+        `Tool reply failed server-side validation`,
+      );
+      const toolId = this.deferredTools.get(requestId);
+      await this.saveAndSendEvent('tool_reply', {
+        requestId,
+        toolId,
+        status: 'failed' as const,
+        error: preValidationError,
+        hasEffects: false,
+        effectsCount: 0,
+        hasData: !!replyData,
+      });
+      this.deferredTools.delete(requestId);
+      return;
+    }
+
+    const toolId = this.deferredTools.get(requestId);
+
+    // Store tool result data for later context injection (normalized to match instant webhook shape)
+    if (replyData !== null) {
+      this.completedToolResults[toolId ?? requestId] = { data: replyData, deferred: true };
+    }
+
+    if (replyEffects && replyEffects.length > 0) {
+      // Buffer effects for processing at the next checkpoint
+      this.bufferedToolReplies.push({
+        requestId,
+        toolId: toolId ?? requestId,
+        replyData,
+        replyEffects,
+      });
+      logger.info(
+        { conversationId: this.conversation.id, requestId, toolId, effectsCount: replyEffects.length, bufferedCount: this.bufferedToolReplies.length },
+        `Tool reply buffered — ${replyEffects.length} effect(s) pending checkpoint processing`,
+      );
+
+      // If conversation is idle, flush immediately instead of waiting for a checkpoint
+      if (this.conversation.status === 'awaiting_user_input') {
+        const flushContext = await this.contextBuilder.buildContextForUserInput(
+          this.stageData.conversation,
+          this.stageData.stage,
+          [],
+          '',
+          '',
+          this.sampleCopyDistributor.getOriginalCopies(),
+          '',
+          '',
+          undefined,
+          this.channel?.connectionType,
+        );
+        await this.flushBufferedToolReplies(flushContext);
+      }
+    } else {
+      // No effects — mark as completed immediately, no need to buffer
+      this.deferredTools.delete(requestId);
+
+      // If idle and there's data, merge into context so it's available for effects
+      if (this.conversation.status === 'awaiting_user_input' && Object.keys(this.completedToolResults).length > 0) {
+        const mergeContext = await this.contextBuilder.buildContextForUserInput(
+          this.stageData.conversation,
+          this.stageData.stage,
+          [],
+          '',
+          '',
+          this.sampleCopyDistributor.getOriginalCopies(),
+          '',
+          '',
+          undefined,
+          this.channel?.connectionType,
+        );
+        this.mergeCompletedToolResults(mergeContext);
+      }
+
+      await this.saveAndSendEvent('tool_reply', {
+        requestId,
+        toolId,
+        status: 'completed',
+        hasEffects: false,
+        effectsCount: 0,
+        hasData: !!replyData,
+        result: replyData,
+      });
+      logger.info(
+        { conversationId: this.conversation.id, requestId, toolId },
+        `Tool reply received — no effects, marked completed`,
+      );
+    }
+  }
+
+  /**
+   * Merge completed tool results into context so effects and templates can reference them.
+   * Clears the completedToolResults map after merging.
+   */
+  private mergeCompletedToolResults(context: ConversationContext): void {
+    if (Object.keys(this.completedToolResults).length === 0) {
+      return;
+    }
+    if (!context.results.tools) {
+      context.results.tools = {};
+    }
+    for (const [toolId, data] of Object.entries(this.completedToolResults)) {
+      context.results.tools[toolId] = {
+        toolId,
+        result: data,
+        isDeferred: false,
+      };
+    }
+    this.completedToolResults = {};
+  }
+
+  /**
+   * Flush buffered tool replies at a natural checkpoint.
+   * Called after response/audio delivery completes, or before classifying the next user input.
+   * Processes all buffered effects through the ActionsExecutor, handles outcomes,
+   * and emits completion events.
+   */
+  private async flushBufferedToolReplies(context: ConversationContext): Promise<void> {
+    if (this.bufferedToolReplies.length === 0) {
+      return;
+    }
+
+    // Expire any timed-out replies before flushing
+    const expiredIds = await this.toolReplyService.expireTimedOutReplies(this.conversation.id);
+    if (expiredIds.length > 0) {
+      this.handleToolTimeouts(expiredIds);
+    }
+
+    logger.info(
+      { conversationId: this.conversation.id, bufferedCount: this.bufferedToolReplies.length },
+      `Flushing ${this.bufferedToolReplies.length} buffered tool reply(ies) at checkpoint`,
+    );
+
+    // Merge stored tool results into context so effects can reference them
+    this.mergeCompletedToolResults(context);
+
+    // Collect all effects from buffered replies
+    const allEffects: Effect[] = [];
+    for (const reply of this.bufferedToolReplies) {
+      allEffects.push(...reply.replyEffects);
+    }
+
+    const flushedRequestIds = this.bufferedToolReplies.map(r => r.requestId);
+
+    if (allEffects.length > 0) {
+      try {
+        const replyAction: StageAction = {
+          name: 'Buffered Tool Replies',
+          triggerOnUserInput: false,
+          triggerOnClientCommand: false,
+          triggerOnTransformation: false,
+          parameters: [],
+          effects: allEffects,
+        };
+
+        const replyOutcome = await this.actionsExecutor.executeActions(
+          [replyAction],
+          context,
+          this.stageData.id,
+          null,
+          this.saveAndSendEvent.bind(this),
+        );
+
+        await this.applyActionOutcome(context, replyOutcome);
+
+        // Apply variable modifications
+        if (replyOutcome.hasModifiedVars) {
+          const updatedStageVars = {
+            ...this.conversation.stageVars,
+            [this.stageData.id]: context.vars,
+          };
+          await db.update(conversations)
+            .set({ stageVars: updatedStageVars, updatedAt: new Date() })
+            .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+          this.conversation.stageVars = updatedStageVars;
+        }
+
+        // Handle stage navigation from effects
+        if (replyOutcome.goToStageId && replyOutcome.goToStageId !== this.stageData.id) {
+          await this.goToStage(replyOutcome.goToStageId, true, replyOutcome.goToStageSourceAction);
+        }
+
+        // Handle conversation termination from effects — route through handlePostResponseAction
+        // so lifecycle actions, events, state transitions, and client disconnection all happen.
+        if (replyOutcome.shouldEndConversation || replyOutcome.shouldAbortConversation) {
+          const isAbort = replyOutcome.shouldAbortConversation;
+
+          if (isAbort) {
+            this.pendingPostResponseAction = {
+              name: replyOutcome.abortConversationSourceAction,
+              type: 'abort_conversation',
+              abortReason: replyOutcome.abortReason || 'Conversation aborted by tool reply effect',
+              context,
+            };
+          } else {
+            this.pendingPostResponseAction = {
+              name: replyOutcome.endConversationSourceAction,
+              type: 'end_conversation',
+              endReason: replyOutcome.endReason || 'Tool reply effect ended conversation',
+              context,
+            };
+          }
+
+          // Emit completion events and clear buffer before handlePostResponseAction,
+          // so its own flush check is a no-op and won't recurse.
+          for (const reply of this.bufferedToolReplies) {
+            await this.saveAndSendEvent('tool_reply', {
+              requestId: reply.requestId,
+              toolId: reply.toolId,
+              status: 'completed',
+              hasEffects: reply.replyEffects.length > 0,
+              effectsCount: reply.replyEffects.length,
+              hasData: !!reply.replyData,
+              result: reply.replyData,
+              aborted: isAbort,
+            });
+            this.deferredTools.delete(reply.requestId);
+          }
+          this.bufferedToolReplies = [];
+          this.completedToolResults = {};
+
+          await this.handlePostResponseAction();
+          return;
+        }
+      } catch (error) {
+        const replyError = error instanceof Error ? error.message : String(error);
+        logger.error({ conversationId: this.conversation.id, error: replyError }, `Failed to process buffered tool reply effects`);
+      }
+    }
+
+    // Emit completed events for each flushed reply
+    for (const reply of this.bufferedToolReplies) {
+      await this.saveAndSendEvent('tool_reply', {
+        requestId: reply.requestId,
+        toolId: reply.toolId,
+        status: 'completed',
+        hasEffects: reply.replyEffects.length > 0,
+        effectsCount: reply.replyEffects.length,
+        hasData: !!reply.replyData,
+        result: reply.replyData,
+      });
+      this.deferredTools.delete(reply.requestId);
+    }
+
+    // Clear buffers
+    this.bufferedToolReplies = [];
+    this.completedToolResults = {};
+
+    logger.info(
+      { conversationId: this.conversation.id, flushedCount: flushedRequestIds.length },
+      `Buffered tool replies flushed successfully`,
+    );
+  }
+
+  /**
+   * Handle tool reply timeouts — remove from deferred tracking and buffered replies.
+   * Called when expireTimedOutReplies finds timed-out entries.
+   */
+  private handleToolTimeouts(expiredRequestIds: string[]): void {
+    for (const requestId of expiredRequestIds) {
+      const toolId = this.deferredTools.get(requestId);
+      this.deferredTools.delete(requestId);
+
+      // Remove from buffer if present
+      const bufferIndex = this.bufferedToolReplies.findIndex(r => r.requestId === requestId);
+      if (bufferIndex !== -1) {
+        this.bufferedToolReplies.splice(bufferIndex, 1);
+      }
+
+      logger.warn(
+        { conversationId: this.conversation.id, requestId, toolId },
+        `Deferred tool reply timed out`,
+      );
+    }
   }
 }

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listParamsSchema, listResponseLimitSchema, llmSettingsSchema } from './common';
 import type { ListParams } from './common';
-import { toolParameterSchema } from '../../types/actions';
+import { toolParameterSchema, effectSchema } from '../../types/actions';
 import type { ToolParameter } from '../../types/actions';
 
 extendZodWithOpenApi(z);
@@ -27,6 +27,18 @@ export const toolInputTypeSchema = z.enum(['text', 'image', 'multi-modal']).desc
  * Defines the format of data the tool produces
  */
 export const toolOutputTypeSchema = z.enum(['text', 'image', 'multi-modal']).describe('Type of output the tool produces: text (plain text), image (image data), multi-modal (combination of text and images)');
+
+/**
+ * Schema for async reply configuration on webhook tools
+ * When enabled, the webhook can defer its response and reply later via the reply endpoint
+ */
+export const asyncReplyConfigSchema = z.object({
+  enabled: z.boolean().describe('Whether async reply is enabled for this tool'),
+  timeoutMs: z.number().int().min(1000).max(600000).optional().describe('Maximum time in milliseconds to wait for a reply (default: 300000 = 5 min)'),
+  secret: z.string().describe('Secret used to authenticate replies; external service must include this in the reply'),
+}).openapi('AsyncReplyConfig');
+
+export type AsyncReplyConfig = z.infer<typeof asyncReplyConfigSchema>;
 
 /**
  * Schema for tool route parameters
@@ -71,6 +83,7 @@ export const createWebhookToolSchema = createToolBaseSchema.extend({
   webhookMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().default('GET').describe('HTTP method to use'),
   webhookHeaders: z.record(z.string(), z.string()).optional().describe('HTTP headers to send; values support Handlebars templating'),
   webhookBody: z.string().optional().describe('Request body template (Handlebars); used for POST/PUT/PATCH'),
+  asyncReply: asyncReplyConfigSchema.optional().nullable().describe('Async reply configuration (webhook only)'),
 }).openapi('CreateWebhookTool');
 
 /**
@@ -124,6 +137,7 @@ export const updateWebhookToolSchema = updateToolBaseSchema.extend({
   webhookMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional().describe('Updated HTTP method (webhook)'),
   webhookHeaders: z.record(z.string(), z.string()).nullable().optional().describe('Updated HTTP headers (webhook)'),
   webhookBody: z.string().nullable().optional().describe('Updated request body template (webhook)'),
+  asyncReply: asyncReplyConfigSchema.nullable().optional().describe('Updated async reply configuration (webhook)'),
 }).openapi('UpdateWebhookTool');
 
 /**
@@ -174,6 +188,7 @@ export const toolResponseSchema = z.object({
   webhookMethod: z.string().nullable().describe('HTTP method (webhook only)'),
   webhookHeaders: z.record(z.string(), z.string()).nullable().describe('HTTP headers (webhook only)'),
   webhookBody: z.string().nullable().describe('Request body template (webhook only)'),
+  asyncReply: asyncReplyConfigSchema.nullable().describe('Async reply configuration (webhook only)'),
   // script fields
   code: z.string().nullable().describe('JavaScript code (script only)'),
   // shared fields
@@ -241,3 +256,28 @@ export type ToolResponse = z.infer<typeof toolResponseSchema>;
 
 /** Response for paginated list of tools with metadata */
 export type ToolListResponse = z.infer<typeof toolListResponseSchema>;
+
+/**
+ * Schema for the tool reply request body
+ * External services use this to submit their deferred response
+ */
+export const toolReplyBodySchema = z.object({
+  requestId: z.string().min(1).optional().describe('The request ID that was sent to the external service (optional — falls back to x-bonsai-request-id header)'),
+  data: z.record(z.string(), z.unknown()).optional().describe('Tool result data to return to the conversation'),
+  effects: z.array(effectSchema).optional().describe('Flow-control effects to apply to the conversation'),
+}).openapi('ToolReplyBody');
+
+/**
+ * Schema for the tool reply response
+ */
+export const toolReplyResponseSchema = z.object({
+  success: z.boolean().describe('Whether the reply was accepted'),
+  requestId: z.string().describe('The request ID that was replied to'),
+  message: z.string().describe('Status message'),
+});
+
+/** Request body for submitting a tool reply */
+export type ToolReplyBody = z.infer<typeof toolReplyBodySchema>;
+
+/** Response for a tool reply */
+export type ToolReplyResponse = z.infer<typeof toolReplyResponseSchema>;

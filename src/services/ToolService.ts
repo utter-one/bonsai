@@ -52,6 +52,7 @@ export class ToolService extends BaseService {
         toolValues.webhookMethod = input.webhookMethod ?? 'GET';
         toolValues.webhookHeaders = input.webhookHeaders ?? null;
         toolValues.webhookBody = input.webhookBody ?? null;
+        toolValues.asyncReply = input.asyncReply ?? null;
       } else if (input.type === 'script') {
         toolValues.code = input.code;
       }
@@ -213,6 +214,7 @@ export class ToolService extends BaseService {
         if (updateData.webhookMethod !== undefined) updatePayload.webhookMethod = updateData.webhookMethod;
         if (updateData.webhookHeaders !== undefined) updatePayload.webhookHeaders = updateData.webhookHeaders;
         if (updateData.webhookBody !== undefined) updatePayload.webhookBody = updateData.webhookBody;
+        if (updateData.asyncReply !== undefined) updatePayload.asyncReply = updateData.asyncReply;
       } else if (updateData.type === 'script') {
         if (updateData.code !== undefined) updatePayload.code = updateData.code;
       }
@@ -298,7 +300,7 @@ export class ToolService extends BaseService {
       const cloneBase = { id: input.id, name: input.name ?? `${existingTool.name} (Clone)`, description: existingTool.description ?? undefined, parameters: existingTool.parameters as any, tags: existingTool.tags as string[], metadata: existingTool.metadata ?? undefined };
       let cloneInput: CreateToolRequest;
       if (existingTool.type === 'webhook') {
-        cloneInput = { ...cloneBase, type: 'webhook', url: existingTool.url!, webhookMethod: existingTool.webhookMethod as any, webhookHeaders: existingTool.webhookHeaders as any, webhookBody: existingTool.webhookBody ?? undefined };
+        cloneInput = { ...cloneBase, type: 'webhook', url: existingTool.url!, webhookMethod: existingTool.webhookMethod as any, webhookHeaders: existingTool.webhookHeaders as any, webhookBody: existingTool.webhookBody ?? undefined, asyncReply: existingTool.asyncReply ?? undefined };
       } else if (existingTool.type === 'script') {
         cloneInput = { ...cloneBase, type: 'script', code: existingTool.code! };
       } else {

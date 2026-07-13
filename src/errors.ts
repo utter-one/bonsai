@@ -186,3 +186,13 @@ export class ValidationError extends Error {
     this.details = details;
   }
 }
+
+/**
+ * Error thrown when an async tool reply is invalid, expired, or cannot be processed
+ */
+export class ToolReplyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ToolReplyError';
+  }
+}

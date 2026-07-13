@@ -3,6 +3,8 @@ import { logger } from '../../utils/logger';
 import { TemplatingEngine } from './TemplatingEngine';
 import { ToolService } from '../ToolService';
 import { ToolExecutor } from './ToolExecutor';
+import { ToolReplyService } from '../ToolReplyService';
+import type { ToolExecutionResult } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
 import { UserService } from '../UserService';
@@ -42,6 +44,10 @@ export type ActionsExecutionOutcome = {
   error?: string;
   /** Pending visibility override to apply to the current turn's messages, produced by change_visibility effects */
   turnVisibility?: MessageVisibility;
+  /** Whether a tool execution was deferred (async reply pending) */
+  hasDeferredTool: boolean;
+  /** Deferred tool executions (async replies pending) — supports multiple concurrent deferred tools */
+  deferredTools: Array<{ toolId: string; requestId: string }>;
 };
 
 /**
@@ -60,6 +66,10 @@ export type EffectOutcome = {
   newStageId?: string;
   /** Pending visibility override for the current turn's messages */
   turnVisibility?: MessageVisibility;
+  /** Whether the tool execution was deferred (async reply pending) */
+  isDeferred?: boolean;
+  /** Request ID for the deferred tool reply */
+  requestId?: string;
 };
 
 /**
@@ -81,7 +91,7 @@ export class ActionsExecutor {
   constructor(
     @inject(ToolService) private readonly toolService: ToolService,
     @inject(ToolExecutor) private readonly toolExecutor: ToolExecutor,
-    @inject(ConversationContextBuilder) private readonly contextBuilder: ConversationContextBuilder,
+    @inject(ToolReplyService) private readonly toolReplyService: ToolReplyService,
     @inject(TemplatingEngine) private readonly templatingEngine: TemplatingEngine,
     @inject(ModifyVariablesEffectExecutor) private readonly modifyVariablesExecutor: ModifyVariablesEffectExecutor,
     @inject(ModifyUserProfileEffectExecutor) private readonly modifyUserProfileExecutor: ModifyUserProfileEffectExecutor,
@@ -234,6 +244,8 @@ export class ActionsExecutor {
         hasModifiedVars: false,
         hasModifiedUserInput: false,
         hasModifiedUserProfile: false,
+        hasDeferredTool: false,
+        deferredTools: [],
       };
     }
 
@@ -306,13 +318,15 @@ export class ActionsExecutor {
       hasModifiedVars: false,
       hasModifiedUserInput: false,
       hasModifiedUserProfile: false,
+      hasDeferredTool: false,
+      deferredTools: [],
     };
 
     let currentContext = context;
     let shouldStop = false;
 
     // Execute all effects in priority order
-    for (const { effect, actionName, actionIndex } of sortedEffects) {
+    for (const { effect, actionName } of sortedEffects) {
       if (shouldStop) {
         logger.debug({ conversationId: context.conversationId, effectType: effect.type, actionName }, `Skipping effect due to conversation termination`);
         continue;
@@ -373,6 +387,14 @@ export class ActionsExecutor {
           shouldStop = true;
           logger.info({ conversationId: context.conversationId, actionName, abortReason: effectResult.abortReason }, `Conversation will abort immediately - skipping remaining effects`);
         }
+
+        // Handle deferred tool execution
+        if (effectResult.isDeferred) {
+          outcome.hasDeferredTool = true;
+          const toolId = (effect as CallToolEffect).toolId;
+          outcome.deferredTools.push({ toolId, requestId: effectResult.requestId });
+          logger.info({ conversationId: context.conversationId, toolId, requestId: effectResult.requestId }, `Tool execution deferred — awaiting external reply`);
+        }
       } catch (error) {
         outcome.success = false;
         outcome.error = error instanceof Error ? error.message : String(error);
@@ -415,14 +437,14 @@ export class ActionsExecutor {
       case 'modify_variables': {
         const changedVariableNames = (effect as ModifyVariablesEffect).modifications.map((m) => m.variableName);
         const result = await this.modifyVariablesExecutor.execute(effect, context);
-        await emitEvent('variables_updated', { sourceActionName: actionName, changedVariableNames, variables: context.vars as any });
+        await emitEvent('variables_updated', { sourceActionName: actionName, changedVariableNames, variables: context.vars });
         return result;
       }
 
       case 'modify_user_profile': {
         const changedProfileNames = (effect as ModifyUserProfileEffect).modifications.map((m) => m.fieldName);
         const result = await this.modifyUserProfileExecutor.execute(effect, context);
-        await emitEvent('user_profile_updated', { sourceActionName: actionName, changedProfileNames, profile: context.userProfile as any });
+        await emitEvent('user_profile_updated', { sourceActionName: actionName, changedProfileNames, profile: context.userProfile });
         return result;
       }
 
@@ -683,30 +705,22 @@ export class ActionsExecutor {
 
         void (async () => {
           try {
-            const executionResult = await this.toolExecutor.executeTool(tool as any, asyncContext, resolvedParameters);
+            const executionResult = await this.toolExecutor.executeTool(tool as any, asyncContext, resolvedParameters, context.conversationId, context.projectId);
             if (!executionResult.success) {
               logger.warn({ conversationId: context.conversationId, toolId: tool.id, toolName: tool.name, reason: executionResult.failureReason }, `Async tool call failed: ${tool.name}`);
             } else {
               logger.info({ conversationId: context.conversationId, toolId: tool.id, toolName: tool.name }, `Async tool call completed: ${tool.name}`);
             }
+            // If the tool was deferred, discard the pending reply so the external
+            // service's reply is rejected — matches fire-and-forget semantics.
+            // Clear isDeferred so the tool_call event is emitted as 'completed'
+            // rather than 'deferred' (client won't be stuck waiting for a reply).
+            if (executionResult.isDeferred && executionResult.requestId) {
+              await this.toolReplyService.discardPendingReply(executionResult.requestId);
+              executionResult.isDeferred = false;
+            }
             try {
-              await emitEvent('tool_call', {
-                toolId: tool.id,
-                toolName: tool.name,
-                toolType: tool.type,
-                parameters: resolvedParameters,
-                success: executionResult.success,
-                result: executionResult.result,
-                error: executionResult.failureReason,
-                sourceActionName: actionName,
-                metadata: {
-                  systemPrompt: executionResult.renderedPrompt,
-                  llmUsage: executionResult.llmUsage,
-                  durationMs: executionResult.durationMs,
-                  startMs: executionResult.startMs,
-                  endMs: executionResult.endMs,
-                },
-              });
+              await this.emitToolCallEvent(tool, executionResult, resolvedParameters, actionName, emitEvent);
             } catch (emitError) {
               logger.warn({ conversationId: context.conversationId, toolId: tool.id, error: emitError instanceof Error ? emitError.message : String(emitError) }, `Failed to emit tool_call event for async tool`);
             }
@@ -725,13 +739,65 @@ export class ActionsExecutor {
       // - Render the tool prompt with context and parameters
       // - Call the LLM
       // - Return the result
-      const executionResult = await this.toolExecutor.executeTool(tool as any, context, resolvedParameters);
+      const executionResult = await this.toolExecutor.executeTool(tool as any, context, resolvedParameters, context.conversationId, context.projectId);
 
       if (!executionResult.success) {
+        try {
+          await this.emitToolCallEvent(tool, executionResult, resolvedParameters, actionName, emitEvent);
+        } catch (emitError) {
+          logger.warn({ conversationId: context.conversationId, toolId: tool.id, error: emitError instanceof Error ? emitError.message : String(emitError) }, `Failed to emit tool_call event for failed tool`);
+        }
         throw new Error(executionResult.failureReason || 'Tool execution failed');
       }
 
       logger.debug({ conversationId: context.conversationId, toolId: effect.toolId, hasResult: !!executionResult.result }, `Tool executed successfully`);
+
+      // Handle deferred tool result — store placeholder and signal ConversationRunner to pause
+      if (executionResult.isDeferred) {
+        logger.info({ conversationId: context.conversationId, toolId: effect.toolId, requestId: executionResult.requestId }, `Tool execution deferred — awaiting external reply`);
+        try {
+          await emitEvent('tool_call', {
+            toolId: tool.id,
+            toolName: tool.name,
+            toolType: 'webhook' as const,
+            parameters: resolvedParameters,
+            status: 'deferred',
+            requestId: executionResult.requestId ?? '',
+            result: { status: 202, statusText: 'Accepted', data: { deferred: true, requestId: executionResult.requestId } },
+            sourceActionName: actionName,
+            metadata: {
+              requestId: executionResult.requestId,
+              durationMs: executionResult.durationMs,
+              startMs: executionResult.startMs,
+              endMs: executionResult.endMs,
+            },
+          });
+        } catch (emitError) {
+          logger.warn({ conversationId: context.conversationId, toolId: tool.id, error: emitError instanceof Error ? emitError.message : String(emitError) }, `Failed to emit tool_call event for deferred tool`);
+        }
+        if (!context.results) {
+          context.results = { webhooks: {}, tools: {} };
+        }
+        if (!context.results.tools) {
+          context.results.tools = {};
+        }
+        context.results.tools[tool.id] = {
+          toolId: tool.id,
+          toolName: tool.name,
+          toolType: tool.type,
+          parameters: resolvedParameters,
+          result: { status: 202, statusText: 'Accepted', data: { deferred: true, requestId: executionResult.requestId } },
+          executedAt: new Date().toISOString(),
+          isDeferred: true,
+          requestId: executionResult.requestId,
+        };
+        return {
+          shouldEndConversation: false,
+          shouldAbortConversation: false,
+          isDeferred: true,
+          requestId: executionResult.requestId,
+        };
+      }
 
       // 5. Store the result in context.results.tools
       if (!context.results) {
@@ -760,12 +826,87 @@ export class ActionsExecutor {
       logger.info({ conversationId: context.conversationId, toolId: effect.toolId, toolName: tool.name, toolType: tool.type }, `Tool called successfully and result stored: ${tool.name}`);
 
       // 6. Emit tool_call event inline now that the effect has been applied
+      await this.emitToolCallEvent(tool, executionResult, resolvedParameters, actionName, emitEvent);
+
+      // 6.5. Process instant effects from webhook response
+      let instantOutcome = {
+        shouldEndConversation: false,
+        shouldAbortConversation: false,
+        hasModifiedVars: false,
+        goToStageId: undefined as string | undefined,
+        goToStageSourceAction: undefined as string | undefined,
+        endConversationSourceAction: undefined as string | undefined,
+        abortConversationSourceAction: undefined as string | undefined,
+      };
+      if (executionResult.effects && executionResult.effects.length > 0) {
+        logger.info(
+          { conversationId: context.conversationId, toolId: tool.id, effectsCount: executionResult.effects.length },
+          `Processing ${executionResult.effects.length} instant effect(s) from webhook response`,
+        );
+        const instantAction: StageAction = {
+          name: `Instant Webhook: ${tool.name}`,
+          triggerOnUserInput: false,
+          triggerOnClientCommand: false,
+          triggerOnTransformation: false,
+          parameters: [],
+          effects: executionResult.effects,
+        };
+        const execOutcome = await this.executeActions(
+          [instantAction],
+          context,
+          context.stage.id,
+          null,
+          emitEvent,
+        );
+        instantOutcome.shouldEndConversation = execOutcome.shouldEndConversation;
+        instantOutcome.endConversationSourceAction = execOutcome.endConversationSourceAction;
+        instantOutcome.shouldAbortConversation = execOutcome.shouldAbortConversation;
+        instantOutcome.abortConversationSourceAction = execOutcome.abortConversationSourceAction;
+        instantOutcome.hasModifiedVars = execOutcome.hasModifiedVars;
+        instantOutcome.goToStageId = execOutcome.goToStageId;
+        instantOutcome.goToStageSourceAction = execOutcome.goToStageSourceAction;
+      }
+
+      // 7. For script tools, propagate flow control and mutable-state change flags onto the outcome
+      const flowControl = executionResult.flowControl ?? {};
+      return {
+        shouldEndConversation: instantOutcome.shouldEndConversation || (flowControl.shouldEndConversation ?? false),
+        endReason: instantOutcome.shouldEndConversation ? undefined : flowControl.endReason,
+        shouldAbortConversation: instantOutcome.shouldAbortConversation || (flowControl.shouldAbortConversation ?? false),
+        abortReason: instantOutcome.shouldAbortConversation ? undefined : flowControl.abortReason,
+        newStageId: instantOutcome.goToStageId || flowControl.goToStageId,
+        shouldGenerateResponse: flowControl.shouldGenerateResponse,
+        prescriptedResponse: flowControl.prescriptedResponse,
+        hasModifiedVars: (executionResult.hasModifiedVars ?? false) || instantOutcome.hasModifiedVars,
+        hasModifiedUserInput: executionResult.hasModifiedUserInput ?? false,
+        hasModifiedUserProfile: executionResult.hasModifiedUserProfile ?? false,
+      };
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
+      throw error;
+    }
+  }
+
+  /**
+   * Emits a tool_call event for all tool execution outcomes (success, deferred, failure).
+   * Webhook tools include requestId; smart_function and script use sync schema.
+   */
+  private async emitToolCallEvent(
+    tool: any,
+    executionResult: ToolExecutionResult,
+    parameters: Record<string, ParameterValue>,
+    actionName: string,
+    emitEvent: EffectEventCallback,
+  ): Promise<void> {
+    if (tool.type === 'webhook') {
+      const status = !executionResult.success ? 'failed' : executionResult.isDeferred ? 'deferred' : 'completed';
       await emitEvent('tool_call', {
         toolId: tool.id,
         toolName: tool.name,
-        toolType: tool.type,
-        parameters: resolvedParameters,
-        success: executionResult.success,
+        toolType: 'webhook' as const,
+        parameters,
+        status,
+        requestId: executionResult.requestId ?? '',
         result: executionResult.result,
         error: executionResult.failureReason,
         sourceActionName: actionName,
@@ -777,24 +918,25 @@ export class ActionsExecutor {
           endMs: executionResult.endMs,
         },
       });
-
-      // 7. For script tools, propagate flow control and mutable-state change flags onto the outcome
-      const flowControl = executionResult.flowControl ?? {};
-      return {
-        shouldEndConversation: flowControl.shouldEndConversation ?? false,
-        endReason: flowControl.endReason,
-        shouldAbortConversation: flowControl.shouldAbortConversation ?? false,
-        abortReason: flowControl.abortReason,
-        newStageId: flowControl.goToStageId,
-        shouldGenerateResponse: flowControl.shouldGenerateResponse,
-        prescriptedResponse: flowControl.prescriptedResponse,
-        hasModifiedVars: executionResult.hasModifiedVars ?? false,
-        hasModifiedUserInput: executionResult.hasModifiedUserInput ?? false,
-        hasModifiedUserProfile: executionResult.hasModifiedUserProfile ?? false,
-      };
-    } catch (error) {
-      logger.error({ conversationId: context.conversationId, toolId: effect.toolId, error: error instanceof Error ? error.message : String(error) }, `Failed to call tool`);
-      throw error;
+    } else {
+      const status = executionResult.success ? 'completed' : 'failed';
+      await emitEvent('tool_call', {
+        toolId: tool.id,
+        toolName: tool.name,
+        toolType: tool.type as 'smart_function' | 'script',
+        parameters,
+        status,
+        result: executionResult.result,
+        error: executionResult.failureReason,
+        sourceActionName: actionName,
+        metadata: {
+          systemPrompt: executionResult.renderedPrompt,
+          llmUsage: executionResult.llmUsage,
+          durationMs: executionResult.durationMs,
+          startMs: executionResult.startMs,
+          endMs: executionResult.endMs,
+        },
+      });
     }
   }
 

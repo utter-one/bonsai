@@ -10,6 +10,8 @@ export const conversationStateSchema = z.enum([
   'receiving_user_voice', // Conversation is receiving voice input from user (ASR in progress)
   'processing_user_input', // Conversation is processing user input
   'generating_response', // Conversation is generating a response
+
+
   'finished', // Conversation has finished
   'aborted', // Conversation has been aborted by user or system
   'failed', // Conversation has failed due to an error
@@ -41,6 +43,7 @@ export const conversationEventTypeSchema = z.enum([
   'visibility_changed',
   'sample_copy_selection',
   'turn_aborted',
+  'tool_reply',
 ]);
 
 export type ConversationEventType = z.infer<typeof conversationEventTypeSchema>;
@@ -160,20 +163,55 @@ export type CommandEventData = z.infer<typeof commandEventDataSchema>;
 
 /**
  * Schema for tool call event data.
+ * Discriminated union by toolType: smart_function and script share completed/failed status,
+ * webhook adds deferred status and requestId for async reply tracking.
  * For smart_function tools, metadata includes `llmUsage` with token usage and provider/model info from the tool LLM call.
  */
-export const toolCallEventDataSchema = z.object({
+export const smartFunctionToolCallEventDataSchema = z.object({
   toolId: z.string(),
   toolName: z.string(),
-  toolType: z.enum(['smart_function', 'webhook', 'script']).optional(),
+  toolType: z.literal('smart_function'),
   parameters: z.record(z.string(), parameterValueSchema),
-  success: z.boolean(),
+  status: z.enum(['completed', 'failed']),
   result: z.unknown().optional(),
   error: z.string().optional(),
   /** Name of the action that triggered this tool call, if triggered by an action effect */
   sourceActionName: z.string().optional().describe('Name of the action that triggered this tool call, if triggered by an action effect'),
   metadata: z.record(z.string(), z.any()).optional(),
 });
+
+export const scriptToolCallEventDataSchema = z.object({
+  toolId: z.string(),
+  toolName: z.string(),
+  toolType: z.literal('script'),
+  parameters: z.record(z.string(), parameterValueSchema),
+  status: z.enum(['completed', 'failed']),
+  result: z.unknown().optional(),
+  error: z.string().optional(),
+  /** Name of the action that triggered this tool call, if triggered by an action effect */
+  sourceActionName: z.string().optional().describe('Name of the action that triggered this tool call, if triggered by an action effect'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export const webhookToolCallEventDataSchema = z.object({
+  toolId: z.string(),
+  toolName: z.string(),
+  toolType: z.literal('webhook'),
+  parameters: z.record(z.string(), parameterValueSchema),
+  status: z.enum(['completed', 'deferred', 'failed']),
+  requestId: z.string(),
+  result: z.unknown().optional(),
+  error: z.string().optional(),
+  /** Name of the action that triggered this tool call, if triggered by an action effect */
+  sourceActionName: z.string().optional().describe('Name of the action that triggered this tool call, if triggered by an action effect'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export const toolCallEventDataSchema = z.discriminatedUnion('toolType', [
+  smartFunctionToolCallEventDataSchema,
+  scriptToolCallEventDataSchema,
+  webhookToolCallEventDataSchema,
+]);
 
 export type ToolCallEventData = z.infer<typeof toolCallEventDataSchema>;
 
@@ -363,6 +401,34 @@ export const turnAbortedEventDataSchema = z.object({
 
 export type TurnAbortedEventData = z.infer<typeof turnAbortedEventDataSchema>;
 
+/**
+ * Schema for tool reply event data.
+ * Emitted when a deferred webhook tool call receives a reply from an external service.
+ */
+export const toolReplyEventDataSchema = z.object({
+  /** The request ID that was replied to */
+  requestId: z.string().describe('The request ID that was replied to'),
+  /** ID of the tool that was replied to */
+  toolId: z.string().nullable().describe('ID of the tool that was replied to'),
+  /** Whether the reply was processed successfully */
+  status: z.enum(['completed', 'failed']).describe('Whether the reply was processed successfully'),
+  /** Error message if reply processing failed */
+  error: z.string().optional().describe('Error message if reply processing failed'),
+  /** Whether the reply included effects */
+  hasEffects: z.boolean().describe('Whether the reply included effects'),
+  /** Number of effects in the reply */
+  effectsCount: z.number().describe('Number of effects in the reply'),
+  /** Whether the reply included data */
+  hasData: z.boolean().describe('Whether the reply included data'),
+  /** Tool result data from the reply */
+  result: z.unknown().optional().describe('Tool result data from the reply'),
+  /** Whether the reply caused the conversation to be aborted */
+  aborted: z.boolean().optional().describe('Whether the reply caused the conversation to be aborted'),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
+export type ToolReplyEventData = z.infer<typeof toolReplyEventDataSchema>;
+
 export const conversationEventDataSchema = z.union([
   messageEventDataSchema,
   classificationEventDataSchema,
@@ -385,6 +451,7 @@ export const conversationEventDataSchema = z.union([
   visibilityChangedEventDataSchema,
   sampleCopySelectionEventDataSchema,
   turnAbortedEventDataSchema,
+  toolReplyEventDataSchema,
 ]);
 
 export type ConversationEventData = z.infer<typeof conversationEventDataSchema>;

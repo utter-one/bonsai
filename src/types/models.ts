@@ -20,6 +20,7 @@ import {
   providers,
   projects,
   sampleCopies,
+  pendingToolReplies,
 } from '../db/schema';
 
 
@@ -44,4 +45,5 @@ export type ConversationArtifact = InferSelectModel<typeof conversationArtifacts
 export type Provider = InferSelectModel<typeof providers>;
 export type Project = InferSelectModel<typeof projects>;
 export type SampleCopy = InferSelectModel<typeof sampleCopies>;
+export type PendingToolReply = InferSelectModel<typeof pendingToolReplies>;
 

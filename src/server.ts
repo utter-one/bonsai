@@ -18,6 +18,7 @@ import { StageController } from './http/controllers/StageController';
 import { ClassifierController } from './http/controllers/ClassifierController';
 import { ContextTransformerController } from './http/controllers/ContextTransformerController';
 import { ToolController } from './http/controllers/ToolController';
+import { ToolReplyController } from './http/controllers/ToolReplyController';
 import { GlobalActionController } from './http/controllers/GlobalActionController';
 import { GuardrailController } from './http/controllers/GuardrailController';
 import { SampleCopyController } from './http/controllers/SampleCopyController';
@@ -158,6 +159,10 @@ export async function createApp(): Promise<express.Application> {
   // Unauthenticated system endpoints — registered before auth middleware intentionally
   const versionController = container.resolve(VersionController);
   versionController.registerRoutes(app);
+
+  // Tool reply endpoint — unauthenticated, for external services to reply to deferred webhook calls
+  const toolReplyController = container.resolve(ToolReplyController);
+  toolReplyController.registerRoutes(app);
 
   // Bootstrap secrets manager registry — must run before any controller that uses ProviderService / EnvironmentService
   const secretsRegistry = container.resolve(SecretsManagerRegistry);

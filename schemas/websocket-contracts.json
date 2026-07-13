@@ -1369,7 +1369,8 @@
             "user_banned",
             "visibility_changed",
             "sample_copy_selection",
-            "turn_aborted"
+            "turn_aborted",
+            "tool_reply"
           ],
           "description": "Type of the conversation event"
         },
@@ -1651,9 +1652,7 @@
                 "toolType": {
                   "type": "string",
                   "enum": [
-                    "smart_function",
-                    "webhook",
-                    "script"
+                    "smart_function"
                   ]
                 },
                 "parameters": {
@@ -1662,8 +1661,12 @@
                     "$ref": "#/definitions/ParameterValue"
                   }
                 },
-                "success": {
-                  "type": "boolean"
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed"
+                  ]
                 },
                 "result": {
                   "nullable": true
@@ -1685,8 +1688,120 @@
               "required": [
                 "toolId",
                 "toolName",
+                "toolType",
                 "parameters",
-                "success"
+                "status"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "toolId": {
+                  "type": "string"
+                },
+                "toolName": {
+                  "type": "string"
+                },
+                "toolType": {
+                  "type": "string",
+                  "enum": [
+                    "script"
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed"
+                  ]
+                },
+                "result": {
+                  "nullable": true
+                },
+                "error": {
+                  "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "toolId",
+                "toolName",
+                "toolType",
+                "parameters",
+                "status"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "toolId": {
+                  "type": "string"
+                },
+                "toolName": {
+                  "type": "string"
+                },
+                "toolType": {
+                  "type": "string",
+                  "enum": [
+                    "webhook"
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "deferred",
+                    "failed"
+                  ]
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "result": {
+                  "nullable": true
+                },
+                "error": {
+                  "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "toolId",
+                "toolName",
+                "toolType",
+                "parameters",
+                "status",
+                "requestId"
               ]
             },
             {
@@ -2099,6 +2214,66 @@
                 "outputTurnId",
                 "accumulatedText",
                 "abortTimestampMs"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "requestId": {
+                  "type": "string",
+                  "description": "The request ID that was replied to"
+                },
+                "toolId": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "ID of the tool that was replied to"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed"
+                  ],
+                  "description": "Whether the reply was processed successfully"
+                },
+                "error": {
+                  "type": "string",
+                  "description": "Error message if reply processing failed"
+                },
+                "hasEffects": {
+                  "type": "boolean",
+                  "description": "Whether the reply included effects"
+                },
+                "effectsCount": {
+                  "type": "number",
+                  "description": "Number of effects in the reply"
+                },
+                "hasData": {
+                  "type": "boolean",
+                  "description": "Whether the reply included data"
+                },
+                "result": {
+                  "nullable": true,
+                  "description": "Tool result data from the reply"
+                },
+                "aborted": {
+                  "type": "boolean",
+                  "description": "Whether the reply caused the conversation to be aborted"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "requestId",
+                "toolId",
+                "status",
+                "hasEffects",
+                "effectsCount",
+                "hasData"
               ]
             }
           ],
@@ -2522,7 +2697,8 @@
             "user_banned",
             "visibility_changed",
             "sample_copy_selection",
-            "turn_aborted"
+            "turn_aborted",
+            "tool_reply"
           ],
           "description": "Type of the conversation event"
         },
@@ -2804,9 +2980,7 @@
                 "toolType": {
                   "type": "string",
                   "enum": [
-                    "smart_function",
-                    "webhook",
-                    "script"
+                    "smart_function"
                   ]
                 },
                 "parameters": {
@@ -2815,8 +2989,12 @@
                     "$ref": "#/definitions/ParameterValue"
                   }
                 },
-                "success": {
-                  "type": "boolean"
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed"
+                  ]
                 },
                 "result": {
                   "nullable": true
@@ -2838,8 +3016,120 @@
               "required": [
                 "toolId",
                 "toolName",
+                "toolType",
                 "parameters",
-                "success"
+                "status"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "toolId": {
+                  "type": "string"
+                },
+                "toolName": {
+                  "type": "string"
+                },
+                "toolType": {
+                  "type": "string",
+                  "enum": [
+                    "script"
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed"
+                  ]
+                },
+                "result": {
+                  "nullable": true
+                },
+                "error": {
+                  "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "toolId",
+                "toolName",
+                "toolType",
+                "parameters",
+                "status"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "toolId": {
+                  "type": "string"
+                },
+                "toolName": {
+                  "type": "string"
+                },
+                "toolType": {
+                  "type": "string",
+                  "enum": [
+                    "webhook"
+                  ]
+                },
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/definitions/ParameterValue"
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "deferred",
+                    "failed"
+                  ]
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "result": {
+                  "nullable": true
+                },
+                "error": {
+                  "type": "string"
+                },
+                "sourceActionName": {
+                  "type": "string",
+                  "description": "Name of the action that triggered this tool call, if triggered by an action effect"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "toolId",
+                "toolName",
+                "toolType",
+                "parameters",
+                "status",
+                "requestId"
               ]
             },
             {
@@ -3252,6 +3542,66 @@
                 "outputTurnId",
                 "accumulatedText",
                 "abortTimestampMs"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "requestId": {
+                  "type": "string",
+                  "description": "The request ID that was replied to"
+                },
+                "toolId": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "ID of the tool that was replied to"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed"
+                  ],
+                  "description": "Whether the reply was processed successfully"
+                },
+                "error": {
+                  "type": "string",
+                  "description": "Error message if reply processing failed"
+                },
+                "hasEffects": {
+                  "type": "boolean",
+                  "description": "Whether the reply included effects"
+                },
+                "effectsCount": {
+                  "type": "number",
+                  "description": "Number of effects in the reply"
+                },
+                "hasData": {
+                  "type": "boolean",
+                  "description": "Whether the reply included data"
+                },
+                "result": {
+                  "nullable": true,
+                  "description": "Tool result data from the reply"
+                },
+                "aborted": {
+                  "type": "boolean",
+                  "description": "Whether the reply caused the conversation to be aborted"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              },
+              "required": [
+                "requestId",
+                "toolId",
+                "status",
+                "hasEffects",
+                "effectsCount",
+                "hasData"
               ]
             }
           ],

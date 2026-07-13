@@ -183,7 +183,7 @@ const toolCallsSource: SourceDef = {
     //{ id: 'toolId', label: 'Tool ID', sqlExpr: `ce.event_data->>'toolId'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'toolName', label: 'Tool Name', sqlExpr: `ce.event_data->>'toolName'`, requiresConversationJoin: false, requiresUserJoin: false },
     { id: 'toolType', label: 'Tool Type', sqlExpr: `ce.event_data->>'toolType'`, requiresConversationJoin: false, requiresUserJoin: false, values: ['smart_function', 'webhook', 'script'] },
-    { id: 'success', label: 'Success', sqlExpr: `(ce.event_data->>'success')`, requiresConversationJoin: false, requiresUserJoin: false, values: ['true', 'false'] },
+    { id: 'status', label: 'Status', sqlExpr: `(ce.event_data->>'status')`, requiresConversationJoin: false, requiresUserJoin: false, values: ['completed', 'deferred', 'failed'] },
     { id: 'sourceActionName', label: 'Source Action', sqlExpr: `ce.event_data->>'sourceActionName'`, requiresConversationJoin: false, requiresUserJoin: false },
   ],
   metrics: [

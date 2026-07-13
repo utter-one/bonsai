@@ -2,6 +2,12 @@ import 'reflect-metadata';
 import { singleton } from 'tsyringe';
 import { logger } from '../utils/logger';
 import type { CALInputMessage } from './messages';
+
+/** Input message types that must be serialized through the runner's operation queue */
+export type QueuedInputMessageType = Extract<
+  CALInputMessage['type'],
+  'send_user_text_input' | 'go_to_stage' | 'set_var' | 'run_action' | 'call_tool' | 'end_conversation'
+>;
 import { ClientMessageHandlerRegistry } from './ClientMessageHandlerRegistry';
 import type { ClientMessageHandler } from './ClientMessageHandler';
 import type { ClientMessageHandlerContext } from './ClientMessageHandlerContext';
@@ -20,6 +26,16 @@ import './handlers';
 @singleton()
 export class ChannelHandlerDispatcher {
   private handlers = new Map<string, { instance: ClientMessageHandler; requiresAuth: boolean; schema: ZodTypeAny; requiredFeature?: ApiKeyFeature }>();
+
+  /** Message types that must be serialized through the runner's operation queue */
+  private static readonly QUEUED_MESSAGE_TYPES: Set<QueuedInputMessageType> = new Set([
+    'send_user_text_input',
+    'go_to_stage',
+    'set_var',
+    'run_action',
+    'call_tool',
+    'end_conversation',
+  ]);
 
   constructor() {
     this.registerHandlers();
@@ -90,7 +106,15 @@ export class ChannelHandlerDispatcher {
         }
       }
 
-      await handler.instance.handle(context, message);
+      // Queue control operations through the runner's operation queue for serialization
+      const shouldQueue = ChannelHandlerDispatcher.QUEUED_MESSAGE_TYPES.has(message.type as QueuedInputMessageType) && context.session?.runner;
+      if (shouldQueue) {
+        await context.session.runner.enqueueOperation(message.type as QueuedInputMessageType, async () => {
+          await handler.instance.handle(context, message);
+        });
+      } else {
+        await handler.instance.handle(context, message);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ error: errorMessage, correlationId }, 'Failed to dispatch message');

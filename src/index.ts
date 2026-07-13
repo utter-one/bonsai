@@ -13,6 +13,12 @@ import { migrateSecretsToEncrypted } from "./scripts/migrateSecretsToEncrypted";
  * Main application entry point - initializes database connection and starts the backend
  */
 async function main() {
+  // Validate required environment variables
+  if (!process.env.APP_URL) {
+    logger.error("APP_URL is required but not set");
+    process.exit(1);
+  }
+
   // Initialize database connection
   try {
     await db.execute(sql`SELECT 1`);
