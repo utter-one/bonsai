@@ -18,22 +18,24 @@ import { XAILlmProvider, XAILlmProviderConfig, xAILlmProviderConfigSchema, XAILl
 import { OllamaLlmProvider, OllamaLlmProviderConfig, ollamaLlmProviderConfigSchema, OllamaLlmSettings } from './OllamaLlmProvider';
 import { OVHLlmProvider, OVHLlmProviderConfig, ovhLlmProviderConfigSchema, OVHLlmSettings } from './OVHLlmProvider';
 import { ScalewayLlmProvider, ScalewayLlmProviderConfig, scalewayLlmProviderConfigSchema, ScalewayLlmSettings } from './ScalewayLlmProvider';
+import { NodeLlamaCppLlmProvider, NodeLlamaCppLlmProviderConfig, nodeLlamaCppLlmProviderConfigSchema, NodeLlamaCppLlmSettings } from './NodeLlamaCppLlmProvider';
+import { LlamaCppInstanceManager } from './LlamaCppInstanceManager';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 /**
  * Supported LLM provider API types
  */
-export type LlmProviderApiType = 'openai' | 'openai-legacy' | 'anthropic' | 'gemini' | 'groq' | 'mistral' | 'deepseek' | 'openrouter' | 'together-ai' | 'fireworks-ai' | 'perplexity' | 'cohere' | 'xai' | 'ollama' | 'ovh' | 'scaleway';
+export type LlmProviderApiType = 'openai' | 'openai-legacy' | 'anthropic' | 'gemini' | 'groq' | 'mistral' | 'deepseek' | 'openrouter' | 'together-ai' | 'fireworks-ai' | 'perplexity' | 'cohere' | 'xai' | 'ollama' | 'ovh' | 'scaleway' | 'node-llama-cpp';
 
 /**
  * Union type for all LLM provider settings
  */
-export type LlmSettings = OpenAILlmSettings | OpenAILegacyLlmSettings | AnthropicLlmSettings | GeminiLlmSettings | GroqLlmSettings | MistralLlmSettings | DeepSeekLlmSettings | OpenRouterLlmSettings | TogetherAILlmSettings | FireworksAILlmSettings | PerplexityLlmSettings | CohereLlmSettings | XAILlmSettings | OllamaLlmSettings | OVHLlmSettings | ScalewayLlmSettings;
+export type LlmSettings = OpenAILlmSettings | OpenAILegacyLlmSettings | AnthropicLlmSettings | GeminiLlmSettings | GroqLlmSettings | MistralLlmSettings | DeepSeekLlmSettings | OpenRouterLlmSettings | TogetherAILlmSettings | FireworksAILlmSettings | PerplexityLlmSettings | CohereLlmSettings | XAILlmSettings | OllamaLlmSettings | OVHLlmSettings | ScalewayLlmSettings | NodeLlamaCppLlmSettings;
 
 /**
  * Union type for all LLM provider configurations
  */
-export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProviderConfig | AnthropicLlmProviderConfig | GeminiLlmProviderConfig | GroqLlmProviderConfig | MistralLlmProviderConfig | DeepSeekLlmProviderConfig | OpenRouterLlmProviderConfig | TogetherAILlmProviderConfig | FireworksAILlmProviderConfig | PerplexityLlmProviderConfig | CohereLlmProviderConfig | XAILlmProviderConfig | OllamaLlmProviderConfig | OVHLlmProviderConfig | ScalewayLlmProviderConfig;
+export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProviderConfig | AnthropicLlmProviderConfig | GeminiLlmProviderConfig | GroqLlmProviderConfig | MistralLlmProviderConfig | DeepSeekLlmProviderConfig | OpenRouterLlmProviderConfig | TogetherAILlmProviderConfig | FireworksAILlmProviderConfig | PerplexityLlmProviderConfig | CohereLlmProviderConfig | XAILlmProviderConfig | OllamaLlmProviderConfig | OVHLlmProviderConfig | ScalewayLlmProviderConfig | NodeLlamaCppLlmProviderConfig;
 
 /**
  * Factory service for creating LLM provider instances based on provider entity configuration
@@ -41,7 +43,10 @@ export type LlmProviderConfig = OpenAILlmProviderConfig | OpenAILegacyLlmProvide
  */
 @singleton()
 export class LlmProviderFactory {
-  constructor(@inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils) {}
+  constructor(
+    @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(LlamaCppInstanceManager) private readonly llamaCppInstanceManager: LlamaCppInstanceManager,
+  ) {}
 
   /**
    * Creates an LLM provider instance from a provider entity
@@ -66,7 +71,7 @@ export class LlmProviderFactory {
     logger.info(`Creating ${provider.apiType} LLM provider for provider ${provider.id} with model ${settings.model}`);
     const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
     const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings);
-    instance.init();
+    await instance.init();
     return instance;
   }
 
@@ -144,8 +149,11 @@ export class LlmProviderFactory {
       case 'scaleway':
         return new ScalewayLlmProvider(scalewayLlmProviderConfigSchema.parse(provider.config), settings as ScalewayLlmSettings);
 
+      case 'node-llama-cpp':
+        return new NodeLlamaCppLlmProvider(nodeLlamaCppLlmProviderConfigSchema.parse(provider.config), settings as NodeLlamaCppLlmSettings, this.llamaCppInstanceManager);
+
       default: {
-        const errorMessage = `Unsupported LLM provider API type: ${provider.apiType}. Supported types: openai, openai-legacy, anthropic, gemini, groq, mistral, deepseek, openrouter, together-ai, fireworks-ai, perplexity, cohere, xai, ollama, ovh, scaleway`;
+        const errorMessage = `Unsupported LLM provider API type: ${provider.apiType}. Supported types: openai, openai-legacy, anthropic, gemini, groq, mistral, deepseek, openrouter, together-ai, fireworks-ai, perplexity, cohere, xai, ollama, ovh, scaleway, node-llama-cpp`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
       }
@@ -162,8 +170,7 @@ export class LlmProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: LlmProviderApiType[] = ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai', 'ollama', 'ovh', 'scaleway'];
-    return supportedApiTypes.includes(provider.apiType as LlmProviderApiType);
+    const supportedApiTypes: LlmProviderApiType[] = ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai', 'ollama', 'ovh', 'scaleway', 'node-llama-cpp'];
   }
 
   /**
@@ -171,6 +178,6 @@ export class LlmProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): LlmProviderApiType[] {
-    return ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai', 'ollama', 'ovh', 'scaleway'];
+    return ['openai', 'openai-legacy', 'anthropic', 'gemini', 'groq', 'mistral', 'deepseek', 'openrouter', 'together-ai', 'fireworks-ai', 'perplexity', 'cohere', 'xai', 'ollama', 'ovh', 'scaleway', 'node-llama-cpp'];
   }
 }

@@ -973,6 +973,37 @@
           "model"
         ]
       },
+      "NodeLlamaCppLlmSettings": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model identifier (used for display)"
+          },
+          "defaultMaxTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Default maximum tokens for generation"
+          },
+          "defaultTemperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "Default temperature for generation (0-2)"
+          },
+          "defaultTopP": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Default top-p for generation (0-1)"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
       "LlmSettings": {
         "anyOf": [
           {
@@ -1022,6 +1053,9 @@
           },
           {
             "$ref": "#/components/schemas/ScalewayLlmSettings"
+          },
+          {
+            "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
           },
           {
             "nullable": true
@@ -2264,6 +2298,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
               },
               {
                 "nullable": true
@@ -5160,6 +5197,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ScalewayLlmSettings"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                   },
                   {
                     "nullable": true
@@ -8974,6 +9014,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -9182,6 +9225,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                     },
                     {
                       "nullable": true
@@ -9548,6 +9594,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -9686,6 +9735,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                     },
                     {
                       "nullable": true
@@ -10004,6 +10056,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -10151,6 +10206,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                     },
                     {
                       "nullable": true
@@ -10343,6 +10401,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
               },
               {
                 "nullable": true
@@ -10657,6 +10718,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -10953,6 +11017,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -11167,6 +11234,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                     },
                     {
                       "nullable": true
@@ -12470,6 +12540,47 @@
               {
                 "type": "object",
                 "properties": {
+                  "modelPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path to GGUF model file"
+                  },
+                  "contextSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Context window size in tokens"
+                  },
+                  "gpuLayers": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of layers to offload to GPU (0 = CPU only)"
+                  },
+                  "threads": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Number of CPU threads for inference"
+                  },
+                  "batchSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Batch size for token processing"
+                  },
+                  "flashAttention": {
+                    "type": "boolean",
+                    "description": "Enable flash attention optimization"
+                  }
+                },
+                "required": [
+                  "modelPath"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
                   "apiKey": {
                     "type": "string",
                     "description": "API key for authenticating with ElevenLabs"
@@ -13165,6 +13276,47 @@
               {
                 "type": "object",
                 "properties": {
+                  "modelPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path to GGUF model file"
+                  },
+                  "contextSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Context window size in tokens"
+                  },
+                  "gpuLayers": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of layers to offload to GPU (0 = CPU only)"
+                  },
+                  "threads": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Number of CPU threads for inference"
+                  },
+                  "batchSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Batch size for token processing"
+                  },
+                  "flashAttention": {
+                    "type": "boolean",
+                    "description": "Enable flash attention optimization"
+                  }
+                },
+                "required": [
+                  "modelPath"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
                   "apiKey": {
                     "type": "string",
                     "description": "API key for authenticating with ElevenLabs"
@@ -13529,6 +13681,47 @@
                 },
                 "required": [
                   "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "modelPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path to GGUF model file"
+                  },
+                  "contextSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Context window size in tokens"
+                  },
+                  "gpuLayers": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Number of layers to offload to GPU (0 = CPU only)"
+                  },
+                  "threads": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Number of CPU threads for inference"
+                  },
+                  "batchSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "description": "Batch size for token processing"
+                  },
+                  "flashAttention": {
+                    "type": "boolean",
+                    "description": "Enable flash attention optimization"
+                  }
+                },
+                "required": [
+                  "modelPath"
                 ],
                 "additionalProperties": false
               },
@@ -13921,6 +14114,47 @@
                       },
                       "required": [
                         "apiKey"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "modelPath": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Path to GGUF model file"
+                        },
+                        "contextSize": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true,
+                          "description": "Context window size in tokens"
+                        },
+                        "gpuLayers": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Number of layers to offload to GPU (0 = CPU only)"
+                        },
+                        "threads": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true,
+                          "description": "Number of CPU threads for inference"
+                        },
+                        "batchSize": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true,
+                          "description": "Batch size for token processing"
+                        },
+                        "flashAttention": {
+                          "type": "boolean",
+                          "description": "Enable flash attention optimization"
+                        }
+                      },
+                      "required": [
+                        "modelPath"
                       ],
                       "additionalProperties": false
                     },
@@ -17982,6 +18216,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -18387,6 +18624,9 @@
                     "$ref": "#/components/schemas/ScalewayLlmSettings"
                   },
                   {
+                    "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                  },
+                  {
                     "nullable": true
                   }
                 ],
@@ -18517,6 +18757,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
               },
               {
                 "nullable": true
@@ -18709,6 +18952,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -18844,6 +19090,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
               },
               {
                 "nullable": true
@@ -18984,6 +19233,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
               },
               {
                 "nullable": true
@@ -19822,6 +20074,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -19971,6 +20226,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                     },
                     {
                       "nullable": true
@@ -29608,6 +29866,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -29901,6 +30162,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -30106,6 +30370,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -30346,6 +30613,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -30657,6 +30927,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -30896,6 +31169,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -31200,6 +31476,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -31414,6 +31693,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -31670,6 +31952,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -31988,6 +32273,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -37545,6 +37833,9 @@
                             "$ref": "#/components/schemas/ScalewayLlmSettings"
                           },
                           {
+                            "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                          },
+                          {
                             "nullable": true
                           }
                         ],
@@ -38174,6 +38465,47 @@
                       {
                         "type": "object",
                         "properties": {
+                          "modelPath": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Path to GGUF model file"
+                          },
+                          "contextSize": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "Context window size in tokens"
+                          },
+                          "gpuLayers": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of layers to offload to GPU (0 = CPU only)"
+                          },
+                          "threads": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "Number of CPU threads for inference"
+                          },
+                          "batchSize": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "Batch size for token processing"
+                          },
+                          "flashAttention": {
+                            "type": "boolean",
+                            "description": "Enable flash attention optimization"
+                          }
+                        },
+                        "required": [
+                          "modelPath"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
                           "apiKey": {
                             "type": "string",
                             "description": "API key for authenticating with ElevenLabs"
@@ -38534,6 +38866,47 @@
                           },
                           "required": [
                             "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "modelPath": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Path to GGUF model file"
+                            },
+                            "contextSize": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Context window size in tokens"
+                            },
+                            "gpuLayers": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Number of layers to offload to GPU (0 = CPU only)"
+                            },
+                            "threads": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Number of CPU threads for inference"
+                            },
+                            "batchSize": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Batch size for token processing"
+                            },
+                            "flashAttention": {
+                              "type": "boolean",
+                              "description": "Enable flash attention optimization"
+                            }
+                          },
+                          "required": [
+                            "modelPath"
                           ],
                           "additionalProperties": false
                         },
@@ -39085,6 +39458,47 @@
                               {
                                 "type": "object",
                                 "properties": {
+                                  "modelPath": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "Path to GGUF model file"
+                                  },
+                                  "contextSize": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": true,
+                                    "description": "Context window size in tokens"
+                                  },
+                                  "gpuLayers": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Number of layers to offload to GPU (0 = CPU only)"
+                                  },
+                                  "threads": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": true,
+                                    "description": "Number of CPU threads for inference"
+                                  },
+                                  "batchSize": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "exclusiveMinimum": true,
+                                    "description": "Batch size for token processing"
+                                  },
+                                  "flashAttention": {
+                                    "type": "boolean",
+                                    "description": "Enable flash attention optimization"
+                                  }
+                                },
+                                "required": [
+                                  "modelPath"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
                                   "apiKey": {
                                     "type": "string",
                                     "description": "API key for authenticating with ElevenLabs"
@@ -39533,6 +39947,47 @@
                         {
                           "type": "object",
                           "properties": {
+                            "modelPath": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Path to GGUF model file"
+                            },
+                            "contextSize": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Context window size in tokens"
+                            },
+                            "gpuLayers": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Number of layers to offload to GPU (0 = CPU only)"
+                            },
+                            "threads": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Number of CPU threads for inference"
+                            },
+                            "batchSize": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Batch size for token processing"
+                            },
+                            "flashAttention": {
+                              "type": "boolean",
+                              "description": "Enable flash attention optimization"
+                            }
+                          },
+                          "required": [
+                            "modelPath"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
                             "apiKey": {
                               "type": "string",
                               "description": "API key for authenticating with ElevenLabs"
@@ -39952,6 +40407,47 @@
                       {
                         "type": "object",
                         "properties": {
+                          "modelPath": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Path to GGUF model file"
+                          },
+                          "contextSize": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "Context window size in tokens"
+                          },
+                          "gpuLayers": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of layers to offload to GPU (0 = CPU only)"
+                          },
+                          "threads": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "Number of CPU threads for inference"
+                          },
+                          "batchSize": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "description": "Batch size for token processing"
+                          },
+                          "flashAttention": {
+                            "type": "boolean",
+                            "description": "Enable flash attention optimization"
+                          }
+                        },
+                        "required": [
+                          "modelPath"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
                           "apiKey": {
                             "type": "string",
                             "description": "API key for authenticating with ElevenLabs"
@@ -40310,6 +40806,47 @@
                           },
                           "required": [
                             "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "modelPath": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Path to GGUF model file"
+                            },
+                            "contextSize": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Context window size in tokens"
+                            },
+                            "gpuLayers": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Number of layers to offload to GPU (0 = CPU only)"
+                            },
+                            "threads": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Number of CPU threads for inference"
+                            },
+                            "batchSize": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "exclusiveMinimum": true,
+                              "description": "Batch size for token processing"
+                            },
+                            "flashAttention": {
+                              "type": "boolean",
+                              "description": "Enable flash attention optimization"
+                            }
+                          },
+                          "required": [
+                            "modelPath"
                           ],
                           "additionalProperties": false
                         },
@@ -47904,6 +48441,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -48267,6 +48807,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -48543,6 +49086,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -48915,6 +49461,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -49299,6 +49848,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -49563,6 +50115,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -49934,6 +50489,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -50218,6 +50776,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -50497,6 +51058,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -50885,6 +51449,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -53995,6 +54562,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -54296,6 +54866,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -54509,6 +55082,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true
@@ -54772,6 +55348,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/NodeLlamaCppLlmSettings"
                         },
                         {
                           "nullable": true

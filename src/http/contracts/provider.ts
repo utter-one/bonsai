@@ -12,6 +12,7 @@ import { geminiLlmProviderConfigSchema } from '../../services/providers/llm/Gemi
 import { ollamaLlmProviderConfigSchema } from '../../services/providers/llm/OllamaLlmProvider';
 import { ovhLlmProviderConfigSchema } from '../../services/providers/llm/OVHLlmProvider';
 import { scalewayLlmProviderConfigSchema } from '../../services/providers/llm/ScalewayLlmProvider';
+import { nodeLlamaCppLlmProviderConfigSchema } from '../../services/providers/llm/NodeLlamaCppLlmProvider';
 import { elevenLabsTtsProviderConfigSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsProviderConfigSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsProviderConfigSchema } from '../../services/providers/tts/DeepgramTtsProvider';
@@ -49,6 +50,7 @@ export const llmProviderConfigSchema = z.union([
   ollamaLlmProviderConfigSchema,
   ovhLlmProviderConfigSchema,
   scalewayLlmProviderConfigSchema,
+  nodeLlamaCppLlmProviderConfigSchema,
 ]).describe('LLM provider configuration');
 
 /**

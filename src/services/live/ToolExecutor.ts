@@ -85,7 +85,6 @@ export class ToolExecutor {
     try {
       const llmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, tool.llmSettings);
       const actualContext = { ...context, tool: { parameters } };
-      await llmProvider.init();
       const renderedPrompt = await this.templatingEngine.render(tool.prompt, actualContext);
       logger.debug({ toolId: tool.id }, `Rendered prompt for tool "${tool.name}"`);
 

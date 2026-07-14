@@ -72,6 +72,7 @@ import { BenchmarkExecutorService } from './services/BenchmarkExecutorService';
 import SpeexResamplerClass from './services/audio/speexResampler';
 import smartTurnDetector from './services/audio/SmartTurnDetector';
 import { preloadFireRedVad } from './services/audio/FireRedVadWrapper';
+import { LlamaCppInstanceManager } from './services/providers/llm/LlamaCppInstanceManager';
 
 // Register the OpenAPI spec provider before the IoC container is used.
 // This breaks the circular module dependency that would arise from VersionService
@@ -163,6 +164,9 @@ export async function createApp(): Promise<express.Application> {
   const secretsRegistry = container.resolve(SecretsManagerRegistry);
   const localSecretsManager = container.resolve(LocalSecretsManager);
   secretsRegistry.register(LOCAL_SECRETS_MANAGER_NAME, localSecretsManager);
+
+  // Bootstrap llama.cpp instance manager — must run before any node-llama-cpp provider is created
+  await container.resolve(LlamaCppInstanceManager).init();
 
   // Authentication middleware (optional - sets req.user if token is valid)
   app.use(optionalAuthMiddleware);

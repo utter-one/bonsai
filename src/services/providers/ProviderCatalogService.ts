@@ -11738,6 +11738,14 @@ export class ProviderCatalogService {
           { id: 'mixtral-8x7b-instruct-v0.1', displayName: 'Mixtral 8x7B Instruct', description: 'Mistral Mixtral MoE model for balanced performance', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 32768 },
         ],
       },
+      {
+        apiType: 'node-llama-cpp',
+        displayName: 'node-llama-cpp',
+        description: 'Local LLM inference using llama.cpp via node-llama-cpp. Model path and launch parameters configured in provider config. Max concurrent models controlled by NODE_LLAMA_CPP_MAX_INSTANCES.',
+        models: [
+          { id: 'local-model', displayName: 'Local Model', recommended: true, description: 'Locally loaded GGUF model from NODE_LLAMA_CPP_MODEL_PATH', supportsToolCalling: false, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: true },
+        ],
+      },
     ];
   }
 

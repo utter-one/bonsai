@@ -817,8 +817,10 @@ export class ConversationRunner {
       }
     }
 
-    // Initialize and wire up completion LLM provider
+    // Wire up completion LLM provider callbacks (already initialized by factory)
     if (completionLlmProvider) {
+      logger.info({ conversationId }, `Completion LLM provider initialized for conversation ${conversationId}`);
+
       let aiTextChunkOrdinal = 0;
 
       completionLlmProvider.setOnChunk(async (chunk: LlmChunk) => {
