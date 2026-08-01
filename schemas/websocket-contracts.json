@@ -309,6 +309,22 @@
             }
           },
           "description": "Session settings for the client"
+        },
+        "simulatedChannelType": {
+          "type": "string",
+          "enum": [
+            "websocket",
+            "webrtc",
+            "twilio_voice",
+            "twilio_messaging",
+            "whatsapp",
+            "telegram",
+            "sendgrid",
+            "ses",
+            "smtp_imap",
+            "testing"
+          ],
+          "description": "Simulated channel type for context building. When set, the agent behaves as if on this channel (e.g. twilio_voice, whatsapp) instead of the real transport."
         }
       },
       "required": [
@@ -2129,6 +2145,9 @@
           "$ref": "#/definitions/CallToolEffect"
         },
         {
+          "$ref": "#/definitions/SaveArtifactEffect"
+        },
+        {
           "$ref": "#/definitions/GenerateResponseEffect"
         },
         {
@@ -2136,6 +2155,9 @@
         },
         {
           "$ref": "#/definitions/BanUserEffect"
+        },
+        {
+          "$ref": "#/definitions/AttachFileEffect"
         }
       ],
       "discriminator": {
@@ -2148,9 +2170,11 @@
           "modify_variables": "#/definitions/ModifyVariablesEffect",
           "modify_user_profile": "#/definitions/ModifyUserProfileEffect",
           "call_tool": "#/definitions/CallToolEffect",
+          "save_artifact": "#/definitions/SaveArtifactEffect",
           "generate_response": "#/definitions/GenerateResponseEffect",
           "change_visibility": "#/definitions/ChangeVisibilityEffect",
-          "ban_user": "#/definitions/BanUserEffect"
+          "ban_user": "#/definitions/BanUserEffect",
+          "attach_file": "#/definitions/AttachFileEffect"
         }
       },
       "description": "The effect to be executed"
@@ -2168,6 +2192,10 @@
         "reason": {
           "type": "string",
           "description": "Optional reason for ending the conversation"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 11000."
         }
       },
       "required": [
@@ -2187,6 +2215,10 @@
         "reason": {
           "type": "string",
           "description": "Optional reason for aborting the conversation"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 12000."
         }
       },
       "required": [
@@ -2207,6 +2239,10 @@
           "type": "string",
           "minLength": 1,
           "description": "ID of the stage to switch to"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 13000."
         }
       },
       "required": [
@@ -2228,6 +2264,10 @@
           "type": "string",
           "minLength": 1,
           "description": "Template to render and replace user input with"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 5000."
         }
       },
       "required": [
@@ -2252,6 +2292,10 @@
           },
           "minItems": 1,
           "description": "Array of variable modifications to apply"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 3000."
         }
       },
       "required": [
@@ -2304,6 +2348,10 @@
           },
           "minItems": 1,
           "description": "Array of user profile field modifications to apply"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 4000."
         }
       },
       "required": [
@@ -2365,12 +2413,65 @@
           "type": "boolean",
           "default": false,
           "description": "When true, the tool runs in the background without blocking the conversation. The result is not stored in context and flow control signals (go_to_stage, end_conversation, etc.) are discarded. Use for fire-and-forget operations such as logging or saving data."
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 1000 (webhook), 2000 (smart_function), 6000 (script)."
         }
       },
       "required": [
         "type",
         "toolId",
         "parameters"
+      ]
+    },
+    "SaveArtifactEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "save_artifact"
+          ],
+          "description": "Effect type"
+        },
+        "data": {
+          "nullable": true,
+          "description": "Data to save: inline value (string, base64, object) or a variable reference template such as {{vars.myFile}}"
+        },
+        "dataEncoding": {
+          "type": "string",
+          "enum": [
+            "raw",
+            "base64"
+          ],
+          "default": "raw",
+          "description": "Encoding of the data: raw (store as-is), base64 (decode before storing)"
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name for the stored file; supports Handlebars templating"
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MIME type for the stored file"
+        },
+        "variableName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Variable name to store the artifactId in (e.g. \"myArtifactId\")"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 8000."
+        }
+      },
+      "required": [
+        "type",
+        "fileName",
+        "variableName"
       ]
     },
     "GenerateResponseEffect": {
@@ -2407,6 +2508,10 @@
             "type": "string"
           },
           "description": "Optional array of prescripted responses to use"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 10000."
         }
       },
       "required": [
@@ -2436,6 +2541,10 @@
         "condition": {
           "type": "string",
           "description": "JavaScript condition expression evaluated against the conversation context — required when visibility is \"conditional\""
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 9000."
         }
       },
       "required": [
@@ -2456,10 +2565,49 @@
         "reason": {
           "type": "string",
           "description": "Optional reason for banning the user"
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 7000."
         }
       },
       "required": [
         "type"
+      ]
+    },
+    "AttachFileEffect": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "attach_file"
+          ],
+          "description": "Effect type"
+        },
+        "artifactId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Artifact ID of the file in storage to attach. Typically from a save_artifact effect or a tool result."
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name for the attachment. Defaults to the artifact's stored name when omitted."
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MIME type override. When omitted, uses the artifact's stored MIME type."
+        },
+        "priority": {
+          "type": "number",
+          "description": "Optional execution priority override. Lower numbers execute first. Default: 9500."
+        }
+      },
+      "required": [
+        "type",
+        "artifactId"
       ]
     },
     "conversation-event-update": {
@@ -4875,6 +5023,69 @@
         "audioData",
         "audioFormat",
         "mimeType",
+        "sequenceNumber",
+        "sessionId"
+      ]
+    },
+    "attach-file-output": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string",
+          "description": "Unique identifier of the conversation"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "attach_file_output"
+          ]
+        },
+        "outputTurnId": {
+          "type": "string",
+          "description": "Generation turn this file belongs to"
+        },
+        "artifactId": {
+          "type": "string",
+          "description": "ID of the conversation artifact record"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Display name of the file"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the file"
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "File size in bytes"
+        },
+        "downloadUrl": {
+          "type": "string",
+          "description": "URL to download the file (signed URL for external storage)"
+        },
+        "sequenceNumber": {
+          "type": "number",
+          "description": "0-based index when multiple files are attached in a single response"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "Optional request ID for correlating responses with requests"
+        },
+        "sessionId": {
+          "type": "string",
+          "description": "Unique identifier for the session"
+        }
+      },
+      "required": [
+        "conversationId",
+        "type",
+        "outputTurnId",
+        "artifactId",
+        "fileName",
+        "mimeType",
+        "fileSize",
+        "downloadUrl",
         "sequenceNumber",
         "sessionId"
       ]

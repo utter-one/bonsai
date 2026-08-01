@@ -25,7 +25,10 @@ import type { SmtpImapSendResponse } from '../../../http/contracts/smtp-imap-out
 import { NotFoundError } from '../../../errors';
 import { SYSTEM_CONTEXT } from '../../../services/RequestContext';
 import { OAuth2TokenRefreshService } from '../../../services/OAuth2TokenRefreshService';
+import { DeferredProcessingService } from '../../../services/DeferredProcessingService';
+import { randomBetween } from '../../../utils/randomBetween';
 import { extractConversationIdFromMessageId, extractConversationIdFromReferences } from '../shared/MessageIdUtils';
+import { resolveEmailRouting, extractRecipientEmails } from '../shared/EmailRoutingUtils';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
@@ -40,6 +43,7 @@ const webhookQuerySchema = z.object({
 export class SmtpImapChannelHost {
   private readonly emailSessionMap = new Map<string, string>();
   private readonly sessionTimeoutMap = new Map<string, NodeJS.Timeout>();
+  private readonly conversationTargetEmailMap = new Map<string, string>();
 
   private readonly timeoutMs = parseInt(process.env.EMAIL_SESSION_TIMEOUT_MS ?? String(DEFAULT_SESSION_TIMEOUT_MS), 10);
 
@@ -52,6 +56,7 @@ export class SmtpImapChannelHost {
     @inject(UserService) private readonly userService: UserService,
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
     @inject(OAuth2TokenRefreshService) private readonly oauth2TokenRefreshService: OAuth2TokenRefreshService,
+    @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
   ) {}
 
   static getOpenAPIPaths(): RouteConfig[] {
@@ -123,14 +128,18 @@ export class SmtpImapChannelHost {
       res.status(500).json({ error: 'Channel provider config is invalid' });
       return;
     }
-    const { fromAddress, smtp, threadingStrategy, oauth2 } = configResult.data;
+    const { fromAddress, smtp, threadingStrategy, oauth2, emailToProject } = configResult.data;
 
     if (oauth2?.accessToken && oauth2.accessTokenExpiry && Date.now() >= oauth2.accessTokenExpiry) {
       logger.info({ channelProviderId }, 'SMTP/IMAP outgoing: OAuth2 token expired, refreshing inline');
       await this.oauth2TokenRefreshService.refreshProvider(channelProviderId);
     }
 
-    let resolvedStageId = body.stageId ?? queryStageId;
+    const fromAddressLookup = body.fromAddress ?? fromAddress;
+    const routing = emailToProject ? resolveEmailRouting(emailToProject, extractRecipientEmails(fromAddressLookup), projectId, fromAddress) : null;
+    const resolvedFromAddress = body.fromAddress ?? routing?.fromAddress ?? fromAddress;
+
+    let resolvedStageId = body.stageId ?? queryStageId ?? routing?.stageId;
     if (!resolvedStageId) {
       const project = await this.projectService.getProjectById(projectId, SYSTEM_CONTEXT);
       resolvedStageId = project.startingStageId ?? undefined;
@@ -139,7 +148,10 @@ export class SmtpImapChannelHost {
         return;
       }
     }
-    const resolvedAgentId = body.agentId ?? queryAgentId;
+    const resolvedAgentId = body.agentId ?? queryAgentId ?? routing?.agentId;
+    const resolvedCc = body.cc ?? routing?.cc;
+    const resolvedBcc = body.bcc ?? routing?.bcc;
+    const resolvedSubject = body.subject ?? routing?.subject ?? 'New Conversation';
 
     try {
       await this.userService.getUserById(projectId, body.to);
@@ -160,19 +172,20 @@ export class SmtpImapChannelHost {
       await this.userService.updateUserProfile(projectId, body.to, body.userProfile);
     }
 
-    const subject = body.subject ?? 'New Conversation';
     const connection = new SmtpImapConnection(
       body.to,
-      body.fromAddress ?? fromAddress,
+      resolvedFromAddress,
       threadingStrategy ?? 'messageId',
       this.sessionManager,
-      subject,
+      resolvedSubject,
       channelProviderId,
       smtp.host,
       smtp.port,
       smtp.secure,
       smtp.auth.user,
       smtp.auth.pass,
+      resolvedCc,
+      resolvedBcc,
     );
 
     try {
@@ -187,7 +200,7 @@ export class SmtpImapChannelHost {
     const sessionId = this.sessionManager.registerSession(connection);
     const session = this.sessionManager.getSession(sessionId);
     connection.attachSession(session);
-    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null, null);
 
     const conversation = await this.conversationService.createConversation({
       projectId,
@@ -196,11 +209,12 @@ export class SmtpImapChannelHost {
       stageId: resolvedStageId,
       status: 'initialized',
       direction: 'outgoing',
-      metadata: body.metadata ?? null,
+      metadata: body.metadata ? { ...body.metadata, targetEmail: resolvedFromAddress } : { targetEmail: resolvedFromAddress },
     }, SYSTEM_CONTEXT);
 
     const emailKey = `${projectId}:${conversation.id}`;
     this.emailSessionMap.set(emailKey, sessionId);
+    this.conversationTargetEmailMap.set(conversation.id, resolvedFromAddress);
     this.scheduleTimeout(sessionId, emailKey);
     connection.setConversationId(conversation.id);
 
@@ -215,7 +229,7 @@ export class SmtpImapChannelHost {
     res.status(201).json(response);
   }
 
-  private async dispatchTextInput(sessionId: string, text: string): Promise<void> {
+  private async dispatchTextInput(sessionId: string, text: string, providerId: string, processingDelayMinMs: number, processingDelayMaxMs: number): Promise<void> {
     const session = this.sessionManager.getSession(sessionId);
     if (!session?.conversationId) {
       logger.warn({ sessionId }, 'SMTP/IMAP: cannot dispatch message — no active conversation');
@@ -228,6 +242,32 @@ export class SmtpImapChannelHost {
     }
 
     const msg: CALInputMessage = { type: 'send_user_text_input', conversationId: session.conversationId, text, correlationId: undefined };
+
+    // Check deferral config
+    if (processingDelayMinMs > 0 && processingDelayMaxMs > 0) {
+      const delayMs = randomBetween(processingDelayMinMs, processingDelayMaxMs);
+      const processAt = new Date(Date.now() + delayMs);
+
+      await this.deferredProcessingService.queue({
+        sessionId,
+        providerId,
+        projectId: session.projectId ?? '',
+        conversationId: session.conversationId,
+        channelType: 'smtp_imap',
+        processAt,
+        message: msg,
+      });
+
+      logger.info({
+        sessionId,
+        projectId: session.projectId,
+        conversationId: session.conversationId,
+        delayMs,
+        processAt,
+      }, 'SMTP/IMAP: incoming message queued for deferred processing');
+      return;
+    }
+
     await this.dispatcher.dispatch(msg, this.buildContext(sessionId));
   }
 
@@ -235,6 +275,7 @@ export class SmtpImapChannelHost {
     projectId: string,
     keySettings: Record<string, unknown> | null,
     fromAddress: string,
+    targetEmail: string,
     threadingStrategy: 'messageId' | 'senderSubject',
     providerId: string,
     smtpHost: string,
@@ -250,32 +291,92 @@ export class SmtpImapChannelHost {
     references: string | string[] | undefined,
     stageId: string | undefined,
     agentId: string | undefined,
+    cc: string | undefined,
+    bcc: string | undefined,
+    routingFromAddress: string | undefined,
+    onEmailSent: (() => void) | undefined,
+    ccBccReplyAsHandOff: boolean,
+    processingDelayMinMs: number,
+    processingDelayMaxMs: number,
   ): Promise<void> {
     const replyConversationId = extractConversationIdFromMessageId(inReplyTo) ?? extractConversationIdFromReferences(references);
-    logger.info({ projectId, from: senderEmail, inReplyTo, references, replyConversationId }, 'SMTP/IMAP: inbound email threading headers');
+    logger.info({ projectId, from: senderEmail, to: targetEmail, inReplyTo, references, replyConversationId }, 'SMTP/IMAP: inbound email threading headers');
 
     if (replyConversationId) {
       const existingSessionId = this.findSessionByConversationId(projectId, replyConversationId);
       if (existingSessionId) {
         const existingSession = this.sessionManager.getSession(existingSessionId);
+        const conversationUserEmail = existingSession?.clientConnection instanceof SmtpImapConnection
+          ? existingSession.clientConnection.getUserEmail()
+          : undefined;
+
+        if (ccBccReplyAsHandOff && conversationUserEmail && senderEmail.toLowerCase() !== conversationUserEmail.toLowerCase()) {
+          logger.info({
+            projectId,
+            conversationId: replyConversationId,
+            from: senderEmail,
+            conversationUserEmail,
+          }, 'SMTP/IMAP: reply from non-conversation user (CC/BCC hand-off), closing conversation');
+          await this.conversationService.finishConversation(projectId, replyConversationId, 'Hand-off: reply from CC/BCC recipient');
+          const emailKey = `${projectId}:${replyConversationId}`;
+          this.emailSessionMap.delete(emailKey);
+          if (existingSession?.conversationId) {
+            this.conversationTargetEmailMap.delete(existingSession.conversationId);
+          }
+          await this.sessionManager.unregisterSession(existingSessionId);
+          return;
+        }
+
         if (existingSession?.clientConnection instanceof SmtpImapConnection) {
+          existingSession.clientConnection.setOnEmailSent(onEmailSent);
           if (messageId) {
             existingSession.clientConnection.setInboundMessageId(messageId);
           }
           if (references) {
             existingSession.clientConnection.setReferencesChain(references);
           }
+          const storedTargetEmail = this.conversationTargetEmailMap.get(replyConversationId);
+          if (storedTargetEmail) {
+            existingSession.clientConnection.setReplyFromAddress(storedTargetEmail);
+          }
+          if (cc !== undefined) {
+            existingSession.clientConnection.setCc(cc);
+          }
+          if (bcc !== undefined) {
+            existingSession.clientConnection.setBcc(bcc);
+          }
         }
         const emailKey = `${projectId}:${replyConversationId}`;
         this.scheduleTimeout(existingSessionId, emailKey);
-        await this.dispatchTextInput(existingSessionId, emailBody);
+        await this.dispatchTextInput(existingSessionId, emailBody, providerId, processingDelayMinMs, processingDelayMaxMs);
         return;
+      }
+
+      // Session not found (may have timed out) — check if this is a hand-off reply
+      if (ccBccReplyAsHandOff) {
+        try {
+          if (senderEmail) {
+          const conversation = await this.conversationService.getConversationById(projectId, replyConversationId);
+          if (conversation.userId.toLowerCase() !== senderEmail.toLowerCase()) {
+            logger.info({
+              projectId,
+              conversationId: replyConversationId,
+              from: senderEmail,
+              conversationUserId: conversation.userId,
+            }, 'SMTP/IMAP: reply from non-conversation user (CC/BCC hand-off), session timed out, closing conversation');
+            await this.conversationService.finishConversation(projectId, replyConversationId, 'Hand-off: reply from CC/BCC recipient');
+            return;
+          }
+        }
+      } catch (error) {
+        logger.warn({ error, projectId, conversationId: replyConversationId }, 'SMTP/IMAP: conversation not found for hand-off check, falling through to new conversation');
+      }
       }
     }
 
     const connection = new SmtpImapConnection(
       senderEmail,
-      fromAddress,
+      routingFromAddress ?? targetEmail,
       threadingStrategy ?? 'messageId',
       this.sessionManager,
       subject ?? 'Re: Conversation',
@@ -285,6 +386,8 @@ export class SmtpImapChannelHost {
       smtpSecure,
       smtpAuthUser,
       smtpAuthPass,
+      cc,
+      bcc,
     );
 
     try {
@@ -304,12 +407,14 @@ export class SmtpImapChannelHost {
     if (references) {
       connection.setReferencesChain(references);
     }
-    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+    connection.setOnEmailSent(onEmailSent);
+    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null, null);
 
     let conversationId: string;
 
     if (replyConversationId) {
       conversationId = replyConversationId;
+      this.conversationTargetEmailMap.set(conversationId, targetEmail);
       await this.sessionManager.attachConversationToSession(sessionId, conversationId);
       const resumedSession = this.sessionManager.getSession(sessionId);
       await resumedSession.runner?.resumeConversation();
@@ -345,7 +450,7 @@ export class SmtpImapChannelHost {
         sessionId,
         status: 'initialized',
         direction: 'incoming',
-        metadata: null,
+        metadata: { targetEmail },
       }, SYSTEM_CONTEXT);
       conversationId = conversation.id;
 
@@ -359,9 +464,10 @@ export class SmtpImapChannelHost {
     connection.setConversationId(conversationId);
     const emailKey = `${projectId}:${conversationId}`;
     this.emailSessionMap.set(emailKey, sessionId);
+    this.conversationTargetEmailMap.set(conversationId, targetEmail);
     this.scheduleTimeout(sessionId, emailKey);
 
-    await this.dispatchTextInput(sessionId, emailBody);
+    await this.dispatchTextInput(sessionId, emailBody, providerId, processingDelayMinMs, processingDelayMaxMs);
   }
 
   private findSessionByConversationId(projectId: string, conversationId: string): string | undefined {
@@ -386,7 +492,15 @@ export class SmtpImapChannelHost {
 
     const handle = setTimeout(async () => {
       logger.info({ sessionId }, 'SMTP/IMAP: session timed out due to inactivity');
+
+      // Cancel any pending deferred messages for this session
+      await this.deferredProcessingService.cancelBySessionId(sessionId);
+
       this.emailSessionMap.delete(emailKey);
+      const session = this.sessionManager.getSession(sessionId);
+      if (session?.conversationId) {
+        this.conversationTargetEmailMap.delete(session.conversationId);
+      }
       this.sessionTimeoutMap.delete(sessionId);
       try {
         await this.sessionManager.unregisterSession(sessionId);

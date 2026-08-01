@@ -51,6 +51,8 @@ Create a provider of type `channel` with API type `smtp_imap`. Configuration:
 | `imap.auth.user` | IMAP username |
 | `imap.auth.pass` | IMAP password or app-specific password |
 | `imap.pollingIntervalMs` | Fallback polling interval when IDLE is unavailable (default: 30000) |
+| `processingDelayMinMs` | Minimum delay in milliseconds before processing an incoming message (default: 0, disabled) |
+| `processingDelayMaxMs` | Maximum delay in milliseconds before processing an incoming message (default: 0, disabled) |
 
 ### 2. Secret Migration
 
@@ -107,6 +109,18 @@ Connection failures trigger exponential backoff reconnection (max 5 minutes).
 ### Threading
 
 Outbound emails include `Message-ID` (generated from conversation ID), `In-Reply-To`, and `References` headers. The `skipNextEmail` flag suppresses the first response on new inbound conversations.
+
+### Outbound Attachments
+
+When an action uses the [`attach_file`](./actions-and-effects#attach_file) effect alongside `generate_response`, the resulting file is downloaded from storage and included as an attachment on the outbound email. Multiple attachments are supported and delivered in the order they were staged. The email is sent with all attachments buffered after the AI response completes.
+
+### Processing Delay
+
+By default, incoming emails are processed immediately. To introduce a natural response delay, set `processingDelayMinMs` and `processingDelayMaxMs` on the provider config. The actual delay is picked uniformly at random from `[min, max]` per message. The full AI pipeline (generation, tool execution, reply) runs only after the delay elapses.
+
+Recommended for email: `30000`–`120000` (30 seconds to 2 minutes).
+
+See [Deferred Processing](./deferred-processing) for details.
 
 ## Environment Variables
 

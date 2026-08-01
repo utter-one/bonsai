@@ -383,6 +383,35 @@ The server sends AI responses as a series of push messages:
 }
 ```
 
+### File Attachment Output
+
+Delivered after text/voice output but before `end_ai_generation_output` when an action uses the `attach_file` effect:
+
+```json
+{
+  "type": "attach_file_output",
+  "sessionId": "session-abc",
+  "conversationId": "conv-123",
+  "outputTurnId": "out-1",
+  "artifactId": "artifact-uuid",
+  "fileName": "invoice.pdf",
+  "mimeType": "application/pdf",
+  "fileSize": 245678,
+  "downloadUrl": "https://storage.example.com/signed-url?...expiry...&signature=...",
+  "sequenceNumber": 0
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `artifactId` | `string` | ID of the conversation artifact record |
+| `fileName` | `string` | Display name of the file |
+| `mimeType` | `string` | MIME type of the file |
+| `fileSize` | `integer` | File size in bytes |
+| `downloadUrl` | `string` | URL to download the file (signed URL for external storage) |
+| `sequenceNumber` | `integer` | 0-based index when multiple files are attached in a single response |
+```
+
 ### Generation End
 
 ```json

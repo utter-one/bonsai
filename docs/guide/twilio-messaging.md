@@ -58,6 +58,8 @@ Save the `id` from the response — you will need it in the webhook URL.
 | `accountSid` | Twilio Account SID (starts with `AC`) |
 | `authToken` | Twilio Auth Token — used to validate incoming webhook signatures and send messages |
 | `fromNumber` | The Twilio phone number in E.164 format (e.g. `+15551234567`) used as the sender |
+| `processingDelayMinMs` | Minimum delay in milliseconds before processing an incoming message (default: 0, disabled) |
+| `processingDelayMaxMs` | Maximum delay in milliseconds before processing an incoming message (default: 0, disabled) |
 
 ::: warning Auth Token Security
 The `authToken` is stored in the provider `config` field and is readable by operators with `provider:read` permission. Use a dedicated sub-account Auth Token in production and rotate it if compromised.
@@ -142,6 +144,16 @@ WhatsApp sender format: `whatsapp:+15551234567`
   "fromNumber": "whatsapp:+15551234567"
 }
 ```
+
+---
+
+## Processing Delay
+
+By default, incoming messages are processed immediately. To introduce a natural response delay, set `processingDelayMinMs` and `processingDelayMaxMs` on the provider config. The actual delay is picked uniformly at random from `[min, max]` per message.
+
+Recommended for SMS: `10000`–`45000` (10 to 45 seconds).
+
+See [Deferred Processing](./deferred-processing) for details.
 
 ---
 

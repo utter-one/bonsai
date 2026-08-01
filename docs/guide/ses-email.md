@@ -70,6 +70,8 @@ Save the `id` from the response — you will need it in the webhook URL.
 | `threadingStrategy` | How thread ID is derived: `messageId` (default, follows Message-ID chain) or `senderSubject` (hashes sender + subject) |
 | `inboundMode` | How inbound email body is delivered: `sns` (raw MIME in notification, 150 KB limit) or `s3` (fetched from S3 bucket, 40 MB limit) |
 | `s3BucketName` | S3 bucket name for `s3` inbound mode. Must match the bucket in the SES receipt rule. Omitted for `sns` mode. |
+| `processingDelayMinMs` | Minimum delay in milliseconds before processing an incoming message (default: 0, disabled) |
+| `processingDelayMaxMs` | Maximum delay in milliseconds before processing an incoming message (default: 0, disabled) |
 
 ### Inbound Mode: SNS vs S3
 
@@ -180,6 +182,16 @@ See the [SES Email API reference](../api/ses-email) for full endpoint documentat
 
 ---
 
+## Processing Delay
+
+By default, incoming emails are processed immediately. To introduce a natural response delay, set `processingDelayMinMs` and `processingDelayMaxMs` on the provider config. The actual delay is picked uniformly at random from `[min, max]` per message.
+
+Recommended for email: `30000`–`120000` (30 seconds to 2 minutes).
+
+See [Deferred Processing](./deferred-processing) for details.
+
+---
+
 ## Thread Continuity
 
 The channel maintains email thread continuity using one of two strategies configured via `threadingStrategy`:
@@ -229,9 +241,12 @@ EMAIL_SESSION_TIMEOUT_MS=86400000   # 24 hours (default)
 | Transcription updates | ❌ |
 | Session authentication (per-message API key) | ✅ (via webhook URL query param) |
 | MIME body parsing | ✅ (plain text, HTML-to-text fallback) |
-| Attachment handling | ❌ (attachments are not parsed or forwarded) |
+| Inbound attachment parsing | ❌ (inbound email attachments are not parsed or forwarded) |
+| Outbound file attachments | ✅ (via `attach_file` effect) |
 
-Only `end_ai_generation_output` messages are delivered as email replies. Streaming voice chunks, image outputs, and event push messages are silently discarded. The MIME parser extracts plain text first, then falls back to HTML-to-text conversion, then raw HTML. Attachments are silently ignored.
+Only `end_ai_generation_output` messages are delivered as email replies. Streaming voice chunks, image outputs, and event push messages are silently discarded. The MIME parser extracts plain text first, then falls back to HTML-to-text conversion, then raw HTML. Inbound attachments are silently ignored.
+
+Outbound file attachments are supported via the [`attach_file`](./actions-and-effects#attach_file) effect. When paired with `generate_response`, files are downloaded from storage and included as email attachments. Multiple attachments are delivered in the order they were staged.
 
 ---
 

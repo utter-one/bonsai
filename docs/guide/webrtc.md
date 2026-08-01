@@ -313,6 +313,8 @@ The `control` channel carries the surrounding generation events so you can show 
 { "type": "end_ai_generation_output", "outputTurnId": "out-uuid", "fullText": "Hello! ..." }
 ```
 
+File attachments from [`attach_file`](./actions-and-effects#attach_file) effects are delivered as `attach_file_output` messages over the `control` channel, after text/voice output but before `end_ai_generation_output`. The format is identical to the WebSocket protocol.
+
 ## Client Commands
 
 All commands are JSON sent over the `control` channel. Formats are identical to WebSocket.

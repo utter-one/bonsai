@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * API key channel and feature permission constants and types.
  *
@@ -12,6 +14,9 @@ export type ApiKeyChannel = 'websocket' | 'webrtc' | 'twilio_voice' | 'twilio_me
 
 /** All supported API key channel values. */
 export const ALL_API_KEY_CHANNELS: Array<ApiKeyChannel> = ['websocket', 'webrtc', 'twilio_voice', 'twilio_messaging', 'whatsapp', 'telegram', 'sendgrid', 'ses', 'smtp_imap', 'testing'];
+
+/** Zod schema for API key channel type. */
+export const apiKeyChannelSchema = z.enum(ALL_API_KEY_CHANNELS);
 
 /**
  * Permitted feature capabilities for an API key.

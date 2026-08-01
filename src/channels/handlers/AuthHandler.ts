@@ -93,7 +93,7 @@ export class AuthHandler implements ClientMessageHandler<AuthRequest> {
       }
     }
 
-    this.sessionManager.setSessionProjectAndSettings(context.session!.id, apiKey.projectId, sessionSettingsSchema.parse(message.sessionSettings ?? {}), keySettings);
+    this.sessionManager.setSessionProjectAndSettings(context.session!.id, apiKey.projectId, sessionSettingsSchema.parse(message.sessionSettings ?? {}), keySettings, message.simulatedChannelType ?? null);
     logger.info({ sessionId: context.session!.id, projectId: apiKey.projectId, requestId: message.requestId }, 'WebSocket authentication successful, session created');
 
     const project = await this.projectService.getProjectById(apiKey.projectId, SYSTEM_CONTEXT);

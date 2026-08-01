@@ -7,7 +7,7 @@ import { extractTextFromContent } from '../../utils/llm';
 import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
 import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
-import { Session } from '../../channels/SessionManager';
+import { Session, getEffectiveChannelType } from '../../channels/SessionManager';
 import { ConversationService } from '../ConversationService';
 import { ConversationContextBuilder, ConversationContext } from './ConversationContextBuilder';
 import { IsolatedScriptExecutor } from './IsolatedScriptExecutor';
@@ -95,7 +95,7 @@ export class ContextTransformerExecutor {
         transformerData.transformer.contextFields ?? [],
         userInput,
         originalUserInput,
-        session.clientConnection.connectionType,
+        getEffectiveChannelType(session),
       );
       return this.executeTransformer(session, transformerData, context);
     });
@@ -149,7 +149,7 @@ export class ContextTransformerExecutor {
     }
 
     // Build a raw context with the updated stage vars for condition evaluation
-    const conditionContext = this.contextBuilder.buildRawContext(conversation, stage, {}, {}, undefined, session.clientConnection.connectionType);
+    const conditionContext = this.contextBuilder.buildRawContext(conversation, stage, {}, {}, undefined, getEffectiveChannelType(session));
 
     // Find and return stage actions triggered by variable changes
     const triggeredActions = await this.findTriggeredActions(session, variableChangeEvents, stage.actions || {}, conditionContext);

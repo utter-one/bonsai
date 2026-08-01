@@ -14,6 +14,8 @@ export const whatsAppChannelProviderConfigSchema = z.strictObject({
   accessToken: z.string().describe('Permanent Meta access token used as Bearer auth for outbound Graph API calls'),
   appSecret: z.string().describe('Meta app secret used to validate incoming webhook signatures via HMAC-SHA256'),
   verifyToken: z.string().describe('Static verification token echoed back during the one-time Meta webhook challenge/verification GET request'),
+  processingDelayMinMs: z.number().int().min(0).default(0).describe('Minimum delay in milliseconds before processing an incoming message. 0 means immediate processing.'),
+  processingDelayMaxMs: z.number().int().min(0).default(0).describe('Maximum delay in milliseconds before processing an incoming message. Must be >= processingDelayMinMs.'),
 }).openapi('WhatsAppChannelConfig');
 
 export type WhatsAppChannelProviderConfig = z.infer<typeof whatsAppChannelProviderConfigSchema>;

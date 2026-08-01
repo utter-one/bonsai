@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
+import { emailRoutingEntrySchema } from '../../../channels/email/shared/EmailRoutingTypes';
 
 extendZodWithOpenApi(z);
 
@@ -39,12 +40,17 @@ const oauth2ConfigSchema = z.strictObject({
 }).openapi('SmtpImapOauth2Config');
 
 export const smtpImapChannelProviderConfigSchema = z.strictObject({
-  projectId: z.string().describe('Project ID that this email channel belongs to (required for IMAP inbound routing)'),
+  projectId: z.string().optional().describe('Default project ID for inbound email routing. Required when emailToProject is not set. When emailToProject is set, used as fallback for unmatched recipient addresses.'),
   fromAddress: z.string().email().describe('Sender email address'),
   smtp: smtpConfigSchema.describe('SMTP server configuration for sending emails'),
   imap: imapConfigSchema.describe('IMAP server configuration for receiving inbound email replies'),
   threadingStrategy: z.enum(['messageId', 'senderSubject']).default('messageId').describe('How to derive thread ID for conversation continuity'),
+  emailToProject: z.record(z.string().email(), z.union([z.string(), emailRoutingEntrySchema])).optional().describe('Maps email addresses to routing entries for multi-project routing. Each entry can specify projectId, cc, bcc, fromAddress, subject, stageId, and agentId. Plain string values (projectId only) are supported for backward compatibility. Inbound: matched against To: field. Outbound: matched against fromAddress.'),
   oauth2: oauth2ConfigSchema.optional().describe('Optional OAuth2/XOAUTH2 configuration. When present, supersedes password-based authentication for both SMTP and IMAP.'),
+  processedFolder: z.string().default('Bonsai/Processed').describe('IMAP folder name to move processed inbound messages to after the AI response is sent. The folder and its parents will be auto-created if they do not exist.'),
+  ccBccReplyAsHandOff: z.boolean().default(true).describe('When enabled, a reply from a CC/BCC recipient (not the conversation user) is treated as a human hand-off: the conversation is closed and no AI response is sent.'),
+  processingDelayMinMs: z.number().int().min(0).default(0).describe('Minimum delay in milliseconds before processing an incoming message. 0 means immediate processing.'),
+  processingDelayMaxMs: z.number().int().min(0).default(0).describe('Maximum delay in milliseconds before processing an incoming message. Must be >= processingDelayMinMs.'),
 }).openapi('SmtpImapChannelConfig');
 
 export type SmtpImapChannelProviderConfig = z.infer<typeof smtpImapChannelProviderConfigSchema>;

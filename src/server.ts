@@ -25,6 +25,7 @@ import { CopyDecoratorController } from './http/controllers/CopyDecoratorControl
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
+import { ProjectProviderUsageController } from './http/controllers/ProjectProviderUsageController';
 import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
@@ -32,11 +33,13 @@ import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryCon
 import { FunnelController } from './http/controllers/FunnelController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
+import { ExternalTriggerController } from './http/controllers/ExternalTriggerController';
 import { MigrationController } from './http/controllers/MigrationController';
 import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
 import { ConversationTimeoutService } from './services/ConversationTimeoutService';
 import { ScenarioRunExecutorService } from './services/testing/ScenarioRunExecutorService';
 import { ImapInboundService } from './services/ImapInboundService';
+import { ProcessingDeferralService } from './services/ProcessingDeferralService';
 import { OAuth2TokenRefreshService } from './services/OAuth2TokenRefreshService';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
@@ -67,6 +70,8 @@ import { BenchmarkSuiteController } from './http/controllers/BenchmarkSuiteContr
 import { BenchmarkProviderConfigController } from './http/controllers/BenchmarkProviderConfigController';
 import { BenchmarkConfigController } from './http/controllers/BenchmarkConfigController';
 import { BenchmarkRunController } from './http/controllers/BenchmarkRunController';
+import { QuickPromptController } from './http/controllers/QuickPromptController';
+import { DeferredProcessingController } from './http/controllers/DeferredProcessingController';
 import { BenchmarkExecutorService } from './services/BenchmarkExecutorService';
 import SpeexResamplerClass from './services/audio/speexResampler';
 import smartTurnDetector from './services/audio/SmartTurnDetector';
@@ -172,6 +177,10 @@ export async function createApp(): Promise<express.Application> {
   // General API rate limiter — keyed by authenticated operator ID, falls back to IP
   app.use(createApiRateLimiter());
 
+  // External trigger endpoint — uses API key auth, not operator JWT; registered after rate limiter for IP-based limiting
+  const externalTriggerController = container.resolve(ExternalTriggerController);
+  externalTriggerController.registerRoutes(app);
+
   // Register routes for all controllers
   const authController = container.resolve(AuthController);
   authController.registerRoutes(app);
@@ -236,6 +245,9 @@ export async function createApp(): Promise<express.Application> {
   const providerCatalogController = container.resolve(ProviderCatalogController);
   providerCatalogController.registerRoutes(app);
 
+  const projectProviderUsageController = container.resolve(ProjectProviderUsageController);
+  projectProviderUsageController.registerRoutes(app);
+
   const channelCatalogController = container.resolve(ChannelCatalogController);
   channelCatalogController.registerRoutes(app);
 
@@ -277,6 +289,12 @@ export async function createApp(): Promise<express.Application> {
   container.resolve(BenchmarkConfigController).registerRoutes(app);
   container.resolve(BenchmarkRunController).registerRoutes(app);
 
+  const quickPromptController = container.resolve(QuickPromptController);
+  quickPromptController.registerRoutes(app);
+
+  const deferredProcessingController = container.resolve(DeferredProcessingController);
+  deferredProcessingController.registerRoutes(app);
+
   container.resolve(WebRTCChannelHost).registerRoutes(app);
   container.resolve(TwilioMessagingChannelHost).registerRoutes(app);
   container.resolve(TwilioVoiceChannelHost).registerRoutes(app);
@@ -315,6 +333,7 @@ export async function createApp(): Promise<express.Application> {
   container.resolve(BenchmarkExecutorService).start();
   container.resolve(ImapInboundService).start();
   container.resolve(OAuth2TokenRefreshService).start();
+  container.resolve(ProcessingDeferralService).start();
 
   app.use(errorHandler);
 

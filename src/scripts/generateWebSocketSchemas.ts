@@ -68,6 +68,7 @@ import {
   userSpeakingStartedMessageSchema,
   sendAiImageOutputMessageSchema,
   sendAiAudioOutputMessageSchema,
+  attachFileOutputMessageSchema,
 } from '../channels/websocket/contracts/aiResponse';
 
 import {
@@ -142,6 +143,7 @@ function generateWebSocketSchemas(): void {
   registry.register('user-speaking-started', userSpeakingStartedMessageSchema);
   registry.register('send-ai-image-output', sendAiImageOutputMessageSchema);
   registry.register('send-ai-audio-output', sendAiAudioOutputMessageSchema);
+  registry.register('attach-file-output', attachFileOutputMessageSchema);
   registry.register('variables-updated-event', variablesUpdatedEventDataSchema);
   registry.register('user-profile-updated-event', userProfileUpdatedEventDataSchema);
   registry.register('user-input-modified-event', userInputModifiedEventDataSchema);

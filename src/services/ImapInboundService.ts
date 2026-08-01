@@ -8,6 +8,9 @@ import { SmtpImapChannelHost } from '../channels/email/smtp-imap/SmtpImapChannel
 import { smtpImapChannelProviderConfigSchema } from './providers/channel/SmtpImapChannelProvider';
 import { SecretRefUtils } from './secrets/SecretRefUtils';
 import { logger } from '../utils/logger';
+import { extractRecipientEmails, resolveEmailRouting } from '../channels/email/shared/EmailRoutingUtils';
+import type { EmailRoutingEntry } from '../channels/email/shared/EmailRoutingTypes';
+import { stripEmailQuotes } from '../channels/email/shared/EmailBodyCleaner';
 
 type MailboxState = 'disconnected' | 'connecting' | 'polling' | 'searching';
 
@@ -20,7 +23,6 @@ function extractHeaderFromSource(source: string, headerName: string): string | u
 class ImapMailboxSession {
   public state: MailboxState = 'disconnected';
   public imap: ImapConnection | null = null;
-  private processedUids = new Set<number>();
   private reconnectTimer: NodeJS.Timeout | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
   private consecutiveErrors = 0;
@@ -29,7 +31,7 @@ class ImapMailboxSession {
 
   constructor(
     public readonly providerId: string,
-    public readonly projectId: string,
+    public readonly defaultProjectId: string | undefined,
     public readonly imapHost: string,
     public readonly imapPort: number,
     public readonly imapSecure: boolean,
@@ -43,8 +45,12 @@ class ImapMailboxSession {
     public readonly smtpSecure: boolean,
     public readonly smtpAuthUser: string,
     public readonly smtpAuthPass: string,
-    public readonly keySettings: Record<string, unknown> | null,
+    public readonly emailToProject: Record<string, string | EmailRoutingEntry> | undefined,
     public readonly oauth2AccessToken: string | undefined,
+    public readonly processedFolder: string,
+    public readonly ccBccReplyAsHandOff: boolean,
+    public readonly processingDelayMinMs: number,
+    public readonly processingDelayMaxMs: number,
   ) {}
 
   public async connect(): Promise<void> {
@@ -86,6 +92,7 @@ class ImapMailboxSession {
       logger.info({ providerId: this.providerId, host: this.imapHost, authMethod: useOAuth2 ? 'XOAUTH2' : 'password' }, 'IMAP connected');
 
       await this.openInbox();
+      await this.ensureProcessedFolder();
     } catch (error) {
       this.state = 'disconnected';
       this.imap = null;
@@ -176,9 +183,9 @@ class ImapMailboxSession {
     this.state = 'searching';
 
     try {
-      logger.info({ providerId: this.providerId, processedCount: this.processedUids.size, state: this.state }, 'IMAP: starting search');
+      logger.info({ providerId: this.providerId, state: this.state }, 'IMAP: starting search');
       const results = await new Promise<any[]>((resolve, reject) => {
-        this.imap!.search(['UNSEEN'], (err, results) => {
+        this.imap!.search(['ALL'], (err, results) => {
           if (err) reject(err);
           else resolve(results);
         });
@@ -188,13 +195,13 @@ class ImapMailboxSession {
 
       if (results.length === 0) return;
 
-      for (const seqno of results) {
+      for (const result of results) {
         if (this.shouldStop) break;
-        const seq = typeof seqno === 'number' ? seqno : seqno.attr;
-        if (!seq) continue;
-        logger.info({ providerId: this.providerId, seqno: seq }, 'IMAP: iterating result');
+        const uid = typeof result === 'number' ? result : result.attr;
+        if (!uid) continue;
+        logger.info({ providerId: this.providerId, uid }, 'IMAP: iterating result');
 
-        await this.fetchAndProcessMessage(seq);
+        await this.fetchAndProcessMessage(uid);
       }
     } catch (error) {
       logger.error({ error, providerId: this.providerId }, 'Failed to search for new messages');
@@ -205,44 +212,32 @@ class ImapMailboxSession {
     }
   }
 
-  private async fetchAndProcessMessage(seqno: number): Promise<void> {
+  private async fetchAndProcessMessage(uid: number): Promise<void> {
     if (!this.imap || this.shouldStop) return;
 
     try {
-      logger.info({ providerId: this.providerId, seqno }, 'IMAP: fetching message');
-      const fetch = this.imap.fetch([seqno], { bodies: '' });
+      logger.info({ providerId: this.providerId, uid }, 'IMAP: fetching message');
+      const fetch = this.imap.fetch([uid], { bodies: '' });
 
-      const result = await new Promise<{ source: string; uid: number }>((resolve, reject) => {
+      const result = await new Promise<string>((resolve, reject) => {
         let source = '';
-        let msgUid = 0;
-        fetch.on('message', (msg, seq) => {
-          msgUid = (msg as any).attr?.uid ?? seq;
+        fetch.on('message', (msg) => {
           msg.on('body', (stream) => {
             stream.on('data', (chunk) => {
               source += chunk.toString('utf8');
             });
             stream.on('end', () => {
-              logger.info({ providerId: this.providerId, uid: msgUid, sourceLength: source.length }, 'IMAP: message body received');
+              logger.info({ providerId: this.providerId, uid, sourceLength: source.length }, 'IMAP: message body received');
             });
           });
           msg.on('end', () => {
-            resolve({ source, uid: msgUid });
+            resolve(source);
           });
         });
         fetch.on('error', reject);
       });
 
-      const { source, uid } = result;
-
-      if (this.processedUids.has(uid)) {
-        logger.info({ providerId: this.providerId, uid }, 'IMAP: already processed, skipping');
-        return;
-      }
-
-      this.processedUids.add(uid);
-      await markSeen(this.imap, uid).catch((error) => {
-        logger.warn({ error, uid, providerId: this.providerId }, 'Failed to mark message as seen');
-      });
+      const source = result;
 
       if (!source) {
         logger.info({ providerId: this.providerId, uid }, 'IMAP: empty source, skipping');
@@ -252,34 +247,51 @@ class ImapMailboxSession {
       logger.info({ providerId: this.providerId, uid, sourcePreview: source.substring(0, 200) }, 'IMAP: parsing email source');
       const parsed = await simpleParser(source);
       const senderEmail = parsed.from?.value?.[0]?.address ?? parsed.from?.text ?? 'unknown';
-      const emailBody = parsed.text?.trim() ?? parsed.textAsHtml?.trim() ?? parsed.html?.trim() ?? '';
+      const rawBody = parsed.text?.trim() ?? parsed.textAsHtml?.trim() ?? parsed.html?.trim() ?? '';
+      const emailBody = rawBody ? stripEmailQuotes(rawBody) : '';
       const subject = parsed.subject ?? '';
 
       const messageId = parsed.messageId || extractHeaderFromSource(source, 'Message-ID') || undefined;
       const inReplyTo = parsed.inReplyTo || extractHeaderFromSource(source, 'In-Reply-To') || undefined;
       const references = parsed.references || extractHeaderFromSource(source, 'References') || undefined;
 
-      logger.info({ providerId: this.providerId, uid, from: senderEmail, subject, bodyLength: emailBody.length, messageId }, 'IMAP: parsed email');
+      const recipientEmails = extractRecipientEmails(parsed.to?.value?.map((v) => v.address) ?? parsed.to?.text);
+
+      logger.info({ providerId: this.providerId, uid, from: senderEmail, to: recipientEmails, subject, bodyLength: emailBody.length, messageId }, 'IMAP: parsed email');
 
       if (!emailBody) {
         logger.info({ uid, providerId: this.providerId }, 'Empty email body, skipping');
-        this.processedUids.add(uid);
+        return;
+      }
+
+      if (!this.defaultProjectId) {
+        logger.error({ uid, providerId: this.providerId }, 'No default projectId configured for provider');
+        return;
+      }
+
+      const routing = resolveEmailRouting(this.emailToProject, recipientEmails, this.defaultProjectId, this.fromAddress);
+
+      const apiKeyRecord = await findProjectApiKey(routing.projectId);
+      if (!apiKeyRecord) {
+        logger.warn({ uid, providerId: this.providerId, projectId: routing.projectId }, 'No API key found for routed project, skipping email');
         return;
       }
 
       logger.info({
         uid,
         from: senderEmail,
-        subject,
+        to: recipientEmails,
+        targetEmail: routing.targetEmail,
+        projectId: routing.projectId,
         providerId: this.providerId,
-        projectId: this.projectId,
       }, 'Processing inbound email');
 
       const channelHost = container.resolve(SmtpImapChannelHost);
       await channelHost.handleInboundEmail(
-        this.projectId,
-        this.keySettings,
+        routing.projectId,
+        apiKeyRecord.keySettings,
         this.fromAddress,
+        routing.targetEmail,
         this.threadingStrategy,
         this.providerId,
         this.smtpHost,
@@ -293,17 +305,25 @@ class ImapMailboxSession {
         messageId,
         inReplyTo,
         references,
-        undefined,
-        undefined,
+        routing.stageId,
+        routing.agentId,
+        routing.cc,
+        routing.bcc,
+        routing.fromAddress,
+        () => this.moveMessage(uid, this.processedFolder),
+        this.ccBccReplyAsHandOff,
+        this.processingDelayMinMs,
+        this.processingDelayMaxMs,
       );
 
-      this.processedUids.add(uid);
-      await markSeen(this.imap, uid).catch((error) => {
-        logger.warn({ error, uid, providerId: this.providerId }, 'Failed to mark message as seen');
-      });
+      // Move the email to the processed folder immediately after handling.
+      // This prevents duplicate processing on the next IMAP poll cycle when
+      // processing deferral is active (the email would otherwise stay in the
+      // inbox until the AI response is sent, getting re-queued every 30s).
+      this.moveMessage(uid, this.processedFolder);
 
     } catch (error) {
-      logger.error({ error, seqno, providerId: this.providerId }, 'Failed to process email');
+      logger.error({ error, uid, providerId: this.providerId }, 'Failed to process email');
     }
   }
 
@@ -336,6 +356,65 @@ class ImapMailboxSession {
     }
   }
 
+  private async ensureProcessedFolder(): Promise<void> {
+    if (!this.imap || !this.processedFolder) return;
+
+    const folders = await new Promise<string[]>((resolve, reject) => {
+      this.imap!.getBoxes((err: Error | null, boxes: ImapConnection.MailBoxes) => {
+        if (err) reject(err);
+        else resolve(Object.keys(boxes));
+      });
+    }).catch((error) => {
+      logger.warn({ error, providerId: this.providerId }, 'Failed to list IMAP folders');
+      return [];
+    });
+
+    if (!folders.length) return;
+
+    const exists = folders.some((f) => f.toLowerCase() === this.processedFolder!.toLowerCase());
+    if (exists) return;
+
+    const separator = '/' as const;
+    const parts = this.processedFolder.split(separator).filter(Boolean);
+
+    let current = '';
+    for (const part of parts) {
+      current = current ? `${current}${separator}${part}` : part;
+      const alreadyExists = folders.some((f) => f.toLowerCase() === current.toLowerCase());
+      if (alreadyExists) continue;
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          this.imap!.addBox(current, (err: Error | null) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        logger.info({ folder: current, providerId: this.providerId }, 'Created IMAP folder');
+      } catch {
+        return;
+      }
+    }
+  }
+
+  public moveMessage(uid: number, folder: string): void {
+    if (!this.imap) {
+      logger.warn({ uid, folder, providerId: this.providerId }, 'Cannot move message: no IMAP connection');
+      return;
+    }
+    try {
+      (this.imap as any).move([uid], folder, (err: Error | null) => {
+        if (err) {
+          logger.error({ error: err, uid, folder, providerId: this.providerId }, 'Failed to move message to processed folder');
+          return;
+        }
+        logger.info({ uid, folder, providerId: this.providerId }, 'Message moved to processed folder');
+      });
+    } catch (error) {
+      logger.error({ error, uid, folder, providerId: this.providerId }, 'Exception during message move');
+    }
+  }
+
   public async stop(): Promise<void> {
     this.shouldStop = true;
     if (this.reconnectTimer) {
@@ -353,18 +432,22 @@ class ImapMailboxSession {
   }
 }
 
-async function markSeen(imap: ImapConnection, uid: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    imap.addFlags([uid], ['\\Seen'], (err: Error | null) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-}
-
 async function resolveOAuth2RefreshService(): Promise<{ refreshProvider: (id: string) => Promise<void> }> {
   const mod = await import('./OAuth2TokenRefreshService');
   return container.resolve(mod.OAuth2TokenRefreshService);
+}
+
+async function findProjectApiKey(projectId: string): Promise<{ key: string; keySettings: Record<string, unknown> | null } | null> {
+  const keys = await db.select().from(apiKeys).where(eq(apiKeys.projectId, projectId));
+
+  const activeKey = keys.find((k) => k.isActive);
+  if (activeKey) {
+    return {
+      key: activeKey.key,
+      keySettings: activeKey.keySettings ?? null,
+    };
+  }
+  return null;
 }
 
 @singleton()
@@ -441,9 +524,8 @@ export class ImapInboundService {
       return;
     }
 
-    const apiKeyRecord = await this.findProjectApiKey(config.projectId);
-    if (!apiKeyRecord) {
-      logger.warn({ providerId, projectId: config.projectId }, 'No API key found for project, skipping IMAP reload');
+    if (!config.projectId && !config.emailToProject) {
+      logger.warn({ providerId }, 'SMTP/IMAP provider has neither projectId nor emailToProject, skipping reload');
       return;
     }
 
@@ -463,8 +545,12 @@ export class ImapInboundService {
       config.smtp.secure,
       config.smtp.auth.user,
       config.smtp.auth.pass,
-      apiKeyRecord.keySettings ?? null,
+      config.emailToProject,
       config.oauth2?.accessToken,
+      config.processedFolder,
+      config.ccBccReplyAsHandOff,
+      config.processingDelayMinMs,
+      config.processingDelayMaxMs,
     );
 
     this.sessions.set(provider.id, session);
@@ -504,9 +590,8 @@ export class ImapInboundService {
           continue;
         }
 
-        const apiKeyRecord = await this.findProjectApiKey(config.projectId);
-        if (!apiKeyRecord) {
-          logger.warn({ providerId: provider.id, projectId: config.projectId }, 'No API key found for project, skipping IMAP inbound');
+        if (!config.projectId && !config.emailToProject) {
+          logger.warn({ providerId: provider.id }, 'SMTP/IMAP provider has neither projectId nor emailToProject, skipping');
           continue;
         }
 
@@ -526,8 +611,12 @@ export class ImapInboundService {
           config.smtp.secure,
           config.smtp.auth.user,
           config.smtp.auth.pass,
-          apiKeyRecord.keySettings ?? null,
+          config.emailToProject,
           config.oauth2?.accessToken,
+          config.processedFolder,
+          config.ccBccReplyAsHandOff,
+          config.processingDelayMinMs,
+          config.processingDelayMaxMs,
         );
 
         this.sessions.set(provider.id, session);
@@ -541,18 +630,5 @@ export class ImapInboundService {
     } catch (error) {
       logger.error({ error }, 'Error during IMAP provider discovery');
     }
-  }
-
-  private async findProjectApiKey(projectId: string): Promise<{ key: string; keySettings: Record<string, unknown> | null } | null> {
-    const keys = await db.select().from(apiKeys).where(eq(apiKeys.projectId, projectId));
-
-    const activeKey = keys.find((k) => k.isActive);
-    if (activeKey) {
-      return {
-        key: activeKey.key,
-        keySettings: activeKey.keySettings ?? null,
-      };
-    }
-    return null;
   }
 }

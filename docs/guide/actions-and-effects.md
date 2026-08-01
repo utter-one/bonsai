@@ -176,7 +176,7 @@ Same operations as `modify_variables`, but applied to the user's profile instead
 
 ### `call_tool`
 
-Invokes a tool. The tool's `type` determines both its execution behaviour and when it runs relative to other effects (see [Effect Execution Priority](#effect-execution-priority)). See [Tools](./tools).
+Invokes a tool. The tool's `type` determines its default execution priority relative to other effects (see [Effect Execution Priority](#effect-execution-priority)). An optional `priority` field can override the default (see [Per-Effect Priority Override](#per-effect-priority-override)). See [Tools](./tools).
 
 ```json
 {
@@ -243,25 +243,109 @@ Sets the visibility of the current turn's messages (both the user input and the 
 
 The visibility is recorded on the message event and evaluated when building history on subsequent turns. See [Message Visibility](#message-visibility) for how each value is interpreted.
 
+### `save_artifact`
+
+Saves data from the conversation context to project storage and stores the resulting `artifactId` in a stage variable. The data can be an inline value (string, base64-encoded data, or any JSON-serializable object) or a reference to a variable via Handlebars template syntax.
+
+Typically used in combination with `attach_file` to deliver files to the client.
+
+```json
+{
+  "type": "save_artifact",
+  "data": "{{vars.generatedPdf}}",
+  "dataEncoding": "base64",
+  "fileName": "invoice.pdf",
+  "mimeType": "application/pdf",
+  "variableName": "invoiceArtifactId"
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `data` | Yes | Data to save: inline value (string, base64, object) or a variable reference (e.g. a Handlebars template resolving a stage variable) |
+| `dataEncoding` | No | Encoding of the data: `"raw"` (store as-is, default) or `"base64"` (decode base64 before storing) |
+| `fileName` | Yes | Display name for the stored file; supports Handlebars templating |
+| `mimeType` | No | MIME type for the stored file. Defaults to `"application/octet-stream"` when omitted |
+| `variableName` | Yes | Variable name to store the `artifactId` in (e.g. `"myArtifactId"`) |
+
+The `artifactId` is stored in the specified variable for downstream effects. Requires a storage provider configured on the project. Runs at **priority 8000** by default, after all tool invocations (including scripts), so tool-generated data is available to save. This can be overridden with the `priority` field.
+
+### `attach_file`
+
+Stages a file for delivery alongside the AI response. Must be paired with `generate_response` in the same action — a standalone `attach_file` with no response generation is silently skipped.
+
+The `artifactId` reference typically comes from a preceding `save_artifact` effect or a tool result.
+
+```json
+{
+  "type": "attach_file",
+  "artifactId": "{{vars.invoiceArtifactId}}",
+  "fileName": "invoice.pdf",
+  "mimeType": "application/pdf"
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `artifactId` | Yes | Artifact ID of the file in storage to attach. Supports Handlebars templating to resolve from a stage variable |
+| `fileName` | No | Display name for the attachment. Defaults to the artifact's stored name when omitted |
+| `mimeType` | No | MIME type override. When omitted, uses the artifact's stored MIME type |
+
+File attachments are delivered to the client as `attach_file_output` messages after text/voice output but before `end_ai_generation_output`. Supported channels: WebSocket, WebRTC, SMTP-IMAP, SendGrid, SES. Runs at **priority 9500** by default, after `save_artifact` (8000), so the artifact ID is guaranteed to be available. This can be overridden with the `priority` field.
+
+`attach_file` is restricted in `__on_leave`, `__conversation_end`, `__conversation_abort`, and `__conversation_failed` lifecycle hooks.
+
 ## Effect Execution Priority
 
 Effects from **all** triggered actions are gathered into a single global list, sorted by priority, and then conflict-resolved before execution. Effects within the same priority tier run in the order they appeared across all actions.
 
-| Priority | Effect type |
+| Default Priority | Effect type |
 |---|---|
-| 1 | `call_tool` _(webhook tools)_ |
-| 2 | `call_tool` _(smart\_function tools)_ |
-| 3 | `modify_variables` |
-| 4 | `modify_user_profile` |
-| 5 | `modify_user_input` |
-| 6 | `call_tool` _(script tools)_ |
-| 50 | `change_visibility` |
-| 100 | `generate_response` |
-| 200 | `end_conversation` |
-| 201 | `abort_conversation` |
-| 202 | `go_to_stage` |
+| 1000 | `call_tool` _(webhook tools)_ |
+| 2000 | `call_tool` _(smart\_function tools)_ |
+| 3000 | `modify_variables` |
+| 4000 | `modify_user_profile` |
+| 5000 | `modify_user_input` |
+| 6000 | `call_tool` _(script tools)_ |
+| 7000 | `ban_user` |
+| 8000 | `save_artifact` |
+| 9000 | `change_visibility` |
+| 9500 | `attach_file` |
+| 10000 | `generate_response` |
+| 11000 | `end_conversation` |
+| 12000 | `abort_conversation` |
+| 13000 | `go_to_stage` |
 
-`call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1, `script` tools at priority 6, and `smart_function` tools at priority 2.
+`call_tool` effects are assigned a priority at runtime based on the referenced tool's `type`: `webhook` tools run at priority 1000, `smart_function` tools at priority 2000, and `script` tools at priority 6000. `save_artifact` (8000) and `attach_file` (9500) run after all tool types so that tool-generated data is available to save and attach.
+
+### Per-Effect Priority Override
+
+Any effect can carry an optional `priority` field that overrides its default. This lets you reorder effects fine-grained without changing the global defaults. The `priority` is a number — lower values execute first. Defaults are spaced by ~1000 so overrides can slot between built-in tiers.
+
+Example — run a specific tool *after* variables are set (default would be before):
+
+```json
+{
+  "type": "call_tool",
+  "toolId": "my-tool",
+  "parameters": { "status": "{{vars.status}}" },
+  "priority": 3500
+}
+```
+
+This places the tool call between `modify_variables` (3000) and `modify_user_profile` (4000), ensuring the variable `status` is already set when the tool runs.
+
+Example — end the conversation immediately, before generating a response:
+
+```json
+{
+  "type": "end_conversation",
+  "reason": "User opted out",
+  "priority": 500
+}
+```
+
+The `execution_plan` conversation event (emitted before any effects run) includes the full effect objects with their resolved priorities, so the actual execution order is always observable.
 
 ### Conflict Resolution
 

@@ -125,7 +125,9 @@ export class ApiKeyService extends BaseService {
 
       return apiKeyResponseSchema.parse({ ...apiKey, keyPreview: this.getKeyPreview(apiKey.key), lastUsedAt: new Date().toISOString(), createdAt: apiKey.createdAt.toISOString(), updatedAt: apiKey.updatedAt.toISOString(), keySettings: apiKey.keySettings ?? null });
     } catch (error) {
-      logger.error({ error: error instanceof Error ? error.message : String(error) }, 'Failed to fetch API key by key');
+      if (!(error instanceof NotFoundError)) {
+        logger.error({ error: error instanceof Error ? error.message : String(error) }, 'Failed to fetch API key by key');
+      }
       throw error;
     }
   }

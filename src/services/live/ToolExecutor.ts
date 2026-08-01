@@ -3,7 +3,7 @@ import { z } from "zod";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { Tool } from "../../types/models";
 import { db } from "../../db";
-import { NotFoundError, InvalidOperationError, RemoteConnectionError } from "../../errors";
+import { NotFoundError, InvalidOperationError } from "../../errors";
 import { llmContentSchema, LlmGenerationOptions, LlmMessage, MessageContent } from "../providers/llm/ILlmProvider";
 import { buildLlmUsage, llmUsageMetadataSchema } from '../../utils/llmUsage';
 import { TemplatingEngine } from "./TemplatingEngine";
@@ -59,13 +59,16 @@ export class ToolExecutor {
    * @returns A promise that resolves to the result of the tool execution.
    */
   async executeTool(tool: Tool, context: ConversationContext, parameters: Record<string, ParameterValue>, costManagementConfig?: CostManagementConfig | null): Promise<ToolExecutionResult> {
+    let result: ToolExecutionResult;
     if (tool.type === 'webhook') {
-      return this.executeWebhookTool(tool, context, parameters);
+      result = await this.executeWebhookTool(tool, context, parameters);
+    } else if (tool.type === 'script') {
+      result = await this.executeScriptTool(tool, context, parameters);
+    } else {
+      result = await this.executeSmartFunctionTool(tool, context, parameters, costManagementConfig);
     }
-    if (tool.type === 'script') {
-      return this.executeScriptTool(tool, context, parameters);
-    }
-    return this.executeSmartFunctionTool(tool, context, parameters, costManagementConfig);
+
+    return result;
   }
 
   /**

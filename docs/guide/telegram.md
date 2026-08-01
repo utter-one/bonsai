@@ -16,9 +16,17 @@ Create a provider of type `channel` with API type `telegram`. Configuration:
 
 ```json
 {
-  "botToken": "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+  "botToken": "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+  "processingDelayMinMs": 5000,
+  "processingDelayMaxMs": 30000
 }
 ```
+
+| Field | Description |
+|---|---|
+| `botToken` | Telegram bot token from @BotFather |
+| `processingDelayMinMs` | Minimum delay in milliseconds before processing an incoming message (default: 0, disabled) |
+| `processingDelayMaxMs` | Maximum delay in milliseconds before processing an incoming message (default: 0, disabled) |
 
 ### 3. Deploy the Webhook
 
@@ -76,6 +84,14 @@ The webhook accepts both `GET` and `POST`:
 | `channelProviderId` | Yes | ID of the Telegram channel provider |
 | `stageId` | No | Starting stage ID |
 | `agentId` | No | Agent override |
+
+## Processing Delay
+
+By default, incoming messages are processed immediately. To introduce a natural response delay, set `processingDelayMinMs` and `processingDelayMaxMs` on the provider config. The actual delay is picked uniformly at random from `[min, max]` per message.
+
+Recommended for Telegram: `5000`–`30000` (5 to 30 seconds).
+
+See [Deferred Processing](./deferred-processing) for details.
 
 ## Environment Variables
 

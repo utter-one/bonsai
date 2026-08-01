@@ -42,7 +42,7 @@ export class GlobalActionService extends BaseService {
     logger.info({ globalActionId, projectId, name: input.name, operatorId: context?.operatorId }, 'Creating global action');
 
     try {
-      const globalAction = await db.insert(globalActions).values({ id: globalActionId, projectId, name: input.name, condition: input.condition ?? null, triggerOnUserInput: input.triggerOnUserInput ?? true, triggerOnClientCommand: input.triggerOnClientCommand ?? false, classificationTrigger: input.classificationTrigger ?? null, overrideClassifierId: input.overrideClassifierId ?? null, parameters: input.parameters ?? [], effects: input.effects ?? [], examples: input.examples ?? null, tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
+      const globalAction = await db.insert(globalActions).values({ id: globalActionId, projectId, name: input.name, condition: input.condition ?? null, triggerOnUserInput: input.triggerOnUserInput ?? true, triggerOnClientCommand: input.triggerOnClientCommand ?? false, triggerOnExternal: input.triggerOnExternal ?? false, classificationTrigger: input.classificationTrigger ?? null, overrideClassifierId: input.overrideClassifierId ?? null, parameters: input.parameters ?? [], effects: input.effects ?? [], examples: input.examples ?? null, tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
       const createdGlobalAction = globalAction[0];
 
@@ -183,6 +183,7 @@ export class GlobalActionService extends BaseService {
       if (updateData.condition !== undefined) updatePayload.condition = updateData.condition;
       if (updateData.triggerOnUserInput !== undefined) updatePayload.triggerOnUserInput = updateData.triggerOnUserInput;
       if (updateData.triggerOnClientCommand !== undefined) updatePayload.triggerOnClientCommand = updateData.triggerOnClientCommand;
+      if (updateData.triggerOnExternal !== undefined) updatePayload.triggerOnExternal = updateData.triggerOnExternal;
       if (updateData.classificationTrigger !== undefined) updatePayload.classificationTrigger = updateData.classificationTrigger;
       if (updateData.overrideClassifierId !== undefined) updatePayload.overrideClassifierId = updateData.overrideClassifierId;
       if (updateData.parameters !== undefined) updatePayload.parameters = updateData.parameters;
@@ -269,7 +270,7 @@ export class GlobalActionService extends BaseService {
         throw new NotFoundError(`Global action with id ${id} not found`);
       }
 
-      return await this.createGlobalAction(projectId, { id: input.id, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, parameters: existingAction.parameters, effects: existingAction.effects, examples: existingAction.examples ?? undefined, tags: existingAction.tags, metadata: existingAction.metadata ?? undefined }, context);
+      return await this.createGlobalAction(projectId, { id: input.id, name: input.name ?? `${existingAction.name} (Clone)`, condition: existingAction.condition, triggerOnUserInput: existingAction.triggerOnUserInput, triggerOnClientCommand: existingAction.triggerOnClientCommand, triggerOnExternal: existingAction.triggerOnExternal, classificationTrigger: existingAction.classificationTrigger, overrideClassifierId: existingAction.overrideClassifierId, parameters: existingAction.parameters, effects: existingAction.effects, examples: existingAction.examples ?? undefined, tags: existingAction.tags, metadata: existingAction.metadata ?? undefined }, context);
     } catch (error) {
       logger.error({ error, id }, 'Failed to clone global action');
       throw error;

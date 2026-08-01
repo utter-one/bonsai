@@ -175,7 +175,7 @@ export const toolResponseSchema = z.object({
   webhookHeaders: z.record(z.string(), z.string()).nullable().describe('HTTP headers (webhook only)'),
   webhookBody: z.string().nullable().describe('Request body template (webhook only)'),
   // script fields
-  code: z.string().nullable().describe('JavaScript code (script only)'),
+  code: z.string().nullable().describe('JavaScript code (script)'),
   // shared fields
   parameters: z.array(toolParameterSchema).describe('Parameters that this tool expects to receive'),
   tags: z.array(z.string()).describe('Tags for categorizing and filtering this tool'),

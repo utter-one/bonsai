@@ -176,6 +176,23 @@ export class WebSocketConnection implements IClientConnection {
         break;
       }
 
+      case 'attach_file_output': {
+        this.send({
+          type: 'attach_file_output',
+          sessionId,
+          conversationId,
+          requestId: msg.correlationId,
+          outputTurnId: msg.outputTurnId,
+          artifactId: msg.artifactId,
+          fileName: msg.fileName,
+          mimeType: msg.mimeType,
+          fileSize: msg.fileSize,
+          downloadUrl: msg.downloadUrl,
+          sequenceNumber: msg.sequenceNumber,
+        });
+        break;
+      }
+
       case 'conversation_event': {
         if (!sessionSettings.receiveEvents) return;
         this.send({

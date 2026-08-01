@@ -24,7 +24,11 @@ import { sendGridSendBodySchema, sendGridSendResponseSchema } from '../../../htt
 import type { SendGridSendResponse } from '../../../http/contracts/sendgrid-outgoing';
 import { NotFoundError } from '../../../errors';
 import { SYSTEM_CONTEXT } from '../../../services/RequestContext';
-import { extractConversationIdFromMessageId } from '../shared/MessageIdUtils';
+import { DeferredProcessingService } from '../../../services/DeferredProcessingService';
+import { randomBetween } from '../../../utils/randomBetween';
+import { extractConversationIdFromMessageId, extractConversationIdFromReferences } from '../shared/MessageIdUtils';
+import { resolveEmailRouting, extractRecipientEmails } from '../shared/EmailRoutingUtils';
+import { stripEmailQuotes } from '../shared/EmailBodyCleaner';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
@@ -57,6 +61,7 @@ export class SendGridChannelHost {
     @inject(ProjectService) private readonly projectService: ProjectService,
     @inject(UserService) private readonly userService: UserService,
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
   ) {}
 
   static getOpenAPIPaths(): RouteConfig[] {
@@ -131,11 +136,12 @@ export class SendGridChannelHost {
       logger.error({ channelProviderId, issues: configResult.error.issues }, 'SendGrid webhook: channel provider config is invalid');
       return;
     }
-    const { apiKey, fromAddress, threadingStrategy } = configResult.data;
+    const { apiKey, fromAddress, threadingStrategy, ccBccReplyAsHandOff, processingDelayMinMs, processingDelayMaxMs } = configResult.data;
 
     const payload = req.body as SendGridInboundPayload;
     const senderEmail = payload.from;
-    const messageText = payload.text?.trim();
+    const rawBody = payload.text?.trim();
+    const messageText = rawBody ? stripEmailQuotes(rawBody) : '';
     const headers = this.parseHeaders(payload.headers);
 
     if (!senderEmail || !messageText) {
@@ -143,24 +149,65 @@ export class SendGridChannelHost {
       return;
     }
 
-    const replyConversationId = extractConversationIdFromMessageId(headers['in-reply-to']);
+    const replyConversationId = extractConversationIdFromMessageId(headers['in-reply-to']) ?? extractConversationIdFromReferences(headers['references']);
 
     if (replyConversationId) {
       const existingSessionId = this.findSessionByConversationId(projectId, replyConversationId);
       if (existingSessionId) {
+        const existingSession = this.sessionManager.getSession(existingSessionId);
+        const conversationUserEmail = existingSession?.clientConnection instanceof SendGridConnection
+          ? existingSession.clientConnection.getUserEmail()
+          : undefined;
+
+        if (ccBccReplyAsHandOff && conversationUserEmail && senderEmail.toLowerCase() !== conversationUserEmail.toLowerCase()) {
+          logger.info({
+            projectId,
+            conversationId: replyConversationId,
+            from: senderEmail,
+            conversationUserEmail,
+          }, 'SendGrid: reply from non-conversation user (CC/BCC hand-off), closing conversation');
+          await this.conversationService.finishConversation(projectId, replyConversationId, 'Hand-off: reply from CC/BCC recipient');
+          const emailKey = `${projectId}:${replyConversationId}`;
+          this.emailSessionMap.delete(emailKey);
+          await this.sessionManager.unregisterSession(existingSessionId);
+          return;
+        }
+
         const emailKey = `${projectId}:${replyConversationId}`;
         this.scheduleTimeout(existingSessionId, emailKey);
-        await this.dispatchTextInput(existingSessionId, messageText);
+        await this.dispatchTextInput(existingSessionId, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
         return;
+      }
+
+      // Session not found (may have timed out) — check if this is a hand-off reply
+      if (ccBccReplyAsHandOff) {
+        try {
+        if (senderEmail) {
+          const conversation = await this.conversationService.getConversationById(projectId, replyConversationId);
+          if (conversation.userId.toLowerCase() !== senderEmail.toLowerCase()) {
+            logger.info({
+              projectId,
+              conversationId: replyConversationId,
+              from: senderEmail,
+              conversationUserId: conversation.userId,
+            }, 'SendGrid: reply from non-conversation user (CC/BCC hand-off), session timed out, closing conversation');
+            await this.conversationService.finishConversation(projectId, replyConversationId, 'Hand-off: reply from CC/BCC recipient');
+            return;
+          }
+        }
+      } catch (error) {
+        logger.warn({ error, projectId, conversationId: replyConversationId }, 'SendGrid: conversation not found for hand-off check, falling through to new conversation');
+      }
       }
     }
 
-    const connection = new SendGridConnection(senderEmail, fromAddress, threadingStrategy ?? 'messageId', this.sessionManager, payload.subject ?? 'Re: Conversation', apiKey);
+    const connection = new SendGridConnection(senderEmail, fromAddress, threadingStrategy ?? 'messageId', this.sessionManager, payload.subject ?? 'Re: Conversation', apiKey, undefined, undefined);
+    connection.setUserEmail(senderEmail);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
     const sessionId = this.sessionManager.registerSession(connection);
     const session = this.sessionManager.getSession(sessionId);
     connection.attachSession(session);
-    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null, null);
     const emailKey = `${projectId}:${sessionId}`;
     this.emailSessionMap.set(emailKey, sessionId);
     this.scheduleTimeout(sessionId, emailKey);
@@ -170,7 +217,7 @@ export class SendGridChannelHost {
     const startMsg: CALInputMessage = { type: 'start_conversation', userId: senderEmail, stageId, agentId, correlationId: undefined };
     await this.dispatcher.dispatch(startMsg, this.buildContext(sessionId));
 
-    await this.dispatchTextInput(sessionId, messageText);
+    await this.dispatchTextInput(sessionId, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
   }
 
   private async handleOutgoingMessage(req: Request, res: Response): Promise<void> {
@@ -213,9 +260,13 @@ export class SendGridChannelHost {
       res.status(500).json({ error: 'Channel provider config is invalid' });
       return;
     }
-    const { apiKey, fromAddress } = configResult.data;
+    const { apiKey, fromAddress, emailToProject } = configResult.data;
 
-    let resolvedStageId = body.stageId ?? queryStageId;
+    const fromAddressLookup = body.fromAddress ?? fromAddress;
+    const routing = emailToProject ? resolveEmailRouting(emailToProject, extractRecipientEmails(fromAddressLookup), projectId, fromAddress) : null;
+    const resolvedFromAddress = body.fromAddress ?? routing?.fromAddress ?? fromAddress;
+
+    let resolvedStageId = body.stageId ?? queryStageId ?? routing?.stageId;
     if (!resolvedStageId) {
       const project = await this.projectService.getProjectById(projectId, SYSTEM_CONTEXT);
       resolvedStageId = project.startingStageId ?? undefined;
@@ -224,7 +275,10 @@ export class SendGridChannelHost {
         return;
       }
     }
-    const resolvedAgentId = body.agentId ?? queryAgentId;
+    const resolvedAgentId = body.agentId ?? queryAgentId ?? routing?.agentId;
+    const resolvedCc = body.cc ?? routing?.cc;
+    const resolvedBcc = body.bcc ?? routing?.bcc;
+    const resolvedSubject = body.subject ?? routing?.subject ?? 'New Conversation';
 
     try {
       await this.userService.getUserById(projectId, body.to);
@@ -245,20 +299,22 @@ export class SendGridChannelHost {
       await this.userService.updateUserProfile(projectId, body.to, body.userProfile);
     }
 
-    const subject = body.subject ?? 'New Conversation';
     const connection = new SendGridConnection(
       body.to,
-      body.fromAddress ?? fromAddress,
+      resolvedFromAddress,
       'messageId',
       this.sessionManager,
-      subject,
+      resolvedSubject,
       apiKey,
+      resolvedCc,
+      resolvedBcc,
     );
+    connection.setUserEmail(body.to);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
     const sessionId = this.sessionManager.registerSession(connection);
     const session = this.sessionManager.getSession(sessionId);
     connection.attachSession(session);
-    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null, null);
 
     const conversation = await this.conversationService.createConversation({
       projectId,
@@ -286,7 +342,7 @@ export class SendGridChannelHost {
     res.status(201).json(response);
   }
 
-  private async dispatchTextInput(sessionId: string, text: string): Promise<void> {
+  private async dispatchTextInput(sessionId: string, text: string, providerId: string, processingDelayMinMs: number, processingDelayMaxMs: number): Promise<void> {
     const session = this.sessionManager.getSession(sessionId);
     if (!session?.conversationId) {
       logger.warn({ sessionId }, 'SendGrid: cannot dispatch message — no active conversation');
@@ -299,6 +355,32 @@ export class SendGridChannelHost {
     }
 
     const msg: CALInputMessage = { type: 'send_user_text_input', conversationId: session.conversationId, text, correlationId: undefined };
+
+    // Check deferral config
+    if (processingDelayMinMs > 0 && processingDelayMaxMs > 0) {
+      const delayMs = randomBetween(processingDelayMinMs, processingDelayMaxMs);
+      const processAt = new Date(Date.now() + delayMs);
+
+      await this.deferredProcessingService.queue({
+        sessionId,
+        providerId,
+        projectId: session.projectId ?? '',
+        conversationId: session.conversationId,
+        channelType: 'sendgrid',
+        processAt,
+        message: msg,
+      });
+
+      logger.info({
+        sessionId,
+        projectId: session.projectId,
+        conversationId: session.conversationId,
+        delayMs,
+        processAt,
+      }, 'SendGrid: incoming message queued for deferred processing');
+      return;
+    }
+
     await this.dispatcher.dispatch(msg, this.buildContext(sessionId));
   }
 
@@ -337,6 +419,10 @@ export class SendGridChannelHost {
 
     const handle = setTimeout(async () => {
       logger.info({ sessionId }, 'SendGrid: session timed out due to inactivity');
+
+      // Cancel any pending deferred messages for this session
+      await this.deferredProcessingService.cancelBySessionId(sessionId);
+
       this.emailSessionMap.delete(emailKey);
       this.sessionTimeoutMap.delete(sessionId);
       await this.sessionManager.unregisterSession(sessionId);

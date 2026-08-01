@@ -67,7 +67,7 @@ export const apiKeyResponseSchema = z.object({
   keyPreview: z.string().optional().describe('First few characters of the key for identification'),
   lastUsedAt: z.string().nullable().describe('ISO timestamp of when the key was last used'),
   isActive: z.boolean().describe('Whether the API key is active'),
-  metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata'),
+  metadata: z.record(z.string(), z.any()).nullable().optional().describe('Additional metadata'),
   keySettings: apiKeySettingsSchema.nullable().optional().describe('Security settings controlling which channels and features this key permits'),
   version: z.number().describe('Version number for optimistic locking'),
   createdAt: z.string().describe('ISO timestamp of creation'),

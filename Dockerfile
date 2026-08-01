@@ -1,5 +1,5 @@
-# Use Node.js LTS version with security updates
-FROM node:20-slim
+# Use Node.js with security updates
+FROM node:24-slim
 
 # Install curl for health checks and build tools for native addons (e.g. @discordjs/opus)
 RUN apt-get update && apt-get install -y --no-install-recommends \

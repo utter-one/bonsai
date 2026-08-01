@@ -63,6 +63,8 @@ Save the `id` from the response — you will need it in the webhook URL.
 | `accessToken` | Permanent Meta access token (or system user token) used as Bearer auth for Graph API calls |
 | `appSecret` | Meta app secret used to validate incoming webhook signatures via HMAC-SHA256 (found in the App Dashboard under App Settings > Basic) |
 | `verifyToken` | A static string of your choice — echoed back during the one-time Meta webhook challenge/verification |
+| `processingDelayMinMs` | Minimum delay in milliseconds before processing an incoming message (default: 0, disabled) |
+| `processingDelayMaxMs` | Maximum delay in milliseconds before processing an incoming message (default: 0, disabled) |
 
 ::: warning Access Token Security
 The `accessToken` and `appSecret` are stored in the provider `config` field and are readable by operators with `provider:read` permission. Use a dedicated system user token with minimal scopes in production and rotate it if compromised.
@@ -150,6 +152,16 @@ The WhatsApp channel supports a lightweight slash-command interface for control 
 ::: tip
 Unknown slash commands (e.g. `/help`) are not intercepted — they are passed through to the AI as normal text input, so you can handle them in your stage prompt.
 :::
+
+---
+
+## Processing Delay
+
+By default, incoming messages are processed immediately. To introduce a natural response delay, set `processingDelayMinMs` and `processingDelayMaxMs` on the provider config. The actual delay is picked uniformly at random from `[min, max]` per message.
+
+Recommended for WhatsApp: `10000`–`45000` (10 to 45 seconds).
+
+See [Deferred Processing](./deferred-processing) for details.
 
 ---
 

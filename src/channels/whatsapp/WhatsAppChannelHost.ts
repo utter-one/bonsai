@@ -23,6 +23,8 @@ import { ProjectService } from '../../services/ProjectService';
 import { UserService } from '../../services/UserService';
 import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
 import { NotFoundError } from '../../errors';
+import { DeferredProcessingService } from '../../services/DeferredProcessingService';
+import { randomBetween } from '../../utils/randomBetween';
 import { whatsAppSendBodySchema, whatsAppSendResponseSchema } from '../../http/contracts/whatsapp-outgoing';
 import type { WhatsAppSendResponse } from '../../http/contracts/whatsapp-outgoing';
 
@@ -102,6 +104,7 @@ export class WhatsAppChannelHost {
     @inject(ProjectService) private readonly projectService: ProjectService,
     @inject(UserService) private readonly userService: UserService,
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
   ) {}
 
   /**
@@ -248,7 +251,7 @@ export class WhatsAppChannelHost {
       logger.error({ channelProviderId, issues: configResult.error.issues }, 'WhatsApp webhook: channel provider config is invalid');
       return;
     }
-    const { phoneNumberId, accessToken, appSecret } = configResult.data;
+    const { phoneNumberId, accessToken, appSecret, processingDelayMinMs, processingDelayMaxMs } = configResult.data;
 
     // Validate X-Hub-Signature-256
     const rawBody: Buffer | undefined = (req as any).rawBody;
@@ -302,14 +305,14 @@ export class WhatsAppChannelHost {
 
     if (existingSessionId) {
       this.scheduleTimeout(existingSessionId, phoneKey);
-      await this.dispatchCommand(existingSessionId, cmd, messageText);
+      await this.dispatchCommand(existingSessionId, cmd, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
     } else {
       const connection = new WhatsAppConnection(senderNumber, phoneNumberId, accessToken, this.sessionManager);
       const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
       const sessionId = this.sessionManager.registerSession(connection);
       const session = this.sessionManager.getSession(sessionId);
       connection.attachSession(session);
-      this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+      this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null, null);
       this.phoneSessionMap.set(phoneKey, sessionId);
       this.scheduleTimeout(sessionId, phoneKey);
 
@@ -320,7 +323,7 @@ export class WhatsAppChannelHost {
 
       // After reset we only start the conversation; don't re-send the /reset text as input
       if (cmd.action !== 'reset') {
-        await this.dispatchCommand(sessionId, cmd, messageText);
+        await this.dispatchCommand(sessionId, cmd, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
       }
     }
   }
@@ -481,7 +484,7 @@ export class WhatsAppChannelHost {
    * @param cmd - The parsed command result.
    * @param rawText - Original message text (used for plain text fall-through).
    */
-  private async dispatchCommand(sessionId: string, cmd: SlashCommandResult, rawText: string): Promise<void> {
+  private async dispatchCommand(sessionId: string, cmd: SlashCommandResult, rawText: string, providerId: string, processingDelayMinMs: number, processingDelayMaxMs: number): Promise<void> {
     const session = this.sessionManager.getSession(sessionId);
     if (!session?.conversationId) {
       logger.warn({ sessionId }, 'WhatsApp: cannot dispatch message — no active conversation');
@@ -504,6 +507,32 @@ export class WhatsAppChannelHost {
       return;
     }
     const msg: CALInputMessage = { type: 'send_user_text_input', conversationId: session.conversationId, text: rawText, correlationId: undefined };
+
+    // Check deferral config
+    if (processingDelayMinMs > 0 && processingDelayMaxMs > 0) {
+      const delayMs = randomBetween(processingDelayMinMs, processingDelayMaxMs);
+      const processAt = new Date(Date.now() + delayMs);
+
+      await this.deferredProcessingService.queue({
+        sessionId,
+        providerId,
+        projectId: session.projectId ?? '',
+        conversationId: session.conversationId,
+        channelType: 'whatsapp',
+        processAt,
+        message: msg,
+      });
+
+      logger.info({
+        sessionId,
+        projectId: session.projectId,
+        conversationId: session.conversationId,
+        delayMs,
+        processAt,
+      }, 'WhatsApp: incoming message queued for deferred processing');
+      return;
+    }
+
     await this.dispatcher.dispatch(msg, this.buildContext(sessionId));
   }
 
@@ -568,6 +597,13 @@ export class WhatsAppChannelHost {
       }
     }
 
+    // Cancel any pending deferred messages for this session
+    try {
+      await this.deferredProcessingService.cancelBySessionId(sessionId);
+    } catch (error) {
+      logger.warn({ error, sessionId }, 'WhatsApp /reset: error cancelling deferred messages, continuing with session teardown');
+    }
+
     await this.sessionManager.unregisterSession(sessionId);
     logger.info({ sessionId }, 'WhatsApp: session terminated by /reset command');
   }
@@ -585,6 +621,10 @@ export class WhatsAppChannelHost {
     const handle = setTimeout(() => {
       (async () => {
         logger.info({ sessionId }, 'WhatsApp: session timed out due to inactivity');
+
+        // Cancel any pending deferred messages for this session
+        await this.deferredProcessingService.cancelBySessionId(sessionId);
+
         this.phoneSessionMap.delete(phoneKey);
         this.sessionTimeoutMap.delete(sessionId);
         await this.sessionManager.unregisterSession(sessionId);

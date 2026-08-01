@@ -11,6 +11,8 @@ extendZodWithOpenApi(z);
  */
 export const telegramChannelProviderConfigSchema = z.strictObject({
   botToken: z.string().describe('Telegram Bot Token obtained from @BotFather'),
+  processingDelayMinMs: z.number().int().min(0).default(0).describe('Minimum delay in milliseconds before processing an incoming message. 0 means immediate processing.'),
+  processingDelayMaxMs: z.number().int().min(0).default(0).describe('Maximum delay in milliseconds before processing an incoming message. Must be >= processingDelayMinMs.'),
 }).openapi('TelegramChannelConfig');
 
 export type TelegramChannelProviderConfig = z.infer<typeof telegramChannelProviderConfigSchema>;

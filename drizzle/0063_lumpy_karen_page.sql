@@ -1,0 +1,1 @@
+ALTER TABLE "global_actions" ADD COLUMN "trigger_on_external" boolean DEFAULT false NOT NULL;

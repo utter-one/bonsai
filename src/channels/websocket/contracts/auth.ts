@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { baseInputMessageSchema, baseOutputMessageSchema } from './common';
 import { asrConfigSchema } from '../../../http/contracts/project';
 import { audioFormatSchema } from '../../../types/audio';
+import { apiKeyChannelSchema } from '../../../apiKeyFeatures';
 
 export const sessionSettingsSchema = z.object({
   sendVoiceInput: z.boolean().optional().default(true).describe('Whether the client can send voice input'),
@@ -20,6 +21,7 @@ export const authRequestSchema = baseInputMessageSchema.extend({
   type: z.literal('auth').describe('Message type for authentication'),
   apiKey: z.string().describe('API key for authentication'),
   sessionSettings: sessionSettingsSchema.optional().describe('Session settings for the client'),
+  simulatedChannelType: apiKeyChannelSchema.optional().describe('Simulated channel type for context building. When set, the agent behaves as if on this channel (e.g. twilio_voice, whatsapp) instead of the real transport.'),
 });
 
 export type AuthRequest = z.infer<typeof authRequestSchema>;

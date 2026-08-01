@@ -359,6 +359,37 @@ For multimodal responses:
 }
 ```
 
+### File Attachments
+
+When an action uses the [`attach_file`](./actions-and-effects#attach_file) effect, the server delivers the file as an `attach_file_output` message after text/voice output but before `end_ai_generation_output`:
+
+```json
+{
+  "type": "attach_file_output",
+  "sessionId": "session-uuid",
+  "conversationId": "conv-uuid",
+  "outputTurnId": "turn-uuid",
+  "artifactId": "artifact-uuid",
+  "fileName": "invoice.pdf",
+  "mimeType": "application/pdf",
+  "fileSize": 245678,
+  "downloadUrl": "https://storage.example.com/signed-url?...expiry...&signature=...",
+  "sequenceNumber": 0
+}
+```
+
+| Field | Description |
+|---|---|
+| `artifactId` | ID of the conversation artifact record |
+| `fileName` | Display name of the file |
+| `mimeType` | MIME type of the file |
+| `fileSize` | File size in bytes |
+| `downloadUrl` | URL to download the file (signed URL for external storage) |
+| `sequenceNumber` | 0-based index when multiple files are attached in a single response |
+
+Multiple attachments are delivered sequentially with incrementing `sequenceNumber`.
+```
+
 ## Client Commands
 
 Clients can send commands to control the conversation:

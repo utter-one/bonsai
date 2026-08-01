@@ -9,6 +9,7 @@ import {
   calUserSpeakingStartedMessageSchema,
   calSendAiImageOutputMessageSchema,
   calSendAiAudioOutputMessageSchema,
+  calAttachFileOutputMessageSchema,
 } from '../../messages';
 
 /** Message indicating the start of AI voice output. */
@@ -59,3 +60,10 @@ export const sendAiAudioOutputMessageSchema = calToWsOutput(calSendAiAudioOutput
   audioData: z.string().describe('Base64-encoded audio data'),
 });
 export type SendAiAudioOutputMessage = z.infer<typeof sendAiAudioOutputMessageSchema>;
+
+/**
+ * Message containing a file attachment staged by an attach_file effect.
+ * Delivered after text/voice output within the same generation turn.
+ */
+export const attachFileOutputMessageSchema = calToWsOutput(calAttachFileOutputMessageSchema);
+export type AttachFileOutputMessage = z.infer<typeof attachFileOutputMessageSchema>;

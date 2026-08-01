@@ -417,7 +417,7 @@ export class TwilioVoiceChannelHost {
             const sessionId = this.sessionManager.registerSession(connection);
             const newSession = this.sessionManager.getSession(sessionId);
             connection.attachSession(newSession);
-            this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, VOICE_SESSION_SETTINGS, keySettings ?? null);
+            this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, VOICE_SESSION_SETTINGS, keySettings ?? null, null);
             session = newSession;
 
             logger.info({ sessionId, projectId, streamSid: startData.streamSid, from: fromNumber }, 'TwilioVoice: new voice session created');

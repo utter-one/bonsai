@@ -1,11 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { container } from 'tsyringe';
 import type { Session, SessionManager } from '../../SessionManager';
-import type { CALOutputMessage } from '../../messages';
+import type { CALOutputMessage, CALAttachFileOutputMessage } from '../../messages';
 import * as nodemailer from 'nodemailer';
 import { db } from '../../../db';
 import { providers } from '../../../db/schema';
-import { EmailConnectionBase, type EmailHeaders } from '../shared/EmailConnectionBase';
+import { EmailConnectionBase, type EmailAttachment, type EmailHeaders } from '../shared/EmailConnectionBase';
 import { extractDomainFromEmail, generateEmailMessageId } from '../shared/MessageIdUtils';
 import { logger } from '../../../utils/logger';
 import { smtpImapChannelProviderConfigSchema } from '../../../services/providers/channel/SmtpImapChannelProvider';
@@ -18,11 +18,15 @@ export class SmtpImapConnection extends EmailConnectionBase {
   private readonly smtpHost: string;
   private readonly smtpPort: number;
   private readonly smtpSecure: boolean;
+  private cc: string | undefined;
+  private bcc: string | undefined;
   private conversationId: string | undefined;
   private inboundMessageId: string | undefined;
   private referencesChain: string[] = [];
   private skipNextEmail = false;
   private cachedOAuth2Token: string | undefined;
+  private replyFromAddress: string | undefined;
+  private onEmailSent: (() => void) | undefined;
 
   constructor(
     private readonly toAddress: string,
@@ -36,12 +40,16 @@ export class SmtpImapConnection extends EmailConnectionBase {
     smtpSecure: boolean,
     smtpAuthUser: string,
     private readonly smtpAuthPass: string,
+    cc: string | undefined,
+    bcc: string | undefined,
   ) {
     super(fromAddress, threadingStrategy, sessionManager, 'smtp_imap');
     this.smtpAuthUser = smtpAuthUser;
     this.smtpHost = smtpHost;
     this.smtpPort = smtpPort;
     this.smtpSecure = smtpSecure;
+    this.cc = cc;
+    this.bcc = bcc;
   }
 
   private createTransporter(oauth2Token?: string): void {
@@ -97,7 +105,7 @@ export class SmtpImapConnection extends EmailConnectionBase {
 
     const newToken = configResult.data.oauth2?.accessToken;
 
-    if (newToken !== this.cachedOAuth2Token) {
+    if (!this.transporter || newToken !== this.cachedOAuth2Token) {
       this.cachedOAuth2Token = newToken;
       this.createTransporter(newToken);
     }
@@ -135,6 +143,26 @@ export class SmtpImapConnection extends EmailConnectionBase {
     this.skipNextEmail = skip;
   }
 
+  setReplyFromAddress(address: string): void {
+    this.replyFromAddress = address;
+  }
+
+  setCc(cc: string | undefined): void {
+    this.cc = cc;
+  }
+
+  setBcc(bcc: string | undefined): void {
+    this.bcc = bcc;
+  }
+
+  setOnEmailSent(callback: (() => void) | undefined): void {
+    this.onEmailSent = callback;
+  }
+
+  getUserEmail(): string {
+    return this.toAddress;
+  }
+
   attachSession(session: Session): void {
     this.session = session;
   }
@@ -148,6 +176,11 @@ export class SmtpImapConnection extends EmailConnectionBase {
   }
 
   async sendMessage(msg: CALOutputMessage): Promise<void> {
+    if (msg.type === 'attach_file_output') {
+      this.bufferAttachment(msg as CALAttachFileOutputMessage);
+      return;
+    }
+
     if (msg.type !== 'end_ai_generation_output') return;
 
     const body = msg.fullText?.trim();
@@ -155,6 +188,7 @@ export class SmtpImapConnection extends EmailConnectionBase {
 
     if (this.skipNextEmail) {
       this.skipNextEmail = false;
+      this.pendingAttachments = [];
       return;
     }
 
@@ -171,13 +205,16 @@ export class SmtpImapConnection extends EmailConnectionBase {
       headers.references = this.referencesChain.join(' ');
     }
 
-    await this.sendEmail(this.toAddress, this.subject, body, headers);
+    const attachments = await this.downloadPendingAttachments();
+    this.pendingAttachments = [];
+
+    await this.sendEmail(this.toAddress, this.subject, body, attachments, headers);
   }
 
-  protected async sendEmail(to: string, subject: string, body: string, headers?: EmailHeaders): Promise<void> {
+  protected async sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
     await this.ensureTransporter();
     const messageId = headers?.messageId ?? this.generateMessageId();
-    const from = headers?.from ?? this.fromAddress ?? this.smtpAuthUser;
+    const from = headers?.from ?? this.replyFromAddress ?? this.fromAddress ?? this.smtpAuthUser;
 
     const mailOptions: nodemailer.SendMailOptions = {
       from,
@@ -185,6 +222,8 @@ export class SmtpImapConnection extends EmailConnectionBase {
       subject: headers?.subject ?? subject,
       text: body,
       headers: {},
+      cc: headers?.cc ?? this.cc,
+      bcc: headers?.bcc ?? this.bcc,
     };
 
     (mailOptions.headers as Record<string, string>)['Message-ID'] = messageId;
@@ -195,13 +234,26 @@ export class SmtpImapConnection extends EmailConnectionBase {
       (mailOptions.headers as Record<string, string>)['References'] = headers.references;
     }
 
+    if (attachments.length > 0) {
+      mailOptions.attachments = attachments.map(att => ({
+        filename: att.fileName,
+        content: att.content,
+        contentType: att.mimeType,
+      }));
+    }
+
     if (!this.transporter) {
       logger.error({ to }, 'SMTP/IMAP: transporter not initialized');
       return;
     }
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      logger.info({ to, messageId, sessionId: this.session?.id, messageIdRemote: info.messageId }, 'SMTP/IMAP email sent');
+      logger.info({ to, messageId, sessionId: this.session?.id, messageIdRemote: info.messageId, attachmentCount: attachments.length }, 'SMTP/IMAP email sent');
+      if (this.onEmailSent) {
+        const callback = this.onEmailSent;
+        this.onEmailSent = undefined;
+        callback();
+      }
     } catch (error) {
       logger.error({ error, to, messageId, sessionId: this.session?.id }, 'Failed to send SMTP/IMAP email');
     }

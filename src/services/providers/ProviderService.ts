@@ -12,6 +12,7 @@ import { buildFilterCondition, buildOrderBy } from '../../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../../utils/pagination';
 import { logger } from '../../utils/logger';
 import { BaseService } from '../BaseService';
+import { DeferredProcessingService } from '../DeferredProcessingService';
 import { ImapInboundService } from '../ImapInboundService';
 import type { RequestContext } from '../RequestContext';
 import { PERMISSIONS } from '../../permissions';
@@ -27,6 +28,7 @@ import { SecretRefUtils, SENSITIVE_PROVIDER_CONFIG_FIELDS } from '../secrets/Sec
 export class ProviderService extends BaseService {
   constructor(
     @inject(AuditService) private readonly auditService: AuditService,
+    @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
     @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
     @inject(ImapInboundService) private readonly imapInboundService: ImapInboundService,
@@ -176,7 +178,10 @@ export class ProviderService extends BaseService {
       description: updateData.description,
       providerType: updateData.providerType,
       apiType: updateData.apiType,
-      config: updateData.config ? await this.secretRefUtils.secretizeObject(updateData.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS) : updateData.config,
+      config: updateData.config ? await this.secretRefUtils.secretizeObject(
+        { ...(updateData.config as Record<string, unknown>), oauth2: (updateData.config as Record<string, unknown>).oauth2 ?? (existingProvider.config as Record<string, unknown>).oauth2 },
+        SENSITIVE_PROVIDER_CONFIG_FIELDS,
+      ) : updateData.config,
       tags: updateData.tags,
       version: existingProvider.version + 1,
       updatedAt: new Date(),
@@ -242,6 +247,13 @@ export class ProviderService extends BaseService {
       this.imapInboundService.stopSession(id).catch((error) => {
         logger.error({ error, providerId: id }, 'Failed to stop IMAP session after provider deletion');
       });
+    }
+
+    // Cancel any pending deferred messages for this provider
+    try {
+      await this.deferredProcessingService.cancelByProviderId(id);
+    } catch (error) {
+      logger.error({ error, providerId: id }, 'Failed to cancel deferred messages after provider deletion');
     }
   }
 

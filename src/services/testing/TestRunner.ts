@@ -196,6 +196,7 @@ export class TestRunner {
         receiveAudioFormat: 'pcm_16000',
       },
       keySettings: null,
+      simulatedChannelType: null,
     };
   }
 }

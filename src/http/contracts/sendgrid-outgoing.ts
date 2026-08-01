@@ -9,6 +9,8 @@ export const sendGridSendRouteParamsSchema = z.object({
 
 export const sendGridSendBodySchema = z.object({
   to: z.string().email().describe('Recipient email address'),
+  cc: z.string().email().optional().describe('CC address for this email. Overrides any CC set in the routing entry.'),
+  bcc: z.string().email().optional().describe('BCC address for this email. Overrides any BCC set in the routing entry.'),
   subject: z.string().optional().describe('Email subject line. If omitted, defaults to the agent name.'),
   fromAddress: z.string().email().optional().describe('Override sender email address (defaults to provider config)'),
   stageId: z.string().optional().describe('Stage ID to start the conversation at. When omitted, falls back to the project-level default starting stage.'),

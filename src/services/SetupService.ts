@@ -4,6 +4,7 @@ import { db } from '../db/index';
 import { operators } from '../db/schema';
 import type { InitialOperatorSetupRequest, InitialOperatorSetupResponse, SetupStatusResponse } from '../http/contracts/setup';
 import { AuthService } from './AuthService';
+import { QuickPromptService } from './QuickPromptService';
 import { InvalidOperationError } from '../errors';
 import { logger } from '../utils/logger';
 
@@ -13,7 +14,7 @@ import { logger } from '../utils/logger';
  */
 @injectable()
 export class SetupService {
-  constructor(@inject(AuthService) private readonly authService: AuthService) {}
+  constructor(@inject(AuthService) private readonly authService: AuthService, @inject(QuickPromptService) private readonly quickPromptService: QuickPromptService) {}
 
   /**
    * Check if the system has been set up (i.e., at least one operator exists)
@@ -66,6 +67,8 @@ export class SetupService {
           const operator = await tx.insert(operators).values({ id: input.id, name: input.name, roles: ['super_admin'], password: hashedPassword, metadata: input.metadata ?? {}, version: 1 }).returning();
 
           createdOperator = operator[0];
+
+          await this.quickPromptService.seedQuickPrompts(tx);
         },
         { isolationLevel: 'serializable' },
       );

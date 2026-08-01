@@ -427,6 +427,21 @@ export const calSendAiAudioOutputMessageSchema = calBaseOutputMessageSchema.exte
   }).optional().describe('Optional low-level audio metadata'),
 });
 
+/**
+ * Carries a file attachment staged by an attach_file effect.
+ * Delivered after text/voice output within the same generation turn.
+ */
+export const calAttachFileOutputMessageSchema = calBaseOutputMessageSchema.extend({
+  type: z.literal('attach_file_output'),
+  outputTurnId: z.string().describe('Generation turn this file belongs to'),
+  artifactId: z.string().describe('ID of the conversation artifact record'),
+  fileName: z.string().describe('Display name of the file'),
+  mimeType: z.string().describe('MIME type of the file'),
+  fileSize: z.number().describe('File size in bytes'),
+  downloadUrl: z.string().describe('URL to download the file (signed URL for external storage)'),
+  sequenceNumber: z.number().describe('0-based index when multiple files are attached in a single response'),
+});
+
 // Output push message schemas — conversation events
 
 /**
@@ -481,6 +496,7 @@ export const calOutputMessageSchema = z.discriminatedUnion('type', [
   calUserTranscribedChunkMessageSchema,
   calSendAiImageOutputMessageSchema,
   calSendAiAudioOutputMessageSchema,
+  calAttachFileOutputMessageSchema,
   calConversationEventMessageSchema,
   calConversationEventUpdateMessageSchema,
 ]);
@@ -529,6 +545,7 @@ export type CALUserSpeakingStartedMessage = z.infer<typeof calUserSpeakingStarte
 export type CALUserTranscribedChunkMessage = z.infer<typeof calUserTranscribedChunkMessageSchema>;
 export type CALSendAiImageOutputMessage = z.infer<typeof calSendAiImageOutputMessageSchema>;
 export type CALSendAiAudioOutputMessage = z.infer<typeof calSendAiAudioOutputMessageSchema>;
+export type CALAttachFileOutputMessage = z.infer<typeof calAttachFileOutputMessageSchema>;
 export type CALConversationEventMessage = z.infer<typeof calConversationEventMessageSchema>;
 export type CALConversationEventUpdateMessage = z.infer<typeof calConversationEventUpdateMessageSchema>;
 export type CALOutputMessage = z.infer<typeof calOutputMessageSchema>;

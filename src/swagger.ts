@@ -22,6 +22,7 @@ import { createCopyDecoratorSchema, updateCopyDecoratorBodySchema, deleteCopyDec
 import { createEnvironmentSchema, updateEnvironmentBodySchema, deleteEnvironmentBodySchema, environmentResponseSchema, environmentListResponseSchema, environmentRouteParamsSchema } from './http/contracts/environment';
 import { createGuardrailSchema, updateGuardrailBodySchema, deleteGuardrailBodySchema, guardrailResponseSchema, guardrailListResponseSchema, cloneGuardrailSchema } from './http/contracts/guardrail';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from './http/contracts/provider';
+import { providerUsageEntrySchema, modelAvailabilitySchema, providerAvailabilitySchema, usedProviderDetailSchema, providerTypeSummarySchema, projectProviderUsageResponseSchema } from './http/contracts/projectProviders';
 import { providerCatalogSchema, asrProvidersResponseSchema, ttsProvidersResponseSchema, llmProvidersResponseSchema, asrProviderInfoSchema, ttsProviderInfoSchema, llmProviderInfoSchema, asrModelInfoSchema, llmModelInfoSchema, voiceInfoSchema, languageInfoSchema, ttsModelInfoSchema, moderationProvidersResponseSchema, moderationProviderInfoSchema, moderationModelInfoSchema, moderationCategoryInfoSchema } from './http/contracts/providerCatalog';
 import { channelCapabilitiesSchema, channelInfoSchema, channelCatalogResponseSchema } from './http/contracts/channelCatalog';
 import { auditLogResponseSchema, auditLogListResponseSchema } from './http/contracts/audit';
@@ -84,6 +85,7 @@ import { CopyDecoratorController } from './http/controllers/CopyDecoratorControl
 import { EnvironmentController } from './http/controllers/EnvironmentController';
 import { ProviderController } from './http/controllers/ProviderController';
 import { ProviderCatalogController } from './http/controllers/ProviderCatalogController';
+import { ProjectProviderUsageController } from './http/controllers/ProjectProviderUsageController';
 import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
@@ -94,6 +96,8 @@ import { funnelStepSchema, funnelQuerySchema, funnelStepResultSchema, funnelQuer
 import { ApiKeyController } from './http/controllers/ApiKeyController';
 import { VersionController } from './http/controllers/VersionController';
 import { versionResponseSchema } from './http/contracts/version';
+import { ExternalTriggerController } from './http/controllers/ExternalTriggerController';
+import { externalTriggerRequestSchema, externalTriggerResponseSchema } from './http/contracts/externalTrigger';
 import { MigrationController } from './http/controllers/MigrationController';
 import { exportBundleSchema, migrationResultSchema, migrationJobSchema, migrationEntityCountSchema, migrationPreviewSchema, entityStubSchema } from './http/contracts/migration';
 import { ProjectExchangeController } from './http/controllers/ProjectExchangeController';
@@ -112,6 +116,10 @@ import { BenchmarkProviderConfigController } from './http/controllers/BenchmarkP
 import { BenchmarkConfigController } from './http/controllers/BenchmarkConfigController';
 import { BenchmarkRunController } from './http/controllers/BenchmarkRunController';
 import { timingStatsSchema, benchmarkStatsSchema, createBenchmarkSuiteSchema, updateBenchmarkSuiteSchema, benchmarkSuiteResponseSchema, benchmarkSuiteListResponseSchema, createBenchmarkProviderConfigSchema, updateBenchmarkProviderConfigSchema, benchmarkProviderConfigResponseSchema, benchmarkProviderConfigListResponseSchema, createBenchmarkConfigSchema, updateBenchmarkConfigSchema, benchmarkConfigResponseSchema, benchmarkConfigListResponseSchema, triggerBenchmarkRunSchema, benchmarkConfigExecutionResponseSchema, benchmarkRunResponseSchema, benchmarkRunListResponseSchema, llmIterationOutputSchema, ttsIterationOutputSchema, asrIterationOutputSchema, benchmarkIterationResultDataSchema, benchmarkResultResponseSchema } from './http/contracts/benchmark';
+import { QuickPromptController } from './http/controllers/QuickPromptController';
+import { DeferredProcessingController } from './http/controllers/DeferredProcessingController';
+import { createQuickPromptSchema, createProjectQuickPromptSchema, updateQuickPromptBodySchema, deleteQuickPromptBodySchema, cloneQuickPromptSchema, quickPromptResponseSchema, quickPromptListResponseSchema, quickPromptRouteParamsSchema, quickPromptProjectRouteParamsSchema } from './http/contracts/quickPrompt';
+import { deferredProcessingResponseSchema, deferredProcessingListResponseSchema, rescheduleDeferredProcessingBodySchema, cancelDeferredProcessingBodySchema } from './http/contracts/deferredProcessing';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
@@ -448,6 +456,18 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register ProjectProviderUsage routes from ProjectProviderUsageController
+  registry.register('ProviderUsageEntry', providerUsageEntrySchema);
+  registry.register('ModelAvailability', modelAvailabilitySchema);
+  registry.register('ProviderAvailability', providerAvailabilitySchema);
+  registry.register('UsedProviderDetail', usedProviderDetailSchema);
+  registry.register('ProviderTypeSummary', providerTypeSummarySchema);
+  registry.register('ProjectProviderUsageResponse', projectProviderUsageResponseSchema);
+  const projectProviderUsagePaths = ProjectProviderUsageController.getOpenAPIPaths();
+  for (const path of projectProviderUsagePaths) {
+    registry.registerPath(path);
+  }
+
   // Register ChannelCatalog routes from ChannelCatalogController
   registry.register('ChannelCapabilities', channelCapabilitiesSchema);
   registry.register('ChannelInfo', channelInfoSchema);
@@ -531,6 +551,14 @@ export function getOpenAPISpec(): any {
   registry.register('VersionResponse', versionResponseSchema);
   const versionPaths = VersionController.getOpenAPIPaths();
   for (const path of versionPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register External Trigger routes
+  registry.register('ExternalTriggerRequest', externalTriggerRequestSchema);
+  registry.register('ExternalTriggerResponse', externalTriggerResponseSchema);
+  const externalTriggerPaths = ExternalTriggerController.getOpenAPIPaths();
+  for (const path of externalTriggerPaths) {
     registry.registerPath(path);
   }
 
@@ -712,6 +740,31 @@ export function getOpenAPISpec(): any {
   }
   const benchmarkRunPaths = BenchmarkRunController.getOpenAPIPaths();
   for (const path of benchmarkRunPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register QuickPrompt schemas and routes
+  registry.register('QuickPromptRouteParams', quickPromptRouteParamsSchema);
+  registry.register('QuickPromptProjectRouteParams', quickPromptProjectRouteParamsSchema);
+  registry.register('CreateQuickPromptRequest', createQuickPromptSchema);
+  registry.register('CreateProjectQuickPromptRequest', createProjectQuickPromptSchema);
+  registry.register('UpdateQuickPromptRequest', updateQuickPromptBodySchema);
+  registry.register('DeleteQuickPromptRequest', deleteQuickPromptBodySchema);
+  registry.register('CloneQuickPromptRequest', cloneQuickPromptSchema);
+  registry.register('QuickPromptResponse', quickPromptResponseSchema);
+  registry.register('QuickPromptListResponse', quickPromptListResponseSchema);
+  const quickPromptPaths = QuickPromptController.getOpenAPIPaths();
+  for (const path of quickPromptPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register DeferredProcessing schemas and routes
+  registry.register('DeferredProcessingEntry', deferredProcessingResponseSchema);
+  registry.register('DeferredProcessingList', deferredProcessingListResponseSchema);
+  registry.register('RescheduleDeferredProcessing', rescheduleDeferredProcessingBodySchema);
+  registry.register('CancelDeferredProcessing', cancelDeferredProcessingBodySchema);
+  const deferredProcessingPaths = DeferredProcessingController.getOpenAPIPaths();
+  for (const path of deferredProcessingPaths) {
     registry.registerPath(path);
   }
 

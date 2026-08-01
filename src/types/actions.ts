@@ -13,6 +13,7 @@ extendZodWithOpenApi(z);
 export const endConversationEffectSchema = z.object({
   type: z.literal('end_conversation').describe('Effect type'),
   reason: z.string().optional().describe('Optional reason for ending the conversation'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 11000.'),
 }).openapi('EndConversationEffect');
 
 /**
@@ -22,6 +23,7 @@ export const endConversationEffectSchema = z.object({
 export const abortConversationEffectSchema = z.object({
   type: z.literal('abort_conversation').describe('Effect type'),
   reason: z.string().optional().describe('Optional reason for aborting the conversation'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 12000.'),
 }).openapi('AbortConversationEffect');
 
 /**
@@ -31,6 +33,7 @@ export const abortConversationEffectSchema = z.object({
 export const goToStageEffectSchema = z.object({
   type: z.literal('go_to_stage').describe('Effect type'),
   stageId: z.string().min(1).describe('ID of the stage to switch to'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 13000.'),
 }).openapi('GoToStageEffect');
 
 /**
@@ -40,6 +43,7 @@ export const goToStageEffectSchema = z.object({
 export const modifyUserInputEffectSchema = z.object({
   type: z.literal('modify_user_input').describe('Effect type'),
   template: z.string().min(1).describe('Template to render and replace user input with'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 5000.'),
 }).openapi('ModifyUserInputEffect');
 
 /**
@@ -67,6 +71,7 @@ export const userProfileOperationSchema = z.object({
 export const modifyVariablesEffectSchema = z.object({
   type: z.literal('modify_variables').describe('Effect type'),
   modifications: z.array(variableOperationSchema).min(1).describe('Array of variable modifications to apply'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 3000.'),
 }).openapi('ModifyVariablesEffect');
 
 /**
@@ -76,6 +81,7 @@ export const modifyVariablesEffectSchema = z.object({
 export const modifyUserProfileEffectSchema = z.object({
   type: z.literal('modify_user_profile').describe('Effect type'),
   modifications: z.array(userProfileOperationSchema).min(1).describe('Array of user profile field modifications to apply'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 4000.'),
 }).openapi('ModifyUserProfileEffect');
 
 /**
@@ -87,6 +93,7 @@ export const callToolEffectSchema = z.object({
   toolId: z.string().min(1).describe('ID of the tool to call'),
   parameters: z.record(z.string(), z.unknown()).describe('Parameters to pass to the tool'),
   asynchronous: z.boolean().optional().default(false).describe('When true, the tool runs in the background without blocking the conversation. The result is not stored in context and flow control signals (go_to_stage, end_conversation, etc.) are discarded. Use for fire-and-forget operations such as logging or saving data.'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 1000 (webhook), 2000 (smart_function), 6000 (script).'),
 }).openapi('CallToolEffect');
 
 /**
@@ -98,6 +105,7 @@ export const generateResponseEffectSchema = z.object({
   responseMode: z.enum(['generated', 'prescripted']).optional().default('generated').describe('Type of response to generate: generated (AI-generated), prescripted (predefined response), best_match (choose the best match from predefined responses)'),
   prescriptedSelectionStrategy: z.enum(['random', 'round_robin']).optional().default('random').describe('Strategy to select prescripted response when multiple are provided'),
   prescriptedResponses: z.array(z.string()).optional().describe('Optional array of prescripted responses to use'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 10000.'),
 }).openapi('GenerateResponseEffect');
 
 /**
@@ -108,6 +116,7 @@ export const changeVisibilityEffectSchema = z.object({
   type: z.literal('change_visibility').describe('Effect type'),
   visibility: z.enum(['always', 'stage', 'never', 'conditional']).describe('Visibility setting: always (always visible), stage (visible only in current stage), never (never visible), conditional (visible based on a JavaScript condition expression)'),
   condition: z.string().optional().describe('JavaScript condition expression evaluated against the conversation context — required when visibility is "conditional"'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 9000.'),
 }).openapi('ChangeVisibilityEffect');
 
 /**
@@ -117,7 +126,37 @@ export const changeVisibilityEffectSchema = z.object({
 export const banUserEffectSchema = z.object({
   type: z.literal('ban_user').describe('Effect type'),
   reason: z.string().optional().describe('Optional reason for banning the user'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 7000.'),
 }).openapi('BanUserEffect');
+
+/**
+ * Effect type: Save Artifact
+ * Saves data from the conversation context to project storage and stores the artifactId in a variable.
+ * Accepts either inline data (base64-encoded string or any JSON-serializable value) or a variable reference.
+ * The artifactId is stored in the specified variable for downstream effects (e.g. attach_file).
+ */
+export const saveArtifactEffectSchema = z.object({
+  type: z.literal('save_artifact').describe('Effect type'),
+  data: z.unknown().describe('Data to save: inline value (string, base64, object) or a variable reference template such as {{vars.myFile}}'),
+  dataEncoding: z.enum(['raw', 'base64']).optional().default('raw').describe('Encoding of the data: raw (store as-is), base64 (decode before storing)'),
+  fileName: z.string().min(1).describe('Display name for the stored file; supports Handlebars templating'),
+  mimeType: z.string().min(1).optional().describe('MIME type for the stored file'),
+  variableName: z.string().min(1).describe('Variable name to store the artifactId in (e.g. "myArtifactId")'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 8000.'),
+}).openapi('SaveArtifactEffect');
+
+/**
+ * Effect type: Attach File
+ * Stages a file for delivery alongside the AI response. Must be paired with generate_response
+ * in the same action — standalone attach_file is silently skipped.
+ */
+export const attachFileEffectSchema = z.object({
+  type: z.literal('attach_file').describe('Effect type'),
+  artifactId: z.string().min(1).describe('Artifact ID of the file in storage to attach. Typically from a save_artifact effect or a tool result.'),
+  fileName: z.string().min(1).optional().describe('Display name for the attachment. Defaults to the artifact\'s stored name when omitted.'),
+  mimeType: z.string().min(1).optional().describe('MIME type override. When omitted, uses the artifact\'s stored MIME type.'),
+  priority: z.number().optional().describe('Optional execution priority override. Lower numbers execute first. Default: 9500.'),
+}).openapi('AttachFileEffect');
 
 /**
  * Discriminated union of all effect types
@@ -131,9 +170,11 @@ export const effectSchema = z.discriminatedUnion('type', [
   modifyVariablesEffectSchema,
   modifyUserProfileEffectSchema,
   callToolEffectSchema,
+  saveArtifactEffectSchema,
   generateResponseEffectSchema,
   changeVisibilityEffectSchema,
   banUserEffectSchema,
+  attachFileEffectSchema,
 ]).openapi('Effect');
 
 // Infer types from schemas
@@ -146,9 +187,11 @@ export type UserProfileOperation = z.infer<typeof userProfileOperationSchema>;
 export type ModifyVariablesEffect = z.infer<typeof modifyVariablesEffectSchema>;
 export type ModifyUserProfileEffect = z.infer<typeof modifyUserProfileEffectSchema>;
 export type CallToolEffect = z.infer<typeof callToolEffectSchema>;
+export type SaveArtifactEffect = z.infer<typeof saveArtifactEffectSchema>;
 export type GenerateResponseEffect = z.infer<typeof generateResponseEffectSchema>;
 export type ChangeVisibilityEffect = z.infer<typeof changeVisibilityEffectSchema>;
 export type BanUserEffect = z.infer<typeof banUserEffectSchema>;
+export type AttachFileEffect = z.infer<typeof attachFileEffectSchema>;
 export type Effect = z.infer<typeof effectSchema>;
 
 
@@ -204,6 +247,7 @@ export const stageActionSchema = z.object({
   effects: z.preprocess(filterDeprecatedEffects, z.array(effectSchema).describe('Array of effects to execute when action is triggered')),
   examples: z.array(z.string()).nullable().optional().describe('Example phrases that trigger this action'),
   triggerOnTransformation: z.boolean().optional().default(false).describe('Whether this action should be triggered on variable transformations'),
+  triggerOnExternal: z.boolean().optional().default(false).describe('Whether this action can be triggered by external services via the external trigger endpoint'),
   watchedVariables: z.record(z.string(), fieldWatchTriggerSchema).optional().describe('Optional map of variable paths to watch for changes that trigger this action'),
   metadata: z.record(z.string(), z.unknown()).nullable().optional().describe('Additional action-specific metadata'),
 }).openapi('StageAction');
@@ -277,7 +321,7 @@ export const LIFECYCLE_EFFECT_RESTRICTIONS: Record<string, Set<Effect['type']>> 
    * __on_leave: Cannot change stage or generate response during exit
    * go_to_stage would create infinite loops, generate_response is handled by destination stage
    */
-  on_leave: new Set<Effect['type']>(['go_to_stage', 'generate_response']),
+  on_leave: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'attach_file']),
 
   /**
    * __on_fallback: No restrictions - fallback can do anything
@@ -299,15 +343,15 @@ export const LIFECYCLE_EFFECT_RESTRICTIONS: Record<string, Set<Effect['type']>> 
   /**
    * __conversation_end: Conversation is already ending — no stage navigation, response generation, or abort
    */
-  conversation_end: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'abort_conversation']),
+  conversation_end: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'abort_conversation', 'attach_file']),
 
   /**
    * __conversation_abort: Conversation is already aborting — no stage navigation, response generation, or end
    */
-  conversation_abort: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'end_conversation']),
+  conversation_abort: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'end_conversation', 'attach_file']),
 
   /**
    * __conversation_failed: Conversation is in an error state — no navigation, response, or termination effects
    */
-  conversation_failed: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'end_conversation', 'abort_conversation']),
+  conversation_failed: new Set<Effect['type']>(['go_to_stage', 'generate_response', 'end_conversation', 'abort_conversation', 'attach_file']),
 };

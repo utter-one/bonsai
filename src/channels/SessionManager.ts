@@ -22,7 +22,19 @@ export type Session = {
   sessionSettings: SessionSettings;
   /** API key security settings controlling permitted channels and features. Null means all permitted. */
   keySettings: ApiKeySettings | null;
+  /** Simulated channel type for context building. When set, overrides the real connection type in LLM context, guardrails, sample copy, and context transformers. */
+  simulatedChannelType: ApiKeyChannel | null;
 };
+
+/**
+ * Returns the effective channel type for context building.
+ * Uses the simulated channel type if set, otherwise falls back to the real connection type.
+ * @param session - The session to check.
+ * @returns The effective channel type.
+ */
+export function getEffectiveChannelType(session: Session): ApiKeyChannel {
+  return session.simulatedChannelType ?? session.clientConnection.connectionType;
+}
 
 /**
  * Returns true if the given channel type is permitted by the session's API key settings.
@@ -72,6 +84,7 @@ export class SessionManager {
       clientConnection,
       sessionSettings: { sendVoiceInput: true, sendTextInput: true, receiveVoiceOutput: true, receiveTranscriptionUpdates: true, receiveEvents: true, sendAudioFormat: 'pcm_16000' as const, receiveAudioFormat: 'pcm_16000' as const },
       keySettings: null,
+      simulatedChannelType: null,
     };
 
     this.clientMap.set(clientConnection, session);
@@ -88,7 +101,7 @@ export class SessionManager {
    * @param sessionSettings - The new session settings to apply.
    * @param keySettings - The API key security settings to enforce for this session.
    */
-  setSessionProjectAndSettings(sessionId: string, projectId: string, sessionSettings: SessionSettings, keySettings: ApiKeySettings | null): void {
+  setSessionProjectAndSettings(sessionId: string, projectId: string, sessionSettings: SessionSettings, keySettings: ApiKeySettings | null, simulatedChannelType: ApiKeyChannel | null): void {
     const session = this.idMap.get(sessionId);
     if (!session) {
       throw new Error('Session not found');
@@ -97,6 +110,7 @@ export class SessionManager {
     session.projectId = projectId;
     session.sessionSettings = sessionSettings;
     session.keySettings = keySettings;
+    session.simulatedChannelType = simulatedChannelType;
     this.idMap.set(sessionId, session);
   }
 

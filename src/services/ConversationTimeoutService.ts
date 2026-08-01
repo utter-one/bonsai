@@ -5,6 +5,7 @@ import { and, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { conversations, projects } from '../db/schema';
 import { ConversationService } from './ConversationService';
+import { DeferredProcessingService } from './DeferredProcessingService';
 import { SessionManager } from '../channels/SessionManager';
 import type { ConversationAbortedEventData } from '../types/conversationEvents';
 import logger from '../utils/logger';
@@ -26,6 +27,7 @@ export class ConversationTimeoutService {
 
   constructor(
     @inject(ConversationService) private readonly conversationService: ConversationService,
+    @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
     @inject(SessionManager) private readonly sessionManager: SessionManager,
   ) { }
 
@@ -114,6 +116,13 @@ export class ConversationTimeoutService {
         try {
           await session.clientConnection?.close();
         } catch { /* best effort */ }
+      }
+
+      // Cancel any pending deferred messages for this conversation
+      try {
+        await this.deferredProcessingService.cancelByConversationId(id);
+      } catch (error) {
+        logger.warn({ error, conversationId: id }, 'Failed to cancel deferred messages for timed-out conversation, continuing');
       }
 
       logger.info({ conversationId: id, projectId }, 'Conversation aborted due to inactivity timeout');

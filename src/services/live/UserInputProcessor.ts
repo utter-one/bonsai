@@ -1,5 +1,5 @@
 import { inject, singleton } from "tsyringe";
-import { Session } from "../../channels/SessionManager";
+import { Session, getEffectiveChannelType } from "../../channels/SessionManager";
 import { ClassifierRuntimeData } from "./ConversationRunner";
 import logger from "../../utils/logger";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
@@ -94,7 +94,7 @@ export class UserInputProcessor {
           userInput,
           originalUserInput,
           classifierKnowledgeCategories,
-          session.clientConnection.connectionType,
+          getEffectiveChannelType(session),
         );
         return this.classifyTextInput(session, classifier, classifierContext);
       });
@@ -102,7 +102,7 @@ export class UserInputProcessor {
       // Build guardrail classification promise if a guardrail classifier is configured and there are active guardrails
       const guardrailPromise = guardrailClassifier && guardrails.length > 0
         ? (async () => {
-          const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput, session.clientConnection.connectionType);
+          const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput, getEffectiveChannelType(session));
           return this.classifyTextInput(session, guardrailClassifier, guardrailContext);
         })()
         : Promise.resolve(null);
@@ -110,7 +110,7 @@ export class UserInputProcessor {
       // Build sample copy classification promise if a classifier is configured and there are applicable sample copies for this stage
       const sampleCopyPromise = sampleCopyClassifier && sampleCopies.length > 0
         ? (async () => {
-          const sampleCopyContext = await this.contextBuilder.buildContextForSampleCopyClassifier(conversation, stage, sampleCopies, userInput, originalUserInput, session.clientConnection.connectionType);
+          const sampleCopyContext = await this.contextBuilder.buildContextForSampleCopyClassifier(conversation, stage, sampleCopies, userInput, originalUserInput, getEffectiveChannelType(session));
           return this.classifyCopyForInput(session, sampleCopyContext);
         })()
         : Promise.resolve(null);

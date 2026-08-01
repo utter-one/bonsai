@@ -9,8 +9,8 @@
 | `id` | Unique identifier |
 | `name` | Display name |
 | `description` | Optional description |
-| `providerType` | Service type: `llm`, `tts`, `asr`, `embeddings`, or `storage` |
-| `apiType` | Implementation identifier (e.g., `openai`, `azure`, `anthropic`) |
+| `providerType` | Service type: `llm`, `tts`, `asr`, `embeddings`, `storage`, or `channel` |
+| `apiType` | Implementation identifier (e.g., `openai`, `azure`, `anthropic`, `smtp_imap`) |
 | `config` | Provider-specific connection configuration |
 | `createdBy` | Operator who created the provider |
 | `tags` | Searchable labels for organization |
@@ -122,6 +122,22 @@ Used for: persisting conversation artifacts (audio recordings, transcripts).
 
 Configured in the project's `storageConfig`.
 
+### Channel Providers
+
+Used for: connecting conversational channels (email, SMS, WhatsApp, Telegram, voice).
+
+| API Type | Description |
+|---|---|
+| `smtp_imap` | SMTP/IMAP email (standard mail servers) |
+| `sendgrid` | SendGrid email (API + inbound parse webhook) |
+| `ses` | AWS SES email (SNS/S3 inbound) |
+| `twilio_messaging` | Twilio SMS/MMS (webhook) |
+| `whatsapp` | WhatsApp Business API (Meta Cloud API) |
+| `telegram` | Telegram Bot API (webhook) |
+| `twilio_voice` | Twilio Voice calls (media streaming) |
+
+Channel providers support **deferred processing** — an optional configurable delay applied to incoming messages before the AI pipeline runs. Set `processingDelayMinMs` and `processingDelayMaxMs` on the provider config to enable. See [Deferred Processing](./deferred-processing) for details.
+
 ## Provider Catalog
 
 The system includes a built-in **Provider Catalog** that lists all available provider types, their API types, and configuration schemas. Access it via:
@@ -136,7 +152,7 @@ This is useful for building operator UIs that dynamically render provider config
 
 | Entity | Provider Types Used |
 |---|---|
-| Project | ASR (speech-to-text), Storage (artifacts) |
+| Project | ASR (speech-to-text), Storage (artifacts), Channel (inbound messaging) |
 | Agent | TTS (voice synthesis) |
 | Stage | LLM (response generation) |
 | Classifier | LLM (intent classification) |

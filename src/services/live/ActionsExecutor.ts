@@ -6,7 +6,10 @@ import { ToolExecutor } from './ToolExecutor';
 import { ModifyVariablesEffectExecutor } from './ModifyVariablesEffectExecutor';
 import { ModifyUserProfileEffectExecutor } from './ModifyUserProfileEffectExecutor';
 import { UserService } from '../UserService';
-import type { AbortConversationEffect, BanUserEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext, ModifyVariablesEffect, ModifyUserProfileEffect } from '../../types/actions';
+import { ConversationStorageService } from '../ConversationStorageService';
+import { db } from '../../db';
+import { eq } from 'drizzle-orm';
+import type { AbortConversationEffect, AttachFileEffect, BanUserEffect, CallToolEffect, ChangeVisibilityEffect, EndConversationEffect, GenerateResponseEffect, GoToStageEffect, ModifyUserInputEffect, Effect, StageAction, LifecycleContext, ModifyVariablesEffect, ModifyUserProfileEffect, SaveArtifactEffect } from '../../types/actions';
 import type { MessageVisibility, ConversationEventType, ConversationEventData, ActionsExecutionPlanEventData } from '../../types/conversationEvents';
 import { LIFECYCLE_EFFECT_RESTRICTIONS } from '../../types/actions';
 import type { GlobalAction, Guardrail } from '../../types/models';
@@ -42,6 +45,12 @@ export type ActionsExecutionOutcome = {
   error?: string;
   /** Pending visibility override to apply to the current turn's messages, produced by change_visibility effects */
   turnVisibility?: MessageVisibility;
+  /** Artifact references from attach_file effects, to be delivered with the AI response */
+  stagedAttachments: Array<{
+    artifactId: string;
+    fileName: string;
+    mimeType: string;
+  }>;
 };
 
 /**
@@ -60,6 +69,12 @@ export type EffectOutcome = {
   newStageId?: string;
   /** Pending visibility override for the current turn's messages */
   turnVisibility?: MessageVisibility;
+  /** Artifact references from attach_file effects */
+  stagedAttachments?: Array<{
+    artifactId: string;
+    fileName: string;
+    mimeType: string;
+  }>;
 };
 
 /**
@@ -86,6 +101,7 @@ export class ActionsExecutor {
     @inject(ModifyVariablesEffectExecutor) private readonly modifyVariablesExecutor: ModifyVariablesEffectExecutor,
     @inject(ModifyUserProfileEffectExecutor) private readonly modifyUserProfileExecutor: ModifyUserProfileEffectExecutor,
     @inject(UserService) private readonly userService: UserService,
+    @inject(ConversationStorageService) private readonly storageService: ConversationStorageService,
   ) { }
 
   /**
@@ -101,8 +117,32 @@ export class ActionsExecutor {
   }
 
   /**
+   * Default execution priority for each effect type.
+   * Lower numbers execute first. Users can override per-effect via the `priority` field.
+   */
+  /**
+   * Default execution priority for each effect type.
+   * Spaced by ~1000 so per-effect `priority` overrides can slot between defaults.
+   */
+  private static readonly DEFAULT_PRIORITIES: Record<Effect['type'], number> = {
+    call_tool: 2000, // resolved per-tool-type below; this is the fallback (smart_function)
+    modify_variables: 3000,
+    modify_user_profile: 4000,
+    modify_user_input: 5000,
+    ban_user: 7000,
+    save_artifact: 8000,
+    attach_file: 9500,
+    change_visibility: 9000,
+    generate_response: 10000,
+    end_conversation: 11000,
+    abort_conversation: 12000,
+    go_to_stage: 13000,
+  };
+
+  /**
    * Gets the execution priority for an effect type.
    * Lower numbers execute first.
+   * If the effect carries an explicit `priority` override, that value is used instead of the default.
    * For call_tool effects, priority is determined by the referenced tool's type:
    * webhook tools run at priority 1, script tools at priority 6, smart_function tools at priority 2.
    * @param effect - The effect to get priority for
@@ -110,31 +150,41 @@ export class ActionsExecutor {
    * @returns Priority number
    */
   private getEffectPriority(effect: Effect, toolTypes?: Map<string, ToolType>): number {
+    // Per-effect override takes precedence over all defaults
+    const explicitPriority = (effect as Record<string, unknown>).priority;
+    if (typeof explicitPriority === 'number') {
+      return explicitPriority;
+    }
+
     switch (effect.type) {
       case 'call_tool': {
         const toolType = toolTypes?.get((effect as CallToolEffect).toolId);
-        if (toolType === 'webhook') return 1;
-        if (toolType === 'script') return 6;
-        return 2; // smart_function or unknown
+        if (toolType === 'webhook') return 1000;
+        if (toolType === 'script') return 6000;
+        return 2000; // smart_function or unknown
       }
       case 'modify_variables':
-        return 3;
+        return ActionsExecutor.DEFAULT_PRIORITIES.modify_variables;
       case 'modify_user_profile':
-        return 4;
+        return ActionsExecutor.DEFAULT_PRIORITIES.modify_user_profile;
       case 'modify_user_input':
-        return 5;
+        return ActionsExecutor.DEFAULT_PRIORITIES.modify_user_input;
       case 'ban_user':
-        return 7;
+        return ActionsExecutor.DEFAULT_PRIORITIES.ban_user;
+      case 'save_artifact':
+        return ActionsExecutor.DEFAULT_PRIORITIES.save_artifact;
+      case 'attach_file':
+        return ActionsExecutor.DEFAULT_PRIORITIES.attach_file;
       case 'change_visibility':
-        return 50;
+        return ActionsExecutor.DEFAULT_PRIORITIES.change_visibility;
       case 'generate_response':
-        return 100;
+        return ActionsExecutor.DEFAULT_PRIORITIES.generate_response;
       case 'end_conversation':
-        return 200;
+        return ActionsExecutor.DEFAULT_PRIORITIES.end_conversation;
       case 'abort_conversation':
-        return 201;
+        return ActionsExecutor.DEFAULT_PRIORITIES.abort_conversation;
       case 'go_to_stage':
-        return 202;
+        return ActionsExecutor.DEFAULT_PRIORITIES.go_to_stage;
       default:
         return 999; // Unknown effects execute last
     }
@@ -234,6 +284,7 @@ export class ActionsExecutor {
         hasModifiedVars: false,
         hasModifiedUserInput: false,
         hasModifiedUserProfile: false,
+        stagedAttachments: [],
       };
     }
 
@@ -306,6 +357,7 @@ export class ActionsExecutor {
       hasModifiedVars: false,
       hasModifiedUserInput: false,
       hasModifiedUserProfile: false,
+      stagedAttachments: [],
     };
 
     let currentContext = context;
@@ -347,6 +399,11 @@ export class ActionsExecutor {
         // Propagate visibility override from change_visibility effect
         if (effectResult.turnVisibility) {
           outcome.turnVisibility = effectResult.turnVisibility;
+        }
+
+        // Accumulate staged file attachments from attach_file effects
+        if (effectResult.stagedAttachments) {
+          outcome.stagedAttachments.push(...effectResult.stagedAttachments);
         }
 
         // Check if effect resulted in conversation termination
@@ -429,6 +486,9 @@ export class ActionsExecutor {
       case 'call_tool':
         return await this.executeCallTool(effect, context, actionName, emitEvent);
 
+      case 'save_artifact':
+        return await this.executeSaveArtifact(effect, context, actionName, emitEvent);
+
       case 'generate_response':
         return await this.executeGenerateResponse(effect, context, actionName);
 
@@ -437,6 +497,9 @@ export class ActionsExecutor {
 
       case 'ban_user':
         return await this.executeBanUser(effect, context, actionName, emitEvent);
+
+      case 'attach_file':
+        return await this.executeAttachFile(effect, context, actionName, emitEvent);
 
       default:
         throw new InvalidOperationError(`Unknown effect type: ${(effect as any).type}`);
@@ -886,5 +949,117 @@ export class ActionsExecutor {
       shouldEndConversation: false,
       shouldAbortConversation: false,
     };
+  }
+
+  /**
+   * Executes save_artifact effect.
+   * Resolves the data value (inline or from a variable reference), converts to a Buffer,
+   * uploads to project storage via ConversationStorageService, and stores the artifactId
+   * in the specified stage variable for downstream effects.
+   */
+  private async executeSaveArtifact(
+    effect: SaveArtifactEffect,
+    context: ConversationContext,
+    actionName: string,
+    emitEvent: EffectEventCallback,
+  ): Promise<EffectOutcome> {
+    try {
+      const renderedFileName = await this.templatingEngine.render(effect.fileName, context);
+      const renderedMimeType = effect.mimeType ? await this.templatingEngine.render(effect.mimeType, context) : 'application/octet-stream';
+
+      let dataValue: unknown;
+      if (typeof effect.data === 'string') {
+        const varPath = this.parseVarsReference(effect.data);
+        if (varPath !== null) {
+          dataValue = this.resolveVarPath(context.vars, varPath);
+          // If the variable doesn't exist, fall through to templating which may resolve it or produce an empty string
+          if (dataValue === undefined) {
+            dataValue = await this.templatingEngine.render(effect.data, context);
+          }
+        } else {
+          dataValue = await this.templatingEngine.render(effect.data, context);
+        }
+      } else {
+        dataValue = effect.data;
+      }
+
+      if (dataValue === undefined || dataValue === null) {
+        throw new Error(`save_artifact: resolved data is null/undefined for variable "${effect.variableName}". Check that the referenced variable or template resolves to a value.`);
+      }
+
+      let data: Buffer;
+      if (effect.dataEncoding === 'base64') {
+        const stringValue = typeof dataValue === 'string' ? dataValue : JSON.stringify(dataValue);
+        data = Buffer.from(stringValue, 'base64');
+      } else if (typeof dataValue === 'string') {
+        data = Buffer.from(dataValue);
+      } else {
+        data = Buffer.from(JSON.stringify(dataValue));
+      }
+
+      const project = await db.query.projects.findFirst({ where: (p, { eq }) => eq(p.id, context.projectId) });
+      if (!project?.storageConfig?.storageProviderId) {
+        throw new Error('Storage provider not configured for this project');
+      }
+
+      const { id: artifactId } = await this.storageService.uploadArtifact(
+        project.storageConfig,
+        context.projectId,
+        context.conversationId,
+        'other',
+        data,
+        { contentType: renderedMimeType, customMetadata: { fileName: renderedFileName } },
+        undefined,
+        undefined,
+        undefined,
+      );
+
+      logger.info({ conversationId: context.conversationId, actionName, artifactId, fileName: renderedFileName }, `Artifact saved to storage`);
+
+      context.vars[effect.variableName] = artifactId;
+
+      await emitEvent('variables_updated', { sourceActionName: actionName, changedVariableNames: [effect.variableName], variables: context.vars as any });
+
+      return {
+        shouldEndConversation: false,
+        shouldAbortConversation: false,
+        hasModifiedVars: true,
+      };
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, actionName, error: error instanceof Error ? error.message : String(error) }, `Failed to save artifact`);
+      throw error;
+    }
+  }
+
+  /**
+   * Executes attach_file effect.
+   * Resolves the artifact ID template and stages the artifact for delivery with the AI response.
+   */
+  private async executeAttachFile(
+    effect: AttachFileEffect,
+    context: ConversationContext,
+    actionName: string,
+    _emitEvent: EffectEventCallback,
+  ): Promise<EffectOutcome> {
+    try {
+      const resolvedArtifactId = await this.templatingEngine.render(effect.artifactId, context);
+      const fileName = effect.fileName ? await this.templatingEngine.render(effect.fileName, context) : '';
+      const mimeType = effect.mimeType || '';
+
+      logger.info({ conversationId: context.conversationId, actionName, artifactId: resolvedArtifactId, fileName, mimeType }, `Staging file attachment`);
+
+      return {
+        shouldEndConversation: false,
+        shouldAbortConversation: false,
+        stagedAttachments: [{
+          artifactId: resolvedArtifactId,
+          fileName,
+          mimeType,
+        }],
+      };
+    } catch (error) {
+      logger.error({ conversationId: context.conversationId, actionName, error: error instanceof Error ? error.message : String(error) }, `Failed to resolve artifact ID for attach_file effect`);
+      throw error;
+    }
   }
 }

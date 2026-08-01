@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { inject, injectable } from "tsyringe";
-import { NotFoundError, InvalidOperationError } from "../../errors";
+import { NotFoundError, InvalidOperationError, TooManyRequestsError } from "../../errors";
 import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, Project, SampleCopy, Stage, Tool } from "../../types/models";
 import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS } from "../../types/actions";
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
-import { conversations, users, sampleCopies } from "../../db/schema";
+import { conversations, users, sampleCopies, conversationArtifacts } from "../../db/schema";
 import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility, VariablesUpdatedEventData, TurnAbortedEventData } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { ConversationStorageService } from "../ConversationStorageService";
@@ -13,8 +13,9 @@ import { ConversationRecorder } from "./ConversationRecorder";
 import { logger } from "../../utils/logger";
 import { AgentService } from "../AgentService";
 import type { Session } from "../../channels/SessionManager";
+import { getEffectiveChannelType } from "../../channels/SessionManager";
 import type { IClientConnection } from '../../channels/IClientConnection';
-import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage, CALAbortAiGenerationOutputMessage, CALUserSpeakingStartedMessage } from '../../channels/messages';
+import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage, CALAbortAiGenerationOutputMessage,   CALUserSpeakingStartedMessage, CALAttachFileOutputMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult, LlmMessage } from "../providers/llm/ILlmProvider";
 import { buildLlmUsage, LlmProviderInfo, LlmUsageMetadata } from '../../utils/llmUsage';
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
@@ -185,6 +186,14 @@ export class ConversationRunner {
   private turnMessageVisibility: MessageVisibility | undefined = undefined;
   /** Terminal action (end or abort) deferred until after the current turn's response has been fully delivered to the client */
   private pendingPostResponseAction: PendingPostResponseAction | null = null;
+  /** Uploaded file attachments ready for delivery with the current turn's response. Cleared after delivery. */
+  private pendingFileAttachments: Array<{
+    artifactId: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    downloadUrl: string;
+  }> = [];
   /** Sample copy distributor */
   private sampleCopyDistributor: SampleCopyDistributor | null = null;
   /** Session-scoped inbound converter: client audio format → ASR input format. Null when no conversion is needed. */
@@ -228,6 +237,18 @@ export class ConversationRunner {
   /** Handles audio recording for the conversation. */
   private recorder: ConversationRecorder | null = null;
 
+  /** Serializes all public runner operations to prevent concurrent state corruption. */
+  private mutex: Promise<void> = Promise.resolve();
+
+  /** Stores the outcome of the last runAction call for external trigger consumption. */
+  private lastActionOutcome: ActionsExecutionOutcome | null = null;
+
+  /** Returns true when the conversation is in a terminal state (finished, aborted, or failed). */
+  isConversationTerminal(): boolean {
+    const status = this.conversation.status;
+    return status === 'finished' || status === 'aborted' || status === 'failed';
+  }
+
   /** True when server-side VAD is active for this session. VAD owns the turn lifecycle when active. */
   get isVadMode(): boolean {
     return this.vadProcessor !== null;
@@ -235,6 +256,31 @@ export class ConversationRunner {
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, moderationStartMs: null, moderationEndMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null, completionTruncationInfo: null, accumulatedText: null };
+
+  /**
+   * Executes a function under the runner mutex, serializing all operations.
+   * If timeoutMs is provided, waits at most that long to acquire the lock.
+   */
+  private async withMutex<T>(fn: () => Promise<T>, timeoutMs?: number): Promise<T> {
+    const release = this.mutex;
+    let resolve!: () => void;
+    this.mutex = new Promise(r => { resolve = r; });
+    try {
+      if (timeoutMs !== undefined) {
+        await Promise.race([
+          release,
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new TooManyRequestsError('Request timed out, runner is busy')), timeoutMs);
+          })
+        ]);
+      } else {
+        await release;
+      }
+      return await fn();
+    } finally {
+      resolve();
+    }
+  }
 
   constructor(
     @inject(LlmProviderFactory) private llmProviderFactory: LlmProviderFactory,
@@ -734,6 +780,9 @@ export class ConversationRunner {
             }
           }
 
+          // Deliver pending file attachments before end_ai_generation_output
+          await this.deliverPendingFileAttachments();
+          this.pendingFileAttachments = [];
           // Send AI response end notification to client through channel
           // TODO: we need a dedicated message for sending full text after TTS generation is complete, as end_ai_voice_output is more about signaling the end of audio output, not necessarily tied to the text content
           const llmText = extractTextFromContent(this.stageData.lastCompletionResult?.content ?? []);
@@ -904,6 +953,9 @@ export class ConversationRunner {
         this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
 
         if (!ttsProvider) {
+          // Deliver pending file attachments before end_ai_generation_output
+          await this.deliverPendingFileAttachments();
+          this.pendingFileAttachments = [];
           // send end generation message to client to signal that response is complete and change state to awaiting user input
           const endGenerationMessage: CALEndAiGenerationOutputMessage = {
             type: 'end_ai_generation_output',
@@ -999,7 +1051,7 @@ export class ConversationRunner {
     await this.saveAndSendEvent('conversation_start', eventData);
     logger.info({ conversationId: this.conversation.id, stageId: this.stageData.id }, 'Conversation started');
 
-    const context = await this.contextBuilder.buildContextForConversationStart(this.conversation, this.channel?.connectionType);
+    const context = await this.contextBuilder.buildContextForConversationStart(this.conversation, getEffectiveChannelType(this.session));
 
     // Execute __conversation_start global lifecycle action if defined
     const onConversationStartAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_START);
@@ -1039,7 +1091,8 @@ export class ConversationRunner {
         success: true,
         shouldAbortConversation: false,
         shouldEndConversation: false,
-        shouldGenerateResponse: true
+        shouldGenerateResponse: true,
+        stagedAttachments: [],
       };
       await this.generateResponse(context, outcome);
     } else {
@@ -1065,7 +1118,7 @@ export class ConversationRunner {
     const onConversationResumeAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_RESUME);
     if (onConversationResumeAction) {
       logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_resume lifecycle action');
-      const resumeContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, this.channel?.connectionType);
+      const resumeContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, getEffectiveChannelType(this.session));
       const resumeOutcome = await this.actionsExecutor.executeActions([onConversationResumeAction], resumeContext, this.stageData.id, 'conversation_resume', this.saveAndSendEvent.bind(this));
       await this.applyActionOutcome(resumeContext, resumeOutcome);
     }
@@ -1083,34 +1136,36 @@ export class ConversationRunner {
     const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
     if (!onConversationEndAction) return;
     logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action (client command)');
-    const endContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, this.channel?.connectionType);
+    const endContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, getEffectiveChannelType(this.session));
     const endOutcome = await this.actionsExecutor.executeActions([onConversationEndAction], endContext, this.stageData.id, 'conversation_end', this.saveAndSendEvent.bind(this));
     await this.applyActionOutcome(endContext, endOutcome);
   }
 
   async receiveUserTextInput(userInput: string): Promise<string> {
-    if (this.conversation.status !== 'awaiting_user_input') {
-      throw new InvalidOperationError(`Cannot receive user input in current state: ${this.conversation.status}`);
-    }
+    return await this.withMutex(async () => {
+      if (this.conversation.status !== 'awaiting_user_input') {
+        throw new InvalidOperationError(`Cannot receive user input in current state: ${this.conversation.status}`);
+      }
 
-    // In VAD mode, stop the pre-warmed ASR session and clear it so the state machine is clean
-    // before processing text input. An active ASR session would still be listening and could
-    // fire recognition callbacks that interfere with the text turn.
-    if (this.isVadMode) {
-      this.asrPreWarmPromise = null;
-      if (this.stageData.asrProvider) {
-        try {
-          await this.stageData.asrProvider.stop();
-          logger.info({ conversationId: this.conversation.id }, 'Stopped pre-warmed ASR session for text input');
-        } catch (error) {
-          logger.warn({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, 'Failed to stop pre-warmed ASR for text input (non-fatal)');
+      // In VAD mode, stop the pre-warmed ASR session and clear it so the state machine is clean
+      // before processing text input. An active ASR session would still be listening and could
+      // fire recognition callbacks that interfere with the text turn.
+      if (this.isVadMode) {
+        this.asrPreWarmPromise = null;
+        if (this.stageData.asrProvider) {
+          try {
+            await this.stageData.asrProvider.stop();
+            logger.info({ conversationId: this.conversation.id }, 'Stopped pre-warmed ASR session for text input');
+          } catch (error) {
+            logger.warn({ conversationId: this.conversation.id, error: error instanceof Error ? error.message : String(error) }, 'Failed to stop pre-warmed ASR for text input (non-fatal)');
+          }
         }
       }
-    }
 
-    this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
-    await this.processUserInput(userInput, 'text');
-    return this.turnData.inputTurnId;
+      this.turnData.inputTurnId = generateId(ID_PREFIXES.INPUT);
+      await this.processUserInput(userInput, 'text');
+      return this.turnData.inputTurnId;
+    });
   }
 
   async startUserVoiceInput(): Promise<string> {
@@ -1345,7 +1400,7 @@ export class ConversationRunner {
       const onLeaveAction = oldStageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_LEAVE];
       if (onLeaveAction) {
         logger.debug({ conversationId: this.conversation.id, stageId: fromStageId }, 'Executing __on_leave lifecycle action');
-        const context = await this.contextBuilder.buildContextForLifecycleAction(oldStageData.conversation, oldStageData.stage, this.channel?.connectionType);
+        const context = await this.contextBuilder.buildContextForLifecycleAction(oldStageData.conversation, oldStageData.stage, getEffectiveChannelType(this.session));
         const leaveOutcome = await this.actionsExecutor.executeActions([onLeaveAction], context, oldStageData.id, 'on_leave', this.saveAndSendEvent.bind(this));
 
         await this.applyActionOutcome(context, leaveOutcome);
@@ -1423,7 +1478,7 @@ export class ConversationRunner {
       await this.saveAndSendEvent('jump_to_stage', eventData);
 
       // Execute __on_enter lifecycle action if defined on new stage
-      const enterContext = await this.contextBuilder.buildContextForLifecycleAction(this.stageData.conversation, this.stageData.stage, this.channel?.connectionType);
+      const enterContext = await this.contextBuilder.buildContextForLifecycleAction(this.stageData.conversation, this.stageData.stage, getEffectiveChannelType(this.session));
       let enterOutcome: ActionsExecutionOutcome | null = null;
       const onEnterAction = this.stageData.stage.actions[LIFECYCLE_ACTION_NAMES.ON_ENTER];
       if (onEnterAction) {
@@ -1454,7 +1509,8 @@ export class ConversationRunner {
           success: true,
           shouldAbortConversation: false,
           shouldEndConversation: false,
-          shouldGenerateResponse: true
+          shouldGenerateResponse: true,
+          stagedAttachments: [],
         };
         await this.generateResponse(enterContext, executionOutcome);
       } else {
@@ -1610,61 +1666,71 @@ export class ConversationRunner {
    * @returns Result of the action execution
    */
   async runAction(actionName: string, parameters: Record<string, any>): Promise<any> {
-    logger.info({ conversationId: this.conversation.id, actionName, parameterCount: parameters.length }, `Running action ${actionName}`);
-
-    if (this.conversation.status !== 'awaiting_user_input') {
-      throw new InvalidOperationError(`Cannot run action in current state: ${this.conversation.status}`);
-    }
-
-    // Reset per-turn data so timing fields are clean for this client-initiated action turn,
-    // just like processUserInput does at the start of each user turn.
-    this.responseGeneratedInTurn = false;
-    this.resetTurnData();
-
-    // Find the action in the already-loaded stage global actions.
-    // Match by id first (clients send the action ID, e.g. "gact_..."), then fall back to name.
-    const globalAction = this.stageData.globalActions.find(a => a.id === actionName || a.name === actionName);
-
-    const stageAction = this.stageData.stage.actions[actionName];
-
-    if (!globalAction && !stageAction) {
-      throw new NotFoundError(`Action ${actionName} not found in project ${this.stageData.project.id}`);
-    }
-
-    const actionToExecute = stageAction || globalAction;
-    logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
-    const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionName, actionToExecute, parameters, this.channel?.connectionType);
-    logger.debug({ conversationId: this.conversation.id, actionName }, `Built context for action ${actionName}`);
-    const outcome = await this.actionsExecutor.executeActions([actionToExecute], context, this.stageData.id, null, this.saveAndSendEvent.bind(this));
-
-    const shouldContinue = await this.applyActionOutcome(context, outcome);
-    const isTerminalWithoutResponse = !outcome.shouldGenerateResponse &&
-      (outcome.shouldAbortConversation || outcome.shouldEndConversation);
-    if (isTerminalWithoutResponse) {
-      // Defer the terminal event: set pendingPostResponseAction but do NOT execute it here.
-      // RunActionHandler will call executePendingTerminalAction() after sending the run_action
-      // response to guarantee conversation_aborted / conversation_end arrives after the acknowledgement.
-      if (outcome.shouldAbortConversation) {
-        this.pendingPostResponseAction = {
-          name: outcome.abortConversationSourceAction,
-          type: 'abort_conversation',
-          abortReason: outcome.abortReason || 'Conversation aborted by action',
-          context,
-        };
-      } else {
-        this.pendingPostResponseAction = {
-          name: outcome.endConversationSourceAction,
-          type: 'end_conversation',
-          endReason: outcome.endReason || 'Action execution completed conversation',
-          context,
-        };
+    return await this.withMutex(async () => {
+      // After acquiring the mutex, re-check: conversation may have become terminal while waiting in queue
+      if (this.isConversationTerminal()) {
+        logger.warn({ conversationId: this.conversation.id, actionName, status: this.conversation.status }, 'runAction ignored: conversation is in terminal state');
+        this.lastActionOutcome = null;
+        return { status: 'ignored', message: 'Conversation is in terminal state' };
       }
-    } else if (shouldContinue || outcome.shouldAbortConversation || outcome.shouldEndConversation) {
-      await this.generateResponse(context, outcome);
-    }
 
-    logger.info({ conversationId: this.conversation.id, actionName }, `Action ${actionName} executed`);
-    return { status: 'completed', message: 'Action execution not yet implemented' };
+      logger.info({ conversationId: this.conversation.id, actionName, parameterCount: parameters.length }, `Running action ${actionName}`);
+
+      if (this.conversation.status !== 'awaiting_user_input') {
+        throw new InvalidOperationError(`Cannot run action in current state: ${this.conversation.status}`);
+      }
+
+      // Reset per-turn data so timing fields are clean for this client-initiated action turn,
+      // just like processUserInput does at the start of each user turn.
+      this.responseGeneratedInTurn = false;
+      this.resetTurnData();
+
+      // Find the action in the already-loaded stage global actions.
+      // Match by id first (clients send the action ID, e.g. "gact_..."), then fall back to name.
+      const globalAction = this.stageData.globalActions.find(a => a.id === actionName || a.name === actionName);
+
+      const stageAction = this.stageData.stage.actions[actionName];
+
+      if (!globalAction && !stageAction) {
+        throw new NotFoundError(`Action ${actionName} not found in project ${this.stageData.project.id}`);
+      }
+
+      const actionToExecute = stageAction || globalAction;
+      logger.info({ conversationId: this.conversation.id, actionName }, `Executing action ${actionName}`);
+      const context = await this.contextBuilder.buildContextForAction(this.stageData.conversation, actionName, actionToExecute, parameters, getEffectiveChannelType(this.session));
+      logger.debug({ conversationId: this.conversation.id, actionName }, `Built context for action ${actionName}`);
+      const outcome = await this.actionsExecutor.executeActions([actionToExecute], context, this.stageData.id, null, this.saveAndSendEvent.bind(this));
+
+      const shouldContinue = await this.applyActionOutcome(context, outcome);
+      const isTerminalWithoutResponse = !outcome.shouldGenerateResponse &&
+        (outcome.shouldAbortConversation || outcome.shouldEndConversation);
+      if (isTerminalWithoutResponse) {
+        // Defer the terminal event: set pendingPostResponseAction but do NOT execute it here.
+        // RunActionHandler will call executePendingTerminalAction() after sending the run_action
+        // response to guarantee conversation_aborted / conversation_end arrives after the acknowledgement.
+        if (outcome.shouldAbortConversation) {
+          this.pendingPostResponseAction = {
+            name: outcome.abortConversationSourceAction,
+            type: 'abort_conversation',
+            abortReason: outcome.abortReason || 'Conversation aborted by action',
+            context,
+          };
+        } else {
+          this.pendingPostResponseAction = {
+            name: outcome.endConversationSourceAction,
+            type: 'end_conversation',
+            endReason: outcome.endReason || 'Action execution completed conversation',
+            context,
+          };
+        }
+      } else if (shouldContinue || outcome.shouldAbortConversation || outcome.shouldEndConversation) {
+        await this.generateResponse(context, outcome);
+      }
+
+      logger.info({ conversationId: this.conversation.id, actionName }, `Action ${actionName} executed`);
+      this.lastActionOutcome = outcome;
+      return { status: 'completed', message: 'Action execution not yet implemented' };
+    });
   }
 
   /**
@@ -1676,6 +1742,13 @@ export class ConversationRunner {
     if (this.pendingPostResponseAction) {
       await this.handlePostResponseAction();
     }
+  }
+
+  /**
+   * Returns the outcome of the last runAction call for external trigger consumption.
+   */
+  getLastActionOutcome(): ActionsExecutionOutcome | null {
+    return this.lastActionOutcome;
   }
 
   /**
@@ -1700,7 +1773,7 @@ export class ConversationRunner {
 
     // Build conversation context for tool execution
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], '', '',
-      this.sampleCopyDistributor.getOriginalCopies(), '', '', undefined, this.channel?.connectionType);
+      this.sampleCopyDistributor.getOriginalCopies(), '', '', undefined, getEffectiveChannelType(this.session));
 
     // Execute the tool
     const executeResult = await this.toolExecutor.executeTool(tool, context, parameters, this.stageData.costManagementConfig);
@@ -2252,7 +2325,7 @@ export class ConversationRunner {
     if (onConversationFailedAction) {
       try {
         logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_failed lifecycle action');
-        const failedContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, this.channel?.connectionType);
+        const failedContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, getEffectiveChannelType(this.session));
         const failedOutcome = await this.actionsExecutor.executeActions([onConversationFailedAction], failedContext, this.stageData.id, 'conversation_failed', this.saveAndSendEvent.bind(this));
       } catch (lifecycleError) {
         logger.error({ conversationId: this.conversation.id, error: lifecycleError instanceof Error ? lifecycleError.message : String(lifecycleError) }, 'Failed to execute __conversation_failed lifecycle action');
@@ -2566,7 +2639,7 @@ export class ConversationRunner {
         if (decorator) {
           const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation,
             this.stageData.stage, nonKnowledgeResults, userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(),
-            copy, copyContent, this.stageData.faq, this.channel?.connectionType);
+            copy, copyContent, this.stageData.faq, getEffectiveChannelType(this.session));
           copy = await this.templatingEngine.render(decorator.template, context);
         }
       }
@@ -2578,7 +2651,7 @@ export class ConversationRunner {
     // and response-related effects from actions are ignored.
     const forcedCopyResponse = sampleCopies.length > 0 && selectedSampleCopy?.mode === 'forced' ? copy : null;
     const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, nonKnowledgeResults, userInput, userInputSource,
-      this.sampleCopyDistributor.getOriginalCopies(), copy, copyContent, this.stageData.faq, this.channel?.connectionType);
+      this.sampleCopyDistributor.getOriginalCopies(), copy, copyContent, this.stageData.faq, getEffectiveChannelType(this.session));
     const stageActionMap = new Map(Object.values(stageActions).map(sa => [sa.name, sa]));
 
     // Deduplicate actions by name - if multiple classifiers detect the same action, only include it once
@@ -2700,6 +2773,73 @@ export class ConversationRunner {
     await this.generateResponse(context, executionOutcome);
   }
 
+  /**
+   * Resolves staged file attachments from storage artifacts.
+   * Artifacts are already in storage (uploaded by tools with storageConfig).
+   * Looks up each artifact and records it in pendingFileAttachments for delivery.
+   */
+  private async uploadStagedAttachments(stagedAttachments: Array<{ artifactId: string; fileName: string; mimeType: string }>): Promise<void> {
+    const conversationId = this.conversation.id;
+
+    for (const attachment of stagedAttachments) {
+      try {
+        const artifact = await db.query.conversationArtifacts.findFirst({
+          where: and(
+            eq(conversationArtifacts.id, attachment.artifactId),
+            eq(conversationArtifacts.conversationId, conversationId),
+          ),
+        });
+
+        if (!artifact) {
+          logger.warn({ conversationId, artifactId: attachment.artifactId }, 'Artifact not found for file attachment');
+          continue;
+        }
+
+        const resolvedFileName = attachment.fileName || (artifact.metadata as { fileName?: string })?.fileName || attachment.artifactId;
+        const resolvedMimeType = attachment.mimeType || artifact.mimeType || 'application/octet-stream';
+
+        this.pendingFileAttachments.push({
+          artifactId: artifact.id,
+          fileName: resolvedFileName,
+          mimeType: resolvedMimeType,
+          fileSize: artifact.fileSize || 0,
+          downloadUrl: artifact.storageUrl || '',
+        });
+        logger.info({ conversationId, artifactId: artifact.id, fileName: resolvedFileName, fileSize: artifact.fileSize || 0 }, 'File attachment resolved from storage');
+      } catch (error) {
+        logger.error({ conversationId, artifactId: attachment.artifactId, error: error instanceof Error ? error.message : String(error) }, 'Failed to resolve file attachment');
+      }
+    }
+  }
+
+
+  /**
+   * Delivers pending file attachments to the client as attach_file_output messages.
+   * Must be called after text/voice output but before end_ai_generation_output.
+   */
+  private async deliverPendingFileAttachments(): Promise<void> {
+    if (this.pendingFileAttachments.length === 0) return;
+
+    const outputTurnId = this.turnData.outputTurnId;
+    for (let i = 0; i < this.pendingFileAttachments.length; i++) {
+      const attachment = this.pendingFileAttachments[i];
+      const fileMessage: CALAttachFileOutputMessage = {
+        type: 'attach_file_output',
+        conversationId: this.conversation.id,
+        outputTurnId,
+        artifactId: attachment.artifactId,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        fileSize: attachment.fileSize,
+        downloadUrl: attachment.downloadUrl,
+        sequenceNumber: i,
+      };
+      await this.channel.sendMessage(fileMessage);
+    }
+
+    logger.info({ conversationId: this.conversation.id, count: this.pendingFileAttachments.length }, 'Delivered file attachments');
+  }
+
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
     // Generate a response when the action succeeded and a generate_response effect is set.
     // Note: shouldAbortConversation no longer suppresses generation — the abort is deferred
@@ -2735,11 +2875,24 @@ export class ConversationRunner {
         }
       }
       await this.changeState('generating_response');
+
+      // Upload staged file attachments before generation so they are available for delivery
+      this.pendingFileAttachments = [];
+      if (executionOutcome.stagedAttachments.length > 0) {
+        await this.uploadStagedAttachments(executionOutcome.stagedAttachments);
+      }
+
       if (executionOutcome.prescriptedResponse !== undefined) {
         await this.deliverPrescriptedResponse(executionOutcome.prescriptedResponse);
       } else {
         this.turnData.promptRenderStartMs = Date.now();
-        this.stageData.lastCompletionPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        let renderedPrompt = await this.templatingEngine.render(this.stageData.stage.prompt, context);
+        // Inject attachment info into prompt so the LLM can reference them
+        if (this.pendingFileAttachments.length > 0) {
+          const attachmentList = this.pendingFileAttachments.map(a => `- ${a.fileName} (${a.mimeType})`).join('\n');
+          renderedPrompt = `${renderedPrompt}\n\nYou have the following files attached to this response. Mention them naturally in your response:\n${attachmentList}`;
+        }
+        this.stageData.lastCompletionPrompt = renderedPrompt;
         this.turnData.promptRenderEndMs = Date.now();
         this.turnData.firstTokenMs = null;
         this.turnData.llmStartMs = Date.now();
@@ -2870,7 +3023,7 @@ export class ConversationRunner {
       logger.info({ globalActions: this.stageData.globalActions }, 'Checking for __moderation_blocked global action');
       const moderationBlockedAction = this.stageData.globalActions.find(ga => ga.id === '__moderation_blocked');
       if (moderationBlockedAction) {
-        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), '', '', this.stageData.faq, this.channel?.connectionType);
+        const context = await this.contextBuilder.buildContextForUserInput(this.stageData.conversation, this.stageData.stage, [], userInput, userInputSource, this.sampleCopyDistributor.getOriginalCopies(), '', '', this.stageData.faq, getEffectiveChannelType(this.session));
         const executionOutcome = await this.actionsExecutor.executeActions([moderationBlockedAction], context, this.stageData.id, null, this.saveAndSendEvent.bind(this));
         await this.applyActionOutcome(context, executionOutcome);
         const messageEventData: MessageEventData = {
@@ -2905,7 +3058,7 @@ export class ConversationRunner {
     if (!fillerLlmProvider || !fillerSettings) {
       return null;
     }
-    const context = await this.contextBuilder.buildContextForFillerSentence(this.conversation, this.stageData.stage, userInput, this.channel?.connectionType);
+    const context = await this.contextBuilder.buildContextForFillerSentence(this.conversation, this.stageData.stage, userInput, getEffectiveChannelType(this.session));
     const renderedPrompt = await this.templatingEngine.render(fillerSettings.prompt, context);
     const historyMessageCount = fillerSettings.historyMessageCount ?? 0;
     let recentHistory = [...context.history];
@@ -2944,7 +3097,7 @@ export class ConversationRunner {
       return null;
     }
     try {
-      const context = await this.contextBuilder.buildContextForFillerSentence(this.conversation, this.stageData.stage, userInput, this.channel?.connectionType);
+      const context = await this.contextBuilder.buildContextForFillerSentence(this.conversation, this.stageData.stage, userInput, getEffectiveChannelType(this.session));
       const renderedPrompt = await this.templatingEngine.render(fillerSettings.prompt, context);
       const historyMessageCount = fillerSettings.historyMessageCount ?? 0;
       // The current user message is already in context.history (saved to DB before context is built),
@@ -3025,6 +3178,9 @@ export class ConversationRunner {
     this.turnData.assistantMessageEventId = await this.saveAndSendEvent('message', messageEventData);
 
     if (!ttsProvider) {
+      // Deliver pending file attachments before end_ai_generation_output
+      await this.deliverPendingFileAttachments();
+      this.pendingFileAttachments = [];
       const prescriptedEndMessage: CALEndAiGenerationOutputMessage = {
         type: 'end_ai_generation_output',
         conversationId,
@@ -3091,7 +3247,7 @@ export class ConversationRunner {
       try {
         const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
         if (onConversationEndAction) {
-          const endContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, this.channel?.connectionType);
+          const endContext = await this.contextBuilder.buildContextForConversationStart(this.conversation, getEffectiveChannelType(this.session));
           await this.actionsExecutor.executeActions([onConversationEndAction], endContext, this.stageData.id, 'conversation_end', this.saveAndSendEvent.bind(this));
         }
         const eventData: ConversationEndEventData = { stageId: this.stageData.id, reason: 'Conversation ended due to prolonged user silence' };

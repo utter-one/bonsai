@@ -375,6 +375,7 @@ export const globalActions = pgTable('global_actions', {
   condition: text('condition'),
   triggerOnUserInput: boolean('trigger_on_user_input').notNull().default(true),
   triggerOnClientCommand: boolean('trigger_on_client_command').notNull().default(false),
+  triggerOnExternal: boolean('trigger_on_external').notNull().default(false),
   classificationTrigger: text('classification_trigger'),
   overrideClassifierId: text('override_classifier_id'),
   parameters: jsonb('parameters').notNull().default([]).$type<StageActionParameter[]>(),
@@ -525,7 +526,7 @@ export const savedFunnelQueries = pgTable('saved_funnel_queries', {
   index('idx_saved_funnel_queries_operator_id').on(table.operatorId),
 ]);
 
-export type ArtifactType = 'user_voice' | 'user_transcript' | 'ai_voice' | 'ai_transcript' | 'tool_input' | 'tool_output' | 'other';
+export type ArtifactType = 'user_voice' | 'user_transcript' | 'ai_voice' | 'ai_transcript' | 'tool_input' | 'tool_output' | 'attachment' | 'other';
 
 // Secrets table — stores AES-256-GCM encrypted secret values
 // Each row holds a single encrypted value; the ID is embedded in `@sec:name:id` references
@@ -725,6 +726,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   scenarios: many(scenarios),
   scenarioRuns: many(scenarioRuns),
   scenarioConversations: many(scenarioConversations),
+  quickPrompts: many(quickPrompts),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -836,6 +838,7 @@ export const conversationArtifactsRelations = relations(conversationArtifacts, (
 export const operatorsRelations = relations(operators, ({ many }) => ({
   auditLogs: many(auditLogs),
   providers: many(providers),
+  quickPrompts: many(quickPrompts),
 }));
 
 export const providersRelations = relations(providers, ({ one }) => ({
@@ -913,6 +916,56 @@ export const scenarioConversationsRelations = relations(scenarioConversations, (
     references: [scenarioRuns.projectId, scenarioRuns.id],
   }),
 }));
+
+// QuickPrompt table — reusable prompt templates with "copy on select" behavior
+export type QuickPromptCategory = 'agent' | 'stage' | 'filler' | 'transformer' | 'classifier' | 'tool' | 'tester' | 'summarization';
+
+export const quickPrompts = pgTable('quick_prompts', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+  categoryId: text('category_id').notNull().$type<QuickPromptCategory>(),
+  ownerId: text('owner_id').references(() => operators.id, { onDelete: 'set null' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  content: text('content').notNull(),
+  tags: jsonb('tags').notNull().default([]).$type<string[]>(),
+  isPublic: boolean('is_public').notNull().default(true),
+  isSystem: boolean('is_system').notNull().default(false),
+  version: integer('version').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (table) => [
+  index('idx_quick_prompts_project_id').on(table.projectId),
+  index('idx_quick_prompts_category_id').on(table.categoryId),
+  index('idx_quick_prompts_owner_id').on(table.ownerId),
+  index('idx_quick_prompts_is_public').on(table.isPublic),
+]);
+
+// ─── Processing Deferral ────────────────────────────────────────────────────
+
+/** Status of a deferred processing entry */
+export type DeferredProcessingStatus = 'pending' | 'processed' | 'failed' | 'cancelled';
+
+// deferred_processing — incoming messages queued for delayed processing
+export const deferredProcessing = pgTable('deferred_processing', {
+  id: text('id').notNull().primaryKey(),
+  sessionId: text('session_id').notNull(),
+  providerId: text('provider_id').notNull().references(() => providers.id),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  conversationId: text('conversation_id'),
+  channelType: text('channel_type').notNull(),
+  processAt: timestamp('process_at').notNull(),
+  message: jsonb('message').notNull().$type<Record<string, unknown>>(),
+  status: text('status').notNull().default('pending').$type<DeferredProcessingStatus>(),
+  retryCount: integer('retry_count').notNull().default(0),
+  lastError: text('last_error'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  processedAt: timestamp('processed_at'),
+}, (table) => [
+  index('idx_deferred_processing_process_at_status').on(table.processAt, table.status),
+  index('idx_deferred_processing_session_id').on(table.sessionId),
+]);
 
 // ─── Benchmarking ────────────────────────────────────────────────────────────
 
@@ -1013,6 +1066,17 @@ export const benchmarkResults = pgTable('benchmark_results', {
 ]);
 
 // ─── Benchmarking Relations ───────────────────────────────────────────────────
+
+export const quickPromptsRelations = relations(quickPrompts, ({ one }) => ({
+  project: one(projects, {
+    fields: [quickPrompts.projectId],
+    references: [projects.id],
+  }),
+  owner: one(operators, {
+    fields: [quickPrompts.ownerId],
+    references: [operators.id],
+  }),
+}));
 
 export const benchmarkSuitesRelations = relations(benchmarkSuites, ({ one, many }) => ({
   creator: one(operators, {

@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db/index';
 import { providers, apiKeys } from '../../db/schema';
 import { SessionManager } from '../SessionManager';
+import { isFeatureAllowed } from '../SessionManager';
 import { ChannelHandlerDispatcher } from '../ChannelHandlerDispatcher';
 import { IpRateLimiter } from '../../IpRateLimiter';
 import { TwilioMessagingConnection } from './TwilioMessagingConnection';
@@ -21,6 +22,8 @@ import { ProjectService } from '../../services/ProjectService';
 import { UserService } from '../../services/UserService';
 import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
 import { NotFoundError } from '../../errors';
+import { DeferredProcessingService } from '../../services/DeferredProcessingService';
+import { randomBetween } from '../../utils/randomBetween';
 import { twilioMessagingSendBodySchema, twilioMessagingSendResponseSchema } from '../../http/contracts/twilio-messaging-outgoing';
 import type { TwilioMessagingSendResponse } from '../../http/contracts/twilio-messaging-outgoing';
 import * as _twilio from 'twilio';
@@ -74,6 +77,7 @@ export class TwilioMessagingChannelHost {
     @inject(ProjectService) private readonly projectService: ProjectService,
     @inject(UserService) private readonly userService: UserService,
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
   ) {}
 
   /**
@@ -176,7 +180,7 @@ export class TwilioMessagingChannelHost {
       res.status(500).send();
       return;
     }
-    const { accountSid, authToken, fromNumber } = configResult.data;
+    const { accountSid, authToken, fromNumber, processingDelayMinMs, processingDelayMaxMs } = configResult.data;
 
     // Validate Twilio request signature
     const twilioSignature = req.headers['x-twilio-signature'] as string | undefined;
@@ -217,14 +221,14 @@ export class TwilioMessagingChannelHost {
 
     if (sessionId) {
       this.scheduleTimeout(sessionId, phoneKey);
-      await this.dispatchTextInput(sessionId, messageText);
+      await this.dispatchTextInput(sessionId, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
     } else {
       const connection = new TwilioMessagingConnection(senderNumber, recipientNumber, accountSid, authToken, this.sessionManager);
       const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
       const sessionId = this.sessionManager.registerSession(connection);
       const session = this.sessionManager.getSession(sessionId);
       connection.attachSession(session);
-      this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+      this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null, null);
       this.phoneSessionMap.set(phoneKey, sessionId);
       this.scheduleTimeout(sessionId, phoneKey);
 
@@ -233,7 +237,7 @@ export class TwilioMessagingChannelHost {
       const startMsg: CALInputMessage = { type: 'start_conversation', userId: senderNumber, stageId, agentId, correlationId: undefined };
       const startContext = this.buildContext(sessionId);
       await this.dispatcher.dispatch(startMsg, startContext);
-      await this.dispatchTextInput(sessionId, messageText);
+      await this.dispatchTextInput(sessionId, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
     }
 
     res.set('Content-Type', 'text/xml').send('<Response/>');
@@ -335,7 +339,7 @@ export class TwilioMessagingChannelHost {
     const sessionId = this.sessionManager.registerSession(connection);
     const session = this.sessionManager.getSession(sessionId);
     connection.attachSession(session);
-    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null);
+    this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, defaultSettings, keySettings ?? null, null);
     this.phoneSessionMap.set(phoneKey, sessionId);
     this.scheduleTimeout(sessionId, phoneKey);
 
@@ -367,13 +371,40 @@ export class TwilioMessagingChannelHost {
    * @param sessionId - The target session ID.
    * @param text - The message text to deliver.
    */
-  private async dispatchTextInput(sessionId: string, text: string): Promise<void> {
+  private async dispatchTextInput(sessionId: string, text: string, providerId: string, processingDelayMinMs: number, processingDelayMaxMs: number): Promise<void> {
     const session = this.sessionManager.getSession(sessionId);
     if (!session?.conversationId) {
       logger.warn({ sessionId }, 'Twilio Messaging: cannot dispatch text input — no active conversation');
       return;
     }
+
     const msg: CALInputMessage = { type: 'send_user_text_input', conversationId: session.conversationId, text, correlationId: undefined };
+
+    // Check deferral config
+    if (processingDelayMinMs > 0 && processingDelayMaxMs > 0) {
+      const delayMs = randomBetween(processingDelayMinMs, processingDelayMaxMs);
+      const processAt = new Date(Date.now() + delayMs);
+
+      await this.deferredProcessingService.queue({
+        sessionId,
+        providerId,
+        projectId: session.projectId ?? '',
+        conversationId: session.conversationId,
+        channelType: 'twilio_messaging',
+        processAt,
+        message: msg,
+      });
+
+      logger.info({
+        sessionId,
+        projectId: session.projectId,
+        conversationId: session.conversationId,
+        delayMs,
+        processAt,
+      }, 'Twilio Messaging: incoming message queued for deferred processing');
+      return;
+    }
+
     const context = this.buildContext(sessionId);
     await this.dispatcher.dispatch(msg, context);
   }
@@ -403,6 +434,10 @@ export class TwilioMessagingChannelHost {
 
     const handle = setTimeout(async () => {
       logger.info({ sessionId }, 'Twilio Messaging: session timed out due to inactivity');
+
+      // Cancel any pending deferred messages for this session
+      await this.deferredProcessingService.cancelBySessionId(sessionId);
+
       this.phoneSessionMap.delete(phoneKey);
       this.sessionTimeoutMap.delete(sessionId);
       await this.sessionManager.unregisterSession(sessionId);

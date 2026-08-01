@@ -78,6 +78,7 @@ A live Swagger UI is available at `/api-docs` on your running instance.
 - [Twilio Messaging](./twilio-messaging) — Twilio SMS/MMS channel integration
 - [WhatsApp](./whatsapp) — WhatsApp Business API channel integration
 - [SES Email](./ses-email) — AWS SES email channel integration
+- [Deferred Processing](./deferred-processing) — Deferred processing queue management
 
 ### Real-time
 - [WebSocket](./websocket) — Real-time conversational AI protocol (WebSocket)
