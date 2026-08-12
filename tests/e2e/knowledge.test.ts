@@ -266,5 +266,34 @@ describe('Knowledge API', () => {
         expect(res.body.length).to.be.greaterThanOrEqual(1);
       });
     });
+
+    describe('list by category', () => {
+      it('returns items scoped to category', async () => {
+        const cr = await authed().post(`/api/projects/${fix.projectId}/knowledge/categories`).send({ ...minimalCategory(), name: 'Second Category' });
+        const secondCategoryId = cr.body.id;
+
+        // Create items in both categories
+        await authed().post(`/api/projects/${fix.projectId}/knowledge/items`).send(minimalItem(categoryId));
+        await authed().post(`/api/projects/${fix.projectId}/knowledge/items`).send(minimalItem(categoryId));
+        await authed().post(`/api/projects/${fix.projectId}/knowledge/items`).send(minimalItem(secondCategoryId));
+
+        const res = await authed().get(`/api/projects/${fix.projectId}/knowledge/categories/${categoryId}/items`);
+        expect(res.status).to.equal(200);
+        expect(res.body).to.be.an('array').with.length(2);
+      });
+
+      it('returns empty list for category with no items', async () => {
+        const cr = await authed().post(`/api/projects/${fix.projectId}/knowledge/categories`).send({ ...minimalCategory(), name: 'Empty Category' });
+        const res = await authed().get(`/api/projects/${fix.projectId}/knowledge/categories/${cr.body.id}/items`);
+        expect(res.status).to.equal(200);
+        expect(res.body).to.be.an('array').that.is.empty;
+      });
+
+      it('returns empty array for non-existent category (no category filter enforced)', async () => {
+        const res = await authed().get(`/api/projects/${fix.projectId}/knowledge/categories/nonexistent/items`);
+        expect(res.status).to.equal(200);
+        expect(res.body).to.be.an('array').that.is.empty;
+      });
+    });
   });
 });

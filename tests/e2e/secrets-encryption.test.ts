@@ -223,6 +223,7 @@ describe('Secrets Encryption', () => {
         },
         oauth2: {
           tokenUrl: 'https://oauth2.googleapis.com/token',
+          authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
           clientId: 'my-client-id',
           clientSecret: 'oauth-secret-123',
           accessToken: 'oauth-access-456',

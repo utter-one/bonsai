@@ -59,6 +59,7 @@ import { gcsStorageProviderConfigSchema, gcsStorageSettingsSchema } from './serv
 import { localStorageProviderConfigSchema, localStorageSettingsSchema } from './services/providers/storage/LocalStorageProvider';
 import { cartesiaTtsSettingsSchema } from './services/providers/tts/CartesiaTtsProvider';
 import { amazonPollyTtsSettingsSchema } from './services/providers/tts/AmazonPollyTtsProvider';
+import { sonioxTtsSettingsSchema } from './services/providers/tts/SonioxTtsProvider';
 import { azureAsrSettingsSchema } from './services/providers/asr/AzureAsrProvider';
 import { elevenLabsAsrSettingsSchema } from './services/providers/asr/ElevenLabsAsrProvider';
 import { deepgramAsrSettingsSchema } from './services/providers/asr/DeepgramAsrProvider';
@@ -118,6 +119,7 @@ import { BenchmarkRunController } from './http/controllers/BenchmarkRunControlle
 import { timingStatsSchema, benchmarkStatsSchema, createBenchmarkSuiteSchema, updateBenchmarkSuiteSchema, benchmarkSuiteResponseSchema, benchmarkSuiteListResponseSchema, createBenchmarkProviderConfigSchema, updateBenchmarkProviderConfigSchema, benchmarkProviderConfigResponseSchema, benchmarkProviderConfigListResponseSchema, createBenchmarkConfigSchema, updateBenchmarkConfigSchema, benchmarkConfigResponseSchema, benchmarkConfigListResponseSchema, triggerBenchmarkRunSchema, benchmarkConfigExecutionResponseSchema, benchmarkRunResponseSchema, benchmarkRunListResponseSchema, llmIterationOutputSchema, ttsIterationOutputSchema, asrIterationOutputSchema, benchmarkIterationResultDataSchema, benchmarkResultResponseSchema } from './http/contracts/benchmark';
 import { QuickPromptController } from './http/controllers/QuickPromptController';
 import { DeferredProcessingController } from './http/controllers/DeferredProcessingController';
+import { ProjectSnapshotController } from './http/controllers/ProjectSnapshotController';
 import { createQuickPromptSchema, createProjectQuickPromptSchema, updateQuickPromptBodySchema, deleteQuickPromptBodySchema, cloneQuickPromptSchema, quickPromptResponseSchema, quickPromptListResponseSchema, quickPromptRouteParamsSchema, quickPromptProjectRouteParamsSchema } from './http/contracts/quickPrompt';
 import { deferredProcessingResponseSchema, deferredProcessingListResponseSchema, rescheduleDeferredProcessingBodySchema, cancelDeferredProcessingBodySchema } from './http/contracts/deferredProcessing';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
@@ -178,6 +180,7 @@ export function getOpenAPISpec(): any {
   registry.register('CartesiaTtsSettings', cartesiaTtsSettingsSchema);
   registry.register('AzureTtsSettings', azureTtsSettingsSchema);
   registry.register('AmazonPollyTtsSettings', amazonPollyTtsSettingsSchema);
+  registry.register('SonioxTtsSettings', sonioxTtsSettingsSchema);
 
   // Voice and ASR configuration schemas
   registry.register('ServerVadConfig', serverVadConfigSchema);
@@ -765,6 +768,12 @@ export function getOpenAPISpec(): any {
   registry.register('CancelDeferredProcessing', cancelDeferredProcessingBodySchema);
   const deferredProcessingPaths = DeferredProcessingController.getOpenAPIPaths();
   for (const path of deferredProcessingPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register ProjectSnapshot schemas and routes
+  const snapshotPaths = ProjectSnapshotController.getOpenAPIPaths();
+  for (const path of snapshotPaths) {
     registry.registerPath(path);
   }
 

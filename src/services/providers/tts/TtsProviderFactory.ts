@@ -8,22 +8,23 @@ import { DeepgramTtsProvider, DeepgramTtsProviderConfig, deepgramTtsProviderConf
 import { CartesiaTtsProvider, CartesiaTtsProviderConfig, cartesiaTtsProviderConfigSchema, CartesiaTtsSettings } from './CartesiaTtsProvider';
 import { AzureTtsProvider, AzureTtsProviderConfig, azureTtsProviderConfigSchema, AzureTtsSettings } from './AzureTtsProvider';
 import { AmazonPollyTtsProvider, AmazonPollyTtsProviderConfig, amazonPollyTtsProviderConfigSchema, AmazonPollyTtsSettings } from './AmazonPollyTtsProvider';
+import { SonioxTtsProvider, SonioxTtsProviderConfig, sonioxTtsProviderConfigSchema, SonioxTtsSettings } from './SonioxTtsProvider';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 /**
  * Supported TTS provider API types
  */
-export type TtsProviderApiType = 'elevenlabs' | 'openai' | 'deepgram' | 'cartesia' | 'azure' | 'amazon-polly';
+export type TtsProviderApiType = 'elevenlabs' | 'openai' | 'deepgram' | 'cartesia' | 'azure' | 'amazon-polly' | 'soniox';
 
 /**
  * Union type for all TTS voice settings
  */
-export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings | DeepgramTtsSettings | CartesiaTtsSettings | AzureTtsSettings | AmazonPollyTtsSettings;
+export type TtsSettings = ElevenLabsTtsSettings | OpenAiTtsSettings | DeepgramTtsSettings | CartesiaTtsSettings | AzureTtsSettings | AmazonPollyTtsSettings | SonioxTtsSettings;
 
 /**
  * Union type for all TTS provider configurations
  */
-export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig | DeepgramTtsProviderConfig | CartesiaTtsProviderConfig | AzureTtsProviderConfig | AmazonPollyTtsProviderConfig;
+export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderConfig | DeepgramTtsProviderConfig | CartesiaTtsProviderConfig | AzureTtsProviderConfig | AmazonPollyTtsProviderConfig | SonioxTtsProviderConfig;
 
 /**
  * Factory service for creating TTS provider instances based on provider entity configuration
@@ -31,7 +32,7 @@ export type TtsProviderConfig = ElevenLabsTtsProviderConfig | OpenAiTtsProviderC
  */
 @singleton()
 export class TtsProviderFactory {
-  constructor(@inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils) {}
+  constructor(@inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils) { }
 
   /**
    * Creates a TTS provider instance from a provider entity
@@ -71,8 +72,11 @@ export class TtsProviderFactory {
       case 'amazon-polly':
         return this.createAmazonPollyProvider(resolvedProvider, settings as AmazonPollyTtsSettings);
 
+      case 'soniox':
+        return this.createSonioxProvider(resolvedProvider, settings as SonioxTtsSettings);
+
       default:
-        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia, azure, amazon-polly`;
+        const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia, azure, amazon-polly, soniox`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -162,6 +166,13 @@ export class TtsProviderFactory {
     return new AmazonPollyTtsProvider(config, settings);
   }
 
+  private createSonioxProvider(provider: Provider, settings: SonioxTtsSettings): SonioxTtsProvider {
+    const config = sonioxTtsProviderConfigSchema.parse(provider.config);
+
+    logger.info(`Creating Soniox TTS provider for provider ${provider.id}`);
+    return new SonioxTtsProvider(config, settings);
+  }
+
   /**
    * Validates if a provider can be used for TTS
    * @param provider - Provider entity to validate
@@ -181,6 +192,6 @@ export class TtsProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): TtsProviderApiType[] {
-    return ['elevenlabs', 'openai', 'deepgram', 'cartesia', 'azure', 'amazon-polly'];
+    return ['elevenlabs', 'openai', 'deepgram', 'cartesia', 'azure', 'amazon-polly', 'soniox'];
   }
 }

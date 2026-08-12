@@ -1523,6 +1523,97 @@
           "provider"
         ]
       },
+      "SonioxTtsSettings": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "soniox"
+            ],
+            "description": "TTS provider type identifier"
+          },
+          "model": {
+            "type": "string",
+            "default": "tts-rt-v1",
+            "description": "TTS model to use. Defaults to \"tts-rt-v1\""
+          },
+          "voiceId": {
+            "type": "string",
+            "default": "Adrian",
+            "description": "Voice ID to use for speech synthesis. Defaults to \"Adrian\""
+          },
+          "language": {
+            "type": "string",
+            "default": "en",
+            "description": "Language code for speech synthesis (e.g., \"en\", \"es\", \"fr\"). Defaults to \"en\""
+          },
+          "audioFormat": {
+            "type": "string",
+            "enum": [
+              "pcm_8000",
+              "pcm_16000",
+              "pcm_22050",
+              "pcm_24000",
+              "pcm_44100",
+              "mulaw",
+              "alaw",
+              "mp3",
+              "opus",
+              "flac",
+              "aac"
+            ],
+            "description": "Preferred audio output format. Defaults to \"pcm_16000\""
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.7,
+            "maximum": 1.3,
+            "description": "Speaking rate multiplier (0.7 to 1.3, default: 1.0)"
+          },
+          "bitrate": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Codec bitrate in bps for compressed formats (e.g., 128000)"
+          },
+          "noSpeechMarkers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "end": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ]
+            },
+            "description": "Markers to identify sections of text that should not be spoken"
+          },
+          "removeExclamationMarks": {
+            "type": "boolean",
+            "description": "Whether to replace exclamation marks with periods"
+          },
+          "useSentenceSplitter": {
+            "type": "boolean",
+            "description": "Whether to use sentence splitter for text processing. Defaults to true"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "additionalProperties": {
+          "nullable": true
+        }
+      },
       "ServerVadConfig": {
         "allOf": [
           {
@@ -1804,6 +1895,9 @@
               },
               {
                 "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+              },
+              {
+                "$ref": "#/components/schemas/SonioxAsrSettings"
               }
             ],
             "description": "ASR-specific settings including model, language preferences, etc."
@@ -2164,6 +2258,192 @@
           "nullable": true
         },
         "description": "Speechmatics speech-to-text settings"
+      },
+      "SonioxAsrSettings": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "default": "stt-rt-v5",
+            "description": "Model ID for transcription (e.g., \"stt-rt-v5\"), defaults to stt-rt-v5"
+          },
+          "audioFormat": {
+            "type": "string",
+            "enum": [
+              "pcm_16000",
+              "pcm_8000",
+              "pcm_22050",
+              "pcm_24000",
+              "pcm_44100"
+            ],
+            "default": "pcm_16000",
+            "description": "Audio encoding format for speech-to-text, defaults to pcm_16000"
+          },
+          "numChannels": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "description": "Number of audio channels for multi-speaker diarization"
+          },
+          "languageHints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of language codes for transcription hints (e.g., [\"en\", \"es\"])"
+          },
+          "languageHintsStrict": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, only transcribe in the specified language, defaults to false"
+          },
+          "enableSpeakerDiarization": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable speaker identification to distinguish different speakers, defaults to false"
+          },
+          "enableLanguageIdentification": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable automatic language detection when language is not specified, defaults to false"
+          },
+          "translation": {
+            "$ref": "#/components/schemas/SonioxTranslation"
+          },
+          "context": {
+            "$ref": "#/components/schemas/SonioxContext"
+          }
+        },
+        "additionalProperties": {
+          "nullable": true
+        },
+        "description": "Soniox speech-to-text settings"
+      },
+      "SonioxTranslation": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SonioxTranslationOneWay"
+          },
+          {
+            "$ref": "#/components/schemas/SonioxTranslationTwoWay"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "one_way": "#/components/schemas/SonioxTranslationOneWay",
+            "two_way": "#/components/schemas/SonioxTranslationTwoWay"
+          }
+        },
+        "description": "Translation settings for translating speech to another language"
+      },
+      "SonioxTranslationOneWay": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "one_way"
+            ]
+          },
+          "targetLanguage": {
+            "type": "string",
+            "description": "Target language code for translation (e.g., \"es\")"
+          }
+        },
+        "required": [
+          "type",
+          "targetLanguage"
+        ]
+      },
+      "SonioxTranslationTwoWay": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "two_way"
+            ]
+          },
+          "languageA": {
+            "type": "string",
+            "description": "First language code for bidirectional translation (e.g., \"en\")"
+          },
+          "languageB": {
+            "type": "string",
+            "description": "Second language code for bidirectional translation (e.g., \"es\")"
+          }
+        },
+        "required": [
+          "type",
+          "languageA",
+          "languageB"
+        ]
+      },
+      "SonioxContext": {
+        "type": "object",
+        "properties": {
+          "general": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SonioxContextKey"
+            },
+            "description": "General context key-value pairs for improved recognition"
+          },
+          "text": {
+            "type": "string",
+            "description": "Custom context text to guide transcription"
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Important terms or phrases to prioritize in recognition"
+          },
+          "translationTerms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SonioxTranslationTerm"
+            },
+            "description": "Translation-specific term pairs for improved translation accuracy"
+          }
+        },
+        "description": "Context settings to improve recognition accuracy for specific domains or terminology"
+      },
+      "SonioxContextKey": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Context key or term"
+          },
+          "value": {
+            "type": "string",
+            "description": "Context value or hint"
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ]
+      },
+      "SonioxTranslationTerm": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Source language term"
+          },
+          "target": {
+            "type": "string",
+            "description": "Target language translation"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ]
       },
       "ModerationConfig": {
         "type": "object",
@@ -3784,6 +4064,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SonioxAsrSettings"
                   }
                 ],
                 "description": "ASR-specific settings including model, language preferences, etc."
@@ -4195,6 +4478,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SonioxAsrSettings"
                   }
                 ],
                 "description": "ASR-specific settings including model, language preferences, etc."
@@ -4480,6 +4766,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SonioxAsrSettings"
                   }
                 ],
                 "description": "ASR-specific settings including model, language preferences, etc."
@@ -4805,6 +5094,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SonioxAsrSettings"
                         }
                       ],
                       "description": "ASR-specific settings including model, language preferences, etc."
@@ -5144,6 +5436,9 @@
                 "$ref": "#/components/schemas/AmazonPollyTtsSettings"
               },
               {
+                "$ref": "#/components/schemas/SonioxTtsSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -5222,6 +5517,9 @@
               },
               {
                 "$ref": "#/components/schemas/AmazonPollyTtsSettings"
+              },
+              {
+                "$ref": "#/components/schemas/SonioxTtsSettings"
               },
               {
                 "nullable": true
@@ -5398,6 +5696,9 @@
                 "$ref": "#/components/schemas/AmazonPollyTtsSettings"
               },
               {
+                "$ref": "#/components/schemas/SonioxTtsSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -5518,6 +5819,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/AmazonPollyTtsSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SonioxTtsSettings"
                     },
                     {
                       "nullable": true
@@ -12699,6 +13003,29 @@
               {
                 "type": "object",
                 "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
                   "region": {
                     "type": "string",
                     "description": "The Azure region to use for the speech recognition service"
@@ -12778,6 +13105,29 @@
                     ],
                     "default": "us",
                     "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                   }
                 },
                 "required": [
@@ -13183,6 +13533,11 @@
             "format": "uri",
             "description": "OAuth2 token endpoint URL (e.g. https://oauth2.googleapis.com/token for Gmail)"
           },
+          "authorizationUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "OAuth2 authorization endpoint URL (e.g. https://accounts.google.com/o/oauth2/v2/auth for Gmail). Required for initial authorization flow."
+          },
           "clientId": {
             "type": "string",
             "description": "OAuth2 client ID"
@@ -13447,6 +13802,29 @@
               {
                 "type": "object",
                 "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
                   "region": {
                     "type": "string",
                     "description": "The Azure region to use for the speech recognition service"
@@ -13526,6 +13904,29 @@
                     ],
                     "default": "us",
                     "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                   }
                 },
                 "required": [
@@ -13817,6 +14218,29 @@
               {
                 "type": "object",
                 "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
                   "region": {
                     "type": "string",
                     "description": "The Azure region to use for the speech recognition service"
@@ -13896,6 +14320,29 @@
                     ],
                     "default": "us",
                     "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                   }
                 },
                 "required": [
@@ -14209,6 +14656,29 @@
                     {
                       "type": "object",
                       "properties": {
+                        "apiKey": {
+                          "type": "string",
+                          "description": "API key for authenticating with Soniox"
+                        },
+                        "region": {
+                          "type": "string",
+                          "enum": [
+                            "us",
+                            "eu",
+                            "jp"
+                          ],
+                          "default": "us",
+                          "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                        }
+                      },
+                      "required": [
+                        "apiKey"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
                         "region": {
                           "type": "string",
                           "description": "The Azure region to use for the speech recognition service"
@@ -14288,6 +14758,29 @@
                           ],
                           "default": "us",
                           "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                        }
+                      },
+                      "required": [
+                        "apiKey"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "apiKey": {
+                          "type": "string",
+                          "description": "API key for authenticating with Soniox"
+                        },
+                        "region": {
+                          "type": "string",
+                          "enum": [
+                            "us",
+                            "eu",
+                            "jp"
+                          ],
+                          "default": "us",
+                          "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                         }
                       },
                       "required": [
@@ -18346,6 +18839,9 @@
               },
               {
                 "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+              },
+              {
+                "$ref": "#/components/schemas/SonioxAsrSettings"
               }
             ],
             "description": "ASR-specific settings including model, language preferences, etc."
@@ -18848,6 +19344,9 @@
               },
               {
                 "$ref": "#/components/schemas/AmazonPollyTtsSettings"
+              },
+              {
+                "$ref": "#/components/schemas/SonioxTtsSettings"
               },
               {
                 "nullable": true
@@ -24544,6 +25043,565 @@
           "success",
           "webhookUrl"
         ]
+      },
+      "SnapshotResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Snapshot ID"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Project ID"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Sequential version number"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable name"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Operator ID who created this snapshot"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation timestamp (ISO 8601)"
+          },
+          "schemaHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "REST schema hash at capture time"
+          },
+          "schemaStatus": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "description": "Schema compatibility status"
+          },
+          "schemaStatusMessage": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable schema status message"
+          },
+          "entityCounts": {
+            "$ref": "#/components/schemas/EntityCounts"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "version",
+          "createdAt",
+          "entityCounts"
+        ],
+        "description": "Snapshot metadata response"
+      },
+      "EntityCounts": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of agents"
+          },
+          "stages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of stages"
+          },
+          "classifiers": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of classifiers"
+          },
+          "contextTransformers": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of context transformers"
+          },
+          "tools": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of tools"
+          },
+          "globalActions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of global actions"
+          },
+          "guardrails": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of guardrails"
+          },
+          "knowledgeCategories": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of knowledge categories"
+          },
+          "knowledgeItems": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of knowledge items"
+          },
+          "sampleCopies": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of sample copies"
+          },
+          "copyDecorators": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of copy decorators"
+          },
+          "testers": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of testers"
+          },
+          "scenarios": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of scenarios"
+          },
+          "quickPrompts": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of quick prompts"
+          },
+          "savedSliceQueries": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of saved slice queries"
+          },
+          "savedFunnelQueries": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of saved funnel queries"
+          }
+        },
+        "required": [
+          "agents",
+          "stages",
+          "classifiers",
+          "contextTransformers",
+          "tools",
+          "globalActions",
+          "guardrails",
+          "knowledgeCategories",
+          "knowledgeItems",
+          "sampleCopies",
+          "copyDecorators",
+          "testers",
+          "scenarios",
+          "quickPrompts",
+          "savedSliceQueries",
+          "savedFunnelQueries"
+        ],
+        "description": "Entity counts summary"
+      },
+      "CreateSnapshotRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 256,
+            "description": "Optional human-readable name for this snapshot"
+          }
+        },
+        "description": "Request body for creating a project snapshot"
+      },
+      "SnapshotListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SnapshotResponse"
+            },
+            "description": "Array of snapshot metadata"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of snapshots"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current offset"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Current limit"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "description": "Paginated list of snapshots"
+      },
+      "SnapshotFullResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Snapshot ID"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Project ID"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Sequential version number"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable name"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Operator ID who created this snapshot"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation timestamp (ISO 8601)"
+          },
+          "schemaHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "REST schema hash at capture time"
+          },
+          "schemaStatus": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "description": "Schema compatibility status"
+          },
+          "schemaStatusMessage": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable schema status message"
+          },
+          "entityData": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Full entity data captured in this snapshot"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "version",
+          "createdAt",
+          "entityData"
+        ],
+        "description": "Full snapshot response with entity data"
+      },
+      "SnapshotComparisonResponse": {
+        "type": "object",
+        "properties": {
+          "fromVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Baseline version number"
+          },
+          "toVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Target version number"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ComparisonSummary"
+          },
+          "diffs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityDiff"
+            },
+            "description": "Detailed diffs for modified entities"
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddedRemovedEntity"
+            },
+            "description": "Entities added in the target"
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddedRemovedEntity"
+            },
+            "description": "Entities removed in the target"
+          }
+        },
+        "required": [
+          "fromVersion",
+          "toVersion",
+          "summary",
+          "diffs",
+          "added",
+          "removed"
+        ],
+        "description": "Snapshot comparison result"
+      },
+      "ComparisonSummary": {
+        "type": "object",
+        "properties": {
+          "entitiesAdded": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "IDs of entities added in the target"
+          },
+          "entitiesRemoved": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "IDs of entities removed in the target"
+          },
+          "entitiesModified": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "IDs of entities modified between snapshots"
+          },
+          "entitiesUnchanged": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of entities unchanged between snapshots"
+          }
+        },
+        "required": [
+          "entitiesAdded",
+          "entitiesRemoved",
+          "entitiesModified",
+          "entitiesUnchanged"
+        ],
+        "description": "Comparison summary"
+      },
+      "EntityDiff": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Entity type (e.g., \"stage\", \"agent\")"
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Entity ID"
+          },
+          "entityName": {
+            "type": "string",
+            "description": "Entity name"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "description": "List of field-level changes"
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId",
+          "entityName",
+          "changes"
+        ],
+        "description": "Entity-level diff"
+      },
+      "FieldChange": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Dot-notation field path (e.g., \"llmSettings.model\")"
+          },
+          "from": {
+            "nullable": true,
+            "description": "Value in the baseline snapshot"
+          },
+          "to": {
+            "nullable": true,
+            "description": "Value in the target snapshot"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "description": "A single field-level change"
+      },
+      "AddedRemovedEntity": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Entity type"
+          },
+          "entity": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Full entity data"
+          }
+        },
+        "required": [
+          "entityType",
+          "entity"
+        ],
+        "description": "Added or removed entity"
+      },
+      "UpdateSnapshotNameRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 256,
+            "description": "New human-readable name for this snapshot, or null to clear"
+          }
+        },
+        "description": "Request body for updating a snapshot name"
+      },
+      "SnapshotRestoreResponse": {
+        "type": "object",
+        "properties": {
+          "restored": {
+            "type": "boolean",
+            "description": "Whether the restore was successful"
+          },
+          "snapshotVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Version of the snapshot that was restored"
+          },
+          "schemaMigrated": {
+            "type": "boolean",
+            "description": "Whether schema migration was applied before restore"
+          },
+          "schemaMigrationSteps": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of transform steps applied during schema migration"
+          },
+          "entityCounts": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EntityCounts"
+              },
+              {
+                "description": "Entity counts after restore"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RestoreWarning"
+            },
+            "description": "Warnings generated during restore"
+          }
+        },
+        "required": [
+          "restored",
+          "snapshotVersion",
+          "entityCounts"
+        ],
+        "description": "Snapshot restore result"
+      },
+      "RestoreWarning": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Warning type (e.g., \"stale_provider_reference\", \"schema_migration_applied\")"
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entity type affected"
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entity ID affected"
+          },
+          "entityName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Entity name affected"
+          },
+          "field": {
+            "type": "string",
+            "nullable": true,
+            "description": "Field affected"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable warning message"
+          }
+        },
+        "required": [
+          "type",
+          "message"
+        ],
+        "description": "Restore warning entry"
+      },
+      "SnapshotDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the snapshot was deleted"
+          },
+          "snapshotId": {
+            "type": "string",
+            "description": "ID of the deleted snapshot"
+          }
+        },
+        "required": [
+          "deleted",
+          "snapshotId"
+        ],
+        "description": "Snapshot deletion result"
       }
     },
     "parameters": {},
@@ -25793,6 +26851,9 @@
                           },
                           {
                             "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                          },
+                          {
+                            "$ref": "#/components/schemas/SonioxAsrSettings"
                           }
                         ],
                         "description": "ASR-specific settings including model, language preferences, etc."
@@ -26031,6 +27092,9 @@
                             },
                             {
                               "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                            },
+                            {
+                              "$ref": "#/components/schemas/SonioxAsrSettings"
                             }
                           ],
                           "description": "ASR-specific settings including model, language preferences, etc."
@@ -26523,6 +27587,9 @@
                                   },
                                   {
                                     "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                                  },
+                                  {
+                                    "$ref": "#/components/schemas/SonioxAsrSettings"
                                   }
                                 ],
                                 "description": "ASR-specific settings including model, language preferences, etc."
@@ -26885,6 +27952,9 @@
                             },
                             {
                               "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                            },
+                            {
+                              "$ref": "#/components/schemas/SonioxAsrSettings"
                             }
                           ],
                           "description": "ASR-specific settings including model, language preferences, etc."
@@ -27232,6 +28302,9 @@
                           },
                           {
                             "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                          },
+                          {
+                            "$ref": "#/components/schemas/SonioxAsrSettings"
                           }
                         ],
                         "description": "ASR-specific settings including model, language preferences, etc."
@@ -27525,6 +28598,9 @@
                             },
                             {
                               "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                            },
+                            {
+                              "$ref": "#/components/schemas/SonioxAsrSettings"
                             }
                           ],
                           "description": "ASR-specific settings including model, language preferences, etc."
@@ -27929,6 +29005,9 @@
                             },
                             {
                               "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                            },
+                            {
+                              "$ref": "#/components/schemas/SonioxAsrSettings"
                             }
                           ],
                           "description": "ASR-specific settings including model, language preferences, etc."
@@ -28303,6 +29382,9 @@
                             },
                             {
                               "$ref": "#/components/schemas/SpeechmaticsAsrSettings"
+                            },
+                            {
+                              "$ref": "#/components/schemas/SonioxAsrSettings"
                             }
                           ],
                           "description": "ASR-specific settings including model, language preferences, etc."
@@ -37462,6 +38544,9 @@
                         "$ref": "#/components/schemas/AmazonPollyTtsSettings"
                       },
                       {
+                        "$ref": "#/components/schemas/SonioxTtsSettings"
+                      },
+                      {
                         "nullable": true
                       }
                     ],
@@ -37554,6 +38639,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/AmazonPollyTtsSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SonioxTtsSettings"
                         },
                         {
                           "nullable": true
@@ -37831,6 +38919,9 @@
                                 "$ref": "#/components/schemas/AmazonPollyTtsSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/SonioxTtsSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -38020,6 +39111,9 @@
                           "$ref": "#/components/schemas/AmazonPollyTtsSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/SonioxTtsSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -38169,6 +39263,9 @@
                       },
                       {
                         "$ref": "#/components/schemas/AmazonPollyTtsSettings"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SonioxTtsSettings"
                       },
                       {
                         "nullable": true
@@ -38338,6 +39435,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/AmazonPollyTtsSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SonioxTtsSettings"
                         },
                         {
                           "nullable": true
@@ -38629,6 +39729,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/AmazonPollyTtsSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SonioxTtsSettings"
                         },
                         {
                           "nullable": true
@@ -38948,6 +40051,29 @@
                       {
                         "type": "object",
                         "properties": {
+                          "apiKey": {
+                            "type": "string",
+                            "description": "API key for authenticating with Soniox"
+                          },
+                          "region": {
+                            "type": "string",
+                            "enum": [
+                              "us",
+                              "eu",
+                              "jp"
+                            ],
+                            "default": "us",
+                            "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                          }
+                        },
+                        "required": [
+                          "apiKey"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
                           "region": {
                             "type": "string",
                             "description": "The Azure region to use for the speech recognition service"
@@ -39027,6 +40153,29 @@
                             ],
                             "default": "us",
                             "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                          }
+                        },
+                        "required": [
+                          "apiKey"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "apiKey": {
+                            "type": "string",
+                            "description": "API key for authenticating with Soniox"
+                          },
+                          "region": {
+                            "type": "string",
+                            "enum": [
+                              "us",
+                              "eu",
+                              "jp"
+                            ],
+                            "default": "us",
+                            "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                           }
                         },
                         "required": [
@@ -39314,6 +40463,29 @@
                         {
                           "type": "object",
                           "properties": {
+                            "apiKey": {
+                              "type": "string",
+                              "description": "API key for authenticating with Soniox"
+                            },
+                            "region": {
+                              "type": "string",
+                              "enum": [
+                                "us",
+                                "eu",
+                                "jp"
+                              ],
+                              "default": "us",
+                              "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                            }
+                          },
+                          "required": [
+                            "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
                             "region": {
                               "type": "string",
                               "description": "The Azure region to use for the speech recognition service"
@@ -39393,6 +40565,29 @@
                               ],
                               "default": "us",
                               "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                            }
+                          },
+                          "required": [
+                            "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "apiKey": {
+                              "type": "string",
+                              "description": "API key for authenticating with Soniox"
+                            },
+                            "region": {
+                              "type": "string",
+                              "enum": [
+                                "us",
+                                "eu",
+                                "jp"
+                              ],
+                              "default": "us",
+                              "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                             }
                           },
                           "required": [
@@ -39859,6 +41054,29 @@
                               {
                                 "type": "object",
                                 "properties": {
+                                  "apiKey": {
+                                    "type": "string",
+                                    "description": "API key for authenticating with Soniox"
+                                  },
+                                  "region": {
+                                    "type": "string",
+                                    "enum": [
+                                      "us",
+                                      "eu",
+                                      "jp"
+                                    ],
+                                    "default": "us",
+                                    "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                                  }
+                                },
+                                "required": [
+                                  "apiKey"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
                                   "region": {
                                     "type": "string",
                                     "description": "The Azure region to use for the speech recognition service"
@@ -39938,6 +41156,29 @@
                                     ],
                                     "default": "us",
                                     "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                                  }
+                                },
+                                "required": [
+                                  "apiKey"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "apiKey": {
+                                    "type": "string",
+                                    "description": "API key for authenticating with Soniox"
+                                  },
+                                  "region": {
+                                    "type": "string",
+                                    "enum": [
+                                      "us",
+                                      "eu",
+                                      "jp"
+                                    ],
+                                    "default": "us",
+                                    "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                                   }
                                 },
                                 "required": [
@@ -40307,6 +41548,29 @@
                         {
                           "type": "object",
                           "properties": {
+                            "apiKey": {
+                              "type": "string",
+                              "description": "API key for authenticating with Soniox"
+                            },
+                            "region": {
+                              "type": "string",
+                              "enum": [
+                                "us",
+                                "eu",
+                                "jp"
+                              ],
+                              "default": "us",
+                              "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                            }
+                          },
+                          "required": [
+                            "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
                             "region": {
                               "type": "string",
                               "description": "The Azure region to use for the speech recognition service"
@@ -40386,6 +41650,29 @@
                               ],
                               "default": "us",
                               "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                            }
+                          },
+                          "required": [
+                            "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "apiKey": {
+                              "type": "string",
+                              "description": "API key for authenticating with Soniox"
+                            },
+                            "region": {
+                              "type": "string",
+                              "enum": [
+                                "us",
+                                "eu",
+                                "jp"
+                              ],
+                              "default": "us",
+                              "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                             }
                           },
                           "required": [
@@ -40726,6 +42013,29 @@
                       {
                         "type": "object",
                         "properties": {
+                          "apiKey": {
+                            "type": "string",
+                            "description": "API key for authenticating with Soniox"
+                          },
+                          "region": {
+                            "type": "string",
+                            "enum": [
+                              "us",
+                              "eu",
+                              "jp"
+                            ],
+                            "default": "us",
+                            "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                          }
+                        },
+                        "required": [
+                          "apiKey"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
                           "region": {
                             "type": "string",
                             "description": "The Azure region to use for the speech recognition service"
@@ -40805,6 +42115,29 @@
                             ],
                             "default": "us",
                             "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                          }
+                        },
+                        "required": [
+                          "apiKey"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "apiKey": {
+                            "type": "string",
+                            "description": "API key for authenticating with Soniox"
+                          },
+                          "region": {
+                            "type": "string",
+                            "enum": [
+                              "us",
+                              "eu",
+                              "jp"
+                            ],
+                            "default": "us",
+                            "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                           }
                         },
                         "required": [
@@ -41090,6 +42423,29 @@
                         {
                           "type": "object",
                           "properties": {
+                            "apiKey": {
+                              "type": "string",
+                              "description": "API key for authenticating with Soniox"
+                            },
+                            "region": {
+                              "type": "string",
+                              "enum": [
+                                "us",
+                                "eu",
+                                "jp"
+                              ],
+                              "default": "us",
+                              "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                            }
+                          },
+                          "required": [
+                            "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
                             "region": {
                               "type": "string",
                               "description": "The Azure region to use for the speech recognition service"
@@ -41169,6 +42525,29 @@
                               ],
                               "default": "us",
                               "description": "Speechmatics region endpoint: \"us\" for neu.rt.speechmatics.com, \"eu\" for eu2.rt.speechmatics.com, or \"apac\" for au.rt.speechmatics.com"
+                            }
+                          },
+                          "required": [
+                            "apiKey"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "apiKey": {
+                              "type": "string",
+                              "description": "API key for authenticating with Soniox"
+                            },
+                            "region": {
+                              "type": "string",
+                              "enum": [
+                                "us",
+                                "eu",
+                                "jp"
+                              ],
+                              "default": "us",
+                              "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
                             }
                           },
                           "required": [
@@ -64401,6 +65780,445 @@
           },
           "404": {
             "description": "Entry not found or not pending"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/snapshots": {
+      "post": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "Create a new snapshot",
+        "description": "Create a new snapshot of the project at the current point in time. Version number is auto-incremented.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSnapshotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Snapshot created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Project not found"
+          },
+          "409": {
+            "description": "Project is archived or snapshot limit reached"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "List snapshots",
+        "description": "List all snapshots for a project, ordered by version descending.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0,
+              "description": "Starting index for pagination (default: 0)"
+            },
+            "required": false,
+            "description": "Starting index for pagination (default: 0)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "description": "Maximum number of items to return (default: 50, max: 200)"
+            },
+            "required": false,
+            "description": "Maximum number of items to return (default: 50, max: 200)",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "description": "Search snapshot names"
+            },
+            "required": false,
+            "description": "Search snapshot names",
+            "name": "textSearch",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshots retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/snapshots/{snapshotId}": {
+      "get": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "Get snapshot",
+        "description": "Retrieve a single snapshot with its full entity data.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Snapshot ID"
+            },
+            "required": true,
+            "description": "Snapshot ID",
+            "name": "snapshotId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotFullResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "Update snapshot name",
+        "description": "Update the human-readable name of an existing snapshot.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Snapshot ID"
+            },
+            "required": true,
+            "description": "Snapshot ID",
+            "name": "snapshotId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSnapshotNameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Snapshot name updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "Delete snapshot",
+        "description": "Delete a single snapshot.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Snapshot ID"
+            },
+            "required": true,
+            "description": "Snapshot ID",
+            "name": "snapshotId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotDeleteResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot not found"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/snapshots/version/{version}": {
+      "get": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "Get snapshot by version",
+        "description": "Retrieve a snapshot by its sequential version number.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Snapshot version number"
+            },
+            "required": true,
+            "description": "Snapshot version number",
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotFullResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Snapshot version not found"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/snapshots/compare": {
+      "get": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "Compare snapshots",
+        "description": "Compare two snapshots and return a structured diff.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "description": "Baseline snapshot version number"
+            },
+            "required": true,
+            "description": "Baseline snapshot version number",
+            "name": "fromVersion",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "description": "Target snapshot version number to compare against"
+            },
+            "required": true,
+            "description": "Target snapshot version number to compare against",
+            "name": "toVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comparison result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotComparisonResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid comparison parameters"
+          },
+          "404": {
+            "description": "Project or snapshot version not found"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/snapshots/{snapshotId}/restore": {
+      "post": {
+        "tags": [
+          "Project Snapshots"
+        ],
+        "summary": "Restore from snapshot",
+        "description": "Restore a project's configuration to match a previous snapshot. A backup snapshot is automatically created before restore.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Project ID"
+            },
+            "required": true,
+            "description": "Project ID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Snapshot ID"
+            },
+            "required": true,
+            "description": "Snapshot ID",
+            "name": "snapshotId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project restored successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotRestoreResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Snapshot cannot be migrated"
+          },
+          "404": {
+            "description": "Snapshot not found"
+          },
+          "409": {
+            "description": "Project is archived"
           }
         }
       }

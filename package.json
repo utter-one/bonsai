@@ -1,6 +1,6 @@
 {
   "name": "bonsai-backend",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Bonsai Backend",
   "main": "dist/index.js",
   "type": "module",
@@ -15,8 +15,10 @@
     "schemas:generate": "tsx src/scripts/generateWebSocketSchemas.ts",
     "cli:generate": "tsx src/scripts/generateCli.ts",
     "secrets:migrate": "tsx src/scripts/migrateSecretsToEncrypted.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "test:e2e": "tsx tests/runner.ts"
+    "test": "npm run test:unit",
+    "test:unit": "tsx tests/unit/runner.ts",
+    "test:e2e": "tsx tests/runner.ts",
+    "test:integration": "tsx tests/integration/runner.ts"
   },
   "author": "utter.one",
   "license": "Apache-2.0",
@@ -34,6 +36,7 @@
     "@mistralai/mistralai": "^1.14.1",
     "@roamhq/wrtc": "^0.10.0",
     "@sendgrid/mail": "^8.1.6",
+    "@soniox/node": "^2.2.0",
     "@speechmatics/auth": "^0.1.0",
     "@speechmatics/real-time-client": "^8.3.0",
     "@types/cors": "^2.8.19",
@@ -57,13 +60,14 @@
     "express-rate-limit": "^8.3.1",
     "ffmpeg-static": "^5.3.0",
     "handlebars": "^4.7.9",
+    "helmet": "^8.3.0",
     "imap": "^0.8.19",
     "isolated-vm": "^6.1.2",
     "jsonwebtoken": "^9.0.3",
     "mailparser": "^3.9.9",
     "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
     "node-cron": "^4.2.1",
-    "nodemailer": "^8.0.10",
+    "nodemailer": "^9.0.4",
     "onnxruntime-node": "^1.26.0",
     "openai": "^6.15.0",
     "pg": "^8.16.3",
@@ -97,6 +101,15 @@
     "supertest": "^7.2.2",
     "testcontainers": "^11.14.0",
     "typescript": "^6.0.2"
+  },
+  "overrides": {
+    "tar": "7.5.22",
+    "adm-zip": "0.6.0",
+    "semver": "7.8.5",
+    "sharp": "0.35.3",
+    "serialize-javascript": "7.0.7",
+    "diff": "9.0.0",
+    "esbuild": "0.28.1"
   },
   "allowScripts": {
     "@discordjs/opus@0.10.0": true,

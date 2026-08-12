@@ -28,6 +28,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 type OAuth2StateEntry = {
   providerId: string;
   tokenUrl: string;
+  authorizationUrl: string;
   clientId: string;
   clientSecret: string;
   redirectUrl: string;
@@ -121,6 +122,7 @@ export class SmtpImapOAuth2Controller {
     this.pendingStates.set(state, {
       providerId,
       tokenUrl,
+      authorizationUrl,
       clientId,
       clientSecret,
       redirectUrl,
@@ -200,6 +202,7 @@ export class SmtpImapOAuth2Controller {
 
       const oauth2Config = updatedConfig.oauth2 as Record<string, unknown>;
       oauth2Config.tokenUrl = entry.tokenUrl;
+      oauth2Config.authorizationUrl = entry.authorizationUrl;
       oauth2Config.clientId = entry.clientId;
       oauth2Config.clientSecret = entry.clientSecret;
       oauth2Config.accessToken = tokenResponse.access_token;

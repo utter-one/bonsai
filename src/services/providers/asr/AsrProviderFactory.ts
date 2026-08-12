@@ -7,22 +7,23 @@ import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProvid
 import { DeepgramAsrProvider, DeepgramAsrProviderConfig, deepgramAsrProviderConfigSchema, DeepgramAsrSettings, deepgramAsrSettingsSchema } from './DeepgramAsrProvider';
 import { AssemblyAiAsrProvider, AssemblyAiAsrProviderConfig, assemblyAiAsrProviderConfigSchema, AssemblyAiAsrSettings, assemblyAiAsrSettingsSchema } from './AssemblyAiAsrProvider';
 import { SpeechmaticsAsrProvider, SpeechmaticsAsrProviderConfig, speechmaticsAsrProviderConfigSchema, SpeechmaticsAsrSettings, speechmaticsAsrSettingsSchema } from './SpeechmaticsAsrProvider';
+import { SonioxAsrProvider, SonioxAsrProviderConfig, sonioxAsrProviderConfigSchema, SonioxAsrSettings, sonioxAsrSettingsSchema } from './SonioxAsrProvider';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 /**
  * Supported ASR provider API types
  */
-export type AsrProviderApiType = 'azure' | 'elevenlabs' | 'deepgram' | 'assemblyai' | 'speechmatics';
+export type AsrProviderApiType = 'azure' | 'elevenlabs' | 'deepgram' | 'assemblyai' | 'speechmatics' | 'soniox';
 
 /** 
  * Union type for all ASR provider settings
  */
-export type AsrSettings = AzureAsrSettings | ElevenLabsAsrSettings | DeepgramAsrSettings | AssemblyAiAsrSettings | SpeechmaticsAsrSettings;
+export type AsrSettings = AzureAsrSettings | ElevenLabsAsrSettings | DeepgramAsrSettings | AssemblyAiAsrSettings | SpeechmaticsAsrSettings | SonioxAsrSettings;
 
 /**
  * Union type for all ASR provider configurations
  */
-export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderConfig | DeepgramAsrProviderConfig | AssemblyAiAsrProviderConfig | SpeechmaticsAsrProviderConfig;
+export type AsrProviderConfig = AzureAsrProviderConfig | ElevenLabsAsrProviderConfig | DeepgramAsrProviderConfig | AssemblyAiAsrProviderConfig | SpeechmaticsAsrProviderConfig | SonioxAsrProviderConfig;
 
 /**
  * Factory service for creating ASR provider instances based on provider entity configuration
@@ -66,8 +67,11 @@ export class AsrProviderFactory {
       case 'speechmatics':
         return this.createSpeechmaticsProvider(resolvedProvider, settings as SpeechmaticsAsrSettings);
 
+      case 'soniox':
+        return this.createSonioxProvider(resolvedProvider, settings as SonioxAsrSettings);
+
       default:
-        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai, speechmatics`;
+        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai, speechmatics, soniox`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
@@ -144,6 +148,20 @@ export class AsrProviderFactory {
   }
 
   /**
+   * Creates a Soniox ASR provider instance from provider entity
+   * @param provider - Provider entity with Soniox-specific configuration
+   * @returns Configured Soniox ASR provider
+   * @throws {Error} When required Soniox configuration fields are missing
+   */
+  private createSonioxProvider(provider: Provider, settings: SonioxAsrSettings): SonioxAsrProvider {
+    const config = sonioxAsrProviderConfigSchema.parse(provider.config);
+    const safeSettings = sonioxAsrSettingsSchema.parse(settings);
+
+    logger.info(`Creating Soniox ASR provider for provider ${provider.id} (region: ${config.region})`);
+    return new SonioxAsrProvider(config, safeSettings);
+  }
+
+  /**
    * Validates if a provider can be used for ASR
    * @param provider - Provider entity to validate
    * @returns True if provider is valid for ASR, false otherwise
@@ -153,7 +171,7 @@ export class AsrProviderFactory {
       return false;
     }
 
-    const supportedApiTypes: AsrProviderApiType[] = ['azure', 'elevenlabs', 'deepgram', 'assemblyai', 'speechmatics'];
+    const supportedApiTypes: AsrProviderApiType[] = ['azure', 'elevenlabs', 'deepgram', 'assemblyai', 'speechmatics', 'soniox'];
     return supportedApiTypes.includes(provider.apiType as AsrProviderApiType);
   }
 
@@ -162,6 +180,6 @@ export class AsrProviderFactory {
    * @returns Array of supported API types
    */
   getSupportedApiTypes(): AsrProviderApiType[] {
-    return ['azure', 'elevenlabs', 'deepgram', 'assemblyai', 'speechmatics'];
+    return ['azure', 'elevenlabs', 'deepgram', 'assemblyai', 'speechmatics', 'soniox'];
   }
 }

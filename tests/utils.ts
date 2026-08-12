@@ -47,6 +47,9 @@ const TABLES = [
   // quick prompts
   'quick_prompts',
 
+  // project snapshots
+  'project_snapshots',
+
   // audit
   'audit_logs',
 
@@ -61,6 +64,15 @@ const TABLES = [
  * Uses CASCADE so FK constraints are not violated.
  */
 export async function resetDatabase(): Promise<void> {
+  // SAFETY GATE: double-check we're not about to truncate a local database.
+  // The testcontainer uses a random high port (e.g. localhost:33248), never :5432.
+  const connStr = process.env.DB_CONNECTION_STRING || '';
+  if (connStr.includes(':5432')) {
+    throw new Error(
+      `ABORT: resetDatabase() refused — DB_CONNECTION_STRING uses port 5432 (local DB): ${connStr}. ` +
+      'This will wipe your data. The testcontainer likely failed to start.',
+    );
+  }
   const db = getDb();
   // Build TRUNCATE with raw identifiers — table names are hardcoded so safe from injection
   // Use raw SQL string since drizzle's sql.template doesn't support dynamic table lists cleanly

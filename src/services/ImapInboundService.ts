@@ -12,8 +12,6 @@ import { extractRecipientEmails, resolveEmailRouting } from '../channels/email/s
 import type { EmailRoutingEntry } from '../channels/email/shared/EmailRoutingTypes';
 import { stripEmailQuotes } from '../channels/email/shared/EmailBodyCleaner';
 
-type MailboxState = 'disconnected' | 'connecting' | 'polling' | 'searching';
-
 function extractHeaderFromSource(source: string, headerName: string): string | undefined {
   const headerSection = source.split(/\r?\n\r?\n/)[0];
   const match = headerSection.match(new RegExp(`${headerName}:\\s*(.+)$`, 'im'));
@@ -21,13 +19,8 @@ function extractHeaderFromSource(source: string, headerName: string): string | u
 }
 
 class ImapMailboxSession {
-  public state: MailboxState = 'disconnected';
-  public imap: ImapConnection | null = null;
-  private reconnectTimer: NodeJS.Timeout | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
-  private consecutiveErrors = 0;
   public shouldStop = false;
-  private channelHostRef: SmtpImapChannelHost | null = null;
 
   constructor(
     public readonly providerId: string,
@@ -53,10 +46,40 @@ class ImapMailboxSession {
     public readonly processingDelayMaxMs: number,
   ) {}
 
-  public async connect(): Promise<void> {
-    if (this.state !== 'disconnected') return;
-    this.state = 'connecting';
+  public startPolling(): void {
+    if (this.shouldStop) return;
+    this.clearPollTimer();
 
+    this.pollTimer = setTimeout(async () => {
+      if (this.shouldStop) return;
+      try {
+        await this.runPollCycle();
+      } catch (error) {
+        logger.error({ error, providerId: this.providerId }, 'Error during IMAP poll cycle');
+      }
+      this.startPolling();
+    }, this.pollingIntervalMs);
+
+    if (this.pollTimer) {
+      this.pollTimer.unref?.();
+    }
+  }
+
+  private async runPollCycle(): Promise<void> {
+    const imap = await this.connectAndOpenInbox();
+    if (!imap) return;
+
+    try {
+      await this.ensureProcessedFolder(imap);
+      await this.processMessages(imap);
+    } catch (error) {
+      logger.error({ error, providerId: this.providerId }, 'Failed to process messages');
+    } finally {
+      this.disconnect(imap);
+    }
+  }
+
+  private async connectAndOpenInbox(): Promise<ImapConnection | null> {
     try {
       const useOAuth2 = this.oauth2AccessToken != null && this.oauth2AccessToken.length > 0;
 
@@ -69,7 +92,6 @@ class ImapMailboxSession {
         tlsOptions: {
           servername: this.imapHost,
         },
-        keepalive: true,
       };
 
       if (useOAuth2) {
@@ -87,164 +109,94 @@ class ImapMailboxSession {
         imap.connect();
       });
 
-      this.imap = imap;
-      this.consecutiveErrors = 0;
-      logger.info({ providerId: this.providerId, host: this.imapHost, authMethod: useOAuth2 ? 'XOAUTH2' : 'password' }, 'IMAP connected');
+      logger.info(
+        { providerId: this.providerId, host: this.imapHost, authMethod: useOAuth2 ? 'XOAUTH2' : 'password' },
+        'IMAP connected',
+      );
 
-      await this.openInbox();
-      await this.ensureProcessedFolder();
-    } catch (error) {
-      this.state = 'disconnected';
-      this.imap = null;
-      logger.error({ error, providerId: this.providerId, host: this.imapHost }, 'IMAP connection failed');
-      this.scheduleReconnect();
-    }
-  }
-
-  private async openInbox(): Promise<void> {
-    if (!this.imap || this.shouldStop) return;
-
-    return new Promise<void>((resolve, reject) => {
-      this.imap!.openBox('INBOX', false, (err) => {
-        if (err) {
-          logger.error({ error: err, providerId: this.providerId }, 'Failed to open INBOX');
-          reject(err);
-          return;
-        }
-        logger.info({ providerId: this.providerId }, 'INBOX opened');
-        resolve();
-      });
-    });
-  }
-
-  public startWatching(channelHost: SmtpImapChannelHost): void {
-    if (!this.imap || this.shouldStop) return;
-    this.channelHostRef = channelHost;
-
-    this.imap.on('error', (error) => {
-      logger.error({ error, providerId: this.providerId }, 'IMAP connection error');
-      this.state = 'disconnected';
-      this.imap = null;
-      this.scheduleReconnect();
-    });
-
-    this.imap.on('newmail', (count) => {
-      logger.debug({ providerId: this.providerId, unseen: count }, 'New mail notification');
-      if (this.channelHostRef) {
-        this.processNewMessages(this.channelHostRef);
-      }
-    });
-
-    this.imap.on('expunge', () => {
-      logger.debug({ providerId: this.providerId }, 'IMAP expunge notification');
-    });
-
-    this.startPolling();
-  }
-
-  private startPolling(): void {
-    if (this.shouldStop) return;
-    this.state = 'polling';
-    this.clearPollTimer();
-
-    this.pollTimer = setTimeout(async () => {
-      if (this.shouldStop) return;
-      try {
-        await this.processNewMessagesDirect();
-      } catch (error) {
-        logger.error({ error, providerId: this.providerId }, 'Error during IMAP polling');
-      }
-      this.startPolling();
-    }, this.pollingIntervalMs);
-
-    if (this.pollTimer) {
-      this.pollTimer.unref?.();
-    }
-  }
-
-  private async processNewMessages(channelHost: SmtpImapChannelHost): Promise<void> {
-    if (!this.imap || this.shouldStop) return;
-    this.clearPollTimer();
-
-    try {
-      await this.processNewMessagesDirect();
-    } catch (error) {
-      logger.error({ error, providerId: this.providerId }, 'Error processing new messages');
-      this.state = 'disconnected';
-      this.imap = null;
-      this.scheduleReconnect();
-    } finally {
-      this.startPolling();
-    }
-  }
-
-  private async processNewMessagesDirect(): Promise<void> {
-    if (!this.imap || this.shouldStop) return;
-    this.state = 'searching';
-
-    try {
-      logger.info({ providerId: this.providerId, state: this.state }, 'IMAP: starting search');
-      const results = await new Promise<any[]>((resolve, reject) => {
-        this.imap!.search(['ALL'], (err, results) => {
+      await new Promise<void>((resolve, reject) => {
+        imap.openBox('INBOX', false, (err) => {
           if (err) reject(err);
-          else resolve(results);
+          else resolve();
         });
       });
 
-      logger.info({ providerId: this.providerId, resultCount: results.length, results: JSON.stringify(results) }, 'IMAP: search results received');
-
-      if (results.length === 0) return;
-
-      for (const result of results) {
-        if (this.shouldStop) break;
-        const uid = typeof result === 'number' ? result : result.attr;
-        if (!uid) continue;
-        logger.info({ providerId: this.providerId, uid }, 'IMAP: iterating result');
-
-        await this.fetchAndProcessMessage(uid);
-      }
+      logger.info({ providerId: this.providerId }, 'INBOX opened');
+      return imap;
     } catch (error) {
-      logger.error({ error, providerId: this.providerId }, 'Failed to search for new messages');
-    } finally {
-      if (!this.shouldStop) {
-        this.state = 'polling';
-      }
+      logger.error({ error, providerId: this.providerId, host: this.imapHost }, 'IMAP connection failed');
+      return null;
     }
   }
 
-  private async fetchAndProcessMessage(uid: number): Promise<void> {
-    if (!this.imap || this.shouldStop) return;
+  private disconnect(imap: ImapConnection): void {
+    try {
+      imap.end();
+      logger.info({ providerId: this.providerId }, 'IMAP disconnected');
+    } catch (error) {
+      logger.warn({ error, providerId: this.providerId }, 'Error during IMAP disconnect');
+    }
+  }
+
+  private async processMessages(imap: ImapConnection): Promise<void> {
+    const results = await new Promise<any[]>((resolve, reject) => {
+      imap.search(['ALL'], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
+
+    logger.info(
+      { providerId: this.providerId, resultCount: results.length, results: JSON.stringify(results) },
+      'IMAP: search results received',
+    );
+
+    if (results.length === 0) return;
+
+    for (const result of results) {
+      if (this.shouldStop) break;
+      const uid = typeof result === 'number' ? result : result.attr;
+      if (!uid) continue;
+
+      logger.info({ providerId: this.providerId, uid }, 'IMAP: iterating result');
+      await this.fetchAndProcessMessage(imap, uid);
+    }
+  }
+
+  private async fetchAndProcessMessage(imap: ImapConnection, uid: number): Promise<void> {
+    if (this.shouldStop) return;
 
     try {
       logger.info({ providerId: this.providerId, uid }, 'IMAP: fetching message');
-      const fetch = this.imap.fetch([uid], { bodies: '' });
+      const fetch = imap.fetch([uid], { bodies: '' });
 
-      const result = await new Promise<string>((resolve, reject) => {
-        let source = '';
+      const source = await new Promise<string>((resolve, reject) => {
+        let data = '';
         fetch.on('message', (msg) => {
           msg.on('body', (stream) => {
             stream.on('data', (chunk) => {
-              source += chunk.toString('utf8');
+              data += chunk.toString('utf8');
             });
             stream.on('end', () => {
-              logger.info({ providerId: this.providerId, uid, sourceLength: source.length }, 'IMAP: message body received');
+              logger.info({ providerId: this.providerId, uid, sourceLength: data.length }, 'IMAP: message body received');
             });
           });
           msg.on('end', () => {
-            resolve(source);
+            resolve(data);
           });
         });
         fetch.on('error', reject);
       });
-
-      const source = result;
 
       if (!source) {
         logger.info({ providerId: this.providerId, uid }, 'IMAP: empty source, skipping');
         return;
       }
 
-      logger.info({ providerId: this.providerId, uid, sourcePreview: source.substring(0, 200) }, 'IMAP: parsing email source');
+      logger.info(
+        { providerId: this.providerId, uid, sourcePreview: source.substring(0, 200) },
+        'IMAP: parsing email source',
+      );
       const parsed = await simpleParser(source);
       const senderEmail = parsed.from?.value?.[0]?.address ?? parsed.from?.text ?? 'unknown';
       const rawBody = parsed.text?.trim() ?? parsed.textAsHtml?.trim() ?? parsed.html?.trim() ?? '';
@@ -257,7 +209,10 @@ class ImapMailboxSession {
 
       const recipientEmails = extractRecipientEmails(parsed.to?.value?.map((v) => v.address) ?? parsed.to?.text);
 
-      logger.info({ providerId: this.providerId, uid, from: senderEmail, to: recipientEmails, subject, bodyLength: emailBody.length, messageId }, 'IMAP: parsed email');
+      logger.info(
+        { providerId: this.providerId, uid, from: senderEmail, to: recipientEmails, subject, bodyLength: emailBody.length, messageId },
+        'IMAP: parsed email',
+      );
 
       if (!emailBody) {
         logger.info({ uid, providerId: this.providerId }, 'Empty email body, skipping');
@@ -273,18 +228,24 @@ class ImapMailboxSession {
 
       const apiKeyRecord = await findProjectApiKey(routing.projectId);
       if (!apiKeyRecord) {
-        logger.warn({ uid, providerId: this.providerId, projectId: routing.projectId }, 'No API key found for routed project, skipping email');
+        logger.warn(
+          { uid, providerId: this.providerId, projectId: routing.projectId },
+          'No API key found for routed project, skipping email',
+        );
         return;
       }
 
-      logger.info({
-        uid,
-        from: senderEmail,
-        to: recipientEmails,
-        targetEmail: routing.targetEmail,
-        projectId: routing.projectId,
-        providerId: this.providerId,
-      }, 'Processing inbound email');
+      logger.info(
+        {
+          uid,
+          from: senderEmail,
+          to: recipientEmails,
+          targetEmail: routing.targetEmail,
+          projectId: routing.projectId,
+          providerId: this.providerId,
+        },
+        'Processing inbound email',
+      );
 
       const channelHost = container.resolve(SmtpImapChannelHost);
       await channelHost.handleInboundEmail(
@@ -310,7 +271,7 @@ class ImapMailboxSession {
         routing.cc,
         routing.bcc,
         routing.fromAddress,
-        () => this.moveMessage(uid, this.processedFolder),
+        () => this.moveMessage(imap, uid, this.processedFolder),
         this.ccBccReplyAsHandOff,
         this.processingDelayMinMs,
         this.processingDelayMaxMs,
@@ -320,47 +281,37 @@ class ImapMailboxSession {
       // This prevents duplicate processing on the next IMAP poll cycle when
       // processing deferral is active (the email would otherwise stay in the
       // inbox until the AI response is sent, getting re-queued every 30s).
-      this.moveMessage(uid, this.processedFolder);
+      await this.moveMessage(imap, uid, this.processedFolder);
 
     } catch (error) {
       logger.error({ error, uid, providerId: this.providerId }, 'Failed to process email');
     }
   }
 
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer || this.shouldStop) return;
-    const delay = Math.min(1000 * Math.pow(2, this.consecutiveErrors), 300000);
-    this.consecutiveErrors++;
-    logger.info({ providerId: this.providerId, delay }, 'Scheduling IMAP reconnect');
-
-    this.reconnectTimer = setTimeout(async () => {
-      this.reconnectTimer = null;
-      if (!this.shouldStop) {
-        await this.connect();
-        if (this.imap) {
-          const channelHost = container.resolve(SmtpImapChannelHost);
-          this.startWatching(channelHost);
-        }
+  private moveMessage(imap: ImapConnection, uid: number, folder: string): Promise<void> {
+    return new Promise((resolve) => {
+      try {
+        (imap as any).move([uid], folder, (err: Error | null) => {
+          if (err) {
+            logger.error({ error: err, uid, folder, providerId: this.providerId }, 'Failed to move message to processed folder');
+            resolve();
+            return;
+          }
+          logger.info({ uid, folder, providerId: this.providerId }, 'Message moved to processed folder');
+          resolve();
+        });
+      } catch (error) {
+        logger.error({ error, uid, folder, providerId: this.providerId }, 'Exception during message move');
+        resolve();
       }
-    }, delay);
-
-    if (this.reconnectTimer) {
-      this.reconnectTimer.unref?.();
-    }
+    });
   }
 
-  private clearPollTimer(): void {
-    if (this.pollTimer) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
-    }
-  }
-
-  private async ensureProcessedFolder(): Promise<void> {
-    if (!this.imap || !this.processedFolder) return;
+  private async ensureProcessedFolder(imap: ImapConnection): Promise<void> {
+    if (!this.processedFolder) return;
 
     const folders = await new Promise<string[]>((resolve, reject) => {
-      this.imap!.getBoxes((err: Error | null, boxes: ImapConnection.MailBoxes) => {
+      imap.getBoxes((err: Error | null, boxes: ImapConnection.MailBoxes) => {
         if (err) reject(err);
         else resolve(Object.keys(boxes));
       });
@@ -385,7 +336,7 @@ class ImapMailboxSession {
 
       try {
         await new Promise<void>((resolve, reject) => {
-          this.imap!.addBox(current, (err: Error | null) => {
+          imap.addBox(current, (err: Error | null) => {
             if (err) reject(err);
             else resolve();
           });
@@ -397,37 +348,16 @@ class ImapMailboxSession {
     }
   }
 
-  public moveMessage(uid: number, folder: string): void {
-    if (!this.imap) {
-      logger.warn({ uid, folder, providerId: this.providerId }, 'Cannot move message: no IMAP connection');
-      return;
-    }
-    try {
-      (this.imap as any).move([uid], folder, (err: Error | null) => {
-        if (err) {
-          logger.error({ error: err, uid, folder, providerId: this.providerId }, 'Failed to move message to processed folder');
-          return;
-        }
-        logger.info({ uid, folder, providerId: this.providerId }, 'Message moved to processed folder');
-      });
-    } catch (error) {
-      logger.error({ error, uid, folder, providerId: this.providerId }, 'Exception during message move');
+  private clearPollTimer(): void {
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
     }
   }
 
-  public async stop(): Promise<void> {
+  public stop(): void {
     this.shouldStop = true;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
     this.clearPollTimer();
-
-    if (this.imap) {
-      this.imap.end();
-      this.imap = null;
-    }
-    this.state = 'disconnected';
     logger.info({ providerId: this.providerId }, 'IMAP session stopped');
   }
 }
@@ -466,29 +396,26 @@ export class ImapInboundService {
     }
     this.isStarted = true;
     logger.info('Starting ImapInboundService');
-    this.discoverAndConnect().catch((error) => {
+    this.discoverAndStart().catch((error) => {
       logger.error({ error }, 'Failed to discover IMAP providers');
     });
   }
 
   stop(): void {
     this.isStarted = false;
-    const promises: Promise<void>[] = [];
     for (const session of this.sessions.values()) {
-      promises.push(session.stop());
+      session.stop();
     }
-    Promise.allSettled(promises).then(() => {
-      this.sessions.clear();
-      logger.info('ImapInboundService stopped');
-    });
+    this.sessions.clear();
+    logger.info('ImapInboundService stopped');
   }
 
-  async stopSession(providerId: string): Promise<void> {
+  stopSession(providerId: string): void {
     if (!this.isStarted) return;
 
     const existing = this.sessions.get(providerId);
     if (existing) {
-      await existing.stop();
+      existing.stop();
       this.sessions.delete(providerId);
       logger.info({ providerId }, 'IMAP session stopped');
     }
@@ -497,7 +424,7 @@ export class ImapInboundService {
   async reload(providerId: string): Promise<void> {
     if (!this.isStarted) return;
 
-    await this.stopSession(providerId);
+    this.stopSession(providerId);
 
     const provider = await db.query.providers.findFirst({
       where: eq(providers.id, providerId),
@@ -529,41 +456,11 @@ export class ImapInboundService {
       return;
     }
 
-    const session = new ImapMailboxSession(
-      provider.id,
-      config.projectId,
-      config.imap.host,
-      config.imap.port,
-      config.imap.secure,
-      config.imap.auth.user,
-      config.imap.auth.pass,
-      config.imap.pollingIntervalMs,
-      config.fromAddress,
-      config.threadingStrategy,
-      config.smtp.host,
-      config.smtp.port,
-      config.smtp.secure,
-      config.smtp.auth.user,
-      config.smtp.auth.pass,
-      config.emailToProject,
-      config.oauth2?.accessToken,
-      config.processedFolder,
-      config.ccBccReplyAsHandOff,
-      config.processingDelayMinMs,
-      config.processingDelayMaxMs,
-    );
-
-    this.sessions.set(provider.id, session);
-    await session.connect();
-
-    if (session.imap) {
-      const channelHost = container.resolve(SmtpImapChannelHost);
-      session.startWatching(channelHost);
-      logger.info({ providerId }, 'IMAP session reloaded with updated config');
-    }
+    this.startSession(provider.id, config);
+    logger.info({ providerId }, 'IMAP session reloaded with updated config');
   }
 
-  private async discoverAndConnect(): Promise<void> {
+  private async discoverAndStart(): Promise<void> {
     try {
       const providerRecords = await db.query.providers.findMany({
         where: and(
@@ -595,40 +492,40 @@ export class ImapInboundService {
           continue;
         }
 
-        const session = new ImapMailboxSession(
-          provider.id,
-          config.projectId,
-          config.imap.host,
-          config.imap.port,
-          config.imap.secure,
-          config.imap.auth.user,
-          config.imap.auth.pass,
-          config.imap.pollingIntervalMs,
-          config.fromAddress,
-          config.threadingStrategy,
-          config.smtp.host,
-          config.smtp.port,
-          config.smtp.secure,
-          config.smtp.auth.user,
-          config.smtp.auth.pass,
-          config.emailToProject,
-          config.oauth2?.accessToken,
-          config.processedFolder,
-          config.ccBccReplyAsHandOff,
-          config.processingDelayMinMs,
-          config.processingDelayMaxMs,
-        );
-
-        this.sessions.set(provider.id, session);
-        await session.connect();
-
-        if (session.imap) {
-          const channelHost = container.resolve(SmtpImapChannelHost);
-          session.startWatching(channelHost);
-        }
+        this.startSession(provider.id, config);
       }
     } catch (error) {
       logger.error({ error }, 'Error during IMAP provider discovery');
     }
+  }
+
+  private startSession(providerId: string, config: ReturnType<typeof smtpImapChannelProviderConfigSchema.parse>): void {
+    const session = new ImapMailboxSession(
+      providerId,
+      config.projectId,
+      config.imap.host,
+      config.imap.port,
+      config.imap.secure,
+      config.imap.auth.user,
+      config.imap.auth.pass,
+      config.imap.pollingIntervalMs,
+      config.fromAddress,
+      config.threadingStrategy,
+      config.smtp.host,
+      config.smtp.port,
+      config.smtp.secure,
+      config.smtp.auth.user,
+      config.smtp.auth.pass,
+      config.emailToProject,
+      config.oauth2?.accessToken,
+      config.processedFolder,
+      config.ccBccReplyAsHandOff,
+      config.processingDelayMinMs,
+      config.processingDelayMaxMs,
+    );
+
+    this.sessions.set(providerId, session);
+    session.startPolling();
+    logger.info({ providerId, intervalMs: config.imap.pollingIntervalMs }, 'IMAP polling started');
   }
 }

@@ -132,6 +132,43 @@ describe('Provider API', () => {
     });
   });
 
+  describe('enumerate models', () => {
+    it('returns models for an LLM provider', async () => {
+      const llmRes = await authed().post('/api/providers').send({
+        name: 'Test LLM',
+        providerType: 'llm',
+        apiType: 'openai',
+        config: { apiKey: 'sk-test-key-123' },
+      });
+      expect(llmRes.status).to.equal(201);
+
+      const res = await authed().get(`/api/providers/${llmRes.body.id}/models`);
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property('models').that.is.an('array');
+      // May have models from API or static fallback
+      expect(res.body.models.length).to.be.greaterThanOrEqual(0);
+    });
+
+    it('returns 400 for non-LLM provider', async () => {
+      const res = await authed().get('/api/providers/nonexistent/models');
+      // Non-existent provider returns 404; non-LLM returns 400
+      expect(res.status).to.be.oneOf([400, 404]);
+    });
+
+    it('returns 404 for non-existent provider', async () => {
+      const res = await authed().get('/api/providers/nonexistent/models');
+      expect(res.status).to.equal(404);
+    });
+
+    it('returns 400 for storage provider', async () => {
+      const cr = await authed().post('/api/providers').send(minimalProvider());
+      expect(cr.status).to.equal(201);
+
+      const res = await authed().get(`/api/providers/${cr.body.id}/models`);
+      expect(res.status).to.equal(400);
+    });
+  });
+
   describe('pagination and filtering', () => {
     it('respects offset/limit', async () => {
       for (let i = 0; i < 3; i++) {

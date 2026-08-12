@@ -727,6 +727,7 @@ export const projectsRelations = relations(projects, ({ many }) => ({
   scenarioRuns: many(scenarioRuns),
   scenarioConversations: many(scenarioConversations),
   quickPrompts: many(quickPrompts),
+  projectSnapshots: many(projectSnapshots),
 }));
 
 export const agentsRelations = relations(agents, ({ one, many }) => ({
@@ -1065,6 +1066,26 @@ export const benchmarkResults = pgTable('benchmark_results', {
   index('idx_benchmark_results_config_execution_id').on(table.configExecutionId),
 ]);
 
+// ─── Project Snapshots ──────────────────────────────────────────────────────
+
+// project_snapshots — immutable point-in-time records of complete project configuration
+export const projectSnapshots = pgTable('project_snapshots', {
+  id: text('id').primaryKey(),                           // proj_snap_{uuidv7}
+  projectId: text('project_id').notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  version: integer('version').notNull(),                 // sequential: 1, 2, 3, ...
+  name: text('name'),                                    // optional operator label
+  entityData: jsonb('entity_data').notNull(),            // full snapshot payload
+  createdBy: text('created_by').references(() => operators.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  // Enforce unique version per project
+  uniqueIndex('project_snapshots_project_id_version_unique')
+    .on(table.projectId, table.version),
+  // Fast lookup for listing versions of a project
+  index('idx_project_snapshots_project_id').on(table.projectId),
+]);
+
 // ─── Benchmarking Relations ───────────────────────────────────────────────────
 
 export const quickPromptsRelations = relations(quickPrompts, ({ one }) => ({
@@ -1131,5 +1152,16 @@ export const benchmarkResultsRelations = relations(benchmarkResults, ({ one }) =
   execution: one(benchmarkConfigExecutions, {
     fields: [benchmarkResults.configExecutionId],
     references: [benchmarkConfigExecutions.id],
+  }),
+}));
+
+export const projectSnapshotsRelations = relations(projectSnapshots, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectSnapshots.projectId],
+    references: [projects.id],
+  }),
+  creator: one(operators, {
+    fields: [projectSnapshots.createdBy],
+    references: [operators.id],
   }),
 }));

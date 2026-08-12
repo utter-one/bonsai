@@ -185,6 +185,24 @@ describe('Project API', () => {
     });
   });
 
+  describe('GET /api/projects/:id/audit-logs', () => {
+    it('should return audit logs after project creation', async () => {
+      const createRes = await authed().post('/api/projects').send({ ...MINIMAL_PROJECT, name: 'Audit Test' });
+      const projectId = createRes.body.id;
+
+      const res = await authed().get(`/api/projects/${projectId}/audit-logs`);
+      expect(res.status).to.equal(200);
+      expect(res.body).to.be.an('array');
+      expect(res.body.length).to.be.greaterThanOrEqual(1);
+    });
+
+    it('should return empty array for non-existent project (no project filter enforced)', async () => {
+      const res = await authed().get('/api/projects/nonexistent-id/audit-logs');
+      expect(res.status).to.equal(200);
+      expect(res.body).to.be.an('array').that.is.empty;
+    });
+  });
+
   describe('archived filter', () => {
     it('should return archived projects when archived=true', async () => {
       // Create and archive a project

@@ -10,6 +10,20 @@ let container: PostgreSqlContainer | null = null;
 let migrationPool: Pool | null = null;
 
 export async function globalSetup(): Promise<void> {
+  // SAFETY: verify Docker is available before starting the testcontainer.
+  // Without Docker, the testcontainer silently fails and tests would hit
+  // whatever DB_CONNECTION_STRING is in .env — wiping your local data.
+  const { execSync } = await import('child_process');
+  try {
+    execSync('docker info', { stdio: 'ignore', timeout: 5000 });
+  } catch {
+    throw new Error(
+      'Docker is not running or not accessible. '
+      + 'E2E tests require a running Docker daemon for the testcontainer. '
+      + 'Aborting to prevent tests from hitting your local database.',
+    );
+  }
+
   // 1. Start ephemeral PostgreSQL container
   container = await new PostgreSqlContainer('postgres:18-alpine')
     .withDatabase('bonsai_test')

@@ -43,6 +43,7 @@ export const ID_PREFIXES = {
   BENCHMARK_CONFIG_EXECUTION: 'bexc',
   BENCHMARK_RESULT: 'bres',
   QUICK_PROMPT: 'qpmt',
+  PROJECT_SNAPSHOT: 'proj_snap',
 } as const;
 
 type EntityPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];

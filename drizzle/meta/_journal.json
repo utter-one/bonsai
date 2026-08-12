@@ -470,6 +470,13 @@
       "when": 1785233487432,
       "tag": "0066_rapid_ultimo",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1785413572610,
+      "tag": "0067_add_project_snapshots",
+      "breakpoints": true
     }
   ]
 }

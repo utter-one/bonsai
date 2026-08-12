@@ -2,6 +2,111 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] - 2026-08-12
+
+### Added
+
+- **Soniox providers** — new ASR and TTS provider implementations for Soniox speech APIs.
+- **Project snapshots** — version tracking and restore for projects:
+  - Snapshot creation with full project state capture.
+  - Saved slice and funnel queries included in snapshots.
+  - Migration chain validation at startup to prevent corrupt restores.
+- **OAuth2 `authorizationUrl`** — added `authorizationUrl` field to OAuth2 provider config schema.
+
+### Fixed
+
+- **Path traversal** — LocalStorageProvider no longer allows path traversal attacks.
+- **DB SSL verification** — conditional SSL verification for database connections.
+- **Helmet middleware** — re-enabled security headers middleware that was inactive.
+- **Test DB safety gates** — hardened test database safety gates.
+- **IMAP polling** — switched from persistent connection to connect-on-demand polling for better reliability.
+- **IMAP `moveMessage`** — properly awaited so MOVE completes before disconnect.
+
+### Security
+
+- Reduced npm audit vulnerabilities from 30 to 9 via dependency overrides.
+- Security audit findings (H1–H6) documented and accepted by design (SSRF, Zod error details, etc.).
+
+### Testing
+
+- **Unit/integration test layers** — Layer 1 (live conversation services), Layer 2 (integration test infrastructure), Phases 2–5 covering ActionsExecutor, IsolatedScriptExecutor, UserInputProcessor, ContextBuilder, ResponseGenerator, ContextTransformerExecutor, HistoryBuilder, ScenarioConversationEvaluator, TestRunner, TesterClientConnection, ConversationRecorder, and ToolExecutor.
+- **Project audit logs and knowledge category-scoped items** — additional E2E coverage.
+- **Integration tests** — stage transitions, abort, multi-turn, provider failure scenarios.
+
+### Documentation
+
+- Testing implementation audit — spec vs actual comparison.
+- General markdown cleanup.
+
+## [0.7.1] - 2026-07-30
+
+### Added
+
+- **Processing deferral mechanism** — non-immediate channels (WhatsApp, Telegram, etc.) can defer message processing instead of handling immediately.
+- **REST API for deferred processing** — queue management endpoints for deferred processing.
+- **Optional per-effect priority override** — custom execution ordering for effects.
+- **`GET /api/projects/:projectId/providers/used`** — lists all providers referenced by a project, with optional `checkIfAvailable` flag to verify connectivity.
+
+### Fixed
+
+- **Project-level provider references** — missing references added to usage report.
+- **`content_manager` RBAC** — project-scoped DELETE permissions added to the role.
+- **Duplicate email processing** — prevented with deferral enabled.
+- **Deferred processing issues 1–4** — resolved edge cases in the deferral pipeline.
+
+### Testing
+
+- **Comprehensive E2E test coverage expansion** (636 → 855 tests):
+  - E2E test infrastructure with testcontainers and Mocha.
+  - Auth edge cases & rate limiter hardening (18 tests).
+  - Secrets encryption tests (16 tests).
+  - RBAC enforcement tests (90 tests).
+  - Full coverage for analytics, funnel, migration, export, conversation, scenario-run controllers.
+  - Benchmark suites/runs, scenario runs/conversations, OAuth2, external trigger.
+  - All infrastructure controllers (stages, actions, classifiers, tools, agents, users, etc.).
+
+### Documentation
+
+- **Deferred processing spec** — mechanism docs + 12 edge cases + REST API reference.
+- CLI readme.
+- **AGENTS.md** updated with test infrastructure and conventions.
+
+### Dev / Chores
+
+- **Upgraded to Node.js 24**.
+
+## [0.7.0] - 2026-07-22
+
+### Added
+
+- **CLI** — OpenAPI-driven command-line client with full CRUD, auth commands (`login`, `logout`, `status`), `--paginate` flag, `--json-schema` flag, and 51 integration tests.
+- **`save_artifact` effect** — agents can save files to storage with optional `dataEncoding` (base64).
+- **`attach_file` action effect** — delivers files to end users across channels.
+- **File attachments in email** — sending and receiving attachments via email channels.
+- **To:-based email routing** — routes incoming emails by recipient address.
+- **Per-address CC/BCC routing** and `fromAddress` override for email.
+- **CC/BCC hand-off detection** — stops responding when a CC/BCC recipient replies.
+- **External triggers** — global actions can be triggered by external events.
+- **Quick prompts** feature with OpenAPI registration and visibility checks.
+- **Simulated channel type** for context building in test sessions.
+
+### Improved
+
+- **Quoted reply stripping** — removes quoted reply history from inbound emails.
+- **IMAP processed folder** — moves processed messages to `Bonsai/Processed` after handling.
+- **Debug logging** for external trigger auth failures (less noise in logs).
+- **SMTP transporter** initialization improved for password-based auth.
+- **OAuth2 section** preserved on provider update.
+- **IMAP UID handling** — uses UID from search results directly instead of broken fetch callback fallback.
+- Suppressed expected IMAP "folder already exists" warning.
+
+### Fixed
+
+- **`triggerOnExternal` field** now persists correctly in global action create and update.
+- **Undefined data** in `save_artifact` effect handled gracefully.
+- **Null metadata** allowed in API key response schema.
+- **CLI build** — fixed TypeScript compilation, ESM imports, path param arguments, and option inheritance issues.
+
 ## [0.6.0] - 2026-06-24
 
 ### Added

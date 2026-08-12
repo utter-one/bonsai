@@ -394,6 +394,9 @@
                     },
                     {
                       "$ref": "#/definitions/SpeechmaticsAsrSettings"
+                    },
+                    {
+                      "$ref": "#/definitions/SonioxAsrSettings"
                     }
                   ],
                   "description": "ASR-specific settings including model, language preferences, etc."
@@ -766,6 +769,192 @@
       },
       "description": "Speechmatics speech-to-text settings"
     },
+    "SonioxAsrSettings": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "default": "stt-rt-v5",
+          "description": "Model ID for transcription (e.g., \"stt-rt-v5\"), defaults to stt-rt-v5"
+        },
+        "audioFormat": {
+          "type": "string",
+          "enum": [
+            "pcm_16000",
+            "pcm_8000",
+            "pcm_22050",
+            "pcm_24000",
+            "pcm_44100"
+          ],
+          "default": "pcm_16000",
+          "description": "Audio encoding format for speech-to-text, defaults to pcm_16000"
+        },
+        "numChannels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Number of audio channels for multi-speaker diarization"
+        },
+        "languageHints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of language codes for transcription hints (e.g., [\"en\", \"es\"])"
+        },
+        "languageHintsStrict": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, only transcribe in the specified language, defaults to false"
+        },
+        "enableSpeakerDiarization": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable speaker identification to distinguish different speakers, defaults to false"
+        },
+        "enableLanguageIdentification": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic language detection when language is not specified, defaults to false"
+        },
+        "translation": {
+          "$ref": "#/definitions/SonioxTranslation"
+        },
+        "context": {
+          "$ref": "#/definitions/SonioxContext"
+        }
+      },
+      "additionalProperties": {
+        "nullable": true
+      },
+      "description": "Soniox speech-to-text settings"
+    },
+    "SonioxTranslation": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/SonioxTranslationOneWay"
+        },
+        {
+          "$ref": "#/definitions/SonioxTranslationTwoWay"
+        }
+      ],
+      "discriminator": {
+        "propertyName": "type",
+        "mapping": {
+          "one_way": "#/definitions/SonioxTranslationOneWay",
+          "two_way": "#/definitions/SonioxTranslationTwoWay"
+        }
+      },
+      "description": "Translation settings for translating speech to another language"
+    },
+    "SonioxTranslationOneWay": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "one_way"
+          ]
+        },
+        "targetLanguage": {
+          "type": "string",
+          "description": "Target language code for translation (e.g., \"es\")"
+        }
+      },
+      "required": [
+        "type",
+        "targetLanguage"
+      ]
+    },
+    "SonioxTranslationTwoWay": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "two_way"
+          ]
+        },
+        "languageA": {
+          "type": "string",
+          "description": "First language code for bidirectional translation (e.g., \"en\")"
+        },
+        "languageB": {
+          "type": "string",
+          "description": "Second language code for bidirectional translation (e.g., \"es\")"
+        }
+      },
+      "required": [
+        "type",
+        "languageA",
+        "languageB"
+      ]
+    },
+    "SonioxContext": {
+      "type": "object",
+      "properties": {
+        "general": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SonioxContextKey"
+          },
+          "description": "General context key-value pairs for improved recognition"
+        },
+        "text": {
+          "type": "string",
+          "description": "Custom context text to guide transcription"
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Important terms or phrases to prioritize in recognition"
+        },
+        "translationTerms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SonioxTranslationTerm"
+          },
+          "description": "Translation-specific term pairs for improved translation accuracy"
+        }
+      },
+      "description": "Context settings to improve recognition accuracy for specific domains or terminology"
+    },
+    "SonioxContextKey": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Context key or term"
+        },
+        "value": {
+          "type": "string",
+          "description": "Context value or hint"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ]
+    },
+    "SonioxTranslationTerm": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Source language term"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target language translation"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ]
+    },
     "ServerVadConfig": {
       "allOf": [
         {
@@ -1047,6 +1236,9 @@
                 },
                 {
                   "$ref": "#/definitions/SpeechmaticsAsrSettings"
+                },
+                {
+                  "$ref": "#/definitions/SonioxAsrSettings"
                 }
               ],
               "description": "ASR-specific settings including model, language preferences, etc."

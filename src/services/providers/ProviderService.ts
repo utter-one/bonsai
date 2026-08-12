@@ -202,9 +202,7 @@ export class ProviderService extends BaseService {
     logger.info({ providerId: provider.id, newVersion: provider.version }, 'Provider updated successfully');
 
     if (provider.apiType === 'smtp_imap') {
-      this.imapInboundService.reload(provider.id).catch((error) => {
-        logger.error({ error, providerId: provider.id }, 'Failed to reload IMAP session after provider update');
-      });
+      this.imapInboundService.reload(provider.id);
     }
 
     return providerResponseSchema.parse(provider);
@@ -244,9 +242,7 @@ export class ProviderService extends BaseService {
     logger.info({ providerId: id }, 'Provider deleted successfully');
 
     if (existingProvider.apiType === 'smtp_imap') {
-      this.imapInboundService.stopSession(id).catch((error) => {
-        logger.error({ error, providerId: id }, 'Failed to stop IMAP session after provider deletion');
-      });
+      this.imapInboundService.stopSession(id);
     }
 
     // Cancel any pending deferred messages for this provider

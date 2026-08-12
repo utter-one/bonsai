@@ -22,6 +22,7 @@ import { deepgramTtsSettingsSchema } from '../../services/providers/tts/Deepgram
 import { cartesiaTtsSettingsSchema } from '../../services/providers/tts/CartesiaTtsProvider';
 import { azureTtsSettingsSchema } from '../../services/providers/tts/AzureTtsProvider';
 import { amazonPollyTtsSettingsSchema } from '../../services/providers/tts/AmazonPollyTtsProvider';
+import { sonioxTtsSettingsSchema } from '../../services/providers/tts/SonioxTtsProvider';
 import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from '../../utils/pagination';
 import { legacyVadConfigSchema, sileroVadConfigSchema, fireredVadConfigSchema } from './vad';
 
@@ -149,6 +150,7 @@ export const ttsSettingsSchema = z.discriminatedUnion('provider', [
   cartesiaTtsSettingsSchema,
   azureTtsSettingsSchema,
   amazonPollyTtsSettingsSchema,
+  sonioxTtsSettingsSchema,
 ]).openapi('TtsSettings').nullable().optional().describe('TTS provider-specific settings');
 
 export type TtsSettings = z.infer<typeof ttsSettingsSchema>;

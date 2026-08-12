@@ -31,6 +31,7 @@ const imapConfigSchema = z.strictObject({
 
 const oauth2ConfigSchema = z.strictObject({
   tokenUrl: z.string().url().describe('OAuth2 token endpoint URL (e.g. https://oauth2.googleapis.com/token for Gmail)'),
+  authorizationUrl: z.string().url().optional().describe('OAuth2 authorization endpoint URL (e.g. https://accounts.google.com/o/oauth2/v2/auth for Gmail). Required for initial authorization flow.'),
   clientId: z.string().describe('OAuth2 client ID'),
   clientSecret: z.string().describe('OAuth2 client secret'),
   refreshToken: z.string().optional().describe('OAuth2 refresh token (long-lived, managed by the OAuth2 callback/refresh service)'),

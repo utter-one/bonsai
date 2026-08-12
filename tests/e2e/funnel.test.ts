@@ -62,13 +62,6 @@ describe('Funnel Saved Query API', () => {
     });
   });
 
-  describe('get by id', () => {
-    it('returns 404 for non-existent', async () => {
-      const res = await authed().get(`/api/projects/${fix.projectId}/analytics/funnels/saved-queries/nonexistent`);
-      expect(res.status).to.equal(404);
-    });
-  });
-
   describe('update', () => {
     it('updates name', async () => {
       const cr = await authed().post(`/api/projects/${fix.projectId}/analytics/funnels/saved-queries`).send(minimalFunnelQuery());

@@ -10,6 +10,7 @@ import { parameterValueSchema, fieldDescriptorSchema } from '../../types/paramet
 import { deepgramAsrSettingsSchema } from '../../services/providers/asr/DeepgramAsrProvider';
 import { assemblyAiAsrSettingsSchema } from '../../services/providers/asr/AssemblyAiAsrProvider';
 import { speechmaticsAsrSettingsSchema } from '../../services/providers/asr/SpeechmaticsAsrProvider';
+import { sonioxAsrSettingsSchema } from '../../services/providers/asr/SonioxAsrProvider';
 import { listParamsSchema } from './common';
 import { serverVadConfigSchema } from './vad';
 import { costManagementConfigSchema } from './costManagement';
@@ -95,6 +96,7 @@ export const asrSettingsSchema = z.union([
   deepgramAsrSettingsSchema,
   assemblyAiAsrSettingsSchema,
   speechmaticsAsrSettingsSchema,
+  sonioxAsrSettingsSchema,
 ]).describe('ASR provider settings');
 
 export const asrConfigSchema = z.object({

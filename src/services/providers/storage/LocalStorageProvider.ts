@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { StorageProviderBase } from './StorageProviderBase';
 import type { StorageMetadata, StorageObject } from './IStorageProvider';
+import { InvalidOperationError } from '../../../errors';
 import { logger } from '../../../utils/logger';
 
 extendZodWithOpenApi(z);
@@ -191,12 +192,21 @@ export class LocalStorageProvider extends StorageProviderBase<LocalStorageProvid
   }
 
   /**
-   * Get full filesystem path
+   * Get full filesystem path — validates against path traversal
    */
   private getFullPath(key: string): string {
     const base = this.config!.basePath;
     const sub = this.settings.subPath || '';
-    return path.join(base, sub, key);
+    const fullPath = path.join(base, sub, key);
+    const resolved = path.resolve(fullPath);
+    const baseResolved = path.resolve(base);
+
+    if (!resolved.startsWith(baseResolved + path.sep) && resolved !== baseResolved) {
+      throw new InvalidOperationError(
+        `Storage key "${key}" escapes base directory "${baseResolved}"`,
+      );
+    }
+    return resolved;
   }
 
   /**
