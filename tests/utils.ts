@@ -50,6 +50,16 @@ const TABLES = [
   // project snapshots
   'project_snapshots',
 
+  // monitoring (P1-01)
+  'provider_call_logs',
+  'provider_call_stats_hourly',
+  'health_checks',
+  'alert_events',
+  'fallback_events',
+  'metric_samples',
+  // NOTE: 'monitoring_config' is intentionally excluded — like 'operators', the
+  // global config row must persist across resets.
+
   // audit
   'audit_logs',
 

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, integer, serial, primaryKey, foreignKey, pgView, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, integer, serial, bigint, doublePrecision, primaryKey, foreignKey, pgView, index, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations, isNull, isNotNull } from 'drizzle-orm';
 import { StageAction, Effect, ToolParameter, StageActionParameter } from '../types/actions';
 import { FieldDescriptor } from '../types/parameters';
@@ -14,6 +14,11 @@ import type { IterationResultData } from '../types/benchmark';
 
 
 export type ProviderConfig = LlmProviderConfig | AsrProviderConfig | TtsProviderConfig | StorageProviderConfig | ChannelProviderConfig;
+
+export type ProviderFallback = {
+  providerId: string;
+  settings?: Record<string, unknown>;
+};
 
 // User table
 export const users = pgTable('users', {
@@ -450,6 +455,7 @@ export const providers = pgTable('providers', {
   providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings, storage
   apiType: text('api_type').notNull(), // azure, elevenlabs, openai, anthropic, gemini, groq, s3, azure-blob, gcs, local
   config: jsonb('config').notNull().$type<ProviderConfig>(),
+  fallbacks: jsonb('fallbacks').$type<ProviderFallback[]>().notNull().default([]),
   createdBy: text('created_by').references(() => operators.id),
   tags: jsonb('tags').$type<string[]>(),
   version: integer('version').notNull().default(1),
@@ -1085,6 +1091,167 @@ export const projectSnapshots = pgTable('project_snapshots', {
   // Fast lookup for listing versions of a project
   index('idx_project_snapshots_project_id').on(table.projectId),
 ]);
+
+// ─── Monitoring (P1-01) ──────────────────────────────────────────────────────
+// Persistence layer for the monitoring module (src/services/monitoring/):
+// provider call logs, hourly call stats, health history, alert events,
+// fallback events, metric samples, and the global monitoring config.
+// Call-log tables are write-optimized: no FK constraints, ids are plain text.
+
+export type AlertNotification = {
+  notifierId: string;
+  phase: 'fired' | 'resolved';
+  ok: boolean;
+  detail?: string;
+  at: string; // ISO timestamp
+};
+
+// Variant-specific phase fields of a provider call. A row is one variant
+// (LLM / TTS / ASR per providerType+operation), so this is stored as a sparse
+// jsonb instead of ~15 mostly-NULL columns. Validated at the write layer
+// (CallLogger) — batch rollups extract keys via ->> (P1-06, P2-01).
+export type CallMetrics = {
+  // LLM (generate / generateStream)
+  ttftMs?: number; // time to first chunk
+  chunksCount?: number;
+  maxChunkGapMs?: number;
+  finishReason?: string;
+  tokensPrompt?: number;
+  tokensCompletion?: number;
+  errorPhase?: 'setup' | 'mid_stream';
+  // TTS (synthesize)
+  audioBytesOut?: number;
+  audioDurationMs?: number;
+  // ASR (session)
+  setupMs?: number; // init -> start
+  timeToFirstPartialMs?: number;
+  eosToFinalMs?: number; // end-of-speech -> final transcript
+  partialsCount?: number;
+  finalsCount?: number;
+  sessionAudioMs?: number;
+};
+
+// provider_call_logs — one row per 3rd-party call (variant phase fields in `metrics` jsonb)
+export const providerCallLogs = pgTable('provider_call_logs', {
+  id: text('id').primaryKey(),
+  providerId: text('provider_id').notNull(),
+  providerType: text('provider_type').notNull(), // asr, tts, llm, embeddings, storage, channel
+  apiType: text('api_type').notNull(),
+  operation: text('operation').notNull(), // llm.generate, asr.session, channel.send_message, ...
+  model: text('model'),
+  projectId: text('project_id'),
+  conversationId: text('conversation_id'),
+  ok: boolean('ok').notNull(),
+  errorCode: text('error_code'), // auth | rate_limited | timeout | server_error | client_error | network | unknown
+  statusHttp: integer('status_http'),
+  durationMs: integer('duration_ms').notNull(),
+  errorText: text('error_text'), // truncated to 1KB at the write layer
+  fallbackProviderId: text('fallback_provider_id'), // set when the call ran on a fallback
+  metrics: jsonb('metrics').$type<CallMetrics>(), // variant phase fields (CallMetrics), null for non-streaming ops
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('idx_provider_call_logs_created_at').on(table.createdAt),
+  index('idx_provider_call_logs_provider_created').on(table.providerId, table.createdAt),
+  index('idx_provider_call_logs_project_created').on(table.projectId, table.createdAt),
+  index('idx_provider_call_logs_conversation').on(table.conversationId),
+]);
+
+// provider_call_stats_hourly — hourly rollup of provider_call_logs (built by RetentionService, P1-06)
+export const providerCallStatsHourly = pgTable('provider_call_stats_hourly', {
+  hourBucket: timestamp('hour_bucket').notNull(),
+  providerId: text('provider_id').notNull(),
+  operation: text('operation').notNull(),
+  ok: boolean('ok').notNull(), // PK member — must be non-NULL
+  errorCode: text('error_code').notNull().default('none'), // PK member; rollup COALESCEs NULL -> 'none'
+  count: bigint('count', { mode: 'number' }).notNull(),
+  sumDurationMs: bigint('sum_duration_ms', { mode: 'number' }).notNull(),
+  minDurationMs: integer('min_duration_ms'),
+  maxDurationMs: integer('max_duration_ms'),
+  p95DurationMs: doublePrecision('p95_duration_ms'),
+  p50TtftMs: doublePrecision('p50_ttft_ms'),
+  p95TtftMs: doublePrecision('p95_ttft_ms'),
+  p99TtftMs: doublePrecision('p99_ttft_ms'),
+  p95MaxChunkGapMs: doublePrecision('p95_max_chunk_gap_ms'),
+  stalledCount: integer('stalled_count').notNull().default(0), // rows with max_chunk_gap_ms > 10000
+  rtfOver1Count: integer('rtf_over_1_count').notNull().default(0), // TTS rows with duration_ms > audio_duration_ms
+}, (table) => [
+  primaryKey({ columns: [table.hourBucket, table.providerId, table.operation, table.ok, table.errorCode] }),
+]);
+
+// health_checks — persisted results of the HealthCheckService 60s loop
+export const healthChecks = pgTable('health_checks', {
+  id: text('id').primaryKey(),
+  checkName: text('check_name').notNull(), // db, provider:<id>, service_heartbeat:<name>, process
+  status: text('status').notNull(), // ok | degraded | down | unknown
+  latencyMs: integer('latency_ms'),
+  detail: jsonb('detail').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('idx_health_checks_check_created').on(table.checkName, table.createdAt),
+  index('idx_health_checks_created_at').on(table.createdAt),
+]);
+
+// alert_events — durable record of the alert rule engine's state machine
+export const alertEvents = pgTable('alert_events', {
+  id: text('id').primaryKey(),
+  ruleId: text('rule_id').notNull(),
+  scopeKey: text('scope_key').notNull(), // ruleId:scope (e.g. provider-down:prov_123)
+  scope: jsonb('scope').$type<Record<string, unknown>>(),
+  severity: text('severity').notNull(), // info | warning | critical
+  status: text('status').notNull().default('firing'), // firing | resolved
+  message: text('message').notNull(),
+  context: jsonb('context').$type<Record<string, unknown>>(),
+  notifications: jsonb('notifications').$type<AlertNotification[]>().notNull().default([]),
+  firedAt: timestamp('fired_at').notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at'),
+  ackedAt: timestamp('acked_at'),
+  ackedBy: text('acked_by'),
+}, (table) => [
+  index('idx_alert_events_fired_at').on(table.firedAt),
+  index('idx_alert_events_scope_key_status').on(table.scopeKey, table.status),
+  index('idx_alert_events_rule_fired').on(table.ruleId, table.firedAt),
+]);
+
+// fallback_events — one row per failover transition (history of the fallbacks)
+export const fallbackEvents = pgTable('fallback_events', {
+  id: text('id').primaryKey(),
+  providerId: text('provider_id').notNull(),
+  fallbackProviderId: text('fallback_provider_id').notNull(),
+  providerType: text('provider_type').notNull(),
+  operation: text('operation').notNull(),
+  reason: text('reason').notNull(), // the failed attempt's errorCode
+  projectId: text('project_id'),
+  conversationId: text('conversation_id'),
+  success: boolean('success'), // whether the fallback ultimately served the request
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('idx_fallback_events_created_at').on(table.createdAt),
+  index('idx_fallback_events_provider_created').on(table.providerId, table.createdAt),
+]);
+
+// metric_samples — 60s flush of the in-process MetricsRegistry (jsonb labels can't be a PK)
+export const metricSamples = pgTable('metric_samples', {
+  id: text('id').primaryKey(),
+  bucket: timestamp('bucket').notNull(),
+  name: text('name').notNull(),
+  labels: jsonb('labels').$type<Record<string, string>>().notNull().default({}),
+  count: bigint('count', { mode: 'number' }).notNull(),
+  sum: doublePrecision('sum'),
+  min: doublePrecision('min'),
+  max: doublePrecision('max'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => [
+  index('idx_metric_samples_name_bucket').on(table.name, table.bucket),
+  index('idx_metric_samples_bucket').on(table.bucket),
+]);
+
+// monitoring_config — single global row (id='global') with the monitoring tunables
+export const monitoringConfig = pgTable('monitoring_config', {
+  id: text('id').primaryKey().default('global'),
+  config: jsonb('config').$type<Record<string, unknown>>().notNull(),
+  version: integer('version').notNull().default(1),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
 
 // ─── Benchmarking Relations ───────────────────────────────────────────────────
 

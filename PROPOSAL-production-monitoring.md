@@ -141,8 +141,7 @@ src/http/contracts/monitoring.ts
 | `projectId`, `conversationId` | nullable — ties incidents to business context |
 | `ok` (bool), `errorCode`, `statusHttp`, `durationMs`, `errorText` (truncated 1KB) | |
 | `fallbackProviderId` | set when this call executed on a fallback |
-| **streaming fields** (null for non-streaming ops): `ttftMs`, `chunksCount`, `maxChunkGapMs`, `tokensPrompt`, `tokensCompletion`, `finishReason`, `audioBytesOut`, `audioDurationMs` (TTS), `errorPhase` (`setup` \| `mid_stream`) | see §3.2f — phase-level measurement instead of a single duration |
-| `asrFields`: `setupMs`, `timeToFirstPartialMs`, `eosToFinalMs`, `partialsCount`, `finalsCount`, `sessionAudioMs` | ASR-specific (see §3.2f) |
+| `metrics` (jsonb, TS type `CallMetrics`) — variant-specific phase fields, sparse: LLM `ttftMs`, `chunksCount`, `maxChunkGapMs`, `finishReason`, `tokensPrompt`, `tokensCompletion`, `errorPhase` (`setup` \| `mid_stream`); TTS `audioBytesOut`, `audioDurationMs`; ASR `setupMs`, `timeToFirstPartialMs`, `eosToFinalMs`, `partialsCount`, `finalsCount`, `sessionAudioMs` | see §3.2f — phase-level measurement instead of a single duration; jsonb because a row is one variant (flat columns would be mostly NULL), nothing index-seeks these fields, and new fields need no migration |
 
 Write path: in-memory bounded buffer, flushed every 5s or 200 rows (whichever first) via `INSERT ... VALUES` batch; flush failure → keep last 10k in memory + pino error (never throw into the business path). Instrumentation points (choke points, minimal diff):
 
@@ -184,7 +183,7 @@ A 20 s LLM stream for a 300-word answer is excellent; 20 s for a 10-word answer 
 | Stream | Phases recorded (per call-log row) | Derived signal |
 |---|---|---|
 | LLM `generateStream` | `ttftMs` (request → first chunk), `chunksCount`, `maxChunkGapMs` (largest gap between consecutive chunks), `tokensPrompt`/`tokensCompletion` (from the `usage` callback), `finishReason` | **TTFT** = perceived responsiveness; **stall** = `maxChunkGapMs > 10 s` mid-stream; throughput = `tokensCompletion / (duration − ttft)` |
-| TTS per turn | `ttft_ms` (time to first `onSpeechGenerating` audio chunk — stored in the same generic `ttft_ms` column as LLM; the dedicated histogram is `tts_ttfa_ms`), `audioBytesOut`, `audioDurationMs` (length of produced audio), `duration_ms` = synthesis wall time | **RTF** = `duration_ms / audioDurationMs`; RTF > 1 ⇒ TTS can't keep up ⇒ user hears gaps mid-sentence |
+| TTS per turn | `ttft_ms` (time to first `onSpeechGenerating` audio chunk — stored under the same generic `ttft_ms` key in `metrics` as LLM; the dedicated histogram is `tts_ttfa_ms`), `audioBytesOut`, `audioDurationMs` (length of produced audio), `duration_ms` = synthesis wall time | **RTF** = `duration_ms / audioDurationMs`; RTF > 1 ⇒ TTS can't keep up ⇒ user hears gaps mid-sentence |
 | ASR per session | `setupMs` (init→start), `timeToFirstPartialMs`, `eosToFinalMs` (VAD end-of-speech → final transcript), `partialsCount`/`finalsCount` | `eosToFinalMs` = how long the system "thinks" after the user stops talking |
 | Voice/WS connections (Twilio Media Streams, WebRTC, WebSocket) | session duration, bytes in/out, `maxFrameGapMs`, disconnect reason | jitter/stall indicator per connection; feeds `active_*` gauges |
 
@@ -290,13 +289,15 @@ All failover executions are persisted in `fallback_events` — this is the "hist
 
 provider_call_logs (id text pk, provider_id, provider_type, api_type, operation,
   model, project_id, conversation_id, ok bool, error_code, status_http,
-  duration_ms int, error_text, fallback_provider_id, created_at,
-  -- streaming (nullable; see §3.2f):
-  ttft_ms int, chunks_count int, max_chunk_gap_ms int, finish_reason text,
-  tokens_prompt int, tokens_completion int, error_phase text, -- 'setup' | 'mid_stream'
-  audio_bytes_out bigint, audio_duration_ms int, -- TTS
-  setup_ms int, time_to_first_partial_ms int, eos_to_final_ms int, -- ASR
-  partials_count int, finals_count int, session_audio_ms int)
+  duration_ms int, error_text, fallback_provider_id, metrics jsonb, created_at)
+  -- metrics (nullable jsonb, TS type CallMetrics; see §3.2f) holds the variant-specific
+  -- streaming/ASR/TTS phase fields sparsely — a row is one variant, so flat columns
+  -- would be ~9–13 NULLs per row: LLM ttftMs/chunksCount/maxChunkGapMs/finishReason/
+  -- tokensPrompt/tokensCompletion/errorPhase; TTS audioBytesOut/audioDurationMs;
+  -- ASR setupMs/timeToFirstPartialMs/eosToFinalMs/partialsCount/finalsCount/sessionAudioMs.
+  -- Nothing index-seeks these (only batch window scans aggregate them, via ->>), and new
+  -- streaming fields can be added without a migration. Core columns stay flat: filtered/
+  -- indexed, and error_code feeds the stats-table PK.
   -- indexes: (created_at), (provider_id, created_at), (project_id, created_at), (conversation_id)
   -- retention: purge > retentionDays (default 90), daily cron
 

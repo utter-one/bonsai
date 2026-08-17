@@ -44,6 +44,8 @@ Every 3rd-party call in the system produces exactly one `provider_call_logs` row
 `llm.generate`, `llm.classify`, `llm.transform`, `llm.tool`, `llm.filler`, `llm.moderate`, `llm.models`, `asr.session`, `tts.synthesize`, `storage.upload`, `storage.download`, `channel.send_message`, `channel.outbound_call`, `channel.webhook`, `oauth.refresh`, `imap.poll`.
 - The provider base knows only "generate" — the **caller** sets the precise operation via `MonitoringContext` (`llm.classify` in the classifier execution, `llm.filler` in filler generation, etc.) before invoking the provider.
 
+Variant-specific phase fields measured below are written into the call-log row's `metrics` jsonb column (TS type `CallMetrics` in `schema.ts`) — not flat columns (see P1-01).
+
 ### LLM (covers all 16 providers via `LlmProviderBase`)
 - `generate()` (non-streaming): duration, ok, classified error, tokens from result, `errorPhase='setup'` (non-streaming has no mid-stream).
 - `generateStream()`: `StreamStats` fed from the existing `notifyStarted/notifyChunk/notifyComplete/notifyError` hooks → `ttftMs` (first `notifyChunk`), `chunksCount`, `maxChunkGapMs`, `finishReason`, `tokensPrompt/tokensCompletion` (from the chunk `usage` payload / completion result).
@@ -55,7 +57,7 @@ Every 3rd-party call in the system produces exactly one `provider_call_logs` row
 - `eosToFinalMs`: provider records final-result timestamp; `ConversationRunner` calls a new `markInputEnded(ts)` on the provider at VAD end-of-speech / last `sendAudio` (the runner already owns that moment). If no final arrives, row is written with `ok=false` on session teardown.
 
 ### TTS (`TtsProviderBase`)
-- `tts.synthesize` row per turn: `ttft_ms` (time to first `onSpeechGenerating` audio chunk — the TTS analogue of TTFT, stored in the same generic `ttft_ms` column), `audioBytesOut`, `audioDurationMs` (chunks × sample rate per the provider's output format — the base already knows it via `getOutputFormat()`), `duration_ms` = synthesis wall time, ok/error.
+- `tts.synthesize` row per turn: `ttft_ms` (time to first `onSpeechGenerating` audio chunk — the TTS analogue of TTFT, stored under the same generic `ttft_ms` key in `metrics`), `audioBytesOut`, `audioDurationMs` (chunks × sample rate per the provider's output format — the base already knows it via `getOutputFormat()`), `duration_ms` = synthesis wall time, ok/error.
 
 ### Storage (`StorageProviderBase`)
 - `storage.upload` / `storage.download`: duration, ok, classified error, bytes.
@@ -69,7 +71,7 @@ Every 3rd-party call in the system produces exactly one `provider_call_logs` row
 - `ConversationRunner` emits `ai_turn_ttft_ms{project_id}` histogram: user end-of-speech → first TTS audio chunk of the AI turn (all four timestamps already exist in the runner).
 
 ### Streaming histograms (fixed set, bucket configs live in `MetricsRegistry`)
-`llm_ttft_ms`, `llm_stream_duration_ms`, `tts_ttfa_ms` (TTS time-to-first-audio, per row the `ttft_ms` column), `tts_synthesis_ms`, `asr_setup_ms`, `asr_eos_to_final_ms`, `ai_turn_ttft_ms{project_id}` — per PROPOSAL §3.2b. Token counts are **never** metric labels (cardinality); they live in call-log columns only.
+`llm_ttft_ms`, `llm_stream_duration_ms`, `tts_ttfa_ms` (TTS time-to-first-audio, per row the `ttft_ms` column), `tts_synthesis_ms`, `asr_setup_ms`, `asr_eos_to_final_ms`, `ai_turn_ttft_ms{project_id}` — per PROPOSAL §3.2b. Token counts are **never** metric labels (cardinality); they live in the call-log `metrics` jsonb only.
 
 ### Business-context propagation
 - `ConversationRunner` wraps provider invocations in `MonitoringContext.run({ projectId, conversationId, stageId, operation }, ...)`; channel hosts set `{ projectId, operation }` from the session/API key. Provider bases read the context (P1-02) — no interface changes.
