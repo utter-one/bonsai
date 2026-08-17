@@ -94,7 +94,7 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 7. `createApiRateLimiter()` — keyed by authenticated operator ID, falls back to IP
 8. All controllers registered via `container.resolve(X).registerRoutes(app)`
 9. Channel hosts register routes: WebRTC, Twilio Messaging, Twilio Voice, WhatsApp, Telegram
-10. Background services start: `ConversationTimeoutService.start()`, `ScenarioRunExecutorService.start()`
+10. Background services start: `ConversationTimeoutService.start()`, `ScenarioRunExecutorService.start()`, `BenchmarkExecutorService.start()`, `ImapInboundService.start()`, `OAuth2TokenRefreshService.start()`, `ProcessingDeferralService.start()`
 11. Global `errorHandler` middleware
 
 ### Express Configuration
@@ -106,11 +106,13 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 
 ### Background Services
 
-Two services run continuously after startup:
-- `ConversationTimeoutService` — monitors conversation timeouts
+Six services run continuously after startup (all resolved from the IoC container and started via `.start()` in `server.ts`):
+- `ConversationTimeoutService` — monitors conversation timeouts (node-cron, every minute)
 - `ScenarioRunExecutorService` — executes scenario runs
-
-Both are resolved from the IoC container and started via `.start()`.
+- `BenchmarkExecutorService` — executes benchmark runs
+- `ImapInboundService` — polls IMAP inboxes
+- `OAuth2TokenRefreshService` — refreshes OAuth2 channel tokens
+- `ProcessingDeferralService` — re-processes deferred conversations
 
 ## Coding Conventions (detailed in `.github/copilot-instructions.md`)
 
