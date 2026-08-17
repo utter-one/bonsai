@@ -44,6 +44,7 @@ import { ProcessingDeferralService } from './services/ProcessingDeferralService'
 import { OAuth2TokenRefreshService } from './services/OAuth2TokenRefreshService';
 import { MetricsRegistry } from './services/monitoring/MetricsRegistry';
 import { CallLogger } from './services/monitoring/CallLogger';
+import { HealthCheckService } from './services/monitoring/HealthCheckService';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -166,6 +167,18 @@ export async function createApp(): Promise<express.Application> {
       status: 'healthy',
       timestamp: new Date().toISOString(),
     });
+  });
+
+  // Readiness endpoint (P1-05) — real DB probe with a 3 s timeout; unauthenticated and
+  // bypasses all middleware (same as /health). Single flight inside the service.
+  const healthCheckService = container.resolve(HealthCheckService);
+  app.get('/health/ready', async (req, res) => {
+    const readiness = await healthCheckService.checkReady();
+    if (readiness.ready) {
+      res.status(200).json({ status: 'ready' });
+    } else {
+      res.status(503).json({ status: 'unavailable', reason: readiness.reason });
+    }
   });
 
   // Request outcome middleware (P1-04) — assigns req.id, counts metrics and logs the outcome on
@@ -396,6 +409,7 @@ export async function createApp(): Promise<express.Application> {
   container.resolve(ImapInboundService).start();
   container.resolve(OAuth2TokenRefreshService).start();
   container.resolve(ProcessingDeferralService).start();
+  healthCheckService.start();
 
   app.use(errorHandler);
 

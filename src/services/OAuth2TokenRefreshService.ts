@@ -6,6 +6,7 @@ import { smtpImapChannelProviderConfigSchema } from './providers/channel/SmtpIma
 import { SecretRefUtils } from './secrets/SecretRefUtils';
 import { logger } from '../utils/logger';
 import { ProviderCallRecorder, getMetricsRegistry } from './monitoring/ProviderCallRecorder';
+import { HeartbeatRegistry } from './monitoring/HeartbeatRegistry';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
@@ -25,6 +26,7 @@ export class OAuth2TokenRefreshService {
   constructor(
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
     @inject(ProviderCallRecorder) private readonly callRecorder: ProviderCallRecorder,
+    @inject(HeartbeatRegistry) private readonly heartbeatRegistry: HeartbeatRegistry,
   ) {}
 
   private async resolveImapInboundService(): Promise<{ reload: (id: string) => Promise<void> }> {
@@ -73,6 +75,7 @@ export class OAuth2TokenRefreshService {
       try {
         await this.runRefreshCycle();
       } catch (error) {
+        this.heartbeatRegistry.recordError('oauth2-token-refresh');
         logger.error({ error }, 'Error during OAuth2 refresh cycle');
       }
       if (this.isRunning) {
@@ -85,6 +88,7 @@ export class OAuth2TokenRefreshService {
   }
 
   private async runRefreshCycle(): Promise<void> {
+    this.heartbeatRegistry.tick('oauth2-token-refresh', REFRESH_INTERVAL_MS);
     const providerRecords = await db.query.providers.findMany({
       where: and(
         eq(providers.providerType, 'channel'),

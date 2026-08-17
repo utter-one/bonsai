@@ -11,7 +11,8 @@ import { logger } from '../utils/logger';
 import { extractRecipientEmails, resolveEmailRouting } from '../channels/email/shared/EmailRoutingUtils';
 import type { EmailRoutingEntry } from '../channels/email/shared/EmailRoutingTypes';
 import { stripEmailQuotes } from '../channels/email/shared/EmailBodyCleaner';
-import { getMetricsRegistry, getProviderCallRecorder } from './monitoring/ProviderCallRecorder';
+import { getHeartbeatRegistry, getMetricsRegistry, getProviderCallRecorder } from './monitoring/ProviderCallRecorder';
+import { HeartbeatRegistry } from './monitoring/HeartbeatRegistry';
 
 function extractHeaderFromSource(source: string, headerName: string): string | undefined {
   const headerSection = source.split(/\r?\n\r?\n/)[0];
@@ -56,9 +57,12 @@ export class ImapMailboxSession {
 
     this.pollTimer = setTimeout(async () => {
       if (this.shouldStop) return;
+      // P1-05: plain class (no DI) — heartbeats through the accessor (NOOP fallback).
+      getHeartbeatRegistry()?.tick('imap-inbound');
       try {
         await this.runPollCycle();
       } catch (error) {
+        getHeartbeatRegistry()?.recordError('imap-inbound');
         logger.error({ error, providerId: this.providerId }, 'Error during IMAP poll cycle');
       }
       this.startPolling();
@@ -422,10 +426,13 @@ async function findProjectApiKey(projectId: string): Promise<{ key: string; keyS
 @singleton()
 export class ImapInboundService {
   private sessions: Map<string, ImapMailboxSession> = new Map();
+  /** Active per-provider poll intervals — the service-level declared interval is their minimum (P1-05). */
+  private sessionIntervals = new Map<string, number>();
   private isStarted = false;
 
   constructor(
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(HeartbeatRegistry) private readonly heartbeatRegistry: HeartbeatRegistry,
   ) {}
 
   start(): void {
@@ -456,6 +463,8 @@ export class ImapInboundService {
     if (existing) {
       existing.stop();
       this.sessions.delete(providerId);
+      this.sessionIntervals.delete(providerId);
+      this.declareImapInterval();
       logger.info({ providerId }, 'IMAP session stopped');
     }
   }
@@ -534,6 +543,7 @@ export class ImapInboundService {
         this.startSession(provider.id, config);
       }
     } catch (error) {
+      this.heartbeatRegistry.recordError('imap-inbound');
       logger.error({ error }, 'Error during IMAP provider discovery');
     }
   }
@@ -564,7 +574,17 @@ export class ImapInboundService {
     );
 
     this.sessions.set(providerId, session);
+    this.sessionIntervals.set(providerId, session.pollingIntervalMs);
+    this.declareImapInterval();
     session.startPolling();
     logger.info({ providerId, intervalMs: config.imap.pollingIntervalMs }, 'IMAP polling started');
+  }
+
+  /** Declares the 'imap-inbound' staleness interval as the minimum active session interval (P1-05). */
+  private declareImapInterval(): void {
+    const intervals = Array.from(this.sessionIntervals.values());
+    if (intervals.length > 0) {
+      this.heartbeatRegistry.declareInterval('imap-inbound', Math.min(...intervals));
+    }
   }
 }

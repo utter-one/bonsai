@@ -4,6 +4,7 @@ import type { CallMetrics } from '../../db/schema';
 import { classifyThirdPartyError } from '../../utils/errorClassification';
 import logger from '../../utils/logger';
 import { CallLogger } from './CallLogger';
+import { HeartbeatRegistry } from './HeartbeatRegistry';
 import { MetricsRegistry } from './MetricsRegistry';
 
 /**
@@ -137,10 +138,27 @@ export function getMetricsRegistry(): MetricsRegistry | null {
   }
 }
 
+let cachedHeartbeatRegistry: HeartbeatRegistry | null = null;
+
+/**
+ * Accessor for non-DI classes that must heartbeat their loops (P1-05: the plain-class
+ * `ImapMailboxSession` poll loop). Same NOOP-fallback contract as `getProviderCallRecorder`.
+ */
+export function getHeartbeatRegistry(): HeartbeatRegistry | null {
+  if (cachedHeartbeatRegistry) return cachedHeartbeatRegistry;
+  try {
+    cachedHeartbeatRegistry = container.resolve(HeartbeatRegistry);
+    return cachedHeartbeatRegistry;
+  } catch {
+    return null;
+  }
+}
+
 /** Test seam: clears cached singletons so a fresh container is picked up. */
 export function resetMonitoringAccessorsForTests(): void {
   cachedRecorder = null;
   cachedMetricsRegistry = null;
+  cachedHeartbeatRegistry = null;
   warnedUnresolvable = false;
 }
 

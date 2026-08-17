@@ -44,6 +44,8 @@ export async function globalSetup(): Promise<void> {
   process.env.RATE_LIMIT_API_MAX = '10000'; // generous limit for tests
   process.env.RATE_LIMIT_AUTH_WINDOW_MS = '60000';
   process.env.RATE_LIMIT_AUTH_MAX = '10000'; // generous limit for tests
+  process.env.MONITORING_HEALTH_INTERVAL_MS = '1000'; // fast health loop so health_checks rows appear within e2e tests
+  process.env.MONITORING_HEALTH_PROBES = 'off'; // no live provider probes in tests — fake provider configs would hit real APIs
   process.env.MASTER_ENCRYPTION_KEY = '0000000000000000000000000000000000000000000000000000000000000000'; // 32-byte hex key for test encryption
 
   // 3. Run migrations against the fresh container

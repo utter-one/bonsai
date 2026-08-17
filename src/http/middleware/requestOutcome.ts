@@ -16,7 +16,7 @@ const REQUEST_ID_HEADER = 'X-Request-Id';
 const MAX_INBOUND_REQUEST_ID_LENGTH = 128;
 
 /** Paths excluded from metrics and outcome/incoming logs (probe/scrape traffic — P1-04 requirement 4). */
-const SKIPPED_PATHS = new Set(['/health', '/metrics']);
+const SKIPPED_PATHS = new Set(['/health', '/health/ready', '/metrics']);
 
 /**
  * Request-outcome middleware (P1-04):
