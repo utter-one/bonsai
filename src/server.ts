@@ -47,6 +47,7 @@ import { CallLogger } from './services/monitoring/CallLogger';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
+import { requestOutcomeMiddleware, isSkippedRequestPath } from './http/middleware/requestOutcome';
 import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
@@ -167,8 +168,15 @@ export async function createApp(): Promise<express.Application> {
     });
   });
 
+  // Request outcome middleware (P1-04) — assigns req.id, counts metrics and logs the outcome on
+  // finish. Registered before the incoming-request log so that line can carry the requestId, and
+  // before the rate limiter so limiter rejections (429) are counted too.
+  app.use(requestOutcomeMiddleware);
+
   app.use((req, res, next) => {
-    logger.info({ method: req.method, url: req.url }, 'Incoming request');
+    if (!isSkippedRequestPath(req.path)) {
+      logger.info({ requestId: req.id, method: req.method, url: req.url }, 'Incoming request');
+    }
     next();
   });
 

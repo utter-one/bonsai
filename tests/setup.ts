@@ -57,6 +57,15 @@ export async function globalSetup(): Promise<void> {
   const app = await createApp();
   (globalThis as any).__TEST_APP__ = app;
 
+  // 4b. Expose the app-world monitoring registry. E2E test files load in a separate
+  //     module graph (mocha's tsx require hook vs this ESM entry chain), so their
+  //     own `container.resolve(MetricsRegistry)` returns a DIFFERENT singleton than
+  //     the app's. Reading the instance from globalThis (shared across module graphs)
+  //     lets tests assert on the registry the middleware actually records into.
+  const { container: iocContainer } = await import('tsyringe');
+  const { MetricsRegistry } = await import('../src/services/monitoring/MetricsRegistry');
+  (globalThis as any).__TEST_METRICS_REGISTRY__ = iocContainer.resolve(MetricsRegistry);
+
   // 5. Create initial operator and capture tokens
   const res = await request(app)
     .post('/api/setup/initial-operator')

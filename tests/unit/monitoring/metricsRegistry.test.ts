@@ -128,16 +128,16 @@ describe('MetricsRegistry (P1-02)', () => {
       expect(series['service=svc_overflow']).to.be.undefined;
     });
 
-    it('route_group value cap: values beyond 100 map to other', () => {
+    it('route_group value cap: values beyond 200 map to other', () => {
       const reg = new CapturingRegistry();
-      for (let i = 0; i < 101; i++) {
+      for (let i = 0; i < 201; i++) {
         reg.inc('api_requests_total', { method: 'GET', route_group: `route_${i}`, status_class: '2xx' });
       }
       const snap = reg.snapshot();
       const series = snap.counters.api_requests_total;
       const keys = Object.keys(series);
-      // 100 distinct routes + one 'other' series (route_100 overflowed into it)
-      expect(keys.length).to.equal(101);
+      // 200 distinct routes (the app has 152 patterns — cap raised in P1-04) + one 'other' series (route_200 overflowed into it)
+      expect(keys.length).to.equal(201);
       expect(series['method=GET,route_group=other,status_class=2xx']).to.deep.equal({ count: 1, sum: 1 });
     });
 

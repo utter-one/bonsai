@@ -61,7 +61,7 @@ export const ALLOWED_LABEL_KEYS = new Set([
   'direction',
 ]);
 
-const routeGroupCap: CappedLabel = { key: 'route_group', max: 100, overflow: 'other' };
+const routeGroupCap: CappedLabel = { key: 'route_group', max: 200, overflow: 'other' };
 
 /**
  * One-place metric config: the closed registry of metric names with kind,

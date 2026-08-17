@@ -81,6 +81,6 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
     return;
   }
 
-  logger.error({ error: err, method: req.method, url: req.url, stack: err.stack, message: err.message }, 'Unhandled error');
+  logger.error({ error: err, requestId: req.id, method: req.method, url: req.url, stack: err.stack, message: err.message }, 'Unhandled error');
   res.status(500).json({ error: 'Internal server error' });
 }
