@@ -23,6 +23,8 @@ import { ITtsProvider } from "../providers/tts/ITtsProvider";
 import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
 import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
+import { MonitoringContext } from "../monitoring/MonitoringContext";
+import { getMetricsRegistry } from "../monitoring/ProviderCallRecorder";
 import { UserInputProcessor } from "./UserInputProcessor";
 import { TtsSettings } from "../providers/tts/TtsProviderFactory";
 import { ActionsExecutionOutcome, ActionsExecutor, EffectEventCallback } from "./ActionsExecutor";
@@ -256,6 +258,8 @@ export class ConversationRunner {
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, moderationStartMs: null, moderationEndMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null, completionTruncationInfo: null, accumulatedText: null };
+  /** P1-03: whether this runner is currently counted in the active_conversations gauge. */
+  private activeConversationsCounted = false;
 
   /**
    * Executes a function under the runner mutex, serializing all operations.
@@ -818,6 +822,10 @@ export class ConversationRunner {
             // Record the timestamp of the first audio chunk if not already captured
             if (this.turnData.firstAudioMs === null) {
               this.turnData.firstAudioMs = Date.now();
+              // P1-03: end-to-end turn latency to first audio (same value persisted as timeToFirstAudioMs)
+              if (this.turnData.startMs !== null) {
+                getMetricsRegistry()?.observe('ai_turn_ttft_ms', { project_id: this.conversation.projectId }, this.turnData.firstAudioMs - this.turnData.startMs);
+              }
             }
           }
 
@@ -1037,7 +1045,16 @@ export class ConversationRunner {
     }
   }
 
+  /** P1-03: turn-level monitoring context for provider call attribution. */
+  private monitoringContextData() {
+    return { projectId: this.conversation.projectId, conversationId: this.conversation.id, stageId: this.stageData.id };
+  }
+
   async startConversation() {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doStartConversation());
+  }
+
+  private async doStartConversation() {
     this.responseGeneratedInTurn = false;
     this.resetTurnData();
     if (this.conversation.status !== 'initialized') {
@@ -1101,6 +1118,10 @@ export class ConversationRunner {
   }
 
   async resumeConversation() {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doResumeConversation());
+  }
+
+  private async doResumeConversation() {
     // Validate conversation can be resumed (should already be checked in prepareConversation, but double-check)
     if (this.conversation.status === 'finished' || this.conversation.status === 'failed' || this.conversation.status === 'aborted') {
       throw new InvalidOperationError(`Cannot resume conversation in state: ${this.conversation.status}`);
@@ -1133,6 +1154,10 @@ export class ConversationRunner {
    * the conversation_end event.
    */
   async executeEndLifecycleAction(): Promise<void> {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doExecuteEndLifecycleAction());
+  }
+
+  private async doExecuteEndLifecycleAction(): Promise<void> {
     const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
     if (!onConversationEndAction) return;
     logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action (client command)');
@@ -1292,6 +1317,8 @@ export class ConversationRunner {
       // guard (status !== 'receiving_user_voice') to bail out early, swallowing the transcript.
       // processUserInput() — called from onRecognitionStopped — is the correct place to
       // transition to processing_user_input, mirroring how handleVadEndOfUtterance works.
+      // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+      this.stageData.asrProvider.markInputEnded(Date.now());
       await this.stageData.asrProvider.stop();
 
       logger.info({ conversationId: this.stageData.conversation.id }, `Stopped voice input for conversation ${this.stageData.conversation.id}`);
@@ -1370,6 +1397,10 @@ export class ConversationRunner {
    * @param sourceActionName - Name of the action that triggered this navigation, if any
    */
   async goToStage(stageId: string, isProcessingUserInput: boolean = false, sourceActionName?: string): Promise<void> {
+    return MonitoringContext.run({ ...this.monitoringContextData(), stageId }, () => this.doGoToStage(stageId, isProcessingUserInput, sourceActionName));
+  }
+
+  private async doGoToStage(stageId: string, isProcessingUserInput: boolean = false, sourceActionName?: string): Promise<void> {
     // Track nesting depth so only the outermost goToStage call resets the per-turn response guard.
     // This prevents chained on_enter stage jumps from each generating their own response.
     const isTopLevel = this.navigationDepth === 0;
@@ -1666,6 +1697,10 @@ export class ConversationRunner {
    * @returns Result of the action execution
    */
   async runAction(actionName: string, parameters: Record<string, any>): Promise<any> {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doRunAction(actionName, parameters));
+  }
+
+  private async doRunAction(actionName: string, parameters: Record<string, any>): Promise<any> {
     return await this.withMutex(async () => {
       // After acquiring the mutex, re-check: conversation may have become terminal while waiting in queue
       if (this.isConversationTerminal()) {
@@ -1758,6 +1793,10 @@ export class ConversationRunner {
    * @returns Result of the tool execution
    */
   async callTool(toolId: string, parameters: Record<string, any>): Promise<any> {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doCallTool(toolId, parameters));
+  }
+
+  private async doCallTool(toolId: string, parameters: Record<string, any>): Promise<any> {
     logger.info({ conversationId: this.conversation.id, toolId, parameterCount: Object.keys(parameters).length }, `Calling tool ${toolId}`);
 
     // Load the tool from the database
@@ -2091,6 +2130,8 @@ export class ConversationRunner {
       }
 
       try {
+        // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+        this.stageData.asrProvider.markInputEnded(Date.now());
         await this.stageData.asrProvider.stop();
         logger.info({ conversationId: this.stageData.conversation.id }, `VAD end-of-utterance, stopped ASR session for conversation ${this.stageData.conversation.id}`);
       } catch (error) {
@@ -2128,6 +2169,8 @@ export class ConversationRunner {
       this.bargeInSilenceTimer = null;
       logger.info({ conversationId: this.stageData.conversation.id }, '**VAD** Barge-in silence timeout reached, stopping ASR');
       try {
+        // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+        this.stageData.asrProvider?.markInputEnded(Date.now());
         await this.stageData.asrProvider?.stop();
         await this.triggerBargeInSilenceResponse();
       } catch (error) {
@@ -2188,6 +2231,8 @@ export class ConversationRunner {
         this.smartTurnContinueTimer = null;
         if (this.conversation.status === 'receiving_user_voice' && this.stageData.asrProvider) {
           try {
+            // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+            this.stageData.asrProvider.markInputEnded(Date.now());
             await this.stageData.asrProvider.stop();
             logger.info({ conversationId }, 'Smart Turn: continuation timeout, stopped ASR');
           } catch (error) {
@@ -2315,6 +2360,7 @@ export class ConversationRunner {
    */
   private async markAsFailed(reason: string): Promise<void> {
     this.conversation.status = 'failed';
+    this.updateActiveConversationsGauge('failed');
     this.conversation.statusDetails = reason;
     await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, 'failed', reason);
     logger.error({ conversationId: this.stageData.conversation.id, reason }, `Conversation ${this.stageData.conversation.id} marked as failed: ${reason}`);
@@ -2397,6 +2443,12 @@ export class ConversationRunner {
   }
 
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
+    // P1-03: every turn (text/voice/barge-in/silence placeholder) runs in a turn-level
+    // monitoring context so all nested 3rd-party calls are attributed to this conversation.
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doProcessUserInput(userInput, userInputSource, asrEndMs));
+  }
+
+  private async doProcessUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
     // Handle barge-in: prepend accumulated partial transcript from previous ASR sessions.
     if (this.isBargeIn && this.bargeInPartialText) {
       const abortedOutputTurnId = this.turnData.outputTurnId || null;
@@ -3118,7 +3170,8 @@ export class ConversationRunner {
       const fillerInputCap = fillerLimits?.inputTokensLimits?.filler;
       const { messages: truncatedFillerMessages, ...fillerTruncation } = truncateMessagesToTokenBudget(fillerMessages, fillerInputCap, fillerModel);
       logger.info({ conversationId: this.conversation.id, model: fillerModel, maxTokens: fillerMaxTokens, messageCount: truncatedFillerMessages.length }, 'Filler LLM payload');
-      const result = await fillerLlmProvider.generate(truncatedFillerMessages, fillerMaxTokens !== undefined ? { maxTokens: fillerMaxTokens } : undefined);
+      // P1-03: tag the call as llm.filler (nested in the turn context, which supplies attribution)
+      const result = await MonitoringContext.run({ operation: 'llm.filler' }, () => fillerLlmProvider.generate(truncatedFillerMessages, fillerMaxTokens !== undefined ? { maxTokens: fillerMaxTokens } : undefined));
       const text = extractTextFromContent(result.content).trim();
       if (text.length > 0) {
         this.lastFillerPrompt = renderedPrompt;
@@ -3264,8 +3317,28 @@ export class ConversationRunner {
     await this.receiveUserTextInput(placeholder);
   }
 
+  /**
+   * P1-03: keeps the global active_conversations gauge in sync with this runner's
+   * state transitions. Idempotent per runner (one +1 on the first non-terminal
+   * state, one -1 on the first terminal state).
+   */
+  private updateActiveConversationsGauge(state: ConversationState): void {
+    const TERMINAL: ConversationState[] = ['finished', 'aborted', 'failed'];
+    const terminal = TERMINAL.includes(state);
+    if (terminal) {
+      if (this.activeConversationsCounted) {
+        this.activeConversationsCounted = false;
+        getMetricsRegistry()?.changeGauge('active_conversations', undefined, -1);
+      }
+    } else if (!this.activeConversationsCounted) {
+      this.activeConversationsCounted = true;
+      getMetricsRegistry()?.changeGauge('active_conversations', undefined, 1);
+    }
+  }
+
   private async changeState(newState: ConversationState) {
     this.conversation.status = newState;
+    this.updateActiveConversationsGauge(newState);
     await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, newState);
 
     const TERMINAL_STATES = ['finished', 'aborted', 'failed'] as const;

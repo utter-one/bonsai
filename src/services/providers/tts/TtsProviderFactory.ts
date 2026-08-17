@@ -2,6 +2,7 @@ import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ITtsProvider } from './ITtsProvider';
+import { TtsProviderBase } from './TtsProviderBase';
 import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProviderConfigSchema, ElevenLabsTtsSettings } from './ElevenLabsTtsProvider';
 import { OpenAiTtsProvider, OpenAiTtsProviderConfig, openAiTtsProviderConfigSchema, OpenAiTtsSettings } from './OpenAiTtsProvider';
 import { DeepgramTtsProvider, DeepgramTtsProviderConfig, deepgramTtsProviderConfigSchema, DeepgramTtsSettings } from './DeepgramTtsProvider';
@@ -53,33 +54,49 @@ export class TtsProviderFactory {
     const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
 
     // Create provider instance based on API type
+    let instance: ITtsProvider;
     switch (provider.apiType) {
       case 'elevenlabs':
-        return this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsTtsSettings);
+        instance = this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsTtsSettings);
+        break;
 
       case 'openai':
-        return this.createOpenAiProvider(resolvedProvider, settings as OpenAiTtsSettings);
+        instance = this.createOpenAiProvider(resolvedProvider, settings as OpenAiTtsSettings);
+        break;
 
       case 'deepgram':
-        return this.createDeepgramProvider(resolvedProvider, settings as DeepgramTtsSettings);
+        instance = this.createDeepgramProvider(resolvedProvider, settings as DeepgramTtsSettings);
+        break;
 
       case 'cartesia':
-        return this.createCartesiaProvider(resolvedProvider, settings as CartesiaTtsSettings);
+        instance = this.createCartesiaProvider(resolvedProvider, settings as CartesiaTtsSettings);
+        break;
 
       case 'azure':
-        return this.createAzureProvider(resolvedProvider, settings as AzureTtsSettings);
+        instance = this.createAzureProvider(resolvedProvider, settings as AzureTtsSettings);
+        break;
 
       case 'amazon-polly':
-        return this.createAmazonPollyProvider(resolvedProvider, settings as AmazonPollyTtsSettings);
+        instance = this.createAmazonPollyProvider(resolvedProvider, settings as AmazonPollyTtsSettings);
+        break;
 
       case 'soniox':
-        return this.createSonioxProvider(resolvedProvider, settings as SonioxTtsSettings);
+        instance = this.createSonioxProvider(resolvedProvider, settings as SonioxTtsSettings);
+        break;
 
       default:
         const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia, azure, amazon-polly, soniox`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
+
+    // Stamp provider identity for call-log attribution (P1-03)
+    if (instance instanceof TtsProviderBase) {
+      instance.providerId = provider.id;
+      instance.providerApiType = provider.apiType;
+    }
+
+    return instance;
   }
 
   /**

@@ -81,7 +81,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     return requestedFormat;
   }
 
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.textBuffer = '';
@@ -150,7 +150,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     this.handleGenerationStarted();
   }
 
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.stream) {
       logger.warn(`[Soniox TTS] No active stream to end`);
       return;
@@ -180,7 +180,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     }
   }
 
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     if (!this.stream) {
       logger.info(`[Soniox TTS] No active stream to cancel`);
       return;
@@ -204,7 +204,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     }
   }
 
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.addText(text);
     } else {

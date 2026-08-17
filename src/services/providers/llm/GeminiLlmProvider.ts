@@ -66,7 +66,7 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
   /**
    * Generate a non-streaming response
    */
-  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async doGenerate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -322,7 +322,7 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
   /**
    * Generate a streaming response
    */
-  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+  protected async doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -422,7 +422,7 @@ export class GeminiLlmProvider extends LlmProviderBase<GeminiLlmProviderConfig> 
    * Enumerate available models using the Google AI models API.
    * Falls back to a static list of well-known Gemini models if the API call fails or the client is not yet initialized.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const pager = await this.client.models.list();

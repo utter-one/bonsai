@@ -16,6 +16,7 @@ import { TwilioVoiceConnection } from './TwilioVoiceConnection';
 import { twilioVoiceChannelProviderConfigSchema } from '../../services/providers/channel/TwilioVoiceChannelProvider';
 import { sessionSettingsSchema } from '../websocket/contracts/auth';
 import { logger } from '../../utils/logger';
+import { getMetricsRegistry, getProviderCallRecorder, trackWebhookOutcome } from '../../services/monitoring/ProviderCallRecorder';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { ApiKeySettings } from '../../apiKeyFeatures';
 import type { CALInputMessage } from '../messages';
@@ -221,6 +222,7 @@ export class TwilioVoiceChannelHost {
       return;
     }
     const { apiKey: rawApiKey, stageId, agentId, channelProviderId } = queryResult.data;
+    trackWebhookOutcome(res, channelProviderId, 'twilio_voice');
 
     const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
     if (!apiKeyRecord || !apiKeyRecord.isActive) {
@@ -330,11 +332,15 @@ export class TwilioVoiceChannelHost {
     let connection: TwilioVoiceConnection | null = null;
     let inputTurnId: string | null = null;
     const pendingMarkCallbacks = new Map<string, () => Promise<void>>();
+    // P1-03: voice media stream instrumentation (gauge + frame flow metrics)
+    let lastInboundMediaAt: number | null = null;
 
     const tryCleanup = async () => {
       if (!session) return;
       const s = session;
       session = null;
+      // Single decrement per stream: tryCleanup runs once (session guard), so no double-count on stop+close
+      getMetricsRegistry()?.changeGauge('active_voice_media_streams', undefined, -1);
       pendingMarkCallbacks.clear();
       await this.sessionManager.unregisterSession(s.id);
     };
@@ -419,6 +425,7 @@ export class TwilioVoiceChannelHost {
             connection.attachSession(newSession);
             this.sessionManager.setSessionProjectAndSettings(sessionId, projectId, VOICE_SESSION_SETTINGS, keySettings ?? null, null);
             session = newSession;
+            getMetricsRegistry()?.changeGauge('active_voice_media_streams', undefined, 1);
 
             logger.info({ sessionId, projectId, streamSid: startData.streamSid, from: fromNumber }, 'TwilioVoice: new voice session created');
 
@@ -438,6 +445,13 @@ export class TwilioVoiceChannelHost {
             // been captured from a successful start_user_voice_input; if not yet available the
             // runner will silently drop audio in awaiting_user_input state.
             const buffer = Buffer.from(msg.media.payload, 'base64');
+            // P1-03: inbound voice media flow (bytes + inter-frame gap)
+            const mediaNow = Date.now();
+            if (lastInboundMediaAt !== null) {
+              getMetricsRegistry()?.observe('voice_media_max_frame_gap_ms', { direction: 'in' }, mediaNow - lastInboundMediaAt);
+            }
+            lastInboundMediaAt = mediaNow;
+            getMetricsRegistry()?.inc('voice_media_bytes_total', { direction: 'in' }, buffer.length);
             await session.runner.receiveUserVoiceData(inputTurnId ?? '', buffer);
             break;
           }
@@ -586,6 +600,7 @@ export class TwilioVoiceChannelHost {
     const TwilioConstructor = _twilioModule.Twilio ?? _twilioModule;
     const twilioClient = new TwilioConstructor(config.accountSid, config.authToken);
     let callSid: string;
+    const callCreateStartedAt = Date.now();
     try {
       const callCreateParams: Record<string, string> = { to: body.to, from: config.phoneNumber };
       if (config.applicationSid) {
@@ -595,7 +610,27 @@ export class TwilioVoiceChannelHost {
       }
       const call = await twilioClient.calls.create(callCreateParams);
       callSid = call.sid;
+      // P1-03: one channel.outbound_call row per Twilio call placement
+      getProviderCallRecorder().record({
+        providerId: channelProviderIdForUrl,
+        providerType: 'channel',
+        apiType: 'twilio_voice',
+        operation: 'channel.outbound_call',
+        projectId,
+        durationMs: Date.now() - callCreateStartedAt,
+        ok: true,
+      });
     } catch (error) {
+      getProviderCallRecorder().record({
+        providerId: channelProviderIdForUrl,
+        providerType: 'channel',
+        apiType: 'twilio_voice',
+        operation: 'channel.outbound_call',
+        projectId,
+        durationMs: Date.now() - callCreateStartedAt,
+        ok: false,
+        error,
+      });
       logger.error({ error, projectId, to: body.to }, 'TwilioVoice: failed to create outbound call');
       try {
         await this.conversationService.failConversation(projectId, conversation.id, 'Failed to initiate outbound call');

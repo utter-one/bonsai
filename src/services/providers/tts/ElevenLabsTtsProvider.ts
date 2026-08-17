@@ -90,7 +90,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.audioChunks = [];
@@ -154,7 +154,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /**
    * Stops and finalizes the speech generation session
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.socket) {
       logger.warn(`[ElevenLabs] No speech generation instance to end`);
       return;
@@ -178,7 +178,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
    * Cancels the ongoing speech generation without finalizing it.
    * Used when a user barge-in interrupts the AI's response.
    */
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     if (!this.socket) {
       logger.info(`[ElevenLabs] No active session to cancel`);
       return;
@@ -196,7 +196,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.addText(text);
     } else {

@@ -58,6 +58,27 @@ describe('MetricsRegistry (P1-02)', () => {
       expect(snap.gauges.active_conversations['scope=ws']).to.equal(1);
     });
 
+    it('changeGauge() applies signed deltas (positive and negative) from many producers', () => {
+      const reg = new CapturingRegistry();
+      // producers add, then one leaves — the net must be the algebraic sum
+      reg.changeGauge('active_conversations'); // +1 (default)
+      reg.changeGauge('active_conversations', undefined, 2);
+      reg.changeGauge('active_conversations', undefined, -1);
+      reg.changeGauge('active_conversations', { scope: 'ws' }, 1);
+      reg.changeGauge('active_conversations', { scope: 'ws' }, -1); // back to 0
+      const snap = reg.snapshot();
+      expect(snap.gauges.active_conversations['']).to.equal(2);
+      expect(snap.gauges.active_conversations['scope=ws']).to.equal(0);
+    });
+
+    it('changeGauge() ignores non-finite deltas', () => {
+      const reg = new CapturingRegistry();
+      reg.changeGauge('active_conversations', undefined, Number.NaN);
+      reg.changeGauge('active_conversations', undefined, Number.POSITIVE_INFINITY);
+      const snap = reg.snapshot();
+      expect(snap.gauges.active_conversations).to.equal(undefined);
+    });
+
     it('snapshot() returns deep copies — mutating it does not affect the registry', () => {
       const reg = new CapturingRegistry();
       reg.inc('api_requests_total');

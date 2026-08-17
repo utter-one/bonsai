@@ -157,11 +157,12 @@ Write path: in-memory bounded buffer, flushed every 5s or 200 rows (whichever fi
 
 - `api_requests_total{method, route_group, status_class}` + duration histogram — from a **new request-outcome middleware** (also adds `requestId` uuid, duration, status, operatorId to pino; `res.on('finish')`).
 - `provider_calls_total{provider_id, provider_type, operation, ok, error_code}` + `provider_call_duration_ms`.
-- Gauges: `active_conversations` (ConversationRunner start/terminal state, P1-03), `active_websocket_connections` (WS connect/disconnect, P1-03), `db_pool_total/idle/waiting` + `rss_bytes` + `event_loop_lag_p95_ms` (p95 over a 60 s in-memory window from `perf_hooks.monitorEventLoopDelay`) — the last group published by the P1-05 checks, so the rule engine reads gauges only.
+- Gauges: `active_conversations` (ConversationRunner start/terminal state, P1-03), `active_websocket_connections` (WS connect/disconnect, P1-03), `active_voice_media_streams` (Twilio Media Streams accept→close, P1-03), `db_pool_total/idle/waiting` + `rss_bytes` + `event_loop_lag_p95_ms` (p95 over a 60 s in-memory window from `perf_hooks.monitorEventLoopDelay`) — the last group published by the P1-05 checks, so the rule engine reads gauges only.
 - `circuit_breaker_state{provider_id}` (0/1/2), `circuit_opens_total{provider_id}`, `circuit_open_skips_total{provider_id}`, `fallback_attempts_total{provider_id}` (each failed attempt that moved the chain), `fallbacks_executed_total{provider_id, fallback_provider_id}` (successful transitions), `provider_chain_exhausted_total{provider_id}`, `fallback_incompatible_total{provider_id}` (skipped incompatible TTS fallback), `background_service_last_run_ts{service}` (heartbeats).
 - `rate_limit_rejections_total{scope, key_type}` (scope: `api` | `auth`; key_type: `operator` | `ip`) — hooked in both `createApiRateLimiter`/`createAuthRateLimiter` handlers, which also gain a pino warn line (`operatorId`/`ip` redacted to key hash, path). Covers **Bonsai's own 429s**. **Upstream 429s** (LLM/ASR/TTS/Twilio returning 429) are captured as `provider_call_logs` rows with `error_code='rate_limited'` — the two directions are tracked separately on purpose (own limits = capacity/client issue; upstream limits = quota problem needing provider attention).
-- `oauth_refresh_total{provider_id, ok}`, `imap_poll_total{provider_id, ok, messages_found}`.
-- **Streaming histograms** (phase-level, not total duration — see §3.2f): `llm_ttft_ms`, `llm_stream_duration_ms`, `tts_ttfa_ms`, `tts_synthesis_ms`, `asr_setup_ms`, `asr_eos_to_final_ms`, `ai_turn_ttft_ms{project_id}` (end-to-end: user EOS → first TTS audio chunk). Labels stay low-cardinality: `provider_id`, `operation`, `model`; token counts live in the call log, never as labels.
+- `oauth_refresh_total{provider_id, ok}`, `imap_poll_total{provider_id, ok}` (message count lives in the call-log `metrics.messagesFound` jsonb — an unbounded label is not allowed).
+- **Voice media (Twilio Media Streams, P1-03):** `voice_media_bytes_total{direction}` (counter, `direction` ∈ in/out), `voice_media_max_frame_gap_ms{direction}` (histogram of frame inter-arrival gaps). Per-frame rows are impossible under the fixed operation enum — metrics only (disconnect reason → pino warn).
+- **Streaming histograms** (phase-level, not total duration — see §3.2f): `llm_ttft_ms`, `llm_stream_duration_ms`, `tts_ttfa_ms`, `tts_synthesis_ms`, `asr_setup_ms`, `asr_eos_to_final_ms`, `ai_turn_ttft_ms{project_id}` (end-to-end: user EOS → first TTS audio chunk). Labels stay low-cardinality: `provider_id`, `operation`, `model`, `direction` (voice media); token counts live in the call log, never as labels.
 
 **c) Deep health — `HealthCheckService`**
 
@@ -183,7 +184,7 @@ A 20 s LLM stream for a 300-word answer is excellent; 20 s for a 10-word answer 
 | Stream | Phases recorded (per call-log row) | Derived signal |
 |---|---|---|
 | LLM `generateStream` | `ttftMs` (request → first chunk), `chunksCount`, `maxChunkGapMs` (largest gap between consecutive chunks), `tokensPrompt`/`tokensCompletion` (from the `usage` callback), `finishReason` | **TTFT** = perceived responsiveness; **stall** = `maxChunkGapMs > 10 s` mid-stream; throughput = `tokensCompletion / (duration − ttft)` |
-| TTS per turn | `ttft_ms` (time to first `onSpeechGenerating` audio chunk — stored under the same generic `ttft_ms` key in `metrics` as LLM; the dedicated histogram is `tts_ttfa_ms`), `audioBytesOut`, `audioDurationMs` (length of produced audio), `duration_ms` = synthesis wall time | **RTF** = `duration_ms / audioDurationMs`; RTF > 1 ⇒ TTS can't keep up ⇒ user hears gaps mid-sentence |
+| TTS per turn | `ttftMs` (time to first `onSpeechGenerating` audio chunk — stored under the same generic `ttftMs` key in `metrics` as LLM; the dedicated histogram is `tts_ttfa_ms`), `audioBytesOut`, `audioDurationMs` (length of produced audio), flat `duration_ms` column = synthesis wall time, `canceled` (barge-in) | **RTF** = `duration_ms / audioDurationMs`; RTF > 1 ⇒ TTS can't keep up ⇒ user hears gaps mid-sentence |
 | ASR per session | `setupMs` (init→start), `timeToFirstPartialMs`, `eosToFinalMs` (VAD end-of-speech → final transcript), `partialsCount`/`finalsCount` | `eosToFinalMs` = how long the system "thinks" after the user stops talking |
 | Voice/WS connections (Twilio Media Streams, WebRTC, WebSocket) | session duration, bytes in/out, `maxFrameGapMs`, disconnect reason | jitter/stall indicator per connection; feeds `active_*` gauges |
 
@@ -201,7 +202,7 @@ A 20 s LLM stream for a 300-word answer is excellent; 20 s for a 10-word answer 
 
 | rule id | severity | condition (defaults) |
 |---|---|---|
-| `stream-slow-ttft` | warning | TTFT p95 > 10 s (LLM) or > 3 s (TTS `ttft_ms`) in 15 min (min 20 streams), per provider |
+| `stream-slow-ttft` | warning | TTFT p95 > 10 s (LLM) or > 3 s (TTS `ttftMs`) in 15 min (min 20 streams), per provider |
 | `stream-stalls` | warning | >10% of streams with `maxChunkGapMs > 10 s` in 15 min — provider stalling, usually the early warning before a full outage |
 | `tts-rtf-degraded` | warning | >10% of TTS turns with RTF > 1 in 15 min (user hears mid-sentence gaps) |
 | `asr-final-latency` | info | `eosToFinalMs` p95 > 10 s in 15 min |
@@ -293,15 +294,16 @@ provider_call_logs (id text pk, provider_id, provider_type, api_type, operation,
   -- metrics (nullable jsonb, TS type CallMetrics; see §3.2f) holds the variant-specific
   -- streaming/ASR/TTS phase fields sparsely — a row is one variant, so flat columns
   -- would be ~9–13 NULLs per row: LLM ttftMs/chunksCount/maxChunkGapMs/finishReason/
-  -- tokensPrompt/tokensCompletion/errorPhase; TTS audioBytesOut/audioDurationMs;
-  -- ASR setupMs/timeToFirstPartialMs/eosToFinalMs/partialsCount/finalsCount/sessionAudioMs.
+  -- tokensPrompt/tokensCompletion/errorPhase; TTS audioBytesOut/audioDurationMs/canceled;
+  -- ASR setupMs/timeToFirstPartialMs/eosToFinalMs/partialsCount/finalsCount/sessionAudioMs;
+  -- channels/storage bytesIn/bytesOut; IMAP messagesFound.
   -- Nothing index-seeks these (only batch window scans aggregate them, via ->>), and new
   -- streaming fields can be added without a migration. Core columns stay flat: filtered/
   -- indexed, and error_code feeds the stats-table PK.
   -- indexes: (created_at), (provider_id, created_at), (project_id, created_at), (conversation_id)
   -- retention: purge > retentionDays (default 90), daily cron
 
-provider_call_stats_hourly (hour_bucket timestamptz, provider_id, operation,
+provider_call_stats_hourly (hour_bucket timestamp, provider_id, operation,
   ok bool notNull, error_code text notNull default 'none', -- PK members must be non-NULL; rollup COALESCEs NULL → 'none'
   count, sum_duration_ms, min_duration_ms, max_duration_ms,
   p95_duration_ms,
@@ -315,7 +317,7 @@ health_checks (id text pk, check_name, status, latency_ms int, detail jsonb, cre
 alert_events (id text pk, rule_id, scope_key, scope jsonb, severity,
   status text, -- 'firing' | 'resolved'
   message, context jsonb, notifications jsonb,
-  fired_at, resolved_at timestamptz, acked_at timestamptz, acked_by text)
+  fired_at, resolved_at timestamp, acked_at timestamp, acked_by text)
   -- indexes: (fired_at), (scope_key, status), (rule_id, fired_at)
 
 fallback_events (id text pk, provider_id, fallback_provider_id, provider_type,
@@ -323,7 +325,7 @@ fallback_events (id text pk, provider_id, fallback_provider_id, provider_type,
   -- indexes: (created_at), (provider_id, created_at)
 
 metric_samples (id text pk, -- jsonb labels can't be part of a PK
-  bucket timestamptz, name, labels jsonb, count bigint,
+  bucket timestamp, name, labels jsonb, count bigint,
   sum double, min double, max double, created_at)
   -- index: (name, bucket), (bucket)
 

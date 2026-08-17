@@ -91,7 +91,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   /**
    * Starts the ElevenLabs speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required ElevenLabs API key';
       logger.error(`[ElevenLabs ASR] ${errorMessage}`);
@@ -181,7 +181,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   /**
    * Stops the ElevenLabs speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[ElevenLabs ASR] Stopping recognition`);
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
@@ -216,7 +216,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[ElevenLabs ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

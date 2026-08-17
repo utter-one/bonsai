@@ -10,6 +10,7 @@ import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { WebSocketConnection } from './WebSocketConnection';
+import { getMetricsRegistry } from '../../services/monitoring/ProviderCallRecorder';
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -52,6 +53,7 @@ export class WebSocketChannelHost {
       const clientIp = (Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0]?.trim()) ?? req.socket.remoteAddress ?? '';
       this.trackSocketIp(ws, clientIp);
       logger.info({ ip: clientIp }, 'New WebSocket connection established');
+      getMetricsRegistry()?.changeGauge('active_websocket_connections', undefined, 1);
 
       // Create a new WebSocketConnection and session for the authenticated client
       const wsConnection = new WebSocketConnection(ws, this.sessionManager);
@@ -67,6 +69,7 @@ export class WebSocketChannelHost {
       });
 
       ws.on('close', () => {
+        getMetricsRegistry()?.changeGauge('active_websocket_connections', undefined, -1);
         this.handleDisconnect(ws).catch((err) => {
           logger.error({ error: err.message }, 'WebSocket handleDisconnect unhandled rejection');
         });

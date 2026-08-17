@@ -95,7 +95,7 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
   /**
    * Starts the Speechmatics speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required Speechmatics API key';
       logger.error(`[Speechmatics ASR] ${errorMessage}`);
@@ -214,7 +214,7 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
   /**
    * Stops the Speechmatics speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[Speechmatics ASR] Stopping recognition`);
 
     if (!this.client) {
@@ -237,7 +237,7 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[Speechmatics ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

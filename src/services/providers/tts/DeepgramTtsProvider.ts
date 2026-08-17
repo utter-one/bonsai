@@ -154,7 +154,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.flushTimestamps = [];
@@ -202,7 +202,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   /**
    * Stops and finalizes the speech generation session
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.socket) {
       logger.warn(`[Deepgram] No speech generation instance to end`);
       return;
@@ -241,7 +241,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
    * Cancels the ongoing speech generation without finalizing it.
    * Used when a user barge-in interrupts the AI's response.
    */
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     if (!this.socket) {
       logger.info(`[Deepgram] No active session to cancel`);
       return;
@@ -263,7 +263,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.addText(text);
     } else {

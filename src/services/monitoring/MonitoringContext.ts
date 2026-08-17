@@ -19,9 +19,17 @@ export interface MonitoringContextData {
 export class MonitoringContext {
   private static readonly storage = new AsyncLocalStorage<MonitoringContextData>();
 
-  /** Runs `fn` with `ctx` as the current monitoring context. */
+  /**
+   * Runs `fn` with `ctx` merged over the current monitoring context: inner
+   * fields override outer ones, fields not set in `ctx` are inherited from
+   * the enclosing `run()`. This lets per-operation wrappers (e.g.
+   * `run({ operation: 'llm.filler' })`) nest inside a turn-level context
+   * without re-declaring projectId/conversationId.
+   */
   static run<T>(ctx: MonitoringContextData, fn: () => T): T {
-    return MonitoringContext.storage.run(ctx, fn);
+    const outer = MonitoringContext.current();
+    const merged: MonitoringContextData = outer ? { ...outer, ...ctx } : { ...ctx };
+    return MonitoringContext.storage.run(merged, fn);
   }
 
   /** The context of the current async execution, or undefined outside a `run()`. */

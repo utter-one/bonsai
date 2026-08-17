@@ -6,6 +6,7 @@ import logger from '../../utils/logger';
 import { extractTextFromContent } from '../../utils/llm';
 import { isActionActive } from '../../utils/actions';
 import { TransformationEventData } from '../../types/conversationEvents';
+import { MonitoringContext } from '../monitoring/MonitoringContext';
 import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
 import { Session, getEffectiveChannelType } from '../../channels/SessionManager';
 import { ConversationService } from '../ConversationService';
@@ -263,7 +264,8 @@ export class ContextTransformerExecutor {
       const transformerMaxTokens = resolveOutputCap((transformerData.transformer.llmSettings as any)?.defaultMaxTokens, transformerLimits, 'transformation');
       const transformerInputCap = transformerLimits?.inputTokensLimits?.transformation;
       const { messages: truncatedTransformerMessages, ...transformerTruncation } = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);
-      const result = await llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined);
+      // P1-03: tag the call as llm.transform (nested in the turn context, which supplies attribution)
+      const result = await MonitoringContext.run({ operation: 'llm.transform' }, () => llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined));
       const textContent = extractTextFromContent(result.content);
       rawResponse = JSON.stringify(result, null, 2);
 

@@ -90,7 +90,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.isStarted = true;
@@ -128,7 +128,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
   /**
    * Stops and finalizes the speech generation session
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.isStarted) {
       logger.warn(`[OpenAI TTS] No speech generation instance to end`);
       return;
@@ -163,7 +163,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
    * Cancels the ongoing speech generation without finalizing it.
    * Used when a user barge-in interrupts the AI's response.
    */
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     logger.info(`[OpenAI TTS] Cancelling speech generation (barge-in)`);
 
     // Abort all active HTTP requests
@@ -180,7 +180,7 @@ export class OpenAiTtsProvider extends TtsProviderBase<OpenAiTtsProviderConfig> 
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (!this.isStarted) {
       logger.warn(`[OpenAI TTS] Cannot send text, generation not started`);
       return;

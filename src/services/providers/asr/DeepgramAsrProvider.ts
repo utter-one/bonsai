@@ -90,7 +90,7 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
   /**
    * Starts the Deepgram speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required Deepgram API key';
       logger.error(`[Deepgram ASR] ${errorMessage}`);
@@ -191,7 +191,7 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
   /**
    * Stops the Deepgram speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[Deepgram ASR] Stopping recognition`);
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
@@ -220,7 +220,7 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[Deepgram ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

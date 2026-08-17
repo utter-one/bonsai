@@ -109,7 +109,7 @@ export class SonioxAsrProvider extends AsrProviderBase<SonioxAsrProviderConfig> 
     logger.info(`[Soniox ASR] Initialized with audio format: ${this.audioFormat}, model: ${this.settings.model}`);
   }
 
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required Soniox API key';
       logger.error(`[Soniox ASR] ${errorMessage}`);
@@ -182,7 +182,7 @@ export class SonioxAsrProvider extends AsrProviderBase<SonioxAsrProviderConfig> 
     });
   }
 
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[Soniox ASR] Stopping recognition`);
 
     if (!this.session) {
@@ -209,7 +209,7 @@ export class SonioxAsrProvider extends AsrProviderBase<SonioxAsrProviderConfig> 
     this.handleRecognitionStopped();
   }
 
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[Soniox ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

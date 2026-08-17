@@ -72,7 +72,7 @@ export class OllamaLlmProvider extends OpenAILegacyLlmProvider<OllamaNormalizedC
   /**
    * Enumerates models available on the configured Ollama server via the OpenAI-compatible `/v1/models` endpoint.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();
@@ -94,7 +94,7 @@ export class OllamaLlmProvider extends OpenAILegacyLlmProvider<OllamaNormalizedC
    * Ollama does not provide a content moderation endpoint.
    * Always returns non-flagged to allow all content through.
    */
-  async moderateUserInput(_input: string): Promise<{ flagged: boolean; categories: string[] }> {
+  protected async doModerateUserInput(_input: string): Promise<{ flagged: boolean; categories: string[] }> {
     return { flagged: false, categories: [] };
   }
 }

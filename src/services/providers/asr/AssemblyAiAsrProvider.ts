@@ -109,7 +109,7 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
   /**
    * Starts the AssemblyAI speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required AssemblyAI API key';
       logger.error(`[AssemblyAI ASR] ${errorMessage}`);
@@ -204,7 +204,7 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
   /**
    * Stops the AssemblyAI speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[AssemblyAI ASR] Stopping recognition`);
 
     if (!this.transcriber) {
@@ -239,7 +239,7 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[AssemblyAI ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

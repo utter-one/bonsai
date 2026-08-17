@@ -58,6 +58,7 @@ export const ALLOWED_LABEL_KEYS = new Set([
   'status_class',
   'service',
   'check',
+  'direction',
 ]);
 
 const routeGroupCap: CappedLabel = { key: 'route_group', max: 100, overflow: 'other' };
@@ -93,6 +94,13 @@ export const METRIC_CONFIGS: Record<string, MetricConfig> = {
   // Live gauges
   active_conversations: { kind: 'gauge' },
   active_websocket_connections: { kind: 'gauge' },
+  active_voice_media_streams: { kind: 'gauge' },
+  // Voice media stream flow (P1-03) — direction ∈ {in, out}; per-frame rows are out of scope
+  voice_media_bytes_total: { kind: 'counter' },
+  voice_media_max_frame_gap_ms: {
+    kind: 'histogram',
+    buckets: [50, 100, 200, 400, 800, 1600, 3200, 6400],
+  },
   db_pool_total: { kind: 'gauge' },
   db_pool_idle: { kind: 'gauge' },
   db_pool_waiting: { kind: 'gauge' },
@@ -192,6 +200,21 @@ export class MetricsRegistry {
     }));
     if (!state) return;
     state.value = value;
+  }
+
+  /** Applies a delta to a gauge (positive or negative, default 1). For gauges driven by many independent producers (e.g. one per conversation runner). */
+  changeGauge(name: string, labels: Record<string, unknown> | undefined, delta = 1): void {
+    const cfg = this.requireMetric(name, 'gauge', 'changeGauge');
+    if (!cfg || !Number.isFinite(delta)) return;
+    const key = this.buildSeriesKey(name, cfg, labels);
+    if (key === undefined) return;
+    const state = this.getOrCreateSeries(name, cfg, key, () => ({
+      kind: 'gauge',
+      value: 0,
+      flushedValue: NaN, // NaN forces the first value to be flushed too
+    }));
+    if (!state) return;
+    state.value += delta;
   }
 
   /** Observes a value on a histogram. */

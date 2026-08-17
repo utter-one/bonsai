@@ -5,6 +5,7 @@ import { providers } from '../db/schema';
 import { smtpImapChannelProviderConfigSchema } from './providers/channel/SmtpImapChannelProvider';
 import { SecretRefUtils } from './secrets/SecretRefUtils';
 import { logger } from '../utils/logger';
+import { ProviderCallRecorder, getMetricsRegistry } from './monitoring/ProviderCallRecorder';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
@@ -23,6 +24,7 @@ export class OAuth2TokenRefreshService {
 
   constructor(
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
+    @inject(ProviderCallRecorder) private readonly callRecorder: ProviderCallRecorder,
   ) {}
 
   private async resolveImapInboundService(): Promise<{ reload: (id: string) => Promise<void> }> {
@@ -123,7 +125,33 @@ export class OAuth2TokenRefreshService {
 
     logger.info({ providerId: provider.id, expiresIn: oauth2.accessTokenExpiry - now }, 'OAuth2 token expiring, refreshing');
 
-    const tokenResponse = await this.fetchToken(oauth2);
+    // One `oauth.refresh` row per actual token refresh (early returns above record nothing — P1-03)
+    const refreshStartedAt = Date.now();
+    let tokenResponse: OAuth2TokenResponse;
+    try {
+      tokenResponse = await this.fetchToken(oauth2);
+    } catch (error) {
+      this.callRecorder.record({
+        providerId: provider.id,
+        providerType: 'channel',
+        apiType: 'smtp_imap',
+        operation: 'oauth.refresh',
+        durationMs: Date.now() - refreshStartedAt,
+        ok: false,
+        error,
+      });
+      getMetricsRegistry()?.inc('oauth_refresh_total', { provider_id: provider.id, ok: false });
+      throw error;
+    }
+    this.callRecorder.record({
+      providerId: provider.id,
+      providerType: 'channel',
+      apiType: 'smtp_imap',
+      operation: 'oauth.refresh',
+      durationMs: Date.now() - refreshStartedAt,
+      ok: true,
+    });
+    getMetricsRegistry()?.inc('oauth_refresh_total', { provider_id: provider.id, ok: true });
 
     const updatedConfig: Record<string, unknown> = { ...provider.config };
     if (typeof updatedConfig.oauth2 !== 'object' || updatedConfig.oauth2 === null) {
@@ -171,7 +199,9 @@ export class OAuth2TokenRefreshService {
     if (!response.ok) {
       const body = await response.text();
       logger.error({ status: response.status, body, providerTokenUrl: oauth2.tokenUrl }, 'OAuth2 token refresh failed');
-      throw new Error(`OAuth2 token refresh failed: ${response.status} ${body}`);
+      const error = new Error(`OAuth2 token refresh failed: ${response.status} ${body}`) as Error & { status?: number };
+      error.status = response.status; // consumed by classifyThirdPartyError for the call-log row
+      throw error;
     }
 
     const json = (await response.json()) as OAuth2TokenResponse;

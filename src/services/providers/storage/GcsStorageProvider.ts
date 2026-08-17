@@ -49,7 +49,7 @@ export class GcsStorageProvider extends StorageProviderBase<GcsStorageProviderCo
     logger.info(`Google Cloud Storage provider initialized for bucket: ${this.settings.bucketName}`);
   }
 
-  async upload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
+  protected async doUpload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const bucket = this.storage!.bucket(this.settings.bucketName);
@@ -75,7 +75,7 @@ export class GcsStorageProvider extends StorageProviderBase<GcsStorageProviderCo
     });
   }
 
-  async download(key: string): Promise<Buffer> {
+  protected async doDownload(key: string): Promise<Buffer> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const bucket = this.storage!.bucket(this.settings.bucketName);

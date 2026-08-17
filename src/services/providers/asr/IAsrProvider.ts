@@ -46,6 +46,14 @@ export interface IAsrProvider {
   start(): Promise<void>;
 
   /**
+   * Marks the user end-of-speech timestamp for the active session (P1-03).
+   * Called by the ConversationRunner at VAD end-of-utterance so the base can
+   * compute `eosToFinalMs` (end-of-speech -> final transcript) per session.
+   * @param ts Unix timestamp in ms; defaults to now
+   */
+  markInputEnded(ts?: number): void;
+
+  /**
    * Stops the speech recognition session for the given context
    * @returns Promise that resolves when recognition session is successfully stopped
    */

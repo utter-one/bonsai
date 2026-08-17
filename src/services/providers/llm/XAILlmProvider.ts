@@ -54,7 +54,7 @@ export class XAILlmProvider extends OpenAILegacyLlmProvider<XAILlmProviderConfig
    * Enumerate available xAI (Grok) models via the API.
    * Falls back to a static list if the API call fails.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();

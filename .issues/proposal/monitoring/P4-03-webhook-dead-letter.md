@@ -26,7 +26,7 @@ When inbound webhook processing throws after signature validation (bug, transien
 
 ### Modified files
 - `src/db/schema.ts` + **own migration** (next free number at `db:generate` time — `0069` if P1-01's `0068` is the latest when this lands; rule: one feature per migration file):
-  - `webhook_failures`: `id text pk`, `channel text` (`whatsapp`|`telegram`|`twilio_voice`|`twilio_messaging`|`email`), `channel_provider_id`, `project_id text null`, `payload jsonb notNull`, `error text`, `received_at timestamptz`, `status text notNull default 'new'` (`new`|`replayed`|`discarded`), `replayed_at timestamptz null`, `replayed_by text null`. Indexes: `(status, received_at)`, `(received_at)`.
+  - `webhook_failures`: `id text pk`, `channel text` (`whatsapp`|`telegram`|`twilio_voice`|`twilio_messaging`|`email`), `channel_provider_id`, `project_id text null`, `payload jsonb notNull`, `error text`, `received_at timestamp`, `status text notNull default 'new'` (`new`|`replayed`|`discarded`), `replayed_at timestamp null`, `replayed_by text null`. Indexes: `(status, received_at)`, `(received_at)`.
 - Channel hosts — capture point in each inbound handler's catch block (the one that currently returns 500):
   - `src/channels/whatsapp/WhatsAppChannelHost.ts`, `src/channels/telegram/TelegramChannelHost.ts`, `src/channels/twilio-voice/TwilioVoiceChannelHost.ts` (webhook leg), `src/channels/twilio-messaging/*` webhook, email IMAP inbound is **excluded** (polling, retried next cycle — no dead-letter needed).
 - `src/http/controllers/MonitoringController.ts` — two routes

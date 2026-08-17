@@ -3,6 +3,7 @@ import type { Session, SessionManager } from '../SessionManager';
 import type { IClientConnection } from '../IClientConnection';
 import type { CALOutputMessage } from '../messages';
 import { logger } from '../../utils/logger';
+import { getMetricsRegistry } from '../../services/monitoring/ProviderCallRecorder';
 
 /**
  * Twilio Media Streams-backed implementation of {@link IClientConnection}.
@@ -31,6 +32,8 @@ export class TwilioVoiceConnection implements IClientConnection {
   private markCounter = 0;
   private pendingMarkName: string | null = null;
   isClosing = false;
+  /** P1-03: timestamp of the last outbound audio frame (for frame-gap metric). */
+  private lastOutboundMediaAt: number | null = null;
   private pendingCloseResolve: (() => void) | null = null;
 
   constructor(
@@ -164,6 +167,13 @@ export class TwilioVoiceConnection implements IClientConnection {
           return;
         }
         if (!canSend) return;
+        // P1-03: outbound voice media flow (bytes + inter-frame gap)
+        const mediaNow = Date.now();
+        if (this.lastOutboundMediaAt !== null) {
+          getMetricsRegistry()?.observe('voice_media_max_frame_gap_ms', { direction: 'out' }, mediaNow - this.lastOutboundMediaAt);
+        }
+        this.lastOutboundMediaAt = mediaNow;
+        getMetricsRegistry()?.inc('voice_media_bytes_total', { direction: 'out' }, msg.audioData.length);
         const payload = msg.audioData.toString('base64');
         const frame = JSON.stringify({ event: 'media', streamSid: this.streamSid, media: { payload } });
         this.ws.send(frame);

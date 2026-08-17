@@ -68,10 +68,10 @@ type EvaluationData = {
     calls: number; errorRate: number; p95DurationMs: number;
     errorCounts: Record<string, number>;         // errorCode → count in window
     ttftP50Ms?: number; ttftP95Ms?: number; ttftP99Ms?: number;
-    stalledFraction: number;                     // rows with max_chunk_gap_ms > 10000
-    rtfOver1Fraction: number;                    // tts rows with duration_ms > audio_duration_ms
+    stalledFraction: number;                     // rows with metrics.maxChunkGapMs > 10000
+    rtfOver1Fraction: number;                    // tts rows with duration_ms > metrics.audioDurationMs
     eosToFinalP95Ms?: number;
-    midStreamErrorFraction: number;              // rows with error_phase='mid_stream'
+    midStreamErrorFraction: number;              // rows with metrics.errorPhase='mid_stream'
   }>;
   fallbackEventCounts: Map<providerId, number>;  // 10-min window over fallback_events
   rejections: { api: number; auth: number; topKeys: { hash: string; count: number }[] };  // P1-07
@@ -95,7 +95,7 @@ Rule conditions (exact — each is one registered evaluator; params are the defa
 - `oauth-refresh-failing` / `imap-poll-failing` (warning) = `oauth_refresh_total{ok=false}` ≥ 3 in 60 min / `imap_poll_total{ok=false}` ≥ 5 in 60 min.
 - `high-memory` (warning) = `rss_bytes` gauge (published by P1-05's `process` check) > threshold (default 1.5 GB, env `MONITORING_MEMORY_THRESHOLD_MB`). `event-loop-lag` (warning) = `event_loop_lag_p95_ms` gauge (P1-05 keeps a 60 s in-memory delay-sample window and publishes the gauge each cycle) > 250 ms — the "5 min" semantics come from `forMinutes` sustainment (document this in the rule's message).
 - `fallback-active` (info, per-provider) = ≥1 `fallback_events` row for that provider in 10 min — inert until Phase 3 writes rows (expected in Phases 1–2; P3-06 verifies per-provider scoping).
-- Streaming (all per-provider): `stream-slow-ttft` (warning) = ttft p95 > 10 s (LLM) / 3 s (TTS, `ttft_ms` key in `metrics`); `stream-stalls` (warning) = `stalledFraction` > 10%; `stream-abort-rate` (warning) = `midStreamErrorFraction` > 10%; `tts-rtf-degraded` (warning) = `rtfOver1Fraction` > 10%; `asr-final-latency` (info) = `eosToFinalP95Ms` > 10 s.
+- Streaming (all per-provider): `stream-slow-ttft` (warning) = ttft p95 > 10 s (LLM) / 3 s (TTS, `ttftMs` key in `metrics`); `stream-stalls` (warning) = `stalledFraction` > 10%; `stream-abort-rate` (warning) = `midStreamErrorFraction` > 10%; `tts-rtf-degraded` (warning) = `rtfOver1Fraction` > 10%; `asr-final-latency` (info) = `eosToFinalP95Ms` > 10 s.
 
 Implementation notes:
 - `provider-*`/`stream-*` data comes from ONE rolling-window query per pass over `provider_call_logs` (per-provider aggregates incl. `percentile_cont`; variant fields extracted from the `metrics` jsonb via `->>`), not one query per rule.

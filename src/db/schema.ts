@@ -1123,12 +1123,19 @@ export type CallMetrics = {
   audioBytesOut?: number;
   audioDurationMs?: number;
   // ASR (session)
-  setupMs?: number; // init -> start
+  setupMs?: number; // start() wall time (per-utterance sessions; see P1-03)
   timeToFirstPartialMs?: number;
   eosToFinalMs?: number; // end-of-speech -> final transcript
   partialsCount?: number;
   finalsCount?: number;
-  sessionAudioMs?: number;
+  sessionAudioMs?: number; // estimated from PCM bytes when the input format has a known sample rate
+  // Storage
+  bytesIn?: number; // storage.download: downloaded bytes
+  bytesOut?: number; // storage.upload: uploaded bytes
+  // IMAP
+  messagesFound?: number; // imap.poll: messages found in the cycle
+  // TTS
+  canceled?: boolean; // session ended via cancel() (barge-in), not an error
 };
 
 // provider_call_logs — one row per 3rd-party call (variant phase fields in `metrics` jsonb)
