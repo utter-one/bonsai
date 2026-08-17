@@ -45,6 +45,7 @@ import { OAuth2TokenRefreshService } from './services/OAuth2TokenRefreshService'
 import { MetricsRegistry } from './services/monitoring/MetricsRegistry';
 import { CallLogger } from './services/monitoring/CallLogger';
 import { HealthCheckService } from './services/monitoring/HealthCheckService';
+import { RetentionService } from './services/monitoring/RetentionService';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -410,6 +411,7 @@ export async function createApp(): Promise<express.Application> {
   container.resolve(OAuth2TokenRefreshService).start();
   container.resolve(ProcessingDeferralService).start();
   healthCheckService.start();
+  container.resolve(RetentionService).start();
 
   app.use(errorHandler);
 

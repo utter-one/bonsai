@@ -106,14 +106,15 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 
 ### Background Services
 
-Seven services run continuously after startup (all resolved from the IoC container and started via `.start()` in `server.ts`):
+Eight services run continuously after startup (all resolved from the IoC container and started via `.start()` in `server.ts`):
 - `ConversationTimeoutService` — monitors conversation timeouts (node-cron, every minute)
 - `ScenarioRunExecutorService` — executes scenario runs
 - `BenchmarkExecutorService` — executes benchmark runs
 - `ImapInboundService` — polls IMAP inboxes
 - `OAuth2TokenRefreshService` — refreshes OAuth2 channel tokens
 - `ProcessingDeferralService` — re-processes deferred conversations
-- `HealthCheckService` — monitoring: db/process/background-service/provider health checks every `MONITORING_HEALTH_INTERVAL_MS` (default 60s) into `health_checks` + gauges; probes llm/storage providers every 10 min (`MONITORING_HEALTH_PROBES=off` to disable); serves `GET /health/ready`
+- `HealthCheckService` — monitoring: db/process/background-service/provider health checks every `MONITORING_HEALTH_INTERVAL_MS` (default 60s) into `health_checks` + gauges; probes llm/storage providers per `monitoring_config.probeSettings` (env `MONITORING_HEALTH_PROBES=off` is a hard kill switch); serves `GET /health/ready`
+- `RetentionService` — monitoring: hourly rollup of `provider_call_logs` → `provider_call_stats_hourly` (`0 * * * *`) + daily purge of retention-aged rows at 03:00 (`0 3 * * *`); `retentionDays` from `monitoring_config`
 
 ## Coding Conventions (detailed in `.github/copilot-instructions.md`)
 

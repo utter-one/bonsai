@@ -66,7 +66,12 @@ export async function globalSetup(): Promise<void> {
   //     lets tests assert on the registry the middleware actually records into.
   const { container: iocContainer } = await import('tsyringe');
   const { MetricsRegistry } = await import('../src/services/monitoring/MetricsRegistry');
+  const { MonitoringConfigService } = await import('../src/services/monitoring/MonitoringConfigService');
+  const { RetentionService } = await import('../src/services/monitoring/RetentionService');
   (globalThis as any).__TEST_METRICS_REGISTRY__ = iocContainer.resolve(MetricsRegistry);
+  // P1-06: app-world config + retention singletons (same dual-module-graph reason).
+  (globalThis as any).__TEST_MONITORING_CONFIG__ = iocContainer.resolve(MonitoringConfigService);
+  (globalThis as any).__TEST_RETENTION_SERVICE__ = iocContainer.resolve(RetentionService);
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)

@@ -8,8 +8,10 @@ import { generateId } from '../../utils/idGenerator';
 import logger from '../../utils/logger';
 import { HeartbeatRegistry } from './HeartbeatRegistry';
 import { MetricsRegistry } from './MetricsRegistry';
+import { MonitoringConfigService } from './MonitoringConfigService';
 import { LlmProviderFactory } from '../providers/llm/LlmProviderFactory';
 import { StorageProviderFactory } from '../providers/storage/StorageProviderFactory';
+import type { ProbeSettings } from '../../http/contracts/monitoring';
 
 /**
  * P1-05 — real, persisted, per-check health (PROPOSAL §3.2e).
@@ -27,9 +29,12 @@ import { StorageProviderFactory } from '../providers/storage/StorageProviderFact
  * snapshot for the API (P1-08) and the rule engine (P2-01). `checkReady()`
  * backs the unauthenticated `/health/ready` endpoint.
  *
- * Probe hygiene: `MONITORING_HEALTH_PROBES=off` switches all providers to
- * call-log inference only (test env) — the vocabulary matches P1-06's
- * reserved `probeSettings.llmProbe` enum.
+ * Probe policy (P1-06): `monitoring_config.probeSettings` drives the LLM
+ * probe mode (`models` | `one_token` | `off`) and the per-provider cooldown;
+ * the settings are fetched once per cycle and fall back to built-in defaults
+ * when the config cannot be loaded. `MONITORING_HEALTH_PROBES=off` remains a
+ * hard env kill switch (env beats config) — the test env sets it so e2e
+ * never sends real outbound probes against fake provider configs.
  */
 
 export type HealthCheckStatus = 'ok' | 'degraded' | 'down' | 'unknown';
@@ -59,7 +64,8 @@ interface PoolStats {
   poolWaiting: number;
 }
 
-const PROBE_COOLDOWN_MS = 10 * 60_000;
+/** Fallback probe policy when monitoring_config cannot be loaded (P1-06). */
+const DEFAULT_PROBE_SETTINGS: ProbeSettings = { llmProbe: 'models', cooldownMinutes: 10 };
 const RECENT_SUCCESS_SKIP_MS = 10 * 60_000;
 const INFERENCE_WINDOW_MS = 30 * 60_000;
 const CHECK_TIMEOUT_MS = 10_000;
@@ -100,6 +106,7 @@ export class HealthCheckService {
     @inject(MetricsRegistry) private readonly metricsRegistry: MetricsRegistry,
     @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
     @inject(StorageProviderFactory) private readonly storageProviderFactory: StorageProviderFactory,
+    @inject(MonitoringConfigService) private readonly monitoringConfigService: MonitoringConfigService,
   ) {
     this.intervalMs = this.readIntervalMs();
     this.probesEnabled = process.env.MONITORING_HEALTH_PROBES !== 'off';
@@ -202,10 +209,30 @@ export class HealthCheckService {
       // heartbeats still matter (the db check reports the DB-side failure).
       logger.warn({ error: (error as Error)?.message }, 'HealthCheckService: provider fetch failed — provider checks skipped this cycle');
     }
+    // Fetched once per cycle so a config load failure degrades the whole
+    // cycle's probes to defaults, not per-provider.
+    const probeSettings = await this.getProbeSettings();
     for (const provider of providerList) {
-      checks.push({ name: `provider:${provider.id}`, run: () => this.runProviderCheck(provider, callStats[provider.id]) });
+      checks.push({ name: `provider:${provider.id}`, run: () => this.runProviderCheck(provider, callStats[provider.id], probeSettings) });
     }
     return checks;
+  }
+
+  /**
+   * Probe policy from monitoring_config (P1-06). Falls back to the built-in
+   * defaults when the config cannot be loaded — a DB blip must not disable
+   * provider checks; inference still runs either way.
+   */
+  private async getProbeSettings(): Promise<ProbeSettings> {
+    try {
+      return (await this.monitoringConfigService.get()).probeSettings;
+    } catch (error) {
+      logger.warn(
+        { error: (error as Error)?.message },
+        'HealthCheckService: probe settings unavailable — using defaults for this cycle',
+      );
+      return { ...DEFAULT_PROBE_SETTINGS };
+    }
   }
 
   private async runCheckWithTimeout(check: HealthCheck): Promise<HealthCheckResult> {
@@ -271,11 +298,16 @@ export class HealthCheckService {
     };
   }
 
-  private async runProviderCheck(provider: Provider, stats: ProviderCallStats | undefined): Promise<HealthCheckResult> {
+  private async runProviderCheck(
+    provider: Provider,
+    stats: ProviderCallStats | undefined,
+    probeSettings: ProbeSettings,
+  ): Promise<HealthCheckResult> {
     const name = `provider:${provider.id}`;
     try {
-      if (this.probesEnabled && (provider.providerType === 'llm' || provider.providerType === 'storage')) {
-        const probeResult = await this.maybeProbe(provider, stats);
+      const llmProbeable = provider.providerType === 'llm' && probeSettings.llmProbe !== 'off';
+      if (this.probesEnabled && (provider.providerType === 'storage' || llmProbeable)) {
+        const probeResult = await this.maybeProbe(provider, stats, probeSettings);
         if (probeResult) return probeResult;
       }
       return this.inferProviderStatus(name, stats);
@@ -289,14 +321,19 @@ export class HealthCheckService {
    * and maps the outcome to a check result. Returns null when the probe is
    * skipped — the caller falls back to call-log inference.
    */
-  private async maybeProbe(provider: Provider, stats: ProviderCallStats | undefined): Promise<HealthCheckResult | null> {
+  private async maybeProbe(
+    provider: Provider,
+    stats: ProviderCallStats | undefined,
+    probeSettings: ProbeSettings,
+  ): Promise<HealthCheckResult | null> {
     const name = `provider:${provider.id}`;
     const now = Date.now();
     const lastSuccessAt = stats?.lastSuccessAt;
     if (lastSuccessAt && now - lastSuccessAt.getTime() < RECENT_SUCCESS_SKIP_MS) return null;
 
+    const cooldownMs = probeSettings.cooldownMinutes * 60_000;
     const lastProbeAt = this.lastProbeAt.get(provider.id);
-    if (lastProbeAt !== undefined && now - lastProbeAt < PROBE_COOLDOWN_MS) return null;
+    if (lastProbeAt !== undefined && now - lastProbeAt < cooldownMs) return null;
 
     this.lastProbeAt.set(provider.id, now);
     const startedAt = Date.now();
@@ -306,7 +343,15 @@ export class HealthCheckService {
         // only constructs the client (no network) so enumerateModels hits the API.
         const instance = await this.llmProviderFactory.createProviderForEnumeration(provider);
         await instance.init();
-        await this.withTimeout(instance.enumerateModels(), CHECK_TIMEOUT_MS);
+        if (probeSettings.llmProbe === 'one_token') {
+          // Costs money (config opt-in) — a single-token generation end-to-end.
+          await this.withTimeout(
+            instance.generate([{ role: 'user', content: 'Health probe' }], { maxTokens: 1 }),
+            CHECK_TIMEOUT_MS,
+          );
+        } else {
+          await this.withTimeout(instance.enumerateModels(), CHECK_TIMEOUT_MS);
+        }
       } else {
         const instance = await this.storageProviderFactory.createProvider(provider, {});
         await this.withTimeout(instance.list('', 1), CHECK_TIMEOUT_MS);
@@ -372,22 +417,27 @@ export class HealthCheckService {
 
   /** One query per cycle: per-provider last success/failure/any-call within 24 h. */
   protected async fetchRecentCallStats(): Promise<Record<string, ProviderCallStats>> {
+    // Timestamps are fetched as text and marked UTC explicitly: pg parses
+    // naive-timestamp results as host-local time, which would skew the
+    // age-of-call comparisons below by the host offset on non-UTC hosts.
+    // The DB session runs in UTC, so the wall clock IS UTC.
     const result = await db.execute(sql`
       SELECT provider_id AS "providerId",
-             max(created_at) FILTER (WHERE ok) AS "lastSuccessAt",
-             max(created_at) FILTER (WHERE NOT ok) AS "lastFailureAt",
-             max(created_at) AS "lastCallAt"
+             max(created_at) FILTER (WHERE ok)::text AS "lastSuccessAt",
+             max(created_at) FILTER (WHERE NOT ok)::text AS "lastFailureAt",
+             max(created_at)::text AS "lastCallAt"
       FROM provider_call_logs
       WHERE created_at >= now() - interval '24 hours'
       GROUP BY provider_id
     `);
+    const parseUtc = (value: string | null): Date | null => (value ? new Date(`${value.replace(' ', 'T')}Z`) : null);
     const stats: Record<string, ProviderCallStats> = {};
     for (const row of result.rows as Array<Record<string, unknown>>) {
-      const cast = row as { providerId: string; lastSuccessAt: Date | null; lastFailureAt: Date | null; lastCallAt: Date | null };
+      const cast = row as { providerId: string; lastSuccessAt: string | null; lastFailureAt: string | null; lastCallAt: string | null };
       stats[cast.providerId] = {
-        lastSuccessAt: cast.lastSuccessAt,
-        lastFailureAt: cast.lastFailureAt,
-        lastCallAt: cast.lastCallAt,
+        lastSuccessAt: parseUtc(cast.lastSuccessAt),
+        lastFailureAt: parseUtc(cast.lastFailureAt),
+        lastCallAt: parseUtc(cast.lastCallAt),
       };
     }
     return stats;
