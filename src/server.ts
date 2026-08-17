@@ -42,6 +42,8 @@ import { ScenarioRunExecutorService } from './services/testing/ScenarioRunExecut
 import { ImapInboundService } from './services/ImapInboundService';
 import { ProcessingDeferralService } from './services/ProcessingDeferralService';
 import { OAuth2TokenRefreshService } from './services/OAuth2TokenRefreshService';
+import { MetricsRegistry } from './services/monitoring/MetricsRegistry';
+import { CallLogger } from './services/monitoring/CallLogger';
 import { errorHandler } from './http/middleware/errorHandler';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
@@ -374,6 +376,11 @@ export async function createApp(): Promise<express.Application> {
   } catch (err) {
     logger.warn({ error: err.message }, 'FireRedVAD failed to preload (non-fatal, will load on first use)');
   }
+
+  // Monitoring core (P1-02) — started first so instrumentation is available to everything below.
+  // P1-09 will wire stop() + flushNow() into the graceful shutdown hook.
+  container.resolve(MetricsRegistry).start();
+  container.resolve(CallLogger).start();
 
   container.resolve(ConversationTimeoutService).start();
   container.resolve(ScenarioRunExecutorService).start();
