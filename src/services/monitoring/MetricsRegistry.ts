@@ -167,6 +167,7 @@ export class MetricsRegistry {
   private warned = new Set<string>();
   private timer: NodeJS.Timeout | null = null;
   private flushing = false;
+  private flushInFlight: Promise<void> | null = null;
   lastFlushError: unknown = null;
 
   /** Increments a counter by `value` (default 1). */
@@ -296,77 +297,105 @@ export class MetricsRegistry {
     }
   }
 
+  /** Metric-sample rows that would be written by the next flush (shutdown log line, P1-09). */
+  pendingRowCount(): number {
+    let count = 0;
+    for (const seriesMap of this.series.values()) {
+      for (const state of seriesMap.values()) {
+        if (state.kind === 'counter' && (state.count !== state.flushedCount || state.sum !== state.flushedSum)) count++;
+        else if (state.kind === 'gauge' && state.value !== state.flushedValue) count++;
+        else if (state.kind === 'histogram' && state.windowCount > 0) count++;
+      }
+    }
+    return count;
+  }
+
   /** Flushes pending deltas to `metric_samples`. Never throws. */
   async flushNow(): Promise<void> {
     if (this.flushing) return;
     this.flushing = true;
-    try {
-      const bucket = new Date(Math.floor(Date.now() / 60_000) * 60_000);
-      const pending: { row: MetricSampleRow; commit: () => void }[] = [];
+    const work = (async () => {
+      try {
+        const bucket = new Date(Math.floor(Date.now() / 60_000) * 60_000);
+        const pending: { row: MetricSampleRow; commit: () => void }[] = [];
 
-      for (const [name, seriesMap] of this.series) {
-        for (const [key, state] of seriesMap) {
-          const labels = parseSeriesKey(key);
-          if (state.kind === 'counter') {
-            const dCount = state.count - state.flushedCount;
-            const dSum = state.sum - state.flushedSum;
-            if (dCount !== 0 || dSum !== 0) {
+        for (const [name, seriesMap] of this.series) {
+          for (const [key, state] of seriesMap) {
+            const labels = parseSeriesKey(key);
+            if (state.kind === 'counter') {
+              const dCount = state.count - state.flushedCount;
+              const dSum = state.sum - state.flushedSum;
+              if (dCount !== 0 || dSum !== 0) {
+                pending.push({
+                  row: { id: generateId('msmp'), bucket, name, labels, count: dCount, sum: dSum, min: null, max: null },
+                  commit: () => {
+                    state.flushedCount = state.count;
+                    state.flushedSum = state.sum;
+                  },
+                });
+              }
+            } else if (state.kind === 'gauge') {
+              if (state.value !== state.flushedValue) {
+                pending.push({
+                  row: {
+                    id: generateId('msmp'),
+                    bucket,
+                    name,
+                    labels,
+                    count: 1,
+                    sum: state.value,
+                    min: state.value,
+                    max: state.value,
+                  },
+                  commit: () => {
+                    state.flushedValue = state.value;
+                  },
+                });
+              }
+            } else if (state.windowCount > 0) {
+              const dCount = state.windowCount;
+              const dSum = state.windowSum;
+              const dMin = state.windowMin;
+              const dMax = state.windowMax;
               pending.push({
-                row: { id: generateId('msmp'), bucket, name, labels, count: dCount, sum: dSum, min: null, max: null },
+                row: { id: generateId('msmp'), bucket, name, labels, count: dCount, sum: dSum, min: dMin, max: dMax },
                 commit: () => {
-                  state.flushedCount = state.count;
-                  state.flushedSum = state.sum;
+                  state.windowCount = 0;
+                  state.windowSum = 0;
+                  state.windowMin = Infinity;
+                  state.windowMax = -Infinity;
                 },
               });
             }
-          } else if (state.kind === 'gauge') {
-            if (state.value !== state.flushedValue) {
-              pending.push({
-                row: {
-                  id: generateId('msmp'),
-                  bucket,
-                  name,
-                  labels,
-                  count: 1,
-                  sum: state.value,
-                  min: state.value,
-                  max: state.value,
-                },
-                commit: () => {
-                  state.flushedValue = state.value;
-                },
-              });
-            }
-          } else if (state.windowCount > 0) {
-            const dCount = state.windowCount;
-            const dSum = state.windowSum;
-            const dMin = state.windowMin;
-            const dMax = state.windowMax;
-            pending.push({
-              row: { id: generateId('msmp'), bucket, name, labels, count: dCount, sum: dSum, min: dMin, max: dMax },
-              commit: () => {
-                state.windowCount = 0;
-                state.windowSum = 0;
-                state.windowMin = Infinity;
-                state.windowMax = -Infinity;
-              },
-            });
           }
         }
-      }
 
-      if (!pending.length) return;
-      try {
-        await this.persistRows(pending.map((p) => p.row));
-        for (const p of pending) p.commit();
-      } catch (err) {
-        // Keep in-memory state (deltas retry on the next flush) and report once.
-        this.lastFlushError = err;
-        this.onFlushError(err);
+        if (!pending.length) {
+          return;
+        }
+        try {
+          await this.persistRows(pending.map((p) => p.row));
+          for (const p of pending) p.commit();
+        } catch (err) {
+          // Keep in-memory state (deltas retry on the next flush) and report once.
+          this.lastFlushError = err;
+          this.onFlushError(err);
+        }
+      } finally {
+        this.flushing = false;
       }
-    } finally {
-      this.flushing = false;
-    }
+    })();
+    this.flushInFlight = work;
+    await work;
+    this.flushInFlight = null;
+  }
+
+  /**
+   * Resolves when the currently running flush (if any) completes. Shutdown awaits this
+   * after `stop()` so `endPool()` cannot race the interval-triggered insert (P1-09).
+   */
+  settled(): Promise<void> {
+    return this.flushInFlight ?? Promise.resolve();
   }
 
   // --- internals (protected seams for unit tests) ---

@@ -116,6 +116,10 @@ Eight services run continuously after startup (all resolved from the IoC contain
 - `HealthCheckService` — monitoring: db/process/background-service/provider health checks every `MONITORING_HEALTH_INTERVAL_MS` (default 60s) into `health_checks` + gauges; probes llm/storage providers per `monitoring_config.probeSettings` (env `MONITORING_HEALTH_PROBES=off` is a hard kill switch); serves `GET /health/ready`
 - `RetentionService` — monitoring: hourly rollup of `provider_call_logs` → `provider_call_stats_hourly` (`0 * * * *`) + daily purge of retention-aged rows at 03:00 (`0 3 * * *`); `retentionDays` from `monitoring_config`
 
+### Graceful Shutdown (P1-09)
+
+`src/index.ts` installs `installShutdownHandlers()` (from `src/utils/shutdown.ts`) after `startServer()`. On the first `SIGTERM`/`SIGINT` the sequence runs in order: stop all eight background services → `server.close()` + `closeIdleConnections()` (not awaited yet) → close WebSocket + Twilio voice media-stream sockets with 1001 "going away" (in-flight turns are aborted via the normal disconnect → `runner.cleanup()` path) → grace drain up to `SHUTDOWN_GRACE_MS` (default 10 s, polling every 100 ms) with force-terminate of stragglers → await the `server.close()` callback → per logger: bounded (5 s) flush, `stop()`, `await settled()` (no in-flight insert can race the pool close), final flush → log remaining pending counts honestly → `endPool()` → `exit(0)`. A second signal forces `exit(1)` immediately; a 30 s hard timeout (from signal receipt) forces `exit(1)` if any step hangs. WebRTC sessions are not drained — the final `exit(0)` kills them (their ref'd audio-scheduler intervals would otherwise keep the process alive). Handlers are installed only in `src/index.ts`, never in `createApp()` — the e2e/integration suites don't trigger them.
+
 ## Coding Conventions (detailed in `.github/copilot-instructions.md`)
 
 - **Zod for all HTTP validation** — not class-validator. Validate manually via `schema.parse(req.body)`, `schema.parse(req.params)`, etc.
@@ -199,6 +203,7 @@ Optional but important:
 - `LOG_LEVEL` — pino log level (default: `info`)
 - `WS_MAX_PAYLOAD_BYTES` — WebSocket max payload size (default: 10MB)
 - `RATE_LIMIT_API_MAX` — max API requests per minute (default: 300; set to 10000+ for tests)
+- `SHUTDOWN_GRACE_MS` — graceful-shutdown drain window for WebSocket/voice sockets (default: 10000; see Graceful Shutdown)
 
 **Test environment vars** (set automatically by `tests/setup.ts`):
 - `NODE_ENV=test` — suppresses DB connection teardown noise

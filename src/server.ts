@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { createServer } from 'http';
+import type { Server } from 'http';
 import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
 import qs from 'qs';
@@ -425,7 +426,11 @@ export async function createApp(): Promise<express.Application> {
 /**
  * Starts the HTTP server and initializes WebSocket host
  */
-export async function startServer(port: number = 3000): Promise<void> {
+/**
+ * Boots the HTTP server (with WebSocket + Twilio voice hosts) and returns it so
+ * the caller can wire graceful shutdown (P1-09) around it.
+ */
+export async function startServer(port: number = 3000): Promise<Server> {
   const app = await createApp();
   const server = createServer(app);
 
@@ -439,4 +444,5 @@ export async function startServer(port: number = 3000): Promise<void> {
   server.listen(port, () => {
     logger.info({ port }, 'HTTP server started');
   });
+  return server;
 }

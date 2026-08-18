@@ -114,13 +114,16 @@ describe('Monitoring endpoints (P1-08)', () => {
   describe('GET /api/monitoring/health/history', () => {
     it('lists persisted rows newest first with pagination', async () => {
       const base = new Date('2026-08-17T05:00:00Z');
+      // The live HealthCheckService (1 s cycle in the test env) interleaves real rows named
+      // db/process/provider:* — filter on a fixture-only name for a deterministic set
+      // (flake fix, 2026-08-18).
       await db.insert(healthChecks).values([
-        { id: 'hmon_1', checkName: 'db', status: 'ok', latencyMs: 1, detail: {}, createdAt: base },
-        { id: 'hmon_2', checkName: 'db', status: 'degraded', latencyMs: 500, detail: {}, createdAt: new Date(base.getTime() + 60_000) },
-        { id: 'hmon_3', checkName: 'process', status: 'ok', latencyMs: null, detail: {}, createdAt: new Date(base.getTime() + 120_000) },
+        { id: 'hmon_1', checkName: 'fixture_probe', status: 'ok', latencyMs: 1, detail: {}, createdAt: base },
+        { id: 'hmon_2', checkName: 'fixture_probe', status: 'degraded', latencyMs: 500, detail: {}, createdAt: new Date(base.getTime() + 60_000) },
+        { id: 'hmon_3', checkName: 'fixture_probe', status: 'ok', latencyMs: null, detail: {}, createdAt: new Date(base.getTime() + 120_000) },
       ]);
 
-      const res = await authed().get('/api/monitoring/health/history').query({ limit: 2 });
+      const res = await authed().get('/api/monitoring/health/history').query({ 'filters[checkName]': 'fixture_probe', limit: 2 });
       expect(res.status).to.equal(200);
       expect(res.body.total).to.equal(3);
       expect(res.body.offset).to.equal(0);
@@ -128,31 +131,41 @@ describe('Monitoring endpoints (P1-08)', () => {
       expect(res.body.items).to.have.length(2);
       // Newest first.
       expect(res.body.items[0].id).to.equal('hmon_3');
-      expect(res.body.items[0].checkName).to.equal('process');
       expect(res.body.items[1].id).to.equal('hmon_2');
 
-      const page2 = await authed().get('/api/monitoring/health/history').query({ limit: 2, offset: 2 });
+      const page2 = await authed().get('/api/monitoring/health/history').query({ 'filters[checkName]': 'fixture_probe', limit: 2, offset: 2 });
       expect(page2.body.items).to.have.length(1);
       expect(page2.body.items[0].id).to.equal('hmon_1');
+
+      // Unfiltered pages are also newest first (real rows interleave — check monotonicity).
+      const all = await authed().get('/api/monitoring/health/history').query({ limit: 50 });
+      const times = all.body.items.map((i: any) => new Date(i.createdAt).getTime());
+      for (let k = 1; k < times.length; k++) {
+        expect(times[k]).to.be.at.most(times[k - 1]);
+      }
     });
 
     it('filters by status and check name (both aliases)', async () => {
       const base = new Date('2026-08-17T06:00:00Z');
+      // Fixture-only check name — the live health service never writes it (flake fix, 2026-08-18).
       await db.insert(healthChecks).values([
-        { id: 'hmon_f1', checkName: 'db', status: 'ok', latencyMs: 1, detail: {}, createdAt: base },
-        { id: 'hmon_f2', checkName: 'db', status: 'down', latencyMs: null, detail: {}, createdAt: base },
-        { id: 'hmon_f3', checkName: 'provider:prov_x', status: 'down', latencyMs: null, detail: {}, createdAt: base },
+        { id: 'hmon_f1', checkName: 'fixture_probe', status: 'ok', latencyMs: 1, detail: {}, createdAt: base },
+        { id: 'hmon_f2', checkName: 'fixture_probe', status: 'down', latencyMs: null, detail: {}, createdAt: base },
+        { id: 'hmon_f3', checkName: 'fixture_probe', status: 'down', latencyMs: null, detail: {}, createdAt: base },
       ]);
 
-      const byStatus = await authed().get('/api/monitoring/health/history').query({ 'filters[status]': 'down' });
+      const byStatus = await authed()
+        .get('/api/monitoring/health/history')
+        .query({ 'filters[status]': 'down', 'filters[checkName]': 'fixture_probe' });
       expect(byStatus.body.total).to.equal(2);
 
-      const byCheck = await authed().get('/api/monitoring/health/history').query({ 'filters[check]': 'db' });
-      expect(byCheck.body.total).to.equal(2);
+      const byCheck = await authed().get('/api/monitoring/health/history').query({ 'filters[check]': 'fixture_probe' });
+      expect(byCheck.body.total).to.equal(3);
 
-      const byCheckName = await authed().get('/api/monitoring/health/history').query({ 'filters[checkName]': 'db' });
-      expect(byCheckName.body.total).to.equal(2);
+      const byCheckName = await authed().get('/api/monitoring/health/history').query({ 'filters[checkName]': 'fixture_probe' });
+      expect(byCheckName.body.total).to.equal(3);
 
+      // Fixture timestamps are yesterday; live rows are "now" — the window is deterministic.
       const byBetween = await authed()
         .get('/api/monitoring/health/history')
         .query({

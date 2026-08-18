@@ -12,7 +12,7 @@ tags: [monitoring, spec, phase-1]
 
 - **Phase:** 1 — Instrumentation & health
 - **Depends on:** P1-01, P1-02
-- **Blocks:** P1-08, P2-02
+- **Blocks:** P1-08, P1-09, P2-02
 - **Estimate:** 1 dev-day
 
 ## Objective

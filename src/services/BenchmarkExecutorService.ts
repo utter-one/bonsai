@@ -48,7 +48,12 @@ export class BenchmarkExecutorService {
     logger.info('Starting BenchmarkExecutorService');
     this.runService.registerNewRunListener((runId) => this.onNewRun(runId));
     this.heartbeatRegistry.tick('benchmark-executor', this.pollingIntervalMs);
-    this.resetStuckRuns().then(() => this.checkAndProcess());
+    this.resetStuckRuns()
+      .catch((err) => {
+        this.heartbeatRegistry.recordError('benchmark-executor');
+        logger.error({ err }, 'Failed to reset stuck benchmark runs on startup');
+      })
+      .then(() => this.checkAndProcess());
     this.pollingTimer = setInterval(() => {
       this.heartbeatRegistry.tick('benchmark-executor', this.pollingIntervalMs);
       this.checkAndProcess();

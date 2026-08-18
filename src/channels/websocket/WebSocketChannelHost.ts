@@ -214,9 +214,43 @@ export class WebSocketChannelHost {
   }
 
   /**
+   * Sockets not fully closed (OPEN or CLOSING). Stale map entries from
+   * disconnected sockets are excluded via readyState (P1-09 shutdown drain).
+   */
+  getOpenSocketCount(): number {
+    let count = 0;
+    for (const ws of this.socketMap.keys()) {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Force-terminates any sockets still OPEN or CLOSING; returns how many were
+   * terminated (P1-09 shutdown drain grace deadline).
+   */
+  terminateOpenSockets(): number {
+    let count = 0;
+    for (const ws of this.socketMap.keys()) {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+        ws.terminate();
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * Closes the WebSocket server and all active connections.
+   * Each active socket is closed with 1001 "going away" first (P1-09):
+   * wss.close() alone only stops accepting, leaving established sockets open.
    */
   close(): void {
+    for (const ws of this.socketMap.keys()) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1001, 'going away');
+      }
+    }
     if (this.wss) {
       this.wss.close(() => {
         logger.info('WebSocket server closed');

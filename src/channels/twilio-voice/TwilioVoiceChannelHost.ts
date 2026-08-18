@@ -121,6 +121,8 @@ export class TwilioVoiceChannelHost {
   private wss: WebSocketServer | null = null;
   /** Maps callSid → conversationId for in-flight outgoing calls awaiting the Twilio webhook. */
   private readonly pendingOutboundCalls = new Map<string, string>();
+  /** Active media-stream sockets (shutdown drain, P1-09 — the host tracked nothing before). */
+  private readonly streamSockets = new Set<WebSocket>();
 
   constructor(
     @inject(SessionManager) private readonly sessionManager: SessionManager,
@@ -190,6 +192,54 @@ export class TwilioVoiceChannelHost {
       this.handleStreamConnection(ws, req);
     });
     logger.info('TwilioVoice: Media Streams WebSocket server initialized on /api/twilio/voice/stream');
+  }
+
+  /**
+   * Media-stream sockets not fully closed (OPEN or CLOSING) — shutdown drain (P1-09).
+   */
+  getOpenSocketCount(): number {
+    let count = 0;
+    for (const ws of this.streamSockets) {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Force-terminates media-stream sockets still OPEN or CLOSING; returns how many
+   * were terminated (P1-09 shutdown drain grace deadline).
+   */
+  terminateOpenSockets(): number {
+    let count = 0;
+    for (const ws of this.streamSockets) {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+        ws.terminate();
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Shutdown (P1-09): closes every active media-stream socket with 1001 "going away",
+   * cancels pending outbound-call bookkeeping (unanswered calls will never complete),
+   * then stops accepting new streams.
+   */
+  close(): void {
+    for (const ws of this.streamSockets) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1001, 'going away');
+      }
+    }
+    if (this.pendingOutboundCalls.size > 0) {
+      logger.warn({ count: this.pendingOutboundCalls.size }, 'TwilioVoice: cancelling pending outbound call bookkeeping on shutdown');
+      this.pendingOutboundCalls.clear();
+    }
+    if (this.wss) {
+      this.wss.close(() => {
+        logger.info('TwilioVoice: Media Streams WebSocket server closed');
+      });
+    }
   }
 
   /**
@@ -327,6 +377,9 @@ export class TwilioVoiceChannelHost {
       return;
     }
 
+    // Tracked for the P1-09 shutdown drain (removed on close below).
+    this.streamSockets.add(ws);
+
     // Per-connection mutable state.
     let session: Session | null = null;
     let connection: TwilioVoiceConnection | null = null;
@@ -345,7 +398,10 @@ export class TwilioVoiceChannelHost {
       await this.sessionManager.unregisterSession(s.id);
     };
 
-    ws.on('close', async () => { await tryCleanup(); });
+    ws.on('close', async () => {
+      this.streamSockets.delete(ws);
+      await tryCleanup();
+    });
 
     ws.on('message', async (raw: Buffer) => {
       try {

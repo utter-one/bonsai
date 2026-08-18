@@ -76,6 +76,8 @@ export class CallLogger {
   private readonly bufferSize: number;
   private timer: NodeJS.Timeout | null = null;
   private flushing = false;
+  private flushInFlight: Promise<void> | null = null;
+  private stopped = false;
   private lastOverflowWarnAt = 0;
   lastFlushError: unknown = null;
 
@@ -110,7 +112,7 @@ export class CallLogger {
           logger.error(`CallLogger: buffer overflow — dropping oldest entries (buffer size ${this.bufferSize}); check DB health or raise MONITORING_CALL_LOG_BUFFER_SIZE`);
         }
       }
-      if (this.buffer.length >= FLUSH_THRESHOLD_ROWS) {
+      if (!this.stopped && this.buffer.length >= FLUSH_THRESHOLD_ROWS) {
         void this.flushNow();
       }
     } catch (err) {
@@ -128,13 +130,21 @@ export class CallLogger {
     logger.info(`CallLogger started (flush every ${FLUSH_INTERVAL_MS}ms or ${FLUSH_THRESHOLD_ROWS} rows, buffer ${this.bufferSize})`);
   }
 
-  /** Stops the flush interval. Call `flushNow()` first on shutdown (P1-09). */
+  /** Stops the flush interval and threshold trigger. Call `flushNow()` first on shutdown (P1-09). */
   stop(): void {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
-      logger.info('CallLogger stopped');
     }
+    // No new threshold-triggered flushes after stop — shutdown owns the remaining
+    // flushes (P1-09), so none can race the pool close.
+    this.stopped = true;
+    logger.info('CallLogger stopped');
+  }
+
+  /** Rows waiting in the buffer (shutdown log line, P1-09 — flush re-queues on DB failure, so don't assume 0). */
+  get pendingCount(): number {
+    return this.buffer.length;
   }
 
   /** Drains the buffer and inserts the rows. Never throws. */
@@ -144,20 +154,33 @@ export class CallLogger {
     const entries = this.buffer.splice(0, this.buffer.length);
     if (!entries.length) return;
     this.flushing = true;
-    try {
-      const rows = entries.map((entry) => toRow(entry));
+    const work = (async () => {
       try {
-        await this.persistRows(rows);
-      } catch (err) {
-        // Re-queue failed rows ahead of newer ones; bounded by bufferSize (oldest dropped).
-        const combined = [...entries, ...this.buffer];
-        this.buffer = combined.slice(Math.max(0, combined.length - this.bufferSize));
-        this.lastFlushError = err;
-        this.onFlushError(err);
+        const rows = entries.map((entry) => toRow(entry));
+        try {
+          await this.persistRows(rows);
+        } catch (err) {
+          // Re-queue failed rows ahead of newer ones; bounded by bufferSize (oldest dropped).
+          const combined = [...entries, ...this.buffer];
+          this.buffer = combined.slice(Math.max(0, combined.length - this.bufferSize));
+          this.lastFlushError = err;
+          this.onFlushError(err);
+        }
+      } finally {
+        this.flushing = false;
       }
-    } finally {
-      this.flushing = false;
-    }
+    })();
+    this.flushInFlight = work;
+    await work;
+    this.flushInFlight = null;
+  }
+
+  /**
+   * Resolves when the currently running flush (if any) completes. Shutdown awaits this
+   * after `stop()` so `endPool()` cannot race a concurrent interval/threshold insert (P1-09).
+   */
+  settled(): Promise<void> {
+    return this.flushInFlight ?? Promise.resolve();
   }
 
   // --- internals (protected seams for unit tests) ---

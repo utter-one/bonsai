@@ -63,7 +63,10 @@ describe('Rate limit 429s (P1-07)', () => {
     }
     const rejected = await unauthed().post('/api/auth/login').send(LOGIN_BODY);
     expect(rejected.status).to.equal(429);
-    expect(rejected.headers['retry-after']).to.equal('60');
+    // Retry-After is the remaining window in seconds — it decays as seconds pass during
+    // the test, so assert the window range, not a constant (flake fix, 2026-08-18).
+    const retryAfter = Number(rejected.headers['retry-after']);
+    expect(Number.isFinite(retryAfter) && retryAfter >= 50 && retryAfter <= 60).to.equal(true);
     // Response body shape is unchanged.
     expect(rejected.body).to.deep.equal({ error: 'Too many login attempts, please try again later' });
 
@@ -82,7 +85,8 @@ describe('Rate limit 429s (P1-07)', () => {
     }
     const rejected = await authed().get('/api/profile');
     expect(rejected.status).to.equal(429);
-    expect(rejected.headers['retry-after']).to.equal('60');
+    const retryAfter = Number(rejected.headers['retry-after']);
+    expect(Number.isFinite(retryAfter) && retryAfter >= 50 && retryAfter <= 60).to.equal(true);
     expect(rejected.body).to.deep.equal({ error: 'Too many requests, please slow down' });
 
     expect(rejectionCount('api', 'operator') - before).to.be.at.least(1);
