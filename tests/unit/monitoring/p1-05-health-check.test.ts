@@ -210,8 +210,9 @@ describe('HealthCheckService (P1-05)', () => {
     expect(rows['db']?.status).to.equal('ok');
     expect(rows['db']?.latencyMs).to.be.a('number').that.is.gte(0);
     expect(rows['db']?.detail).to.deep.equal({ poolTotal: 5, poolIdle: 3, poolWaiting: 0 });
-    // 'degraded' is possible here: the event-loop-lag p95 window can pick up
-    // mocha load; the memory-threshold test below covers the degraded path.
+    // 'degraded' is possible here: under load a sub-second window can pick up a
+    // >250 ms lag spike; the dedicated tests below cover the degraded path and
+    // pin the lag magnitude (finding 11).
     expect(rows['process']?.status).to.be.oneOf(['ok', 'degraded']);
     expect(rows['service_heartbeat:health-checks']?.status).to.equal('ok');
     expect(rows['service_heartbeat:conversation-timeout']?.status).to.equal('ok');
@@ -256,6 +257,23 @@ describe('HealthCheckService (P1-05)', () => {
     const row = byName(service.persisted[0])['process'];
     expect(row?.status).to.equal('degraded');
     expect(row?.detail).to.include.keys('rssBytes', 'heapUsedBytes', 'eventLoopLagP95Ms', 'uptimeSec');
+  });
+
+  it('process check: event-loop lag p95 is real ms (unit regression — finding 11)', async () => {
+    const { service } = makeService();
+    await sleep(50); // let the 20 ms probe tick a few times
+    // Deterministic ~300 ms main-thread block → one coalesced large lag sample.
+    const t0 = Date.now();
+    while (Date.now() - t0 < 300) { /* spin */ }
+    await sleep(80); // let the delayed probe tick record the block
+    await service.runNow();
+    const row = byName(service.persisted[0])['process'];
+    const lag = row?.detail?.eventLoopLagP95Ms as number;
+    // Must land in the ~300 ms order: the old /1000 (µs-assumption) conversion
+    // would report ~300,000, and reading the raw value as µs would report ~0.3.
+    expect(lag).to.be.gte(200);
+    expect(lag).to.be.lt(10_000);
+    expect(row?.status).to.equal('degraded'); // > 250 ms threshold
   });
 
   it('provider inference (probes off): ok / degraded / stale-unknown / no-activity-unknown', async () => {

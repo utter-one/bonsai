@@ -48,6 +48,13 @@ describe('Health Check Service (P1-05)', () => {
     expect(dbRows.length).to.be.gte(2);
     expect(dbRows.every((r) => r.status === 'ok')).to.equal(true);
     expect(dbRows[0].detail).to.include.keys('poolTotal', 'poolIdle', 'poolWaiting');
+
+    const processRows = rows.filter((r) => r.checkName === 'process');
+    expect(processRows.length).to.be.gte(2);
+    // Unit regression (P1-05 finding 11): monitorEventLoopDelay values are ns —
+    // a healthy test machine reports tens of ms, never the ~20,000+ the old
+    // /1000 (µs-assumption) conversion produced.
+    expect(processRows[0].detail.eventLoopLagP95Ms).to.be.lessThan(1000);
     expect(dbRows[0].latencyMs).to.be.a('number');
 
     // No IMAP providers configured → never ticked → unknown, not down

@@ -481,14 +481,18 @@ export class HealthCheckService {
 
   /**
    * p95 event-loop lag over the last cycle (the histogram is reset after each
-   * read, so the window ≈ the check interval). µs → ms, NaN-guarded.
+   * read, so the window ≈ the check interval). monitorEventLoopDelay values are
+   * in **nanoseconds** (nodejs.org/api/perf_hooks.html) — ms = /1e6. The original
+   * /1000 assumed µs and read every value 1000× too large, so the 250 ms threshold
+   * effectively became 250 µs and a healthy process check degraded on every
+   * machine (P1-05 finding 11). NaN-guarded (empty histogram → 0).
    */
   private readEventLoopLagP95Ms(): number {
     try {
-      const p95Us = this.eventLoopDelay.percentile(95);
+      const p95Ns = this.eventLoopDelay.percentile(95);
       this.eventLoopDelay.reset();
-      if (Number.isNaN(p95Us)) return 0;
-      return Math.round(p95Us / 1000);
+      if (Number.isNaN(p95Ns)) return 0;
+      return Math.round(p95Ns / 1e6);
     } catch {
       return 0;
     }
