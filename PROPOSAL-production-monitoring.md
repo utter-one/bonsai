@@ -349,7 +349,7 @@ New permission: `PERMISSIONS.SYSTEM_MONITORING: 'system:monitoring'` (granted to
 | `POST /api/monitoring/alerts/{id}/acknowledge` | manual ack (audit-logged) |
 | `GET /api/monitoring/providers` | per provider: breaker state, last probe, rolling error rate + p95 (15 min) |
 | `GET /api/monitoring/provider-calls` | raw call logs; filters: `providerId`, `providerType`, `ok`, `errorCode`, `conversationId`, date range |
-| `GET /api/monitoring/provider-stats` | aggregated from hourly rollups: `groupBy=hour\|day`, `from/to`, `providerId` |
+| `GET /api/monitoring/provider-stats` | `groupBy=hour\|day`, `from/to` (span ≤ 14 days), `providerId`, `operation` — recomputed from `provider_call_logs` over the window (percentiles can't be merged across the rollup's `ok`/`errorCode` PK dimension, and the live partial hour has no rollup row yet; P1-08 soundness finding 1) |
 | `GET /api/monitoring/fallback-events` | failover history; filters: `providerId`, `date range`, `success` |
 | `GET /api/monitoring/metrics` | generic time series: `name`, label filters, `from/to/step` |
 | `GET /api/monitoring/config` | current rules/notifiers/retention |

@@ -122,6 +122,25 @@ import { DeferredProcessingController } from './http/controllers/DeferredProcess
 import { ProjectSnapshotController } from './http/controllers/ProjectSnapshotController';
 import { createQuickPromptSchema, createProjectQuickPromptSchema, updateQuickPromptBodySchema, deleteQuickPromptBodySchema, cloneQuickPromptSchema, quickPromptResponseSchema, quickPromptListResponseSchema, quickPromptRouteParamsSchema, quickPromptProjectRouteParamsSchema } from './http/contracts/quickPrompt';
 import { deferredProcessingResponseSchema, deferredProcessingListResponseSchema, rescheduleDeferredProcessingBodySchema, cancelDeferredProcessingBodySchema } from './http/contracts/deferredProcessing';
+import {
+  healthCheckItemSchema,
+  healthSnapshotResponseSchema,
+  healthCheckResponseSchema,
+  healthHistoryListResponseSchema,
+  providerRollingSchema,
+  providerOverviewSchema,
+  providersMonitoringResponseSchema,
+  providerCallResponseSchema,
+  providerCallListResponseSchema,
+  providerStatsQuerySchema,
+  providerStatsBucketSchema,
+  providerStatsResponseSchema,
+  metricSeriesQuerySchema,
+  metricSeriesPointSchema,
+  metricSeriesSchema,
+  metricSeriesResponseSchema,
+} from './http/contracts/monitoring';
+import { MonitoringController } from './http/controllers/MonitoringController';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
@@ -774,6 +793,28 @@ export function getOpenAPISpec(): any {
   // Register ProjectSnapshot schemas and routes
   const snapshotPaths = ProjectSnapshotController.getOpenAPIPaths();
   for (const path of snapshotPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Monitoring schemas and routes (P1-08 read-only endpoints)
+  registry.register('HealthCheckItem', healthCheckItemSchema);
+  registry.register('HealthMonitoringResponse', healthSnapshotResponseSchema);
+  registry.register('HealthCheckResponse', healthCheckResponseSchema);
+  registry.register('HealthMonitoringListResponse', healthHistoryListResponseSchema);
+  registry.register('ProviderRolling', providerRollingSchema);
+  registry.register('ProviderMonitoringItem', providerOverviewSchema);
+  registry.register('ProvidersMonitoringResponse', providersMonitoringResponseSchema);
+  registry.register('ProviderCallResponse', providerCallResponseSchema);
+  registry.register('ProviderCallListResponse', providerCallListResponseSchema);
+  registry.register('ProviderStatsQuery', providerStatsQuerySchema);
+  registry.register('ProviderStatsBucket', providerStatsBucketSchema);
+  registry.register('ProviderStatsMonitoringResponse', providerStatsResponseSchema);
+  registry.register('MetricSeriesQuery', metricSeriesQuerySchema);
+  registry.register('MetricSeriesPoint', metricSeriesPointSchema);
+  registry.register('MetricSeries', metricSeriesSchema);
+  registry.register('MetricSeriesMonitoringResponse', metricSeriesResponseSchema);
+  const monitoringPaths = MonitoringController.getOpenAPIPaths();
+  for (const path of monitoringPaths) {
     registry.registerPath(path);
   }
 

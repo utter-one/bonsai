@@ -130,6 +130,7 @@ export const PERMISSIONS = {
 
   // System permissions
   SYSTEM_CONFIG: 'system:config',
+  SYSTEM_MONITORING: 'system:monitoring',
   AUDIT_READ: 'audit:read',
   ANALYTICS_READ: 'analytics:read',
 } as const;

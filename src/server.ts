@@ -30,6 +30,7 @@ import { ProjectProviderUsageController } from './http/controllers/ProjectProvid
 import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
+import { MonitoringController } from './http/controllers/MonitoringController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
 import { FunnelController } from './http/controllers/FunnelController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
@@ -264,6 +265,9 @@ export async function createApp(): Promise<express.Application> {
 
   const auditController = container.resolve(AuditController);
   auditController.registerRoutes(app);
+
+  const monitoringController = container.resolve(MonitoringController);
+  monitoringController.registerRoutes(app);
 
   const analyticsController = container.resolve(AnalyticsController);
   analyticsController.registerRoutes(app);
