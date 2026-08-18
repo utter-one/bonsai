@@ -49,6 +49,7 @@ import { CallLogger } from './services/monitoring/CallLogger';
 import { HealthCheckService } from './services/monitoring/HealthCheckService';
 import { RetentionService } from './services/monitoring/RetentionService';
 import { errorHandler } from './http/middleware/errorHandler';
+import { corsOptions } from './http/middleware/cors';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
 import { requestOutcomeMiddleware, isSkippedRequestPath } from './http/middleware/requestOutcome';
@@ -156,13 +157,9 @@ export async function createApp(): Promise<express.Application> {
     xssFilter: true,
   }));
 
-  // CORS configuration
-  app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+  // CORS configuration — see src/http/middleware/cors.ts (CORS_ORIGIN allowlist /
+  // origin-echo default, credentials-compatible, X-Request-Id preflight + exposure)
+  app.use(cors(corsOptions()));
 
   // Health check endpoint - bypasses all middleware for reliability
   app.get('/health', (req, res) => {

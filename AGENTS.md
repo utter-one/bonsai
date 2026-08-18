@@ -102,7 +102,7 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 - **JSON body limit**: 10mb (accommodates migration import bundles)
 - **Query parser**: uses `qs` with `allowDots: true, depth: 10` for nested query params
 - **Trust proxy**: enabled by default (`trust proxy: 1`), set `TRUST_PROXY=false` to disable
-- **CORS**: origin from `CORS_ORIGIN` env var (default `*`), credentials enabled
+- **CORS** (`src/http/middleware/cors.ts`): `CORS_ORIGIN` env var is a comma-separated origin allowlist; unset → every request's origin is echoed back (credentials-compatible — a literal `*` breaks browsers using `credentials: 'include'`). `allowedHeaders` includes `X-Request-Id` (preflight); `exposedHeaders` exposes `X-Request-Id`, `Retry-After`, `RateLimit-*` so browser JS can read them
 
 ### Background Services
 
@@ -199,7 +199,7 @@ Required: `DB_CONNECTION_STRING`, `JWT_SECRET` (min 32 chars). See `.env.example
 Optional but important:
 - `MASTER_ENCRYPTION_KEY` — enables automatic migration of plain-text secrets in provider configs/environment passwords on startup; startup **aborts** if migration fails
 - `TRUST_PROXY=false` — disables trust proxy (default: enabled)
-- `CORS_ORIGIN` — CORS allowed origin (default: `*`)
+- `CORS_ORIGIN` — comma-separated CORS origin allowlist (unset: all origins allowed, request origin echoed back)
 - `LOG_LEVEL` — pino log level (default: `info`)
 - `WS_MAX_PAYLOAD_BYTES` — WebSocket max payload size (default: 10MB)
 - `RATE_LIMIT_API_MAX` — max API requests per minute (default: 300; set to 10000+ for tests)
