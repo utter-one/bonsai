@@ -72,6 +72,9 @@ export async function globalSetup(): Promise<void> {
   // P1-06: app-world config + retention singletons (same dual-module-graph reason).
   (globalThis as any).__TEST_MONITORING_CONFIG__ = iocContainer.resolve(MonitoringConfigService);
   (globalThis as any).__TEST_RETENTION_SERVICE__ = iocContainer.resolve(RetentionService);
+  // P1-07: app-world rate limiter test seams (store reset + top-N rejection map).
+  const { resetRateLimitersForTests, getRateLimitRejectionStats } = await import('../src/http/middleware/rateLimiter');
+  (globalThis as any).__TEST_RATE_LIMITS__ = { reset: resetRateLimitersForTests, getStats: getRateLimitRejectionStats };
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)

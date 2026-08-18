@@ -113,9 +113,13 @@ export class BenchmarkExecutionError extends Error {
  * Error thrown when a rate limit has been exceeded
  */
 export class TooManyRequestsError extends Error {
-  constructor(message: string) {
+  /** Which limiter rejected the request — internal only, never serialized into the response body. */
+  scope?: 'auth' | 'api';
+
+  constructor(message: string, scope?: 'auth' | 'api') {
     super(message);
     this.name = 'TooManyRequestsError';
+    this.scope = scope;
   }
 }
 
