@@ -19,7 +19,9 @@ import type { ProbeSettings } from '../../http/contracts/monitoring';
  * Every cycle (default 60 s, `MONITORING_HEALTH_INTERVAL_MS`) runs all checks
  * concurrently with a per-check 10 s timeout:
  *   - `db` — SELECT 1 + pg pool stats (publishes `db_pool_*` gauges)
- *   - `process` — RSS / event-loop lag p95 (publishes `rss_bytes`, `event_loop_lag_p95_ms`)
+ *   - `process` — RSS / event-loop lag p95 + max (publishes `rss_bytes`,
+ *     `event_loop_lag_p95_ms`, `event_loop_lag_max_ms` — max for burst-sensitive
+ *     P2-01 rules, since p95 misses isolated stalls)
  *   - `service_heartbeat:<name>` — 6 background services + this service itself
  *   - `provider:<id>` — LLM/storage probed (`enumerateModels()` / `list('', 1)`,
  *     cooldown-gated; probe rows land in `provider_call_logs` via P1-03 wrappers),
@@ -266,10 +268,11 @@ export class HealthCheckService {
   private async runProcessCheck(): Promise<HealthCheckResult> {
     const name = 'process';
     const memory = process.memoryUsage();
-    const lagP95Ms = this.readEventLoopLagP95Ms();
+    const { lagP95Ms, lagMaxMs } = this.readEventLoopLagMs();
     const thresholdBytes = this.memoryThresholdBytes();
     this.metricsRegistry.setGauge('rss_bytes', {}, memory.rss);
     this.metricsRegistry.setGauge('event_loop_lag_p95_ms', {}, lagP95Ms);
+    this.metricsRegistry.setGauge('event_loop_lag_max_ms', {}, lagMaxMs);
     const degraded = memory.rss > thresholdBytes || lagP95Ms > EVENT_LOOP_LAG_THRESHOLD_MS;
     return {
       name,
@@ -280,6 +283,7 @@ export class HealthCheckService {
         heapUsedBytes: memory.heapUsed,
         memoryThresholdBytes: thresholdBytes,
         eventLoopLagP95Ms: lagP95Ms,
+        eventLoopLagMaxMs: lagMaxMs,
       },
     };
   }
@@ -480,21 +484,26 @@ export class HealthCheckService {
   }
 
   /**
-   * p95 event-loop lag over the last cycle (the histogram is reset after each
-   * read, so the window ≈ the check interval). monitorEventLoopDelay values are
-   * in **nanoseconds** (nodejs.org/api/perf_hooks.html) — ms = /1e6. The original
-   * /1000 assumed µs and read every value 1000× too large, so the 250 ms threshold
-   * effectively became 250 µs and a healthy process check degraded on every
-   * machine (P1-05 finding 11). NaN-guarded (empty histogram → 0).
+   * Event-loop lag p95 + max over the last cycle (the histogram is reset after
+   * each read, so the window ≈ the check interval). monitorEventLoopDelay values
+   * are in **nanoseconds** (nodejs.org/api/perf_hooks.html) — ms = /1e6. The
+   * original /1000 assumed µs and read every value 1000× too large, so the 250 ms
+   * threshold effectively became 250 µs and a healthy process check degraded on
+   * every machine (P1-05 finding 11). Max is published alongside p95 so P2-01
+   * rules can alert on isolated stalls that p95 misses (a single long block
+   * yields one coalesced sample — nodejs/node#34661). NaN-guarded (empty
+   * histogram → 0).
    */
-  private readEventLoopLagP95Ms(): number {
+  private readEventLoopLagMs(): { lagP95Ms: number; lagMaxMs: number } {
     try {
       const p95Ns = this.eventLoopDelay.percentile(95);
+      const maxNs = this.eventLoopDelay.max;
       this.eventLoopDelay.reset();
-      if (Number.isNaN(p95Ns)) return 0;
-      return Math.round(p95Ns / 1e6);
+      const toMs = (ns: number): number =>
+        Number.isNaN(ns) ? 0 : Math.round(ns / 1e6);
+      return { lagP95Ms: toMs(p95Ns), lagMaxMs: toMs(maxNs) };
     } catch {
-      return 0;
+      return { lagP95Ms: 0, lagMaxMs: 0 };
     }
   }
 

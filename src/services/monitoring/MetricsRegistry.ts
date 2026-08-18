@@ -106,6 +106,7 @@ export const METRIC_CONFIGS: Record<string, MetricConfig> = {
   db_pool_waiting: { kind: 'gauge' },
   rss_bytes: { kind: 'gauge' },
   event_loop_lag_p95_ms: { kind: 'gauge' },
+  event_loop_lag_max_ms: { kind: 'gauge' },
   // Circuit breaker / failover (P3-01..P3-06)
   circuit_breaker_state: { kind: 'gauge', maxSeries: 500 },
   circuit_opens_total: { kind: 'counter', maxSeries: 500 },

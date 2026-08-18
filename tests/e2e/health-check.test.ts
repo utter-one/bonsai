@@ -55,6 +55,9 @@ describe('Health Check Service (P1-05)', () => {
     // a healthy test machine reports tens of ms, never the ~20,000+ the old
     // /1000 (µs-assumption) conversion produced.
     expect(processRows[0].detail.eventLoopLagP95Ms).to.be.lessThan(1000);
+    // max: a single isolated GC stall may exceed p95, so the guard is wider —
+    // still 10× below what the unit bug would produce.
+    expect(processRows[0].detail.eventLoopLagMaxMs).to.be.lessThan(5000);
     expect(dbRows[0].latencyMs).to.be.a('number');
 
     // No IMAP providers configured → never ticked → unknown, not down

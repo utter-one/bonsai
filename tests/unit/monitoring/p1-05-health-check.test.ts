@@ -214,6 +214,7 @@ describe('HealthCheckService (P1-05)', () => {
     // >250 ms lag spike; the dedicated tests below cover the degraded path and
     // pin the lag magnitude (finding 11).
     expect(rows['process']?.status).to.be.oneOf(['ok', 'degraded']);
+    expect(rows['process']?.detail).to.include.key('eventLoopLagMaxMs');
     expect(rows['service_heartbeat:health-checks']?.status).to.equal('ok');
     expect(rows['service_heartbeat:conversation-timeout']?.status).to.equal('ok');
     expect(rows['service_heartbeat:imap-inbound']?.status).to.equal('unknown');
@@ -229,6 +230,7 @@ describe('HealthCheckService (P1-05)', () => {
     expect(gauges.db_pool_waiting?.['']).to.equal(0);
     expect(gauges.rss_bytes?.['']).to.be.greaterThan(0);
     expect(gauges.event_loop_lag_p95_ms?.['']).to.be.gte(0);
+    expect(gauges.event_loop_lag_max_ms?.['']).to.be.gte(0);
     expect(gauges.background_service_last_run_ts?.['service=health-checks']).to.be.a('number');
 
     const snapshot = service.getSnapshot();
@@ -256,7 +258,7 @@ describe('HealthCheckService (P1-05)', () => {
     await service.runNow();
     const row = byName(service.persisted[0])['process'];
     expect(row?.status).to.equal('degraded');
-    expect(row?.detail).to.include.keys('rssBytes', 'heapUsedBytes', 'eventLoopLagP95Ms', 'uptimeSec');
+    expect(row?.detail).to.include.keys('rssBytes', 'heapUsedBytes', 'eventLoopLagP95Ms', 'eventLoopLagMaxMs', 'uptimeSec');
   });
 
   it('process check: event-loop lag p95 is real ms (unit regression — finding 11)', async () => {
@@ -274,6 +276,9 @@ describe('HealthCheckService (P1-05)', () => {
     expect(lag).to.be.gte(200);
     expect(lag).to.be.lt(10_000);
     expect(row?.status).to.equal('degraded'); // > 250 ms threshold
+    const lagMax = row?.detail?.eventLoopLagMaxMs as number;
+    expect(lagMax).to.be.at.least(lag); // max ≥ p95 by construction
+    expect(lagMax).to.be.lt(10_000); // same unit regression guard
   });
 
   it('provider inference (probes off): ok / degraded / stale-unknown / no-activity-unknown', async () => {
