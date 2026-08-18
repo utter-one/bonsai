@@ -296,6 +296,9 @@ export class OperatorController {
    * Get the profile of the currently logged-in operator user
    */
   private async getProfile(req: Request, res: Response): Promise<void> {
+    // Self-scoped route: any authenticated operator may view their own profile (auth only, no RBAC permission).
+    // Without this guard req.context is undefined and the service crashes with a 500.
+    checkPermissions(req, []);
     const profile = await this.operatorService.getProfile(req.context);
     res.status(200).json(profile);
   }
@@ -305,6 +308,8 @@ export class OperatorController {
    * Update the profile of the currently logged-in operator user
    */
   private async updateProfile(req: Request, res: Response): Promise<void> {
+    // Self-scoped route: any authenticated operator may update their own profile (auth only, no RBAC permission).
+    checkPermissions(req, []);
     const body = updateProfileSchema.parse(req.body);
     const profile = await this.operatorService.updateProfile(body, req.context);
     res.status(200).json(profile);
