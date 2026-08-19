@@ -319,3 +319,69 @@ export type MetricSeriesQuery = z.infer<typeof metricSeriesQuerySchema>;
 export type MetricSeriesPoint = z.infer<typeof metricSeriesPointSchema>;
 export type MetricSeries = z.infer<typeof metricSeriesSchema>;
 export type MetricSeriesResponse = z.infer<typeof metricSeriesResponseSchema>;
+
+// ==================
+// P2-03 — alerts + monitoring config endpoints
+// ==================
+
+/** One delivery attempt recorded on an alert event (P2-02 appends these). */
+export const alertNotificationResponseSchema = z
+  .object({
+    notifierId: z.string().describe('Notifier id from the monitoring config'),
+    phase: z.enum(['fired', 'resolved']).describe('Which event phase this delivery attempted'),
+    ok: z.boolean().describe('Whether the delivery attempt succeeded'),
+    detail: z.string().optional().describe('Failure detail (HTTP status, error message, cap overrun)'),
+    at: z.coerce.date().describe('When the attempt happened'),
+  })
+  .openapi('AlertNotification')
+  .describe('One alert delivery attempt');
+
+/** One alert event (alert_events row, camelCase). */
+export const alertEventResponseSchema = z.object({
+  id: z.string().describe('Alert event id (stable — webhook receivers dedupe on this)'),
+  ruleId: z.string().describe('Alert rule id that produced this event'),
+  scopeKey: z.string().describe('Rule id + scope part (e.g. provider-down:prov_123)'),
+  scope: z.record(z.string(), z.unknown()).nullable().describe('Scope detail fields (provider, service, …)'),
+  severity: z.enum(['info', 'warning', 'critical']).describe('Alert severity'),
+  status: z.enum(['firing', 'resolved']).describe('Current alert status'),
+  message: z.string().describe('Human-readable alert message'),
+  context: z.record(z.string(), z.unknown()).nullable().describe('Evaluation context (includes resolutionReason on resolve)'),
+  notifications: z.array(alertNotificationResponseSchema).describe('All delivery attempts, oldest first'),
+  firedAt: z.coerce.date().describe('When the alert fired'),
+  resolvedAt: z.coerce.date().nullable().describe('When the alert resolved (null while firing)'),
+  ackedAt: z.coerce.date().nullable().describe('When the alert was acknowledged (null if never)'),
+  ackedBy: z.string().nullable().describe('Operator id that acknowledged the alert'),
+});
+
+/** Paginated list of alert events (newest fired_at first by default). */
+export const alertEventListResponseSchema = z.object({
+  items: z.array(alertEventResponseSchema).describe('Alert events in the current page'),
+  total: z.number().int().min(0).describe('Total matching rows'),
+  offset: z.number().int().min(0).describe('Starting index of the current page'),
+  limit: listResponseLimitSchema,
+});
+
+/** Route params for /api/monitoring/alerts/{id}. */
+export const alertIdParamsSchema = z.object({
+  id: z.string().min(1).describe('Alert event id'),
+});
+
+/** GET /api/monitoring/config response — validated config + row metadata. */
+export const monitoringConfigResponseSchema = z.object({
+  config: monitoringConfigSchema.describe('The current validated monitoring config'),
+  version: z.number().int().min(1).describe('Optimistic-lock version — send back unchanged in PUT'),
+  updatedAt: z.coerce.date().nullable().describe('When the config row was last written'),
+});
+
+/** PUT /api/monitoring/config request — full replace under optimistic lock. */
+export const monitoringConfigUpdateRequestSchema = z.object({
+  version: z.number().int().min(1).describe('Current version from GET — mismatch returns 409'),
+  config: monitoringConfigSchema.describe('Full replacement config (no partial updates)'),
+});
+
+export type AlertNotificationResponse = z.infer<typeof alertNotificationResponseSchema>;
+export type AlertEventResponse = z.infer<typeof alertEventResponseSchema>;
+export type AlertEventListResponse = z.infer<typeof alertEventListResponseSchema>;
+export type AlertIdParams = z.infer<typeof alertIdParamsSchema>;
+export type MonitoringConfigResponse = z.infer<typeof monitoringConfigResponseSchema>;
+export type MonitoringConfigUpdateRequest = z.infer<typeof monitoringConfigUpdateRequestSchema>;

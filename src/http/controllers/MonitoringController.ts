@@ -7,8 +7,13 @@ import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { listParamsSchema } from '../contracts/common';
 import {
+  alertEventListResponseSchema,
+  alertEventResponseSchema,
+  alertIdParamsSchema,
   healthSnapshotResponseSchema,
   healthHistoryListResponseSchema,
+  monitoringConfigResponseSchema,
+  monitoringConfigUpdateRequestSchema,
   providersMonitoringResponseSchema,
   providerCallListResponseSchema,
   providerStatsQuerySchema,
@@ -18,11 +23,11 @@ import {
 } from '../contracts/monitoring';
 
 /**
- * Controller for the read-only monitoring API (P1-08, PROPOSAL §3.6).
+ * Controller for the monitoring API (P1-08 read-only, PROPOSAL §3.6; P2-03
+ * alerts history/acknowledge + config management).
  *
- * All six endpoints require `system:monitoring` (super_admin in Phase 1 —
- * the role matrix is finalized in P2-04). Write endpoints (config) land in P2-03,
- * alerts in P2-03, fallback events in P3-06.
+ * All eleven endpoints require `system:monitoring` (super_admin until P2-04
+ * finalizes the role matrix). Fallback events land in P3-06.
  */
 @singleton()
 export class MonitoringController {
@@ -33,10 +38,11 @@ export class MonitoringController {
    */
   static getOpenAPIPaths(): RouteConfig[] {
     const commonResponses = {
-      400: { description: 'Invalid query parameters' },
+      400: { description: 'Invalid query parameters or request body' },
       401: { description: 'Authentication required' },
       403: { description: 'Insufficient permissions (requires system:monitoring)' },
     };
+    const notFoundResponse = { 404: { description: 'Not found' } };
 
     return [
       {
@@ -140,6 +146,117 @@ export class MonitoringController {
       },
       {
         method: 'get',
+        path: '/api/monitoring/alerts',
+        tags: ['Monitoring'],
+        summary: 'Alert events',
+        description: 'Alert event history (P2-01/P2-02), newest fired_at first by default. Items include the full notifications delivery trail. Filters: id, ruleId, scopeKey, severity (info|warning|critical), status (firing|resolved), firedAt, resolvedAt, ackedAt (operators supported, e.g. filters[firedAt][op]=between&filters[firedAt][value][0]=from&filters[firedAt][value][1]=to); textSearch over message, scopeKey, ruleId.',
+        request: {
+          query: listParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Paginated alert events',
+            content: {
+              'application/json': {
+                schema: alertEventListResponseSchema,
+              },
+            },
+          },
+          ...commonResponses,
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/monitoring/alerts/{id}',
+        tags: ['Monitoring'],
+        summary: 'Alert event by id',
+        description: 'A single alert event with its notification delivery trail and acknowledgment stamps.',
+        request: {
+          params: alertIdParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Alert event',
+            content: {
+              'application/json': {
+                schema: alertEventResponseSchema,
+              },
+            },
+          },
+          ...notFoundResponse,
+          ...commonResponses,
+        },
+      },
+      {
+        method: 'post',
+        path: '/api/monitoring/alerts/{id}/acknowledge',
+        tags: ['Monitoring'],
+        summary: 'Acknowledge alert event',
+        description: 'Stamps acked_at + acked_by (the authenticated operator) exactly once — a second ack returns 200 with the existing stamps (idempotent, no overwrite). Writes an audit entry on the first ack.',
+        request: {
+          params: alertIdParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Alert event with acknowledgment stamps',
+            content: {
+              'application/json': {
+                schema: alertEventResponseSchema,
+              },
+            },
+          },
+          ...notFoundResponse,
+          ...commonResponses,
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/monitoring/config',
+        tags: ['Monitoring'],
+        summary: 'Monitoring config',
+        description: 'The current validated monitoring config (notifiers, rule overrides, retention, probe + alerting settings) plus the optimistic-lock version.',
+        responses: {
+          200: {
+            description: 'Monitoring config + version',
+            content: {
+              'application/json': {
+                schema: monitoringConfigResponseSchema,
+              },
+            },
+          },
+          ...commonResponses,
+        },
+      },
+      {
+        method: 'put',
+        path: '/api/monitoring/config',
+        tags: ['Monitoring'],
+        summary: 'Replace monitoring config',
+        description: 'Full-replace the monitoring config under optimistic lock. `version` must match the current row version (409 on mismatch); invalid config (unknown rule id, bad notifier, retention < 7) returns 400. On success the running engine and notifiers observe the new config on their next evaluation/delivery — no restart. The audit entry stores sanitized before/after summaries (webhook URLs are replaced by hasUrl).',
+        request: {
+          body: {
+            content: {
+              'application/json': {
+                schema: monitoringConfigUpdateRequestSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Updated monitoring config + new version',
+            content: {
+              'application/json': {
+                schema: monitoringConfigResponseSchema,
+              },
+            },
+          },
+          409: { description: 'Version mismatch (stale version) — re-GET and retry' },
+          ...commonResponses,
+        },
+      },
+      {
+        method: 'get',
         path: '/api/monitoring/metrics',
         tags: ['Monitoring'],
         summary: 'Metric time series',
@@ -172,6 +289,11 @@ export class MonitoringController {
     router.get('/api/monitoring/provider-calls', asyncHandler(this.listProviderCalls.bind(this)));
     router.get('/api/monitoring/provider-stats', asyncHandler(this.getProviderStats.bind(this)));
     router.get('/api/monitoring/metrics', asyncHandler(this.getMetrics.bind(this)));
+    router.get('/api/monitoring/alerts', asyncHandler(this.listAlerts.bind(this)));
+    router.get('/api/monitoring/alerts/:id', asyncHandler(this.getAlert.bind(this)));
+    router.post('/api/monitoring/alerts/:id/acknowledge', asyncHandler(this.acknowledgeAlert.bind(this)));
+    router.get('/api/monitoring/config', asyncHandler(this.getConfig.bind(this)));
+    router.put('/api/monitoring/config', asyncHandler(this.updateConfig.bind(this)));
   }
 
   /**
@@ -230,5 +352,54 @@ export class MonitoringController {
     const query = metricSeriesQuerySchema.parse(req.query);
     const series = await this.monitoringService.getMetricSeries(req.context, query);
     res.status(200).json(series);
+  }
+
+  /**
+   * GET /api/monitoring/alerts
+   */
+  private async listAlerts(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const query = listParamsSchema.parse(req.query);
+    const alerts = await this.monitoringService.listAlerts(req.context, query);
+    res.status(200).json(alerts);
+  }
+
+  /**
+   * GET /api/monitoring/alerts/:id
+   */
+  private async getAlert(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const { id } = alertIdParamsSchema.parse(req.params);
+    const alert = await this.monitoringService.getAlert(req.context, id);
+    res.status(200).json(alert);
+  }
+
+  /**
+   * POST /api/monitoring/alerts/:id/acknowledge
+   */
+  private async acknowledgeAlert(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const { id } = alertIdParamsSchema.parse(req.params);
+    const alert = await this.monitoringService.acknowledgeAlert(req.context, id);
+    res.status(200).json(alert);
+  }
+
+  /**
+   * GET /api/monitoring/config
+   */
+  private async getConfig(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const config = await this.monitoringService.getConfig(req.context);
+    res.status(200).json(config);
+  }
+
+  /**
+   * PUT /api/monitoring/config
+   */
+  private async updateConfig(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const body = monitoringConfigUpdateRequestSchema.parse(req.body);
+    const config = await this.monitoringService.updateConfig(req.context, body);
+    res.status(200).json(config);
   }
 }

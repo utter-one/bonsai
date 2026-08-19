@@ -26512,6 +26512,198 @@
           "snapshotId"
         ],
         "description": "Snapshot deletion result"
+      },
+      "AlertNotification": {
+        "type": "object",
+        "properties": {
+          "notifierId": {
+            "type": "string",
+            "description": "Notifier id from the monitoring config"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "fired",
+              "resolved"
+            ],
+            "description": "Which event phase this delivery attempted"
+          },
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the delivery attempt succeeded"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Failure detail (HTTP status, error message, cap overrun)"
+          },
+          "at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the attempt happened"
+          }
+        },
+        "required": [
+          "notifierId",
+          "phase",
+          "ok",
+          "at"
+        ],
+        "description": "One alert delivery attempt"
+      },
+      "NotifierConfig": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notifier id (synthesized on first boot for env-derived notifiers)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "webhook",
+              "email"
+            ],
+            "description": "Notifier type (Phase 1: webhook, email)"
+          },
+          "channelProviderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Email channel provider id (required for email notifiers)"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Webhook delivery URL, http(s) (required for webhook notifiers)"
+          },
+          "to": {
+            "type": "string",
+            "format": "email",
+            "description": "Recipient email address (required for email notifiers)"
+          },
+          "minSeverity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "description": "Only deliver alerts at or above this severity (default: all)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Disabled notifiers are skipped by the publisher"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "enabled"
+        ]
+      },
+      "RuleOverride": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Disable the rule without deleting its override"
+          },
+          "threshold": {
+            "type": "number",
+            "description": "Rule threshold (rate, count, or ms — per-rule semantics)"
+          },
+          "windowMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Evaluation window in minutes"
+          },
+          "minSamples": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Minimum samples before the rule may fire"
+          },
+          "forMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sustainment in minutes before firing"
+          },
+          "resolveAfterGoodChecks": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Consecutive good evaluations to auto-resolve"
+          },
+          "cooldownMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minimum gap between re-fires of the same key"
+          },
+          "maxUnresolvedHours": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Auto-resolve safety valve in hours"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "description": "Override the rule default severity"
+          }
+        }
+      },
+      "ProbeSettings": {
+        "type": "object",
+        "properties": {
+          "llmProbe": {
+            "type": "string",
+            "enum": [
+              "models",
+              "one_token",
+              "off"
+            ],
+            "default": "models",
+            "description": "LLM health probe mode: 'models' = enumerateModels() (free), 'one_token' = 1-token generation (costs money), 'off' = call-log inference only"
+          },
+          "cooldownMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "default": 10,
+            "description": "Minimum minutes between probes of the same provider"
+          }
+        },
+        "default": {
+          "llmProbe": "models",
+          "cooldownMinutes": 10
+        },
+        "description": "Provider health probe policy (P1-05 consumes this)"
+      },
+      "AlertingSettings": {
+        "type": "object",
+        "properties": {
+          "engineIntervalMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "default": 1,
+            "description": "Alert rule engine interval in minutes (P2-01)"
+          },
+          "defaultCooldownMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "default": 15,
+            "description": "Default per-key re-fire cooldown in minutes (P2-01)"
+          }
+        },
+        "default": {
+          "engineIntervalMinutes": 1,
+          "defaultCooldownMinutes": 15
+        },
+        "description": "Alert engine settings (P2-01 consumes this)"
       }
     },
     "parameters": {},
@@ -67171,7 +67363,7 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters or request body"
           },
           "401": {
             "description": "Authentication required"
@@ -67406,7 +67598,7 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters or request body"
           },
           "401": {
             "description": "Authentication required"
@@ -67496,7 +67688,7 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters or request body"
           },
           "401": {
             "description": "Authentication required"
@@ -67787,7 +67979,7 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters or request body"
           },
           "401": {
             "description": "Authentication required"
@@ -67913,13 +68105,806 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters or request body"
           },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/alerts": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Alert events",
+        "description": "Alert event history (P2-01/P2-02), newest fired_at first by default. Items include the full notifications delivery trail. Filters: id, ruleId, scopeKey, severity (info|warning|critical), status (firing|resolved), firedAt, resolvedAt, ackedAt (operators supported, e.g. filters[firedAt][op]=between&filters[firedAt][value][0]=from&filters[firedAt][value][1]=to); textSearch over message, scopeKey, ruleId.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0,
+              "description": "Starting index for pagination (default: 0)"
+            },
+            "required": false,
+            "description": "Starting index for pagination (default: 0)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 1000,
+              "description": "Maximum number of items to return. Defaults to 100; maximum 1000"
+            },
+            "required": false,
+            "description": "Maximum number of items to return. Defaults to 100; maximum 1000",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "description": "Full-text search query string (optional)"
+            },
+            "required": false,
+            "description": "Full-text search query string (optional)",
+            "name": "textSearch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")"
+            },
+            "required": false,
+            "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")",
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to group results by (optional)"
+            },
+            "required": false,
+            "description": "Field(s) to group results by (optional)",
+            "name": "groupBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "nullable": true,
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "boolean"
+                    }
+                  },
+                  {
+                    "$ref": "#/components/schemas/ListFilterOperation"
+                  }
+                ]
+              },
+              "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects"
+            },
+            "required": false,
+            "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects",
+            "name": "filters",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated alert events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Alert event id (stable — webhook receivers dedupe on this)"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "description": "Alert rule id that produced this event"
+                          },
+                          "scopeKey": {
+                            "type": "string",
+                            "description": "Rule id + scope part (e.g. provider-down:prov_123)"
+                          },
+                          "scope": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            },
+                            "description": "Scope detail fields (provider, service, …)"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "warning",
+                              "critical"
+                            ],
+                            "description": "Alert severity"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "firing",
+                              "resolved"
+                            ],
+                            "description": "Current alert status"
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Human-readable alert message"
+                          },
+                          "context": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            },
+                            "description": "Evaluation context (includes resolutionReason on resolve)"
+                          },
+                          "notifications": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/AlertNotification"
+                            },
+                            "description": "All delivery attempts, oldest first"
+                          },
+                          "firedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the alert fired"
+                          },
+                          "resolvedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the alert resolved (null while firing)"
+                          },
+                          "ackedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the alert was acknowledged (null if never)"
+                          },
+                          "ackedBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Operator id that acknowledged the alert"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ruleId",
+                          "scopeKey",
+                          "scope",
+                          "severity",
+                          "status",
+                          "message",
+                          "context",
+                          "notifications",
+                          "firedAt",
+                          "resolvedAt",
+                          "ackedAt",
+                          "ackedBy"
+                        ]
+                      },
+                      "description": "Alert events in the current page"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Total matching rows"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Starting index of the current page"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 1000,
+                      "default": 100,
+                      "description": "Maximum number of items requested for the current page. Defaults to 100; maximum 1000"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "offset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/alerts/{id}": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Alert event by id",
+        "description": "A single alert event with its notification delivery trail and acknowledgment stamps.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Alert event id"
+            },
+            "required": true,
+            "description": "Alert event id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Alert event id (stable — webhook receivers dedupe on this)"
+                    },
+                    "ruleId": {
+                      "type": "string",
+                      "description": "Alert rule id that produced this event"
+                    },
+                    "scopeKey": {
+                      "type": "string",
+                      "description": "Rule id + scope part (e.g. provider-down:prov_123)"
+                    },
+                    "scope": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Scope detail fields (provider, service, …)"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "info",
+                        "warning",
+                        "critical"
+                      ],
+                      "description": "Alert severity"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "firing",
+                        "resolved"
+                      ],
+                      "description": "Current alert status"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable alert message"
+                    },
+                    "context": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Evaluation context (includes resolutionReason on resolve)"
+                    },
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AlertNotification"
+                      },
+                      "description": "All delivery attempts, oldest first"
+                    },
+                    "firedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert fired"
+                    },
+                    "resolvedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert resolved (null while firing)"
+                    },
+                    "ackedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert was acknowledged (null if never)"
+                    },
+                    "ackedBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Operator id that acknowledged the alert"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ruleId",
+                    "scopeKey",
+                    "scope",
+                    "severity",
+                    "status",
+                    "message",
+                    "context",
+                    "notifications",
+                    "firedAt",
+                    "resolvedAt",
+                    "ackedAt",
+                    "ackedBy"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/monitoring/alerts/{id}/acknowledge": {
+      "post": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Acknowledge alert event",
+        "description": "Stamps acked_at + acked_by (the authenticated operator) exactly once — a second ack returns 200 with the existing stamps (idempotent, no overwrite). Writes an audit entry on the first ack.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Alert event id"
+            },
+            "required": true,
+            "description": "Alert event id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert event with acknowledgment stamps",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Alert event id (stable — webhook receivers dedupe on this)"
+                    },
+                    "ruleId": {
+                      "type": "string",
+                      "description": "Alert rule id that produced this event"
+                    },
+                    "scopeKey": {
+                      "type": "string",
+                      "description": "Rule id + scope part (e.g. provider-down:prov_123)"
+                    },
+                    "scope": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Scope detail fields (provider, service, …)"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "info",
+                        "warning",
+                        "critical"
+                      ],
+                      "description": "Alert severity"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "firing",
+                        "resolved"
+                      ],
+                      "description": "Current alert status"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable alert message"
+                    },
+                    "context": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Evaluation context (includes resolutionReason on resolve)"
+                    },
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AlertNotification"
+                      },
+                      "description": "All delivery attempts, oldest first"
+                    },
+                    "firedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert fired"
+                    },
+                    "resolvedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert resolved (null while firing)"
+                    },
+                    "ackedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert was acknowledged (null if never)"
+                    },
+                    "ackedBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Operator id that acknowledged the alert"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ruleId",
+                    "scopeKey",
+                    "scope",
+                    "severity",
+                    "status",
+                    "message",
+                    "context",
+                    "notifications",
+                    "firedAt",
+                    "resolvedAt",
+                    "ackedAt",
+                    "ackedBy"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/monitoring/config": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Monitoring config",
+        "description": "The current validated monitoring config (notifiers, rule overrides, retention, probe + alerting settings) plus the optimistic-lock version.",
+        "responses": {
+          "200": {
+            "description": "Monitoring config + version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "notifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/NotifierConfig"
+                          },
+                          "default": [],
+                          "description": "Alert delivery targets (webhook, email in Phase 1)"
+                        },
+                        "rules": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "$ref": "#/components/schemas/RuleOverride"
+                          },
+                          "default": {},
+                          "description": "Per-rule overrides keyed by rule id (P2-01 defines the ids)"
+                        },
+                        "retentionDays": {
+                          "type": "integer",
+                          "minimum": 7,
+                          "default": 90,
+                          "description": "Retention in days for provider_call_logs, health_checks, metric_samples (stats_hourly: 2x)"
+                        },
+                        "probeSettings": {
+                          "$ref": "#/components/schemas/ProbeSettings"
+                        },
+                        "alerting": {
+                          "$ref": "#/components/schemas/AlertingSettings"
+                        }
+                      },
+                      "description": "The current validated monitoring config"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-lock version — send back unchanged in PUT"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the config row was last written"
+                    }
+                  },
+                  "required": [
+                    "config",
+                    "version",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Replace monitoring config",
+        "description": "Full-replace the monitoring config under optimistic lock. `version` must match the current row version (409 on mismatch); invalid config (unknown rule id, bad notifier, retention < 7) returns 400. On success the running engine and notifiers observe the new config on their next evaluation/delivery — no restart. The audit entry stores sanitized before/after summaries (webhook URLs are replaced by hasUrl).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Current version from GET — mismatch returns 409"
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "notifiers": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/NotifierConfig"
+                        },
+                        "default": [],
+                        "description": "Alert delivery targets (webhook, email in Phase 1)"
+                      },
+                      "rules": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "$ref": "#/components/schemas/RuleOverride"
+                        },
+                        "default": {},
+                        "description": "Per-rule overrides keyed by rule id (P2-01 defines the ids)"
+                      },
+                      "retentionDays": {
+                        "type": "integer",
+                        "minimum": 7,
+                        "default": 90,
+                        "description": "Retention in days for provider_call_logs, health_checks, metric_samples (stats_hourly: 2x)"
+                      },
+                      "probeSettings": {
+                        "$ref": "#/components/schemas/ProbeSettings"
+                      },
+                      "alerting": {
+                        "$ref": "#/components/schemas/AlertingSettings"
+                      }
+                    },
+                    "description": "Full replacement config (no partial updates)"
+                  }
+                },
+                "required": [
+                  "version",
+                  "config"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated monitoring config + new version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "notifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/NotifierConfig"
+                          },
+                          "default": [],
+                          "description": "Alert delivery targets (webhook, email in Phase 1)"
+                        },
+                        "rules": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "$ref": "#/components/schemas/RuleOverride"
+                          },
+                          "default": {},
+                          "description": "Per-rule overrides keyed by rule id (P2-01 defines the ids)"
+                        },
+                        "retentionDays": {
+                          "type": "integer",
+                          "minimum": 7,
+                          "default": 90,
+                          "description": "Retention in days for provider_call_logs, health_checks, metric_samples (stats_hourly: 2x)"
+                        },
+                        "probeSettings": {
+                          "$ref": "#/components/schemas/ProbeSettings"
+                        },
+                        "alerting": {
+                          "$ref": "#/components/schemas/AlertingSettings"
+                        }
+                      },
+                      "description": "The current validated monitoring config"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-lock version — send back unchanged in PUT"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the config row was last written"
+                    }
+                  },
+                  "required": [
+                    "config",
+                    "version",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          },
+          "409": {
+            "description": "Version mismatch (stale version) — re-GET and retry"
           }
         }
       }
@@ -68070,7 +69055,7 @@
             }
           },
           "400": {
-            "description": "Invalid query parameters"
+            "description": "Invalid query parameters or request body"
           },
           "401": {
             "description": "Authentication required"

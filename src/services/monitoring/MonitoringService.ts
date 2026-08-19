@@ -1,27 +1,34 @@
 import { inject, injectable } from 'tsyringe';
-import { and, desc, SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, SQL, sql } from 'drizzle-orm';
 import { db } from '../../db/index';
-import { healthChecks, metricSamples, providerCallLogs, providers } from '../../db/schema';
+import { alertEvents, healthChecks, metricSamples, monitoringConfig, providerCallLogs, providers } from '../../db/schema';
 import type { RequestContext } from '../RequestContext';
 import { BaseService } from '../BaseService';
 import { PERMISSIONS } from '../../permissions';
-import { ValidationError } from '../../errors';
+import { NotFoundError, OptimisticLockError, ValidationError } from '../../errors';
 import { buildFilterCondition, buildOrderBy } from '../../utils/queryBuilder';
 import { buildTextSearchCondition } from '../../utils/textSearch';
 import { countRows, normalizeListLimit } from '../../utils/pagination';
 import type { ListParams } from '../../http/contracts/common';
 import type {
+  AlertEventListResponse,
+  AlertEventResponse,
   HealthHistoryListResponse,
   HealthSnapshotResponse,
   MetricSeriesQuery,
   MetricSeriesResponse,
+  MonitoringConfig,
+  MonitoringConfigResponse,
+  MonitoringConfigUpdateRequest,
   ProviderCallListResponse,
   ProviderStatsQuery,
   ProviderStatsResponse,
   ProvidersMonitoringResponse,
 } from '../../http/contracts/monitoring';
-import { healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
+import { alertEventListResponseSchema, alertEventResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
+import { AuditService } from '../AuditService';
 import { HealthCheckService } from './HealthCheckService';
+import { MonitoringConfigService } from './MonitoringConfigService';
 import logger from '../../utils/logger';
 
 /** Rolling window for GET /api/monitoring/providers. */
@@ -69,9 +76,10 @@ interface MetricSampleBucketRow {
 }
 
 /**
- * P1-08 — read-only monitoring API surface (PROPOSAL §3.6).
+ * P1-08 — read-only monitoring API surface (PROPOSAL §3.6) + P2-03 — alert
+ * history/acknowledge + monitoring config management.
  *
- * Six read methods, each guarded by `requirePermission(context, SYSTEM_MONITORING)`
+ * Every method is guarded by `requirePermission(context, SYSTEM_MONITORING)`
  * (defense in depth — the controller checks the same permission). Timestamps are
  * read as `::text` and reconstructed with an explicit Z marker: pg parses tz-less
  * timestamp results as host-local (P1-06 TZ lesson). Window boundaries are passed
@@ -81,6 +89,8 @@ interface MetricSampleBucketRow {
 export class MonitoringService extends BaseService {
   constructor(
     @inject(HealthCheckService) private readonly healthCheckService: HealthCheckService,
+    @inject(MonitoringConfigService) private readonly monitoringConfigService: MonitoringConfigService,
+    @inject(AuditService) private readonly auditService: AuditService,
   ) {
     super();
   }
@@ -474,6 +484,198 @@ export class MonitoringService extends BaseService {
       step: query.step,
       series: [...seriesMap.values()],
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // P2-03 — alerts history + acknowledge
+  // ---------------------------------------------------------------------
+
+  /**
+   * Paginated alert events, newest fired_at first by default.
+   * Filters: id, ruleId, scopeKey, severity, status, firedAt, resolvedAt, ackedAt;
+   * textSearch over message + scopeKey + ruleId.
+   */
+  async listAlerts(context: RequestContext, params?: ListParams): Promise<AlertEventListResponse> {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    logger.debug({ params }, 'Listing alert events');
+
+    const offset = params?.offset ?? 0;
+    const limit = normalizeListLimit(params?.limit);
+
+    const columnMap = {
+      id: alertEvents.id,
+      ruleId: alertEvents.ruleId,
+      scopeKey: alertEvents.scopeKey,
+      severity: alertEvents.severity,
+      status: alertEvents.status,
+      firedAt: alertEvents.firedAt,
+      resolvedAt: alertEvents.resolvedAt,
+      ackedAt: alertEvents.ackedAt,
+    };
+
+    const conditions: SQL[] = [];
+    if (params?.filters) {
+      for (const [field, filter] of Object.entries(params.filters)) {
+        const condition = buildFilterCondition(field, filter, columnMap, logger);
+        if (condition) conditions.push(condition);
+      }
+    }
+    if (params?.textSearch) {
+      const searchCondition = buildTextSearchCondition(params.textSearch, [
+        alertEvents.message,
+        alertEvents.scopeKey,
+        alertEvents.ruleId,
+      ]);
+      if (searchCondition) conditions.push(searchCondition);
+    }
+
+    const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const total = await countRows(alertEvents, whereCondition);
+    const rows = await db.query.alertEvents.findMany({
+      where: whereCondition,
+      orderBy: orderByClause.length > 0 ? orderByClause : [desc(alertEvents.firedAt)],
+      limit,
+      offset,
+    });
+
+    return alertEventListResponseSchema.parse({
+      items: rows.map((row) => alertEventResponseSchema.parse(row)),
+      total,
+      offset,
+      limit,
+    });
+  }
+
+  /** Single alert event; 404 when missing. */
+  async getAlert(context: RequestContext, id: string): Promise<AlertEventResponse> {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    const rows = await db.select().from(alertEvents).where(eq(alertEvents.id, id));
+    if (rows.length === 0) {
+      throw new NotFoundError(`Alert event '${id}' not found`);
+    }
+    return alertEventResponseSchema.parse(rows[0]);
+  }
+
+  /**
+   * Stamp acked_at + acked_by exactly once (idempotent — a second ack returns
+   * the existing stamps without overwriting them). Writes an audit entry on the
+   * first ack only.
+   */
+  async acknowledgeAlert(context: RequestContext, id: string): Promise<AlertEventResponse> {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    logger.debug({ operatorId: context.operatorId, alertId: id }, 'Acknowledging alert event');
+
+    const now = new Date();
+    const updated = await db
+      .update(alertEvents)
+      .set({ ackedAt: now, ackedBy: context.operatorId })
+      .where(and(eq(alertEvents.id, id), isNull(alertEvents.ackedAt)))
+      .returning();
+
+    if (updated.length > 0) {
+      await this.auditService.logChange({
+        userId: context.operatorId,
+        action: 'ACKNOWLEDGE_ALERT',
+        entityType: 'alert_event',
+        entityId: id,
+        newEntity: { ackedAt: now, ackedBy: context.operatorId },
+      });
+      return alertEventResponseSchema.parse(updated[0]);
+    }
+
+    // Guarded update matched nothing: either the id is unknown (404) or the
+    // alert was already acknowledged (idempotent 200, no overwrite).
+    const rows = await db.select().from(alertEvents).where(eq(alertEvents.id, id));
+    if (rows.length === 0) {
+      throw new NotFoundError(`Alert event '${id}' not found`);
+    }
+    return alertEventResponseSchema.parse(rows[0]);
+  }
+
+  // ---------------------------------------------------------------------
+  // P2-03 — monitoring config (read + optimistic-locked full replace)
+  // ---------------------------------------------------------------------
+
+  /** Current config + row metadata (version for optimistic locking). */
+  async getConfig(context: RequestContext): Promise<MonitoringConfigResponse> {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    // get() validates the row (and creates the default row on first boot).
+    const config = await this.monitoringConfigService.get();
+    const rows = await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, 'global'));
+    const row = rows[0];
+    if (!row) {
+      throw new OptimisticLockError('Monitoring config row is missing');
+    }
+    return monitoringConfigResponseSchema.parse({
+      config,
+      version: row.version,
+      updatedAt: row.updatedAt,
+    });
+  }
+
+  /**
+   * Full-replace config under optimistic lock. Validates (ZodError → 400),
+   * version-mismatch (OptimisticLockError → 409), persists + refreshes the
+   * shared config cache (MonitoringConfigService.save — engine and notifiers
+   * observe the new config on their next evaluation/delivery, no restart),
+   * and writes a sanitized audit entry (webhook URLs carry tokens — they are
+   * replaced by `hasUrl: true` in the before/after summaries).
+   */
+  async updateConfig(context: RequestContext, body: MonitoringConfigUpdateRequest): Promise<MonitoringConfigResponse> {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    logger.debug({ operatorId: context.operatorId, version: body.version }, 'Updating monitoring config');
+
+    const before = await this.monitoringConfigService.get();
+    const parsed = monitoringConfigSchema.parse(body.config);
+    await this.monitoringConfigService.save(parsed, body.version);
+    await this.auditService.logChange({
+      userId: context.operatorId,
+      action: 'UPDATE_MONITORING_CONFIG',
+      entityType: 'monitoring_config',
+      entityId: 'global',
+      oldEntity: { version: body.version, config: this.configAuditSummary(before) },
+      newEntity: { version: body.version + 1, config: this.configAuditSummary(parsed) },
+    });
+
+    const rows = await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, 'global'));
+    const row = rows[0];
+    if (!row) {
+      throw new OptimisticLockError('Monitoring config row is missing');
+    }
+    return monitoringConfigResponseSchema.parse({
+      config: parsed,
+      version: row.version,
+      updatedAt: row.updatedAt,
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------
+
+  /**
+   * Audit-safe config summary (finding 5): the webhook `url` may carry a token
+   * and is replaced by `hasUrl: true`; everything else (including rule
+   * overrides, email recipients, channel provider ids) is not a secret.
+   */
+  private configAuditSummary(config: MonitoringConfig): Record<string, unknown> {
+    return {
+      retentionDays: config.retentionDays,
+      probeSettings: config.probeSettings,
+      alerting: config.alerting,
+      rules: config.rules,
+      notifiers: config.notifiers.map((n) => ({
+        id: n.id,
+        type: n.type,
+        enabled: n.enabled,
+        ...(n.minSeverity !== undefined ? { minSeverity: n.minSeverity } : {}),
+        ...(n.channelProviderId !== undefined ? { channelProviderId: n.channelProviderId } : {}),
+        ...(n.to !== undefined ? { to: n.to } : {}),
+        ...(n.url !== undefined ? { hasUrl: true } : {}),
+      })),
+    };
   }
 
   /** Window must be non-empty and bounded (raw-log scans stay cheap). */
