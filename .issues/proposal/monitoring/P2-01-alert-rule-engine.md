@@ -1,9 +1,9 @@
 ---
 title: "P2-01 — AlertRuleEngine: rules, state machine, default rules"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
-updated: 2026-08-18
+updated: 2026-08-19
 assignee: ""
 tags: [monitoring, spec, phase-2]
 ---

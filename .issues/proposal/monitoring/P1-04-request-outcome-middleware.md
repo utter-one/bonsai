@@ -1,9 +1,9 @@
 ---
 title: "P1-04 — Request-outcome logging, requestId, API request metrics, pino redaction"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-19
 assignee: ""
 tags: [monitoring, spec, phase-1]
 ---

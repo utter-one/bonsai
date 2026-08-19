@@ -1,7 +1,7 @@
 ---
 title: "P2-03 — Alerts + monitoring config API"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
 updated: 2026-08-19
 assignee: ""

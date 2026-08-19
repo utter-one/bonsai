@@ -1,9 +1,9 @@
 ---
 title: "P1-07 — Rate-limit (429) instrumentation"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-19
 assignee: ""
 tags: [monitoring, spec, phase-1]
 ---
