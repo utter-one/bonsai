@@ -5,6 +5,8 @@ import { HealthCheckService, type HealthCheckResult } from '../../../src/service
 import { MetricsRegistry, type MetricSampleRow } from '../../../src/services/monitoring/MetricsRegistry';
 import type { LlmProviderFactory } from '../../../src/services/providers/llm/LlmProviderFactory';
 import type { StorageProviderFactory } from '../../../src/services/providers/storage/StorageProviderFactory';
+import type { AsrProviderFactory } from '../../../src/services/providers/asr/AsrProviderFactory';
+import type { TtsProviderFactory } from '../../../src/services/providers/tts/TtsProviderFactory';
 import type { Provider } from '../../../src/types/models';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -95,7 +97,23 @@ function makeStorageFactory(behavior: { calls: number[]; fail?: boolean }): Stor
   } as unknown as StorageProviderFactory;
 }
 
-function makeConfigService(options?: { probeSettings?: { llmProbe?: 'models' | 'one_token' | 'off'; cooldownMinutes?: number }; fail?: boolean }) {
+/** ASR/TTS probe factory stub: instances expose ping() unless withPing is false (P1-05b). */
+function makeProbeFactory(behavior: { calls: number[]; fail?: boolean; withPing?: boolean }): AsrProviderFactory & TtsProviderFactory {
+  return {
+    createProviderForProbing: async () => {
+      const instance: Record<string, unknown> = {};
+      if (behavior.withPing !== false) {
+        instance.ping = async () => {
+          behavior.calls.push(Date.now());
+          if (behavior.fail) throw new Error('probe failed');
+        };
+      }
+      return instance;
+    },
+  } as unknown as AsrProviderFactory & TtsProviderFactory;
+}
+
+function makeConfigService(options?: { probeSettings?: { llmProbe?: 'models' | 'one_token' | 'off'; asrProbe?: 'free' | 'off'; ttsProbe?: 'free' | 'off'; cooldownMinutes?: number }; fail?: boolean }) {
   return {
     get: async () => {
       if (options?.fail) throw new Error('config unavailable');
@@ -103,7 +121,7 @@ function makeConfigService(options?: { probeSettings?: { llmProbe?: 'models' | '
         notifiers: [],
         rules: {},
         retentionDays: 90,
-        probeSettings: { llmProbe: 'models', cooldownMinutes: 10, ...options?.probeSettings },
+        probeSettings: { llmProbe: 'models', asrProbe: 'free', ttsProbe: 'free', cooldownMinutes: 10, ...options?.probeSettings },
         alerting: { engineIntervalMinutes: 1, defaultCooldownMinutes: 15 },
       };
     },
@@ -120,7 +138,7 @@ function makeService(probesEnv?: string): {
   if (probesEnv !== undefined) process.env.MONITORING_HEALTH_PROBES = probesEnv;
   const registry = new QuietRegistry();
   const hb = new HeartbeatRegistry(registry);
-  const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls: [] }), makeStorageFactory({ calls: [] }), makeConfigService());
+  const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls: [] }), makeStorageFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeConfigService());
   return { service, registry, hb, restoreEnv: () => {
     if (previous === undefined) delete process.env.MONITORING_HEALTH_PROBES;
     else process.env.MONITORING_HEALTH_PROBES = previous;
@@ -315,7 +333,7 @@ describe('HealthCheckService (P1-05)', () => {
     const hb = new HeartbeatRegistry(registry);
     const previous = process.env.MONITORING_HEALTH_PROBES;
     process.env.MONITORING_HEALTH_PROBES = 'on';
-    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeConfigService());
+    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeConfigService());
     service.providers = [providerRow('prov_llm', 'llm')];
 
     await service.runNow();
@@ -351,6 +369,8 @@ describe('HealthCheckService (P1-05)', () => {
       hb, registry,
       makeLlmFactory({ calls, get fail() { return fail; } }) as LlmProviderFactory,
       makeStorageFactory({ calls: [] }),
+      makeProbeFactory({ calls: [] }),
+      makeProbeFactory({ calls: [] }),
       makeConfigService(),
     );
     service.providers = [providerRow('prov_llm', 'llm')];
@@ -383,7 +403,7 @@ describe('HealthCheckService (P1-05)', () => {
     const hb = new HeartbeatRegistry(registry);
     const previous = process.env.MONITORING_HEALTH_PROBES;
     process.env.MONITORING_HEALTH_PROBES = 'on';
-    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls: [] }), makeStorageFactory({ calls }), makeConfigService());
+    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls: [] }), makeStorageFactory({ calls }), makeProbeFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeConfigService());
     service.providers = [providerRow('prov_s3', 'storage')];
 
     await service.runNow();
@@ -432,7 +452,7 @@ describe('HealthCheckService (P1-05)', () => {
     const hb = new HeartbeatRegistry(registry);
     const previous = process.env.MONITORING_HEALTH_PROBES;
     delete process.env.MONITORING_HEALTH_PROBES;
-    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeConfigService());
+    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeConfigService());
     service.providers = [providerRow('prov_llm', 'llm')];
 
     await service.runNow();

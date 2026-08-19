@@ -100,6 +100,21 @@ export class TtsProviderFactory {
   }
 
   /**
+   * Creates a TTS provider instance for the HealthCheckService liveness probe (P1-05b).
+   * Resolves secrets and constructs the instance with minimal settings — every TTS
+   * settings schema requires the `provider` literal (it equals `apiType`); all other
+   * fields take schema defaults. `ping()` implementations never read session settings.
+   * The instance is NOT initialised: probe `ping()` methods must be self-contained on
+   * a fresh instance (Deepgram TTS' init() opens a persistent WebSocket).
+   * @param provider - Provider entity from database containing configuration
+   * @returns TTS provider instance suitable for calling `ping()`
+   * @throws {Error} When provider type is not 'tts' or when API type is not supported
+   */
+  async createProviderForProbing(provider: Provider): Promise<ITtsProvider> {
+    return this.createProvider(provider, { provider: provider.apiType } as TtsSettings);
+  }
+
+  /**
    * Creates an ElevenLabs TTS provider instance from provider entity
    * @param provider - Provider entity with ElevenLabs-specific configuration
    * @param settings - ElevenLabs-specific TTS settings

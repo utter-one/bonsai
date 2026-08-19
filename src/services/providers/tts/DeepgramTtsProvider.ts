@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
+import { httpPing } from '../providerPing';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import type { AudioFormat } from '../../../types/audio';
@@ -129,6 +130,24 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   async init(): Promise<void> {
     this.resolveAudioFormatAndEncoding();
     await this.connect();
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists a single project from the key-management
+   * API via raw fetch — deliberately does NOT call init(), which opens the persistent
+   * synthesis WebSocket.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.deepgram.com/v1/projects?limit=1', {
+        Authorization: `Token ${this.config.apiKey}`,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
   }
 
   /**

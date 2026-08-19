@@ -3,6 +3,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { SonioxNodeClient } from '@soniox/node';
 import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
+import { httpPing } from '../providerPing';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import type { AudioFormat } from '../../../types/audio';
@@ -66,6 +67,23 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
   async init(): Promise<void> {
     this.resolveAudioFormat();
     logger.info(`[Soniox TTS] Initialized with audio format: ${this.audioFormat}, sample rate: ${this.sampleRate}`);
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists models from the Soniox management API.
+   * The management REST base is global — only the realtime endpoints are region-scoped.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.soniox.com/v1/models', {
+        Authorization: `Bearer ${this.config.apiKey}`,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
   }
 
   getSupportedFormats(): AudioFormat[] {

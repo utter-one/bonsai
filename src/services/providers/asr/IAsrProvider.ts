@@ -40,6 +40,17 @@ export interface IAsrProvider {
   init(): Promise<void>;
 
   /**
+   * Optional zero-cost liveness check (P1-05b). Called by the HealthCheckService provider
+   * probe to verify the stored credentials still work while no recognition traffic flows.
+   * Providers without a free liveness endpoint (e.g. Azure) omit this; the probe then
+   * falls back to call-log inference. Implementations must hit a zero-cost,
+   * side-effect-free endpoint, record the call via the base recorder (operation
+   * `asr.ping`), and throw on any non-2xx response, network error, or timeout.
+   * @returns Promise that resolves when the endpoint accepts the stored credentials
+   */
+  ping?(): Promise<void>;
+
+  /**
    * Starts the speech recognition session for the given context
    * @returns Promise that resolves when recognition session is successfully started
    */

@@ -182,6 +182,24 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
   }
 
   /**
+   * Records one zero-cost liveness probe (P1-05b) as a plain `tts.ping` call-log row.
+   * Probe rows feed the same window stats as real traffic; volume is bounded by the
+   * HealthCheckService probe cooldown + recent-success skip. Callers: `ping()` implementations.
+   */
+  protected recordPingCall(startedAt: number, error?: Error): void {
+    if (!this.providerId || !this.providerApiType) return;
+    this.resolveCallRecorder().record({
+      providerId: this.providerId,
+      providerType: 'tts',
+      apiType: this.providerApiType,
+      operation: 'tts.ping',
+      durationMs: Date.now() - startedAt,
+      ok: !error,
+      error,
+    });
+  }
+
+  /**
    * Flushes the active session: records exactly one `tts.session` call-log row
    * + tts_ttfa_ms / tts_synthesis_ms histograms.
    */

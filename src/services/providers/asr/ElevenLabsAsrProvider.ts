@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -86,6 +87,22 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
     this.audioFormat = this.resolveAudioFormat(this.settings?.audioFormat);
     this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
     logger.info(`[ElevenLabs ASR] Initialized with audio format: ${this.audioFormat}`);
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists models from the ElevenLabs API.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.elevenlabs.io/v1/models', {
+        'xi-api-key': this.config.apiKey,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
   }
 
   /**

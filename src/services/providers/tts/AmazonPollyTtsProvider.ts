@@ -1,4 +1,4 @@
-import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { PollyClient, DescribeVoicesCommand, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { logger } from '../../../utils/logger';
@@ -97,6 +97,25 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
     });
 
     logger.info(`[Amazon Polly TTS] Initialized with region: ${this.config.region}`);
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists voices via DescribeVoices — validates
+   * AWS credentials and network reachability without any synthesis. Probe instances
+   * skip the service-level init, so the client is built lazily here.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      if (!this.pollyClient) {
+        await this.init();
+      }
+      await this.pollyClient.send(new DescribeVoicesCommand({}));
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
   }
 
   /**

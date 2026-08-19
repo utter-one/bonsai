@@ -69,6 +69,14 @@ export const probeSettingsSchema = z
       .enum(['models', 'one_token', 'off'])
       .default('models')
       .describe("LLM health probe mode: 'models' = enumerateModels() (free), 'one_token' = 1-token generation (costs money), 'off' = call-log inference only"),
+    asrProbe: z
+      .enum(['free', 'off'])
+      .default('free')
+      .describe("ASR health probe mode (P1-05b): 'free' = zero-cost liveness endpoint (providers without one fall back to call-log inference), 'off' = call-log inference only"),
+    ttsProbe: z
+      .enum(['free', 'off'])
+      .default('free')
+      .describe("TTS health probe mode (P1-05b): 'free' = zero-cost liveness endpoint (providers without one fall back to call-log inference), 'off' = call-log inference only"),
     cooldownMinutes: z
       .number()
       .min(0)

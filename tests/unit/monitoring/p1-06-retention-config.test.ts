@@ -7,6 +7,8 @@ import { HealthCheckService, type HealthCheckResult } from '../../../src/service
 import { MetricsRegistry, type MetricSampleRow } from '../../../src/services/monitoring/MetricsRegistry';
 import type { LlmProviderFactory } from '../../../src/services/providers/llm/LlmProviderFactory';
 import type { StorageProviderFactory } from '../../../src/services/providers/storage/StorageProviderFactory';
+import type { AsrProviderFactory } from '../../../src/services/providers/asr/AsrProviderFactory';
+import type { TtsProviderFactory } from '../../../src/services/providers/tts/TtsProviderFactory';
 import type { Provider } from '../../../src/types/models';
 
 class QuietRegistry extends MetricsRegistry {
@@ -100,8 +102,19 @@ function makeStorageFactory(behavior: { calls: string[] }): StorageProviderFacto
   } as unknown as StorageProviderFactory;
 }
 
+/** ASR/TTS probe factory stub (P1-05b): instances expose ping() unless withPing is false. */
+function makeProbeFactory(behavior: { calls: string[] }): AsrProviderFactory & TtsProviderFactory {
+  return {
+    createProviderForProbing: async () => ({
+      ping: async () => {
+        behavior.calls.push('ping');
+      },
+    }),
+  } as unknown as AsrProviderFactory & TtsProviderFactory;
+}
+
 function makeConfig(options?: {
-  probeSettings?: { llmProbe?: 'models' | 'one_token' | 'off'; cooldownMinutes?: number };
+  probeSettings?: { llmProbe?: 'models' | 'one_token' | 'off'; asrProbe?: 'free' | 'off'; ttsProbe?: 'free' | 'off'; cooldownMinutes?: number };
   fail?: boolean;
 }) {
   return {
@@ -111,7 +124,7 @@ function makeConfig(options?: {
         notifiers: [],
         rules: {},
         retentionDays: 90,
-        probeSettings: { llmProbe: 'models', cooldownMinutes: 10, ...options?.probeSettings },
+        probeSettings: { llmProbe: 'models', asrProbe: 'free', ttsProbe: 'free', cooldownMinutes: 10, ...options?.probeSettings },
         alerting: { engineIntervalMinutes: 1, defaultCooldownMinutes: 15 },
       };
     },
@@ -125,7 +138,7 @@ function makeService(config: MonitoringConfigService): {
 } {
   const registry = new QuietRegistry();
   const hb = new HeartbeatRegistry(registry);
-  const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls: [] }), makeStorageFactory({ calls: [] }), config);
+  const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls: [] }), makeStorageFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeProbeFactory({ calls: [] }), config);
   return { service, registry, hb };
 }
 
@@ -140,7 +153,7 @@ describe('P1-06 monitoringConfigSchema', () => {
       notifiers: [],
       rules: {},
       retentionDays: 90,
-      probeSettings: { llmProbe: 'models', cooldownMinutes: 10 },
+      probeSettings: { llmProbe: 'models', asrProbe: 'free', ttsProbe: 'free', cooldownMinutes: 10 },
       alerting: { engineIntervalMinutes: 1, defaultCooldownMinutes: 15 },
     });
   });
@@ -193,6 +206,15 @@ describe('P1-06 monitoringConfigSchema', () => {
       .to.have.nested.property('probeSettings.llmProbe', 'one_token');
     expect(() => monitoringConfigSchema.parse({ probeSettings: { llmProbe: 'generate' } })).to.throw();
     expect(() => monitoringConfigSchema.parse({ probeSettings: { cooldownMinutes: -1 } })).to.throw();
+  });
+
+  it('probeSettings: asrProbe/ttsProbe enum with free defaults (P1-05b)', () => {
+    expect(monitoringConfigSchema.parse({ probeSettings: {} }).probeSettings)
+      .to.deep.include({ llmProbe: 'models', asrProbe: 'free', ttsProbe: 'free', cooldownMinutes: 10 });
+    expect(monitoringConfigSchema.parse({ probeSettings: { asrProbe: 'off', ttsProbe: 'off' } }).probeSettings)
+      .to.deep.include({ asrProbe: 'off', ttsProbe: 'off' });
+    expect(() => monitoringConfigSchema.parse({ probeSettings: { asrProbe: 'one_token' } })).to.throw();
+    expect(() => monitoringConfigSchema.parse({ probeSettings: { ttsProbe: 'models' } })).to.throw();
   });
 });
 
@@ -293,7 +315,7 @@ describe('P1-06 config-driven probe policy (HealthCheckService)', () => {
     const calls: string[] = [];
     const registry = new QuietRegistry();
     const hb = new HeartbeatRegistry(registry);
-    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeConfig({ probeSettings: { llmProbe: 'one_token' } }));
+    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeConfig({ probeSettings: { llmProbe: 'one_token' } }));
     service.providers = [providerRow('prov_llm', 'llm')];
 
     await service.runNow();
@@ -307,7 +329,7 @@ describe('P1-06 config-driven probe policy (HealthCheckService)', () => {
     const calls: string[] = [];
     const registry = new QuietRegistry();
     const hb = new HeartbeatRegistry(registry);
-    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeConfig({ probeSettings: { cooldownMinutes: 0 } }));
+    const service = new TestHealthCheckService(hb, registry, makeLlmFactory({ calls }), makeStorageFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeProbeFactory({ calls: [] }), makeConfig({ probeSettings: { cooldownMinutes: 0 } }));
     service.providers = [providerRow('prov_llm', 'llm')];
 
     await service.runNow();

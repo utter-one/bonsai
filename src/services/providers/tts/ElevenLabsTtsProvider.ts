@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
+import { httpPing } from '../providerPing';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import type { AudioFormat } from '../../../types/audio';
@@ -72,6 +73,22 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   }
 
   async init(): Promise<void> { }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists models from the ElevenLabs API.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.elevenlabs.io/v1/models', {
+        'xi-api-key': this.config.apiKey,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
 
   /**
    * Gets the list of supported audio output formats for ElevenLabs

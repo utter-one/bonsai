@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -85,6 +86,22 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
     this.audioFormat = this.resolveAudioFormat(this.settings?.audioFormat);
     this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
     logger.info(`[Deepgram ASR] Initialized with audio format: ${this.audioFormat}`);
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists a single project from the key-management API.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.deepgram.com/v1/projects?limit=1', {
+        Authorization: `Token ${this.config.apiKey}`,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
   }
 
   /**

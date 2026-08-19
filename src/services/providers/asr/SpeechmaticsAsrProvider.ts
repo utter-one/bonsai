@@ -3,6 +3,7 @@ import { createSpeechmaticsJWT } from '@speechmatics/auth';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -90,6 +91,49 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
     this.audioFormat = this.resolveAudioFormat(this.settings?.audioFormat);
     this.currentChunkId = generateId(ID_PREFIXES.CHUNK);
     logger.info(`[Speechmatics ASR] Initialized with audio format: ${this.audioFormat}, mode: ${this.settings.transcriptionMode}`);
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists jobs from the Batch REST API using a
+   * short-lived JWT (`type: 'batch'`). The Batch REST bases are region-scoped like
+   * the realtime endpoints.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    const authRegion = this.getAuthRegion(this.config.region);
+    const url = `${this.getBatchApiBase(this.config.region)}/jobs`;
+    try {
+      // clientRef is mandatory for batch JWTs (SDK validation) — any stable id works.
+      const jwtToken = await createSpeechmaticsJWT({
+        type: 'batch',
+        apiKey: this.config.apiKey,
+        region: authRegion,
+        clientRef: 'bonsai-health-check',
+        ttl: 60,
+      });
+      await httpPing(url, { Authorization: `Bearer ${jwtToken}` });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets the Batch REST API base URL for the specified region (P1-05b probe)
+   * @param region Region identifier
+   * @returns Batch REST API base URL
+   */
+  private getBatchApiBase(region: string): string {
+    switch (region) {
+      case 'eu':
+        return 'https://asr.api.speechmatics.com/v2';
+      case 'apac':
+        return 'https://au1.asr.api.speechmatics.com/v2';
+      case 'us':
+      default:
+        return 'https://usa.asr.api.speechmatics.com/v2';
+    }
   }
 
   /**

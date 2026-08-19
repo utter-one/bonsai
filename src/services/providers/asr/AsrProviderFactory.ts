@@ -94,6 +94,19 @@ export class AsrProviderFactory {
   }
 
   /**
+   * Creates an ASR provider instance for the HealthCheckService liveness probe (P1-05b).
+   * Resolves secrets and constructs the instance with default (empty) settings —
+   * `ping()` implementations never read session settings. The instance is NOT
+   * initialised: probe `ping()` methods must be self-contained on a fresh instance.
+   * @param provider - Provider entity from database containing configuration
+   * @returns ASR provider instance suitable for calling `ping()`
+   * @throws {Error} When provider type is not 'asr' or when API type is not supported
+   */
+  async createProviderForProbing(provider: Provider): Promise<IAsrProvider> {
+    return this.createProvider(provider, {});
+  }
+
+  /**
    * Creates an Azure ASR provider instance from provider entity
    * @param provider - Provider entity with Azure-specific configuration
    * @returns Configured Azure ASR provider

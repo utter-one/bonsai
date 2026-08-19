@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { SonioxNodeClient } from '@soniox/node';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -107,6 +108,23 @@ export class SonioxAsrProvider extends AsrProviderBase<SonioxAsrProviderConfig> 
     this.startResolve = null;
     this.startReject = null;
     logger.info(`[Soniox ASR] Initialized with audio format: ${this.audioFormat}, model: ${this.settings.model}`);
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists models from the Soniox management API.
+   * The management REST base is global — only the realtime endpoints are region-scoped.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.soniox.com/v1/models', {
+        Authorization: `Bearer ${this.config.apiKey}`,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
   }
 
   protected async doStart(): Promise<void> {

@@ -33,6 +33,7 @@ Phase 1 (foundation)
   P1-07  ◄── P1-02
   P1-08  ◄── P1-01, P1-02, P1-05, P1-06
   P1-09  ◄── P1-02, P1-05, P1-06
+  P1-05b ◄── P1-03, P1-05, P1-06   (gap remediation, 2026-08-19)
 
 Phase 2 (alerting)
   P2-01  ◄── P1-02, P1-03, P1-04, P1-05, P1-07
@@ -67,6 +68,7 @@ Phase 4 (polish)
 | P1-03 | [P1-03-provider-instrumentation.md](P1-03-provider-instrumentation.md) | Instrument all 3rd-party call sites + streaming phase measurement |
 | P1-04 | [P1-04-request-outcome-middleware.md](P1-04-request-outcome-middleware.md) | Request-outcome logging, requestId, API request metrics, pino redaction |
 | P1-05 | [P1-05-health-check-service.md](P1-05-health-check-service.md) | HealthCheckService, `/health/ready`, background-service heartbeats |
+| P1-05b | [P1-05b-asr-tts-provider-probes.md](P1-05b-asr-tts-provider-probes.md) | ASR/TTS provider liveness probes (closes the P1-05 probe-coverage hole) |
 | P1-06 | [P1-06-retention-and-config.md](P1-06-retention-and-config.md) | RetentionService (rollups + purge), MonitoringConfigService |
 | P1-07 | [P1-07-rate-limit-instrumentation.md](P1-07-rate-limit-instrumentation.md) | 429 rejection metrics + warn logging in both rate limiters |
 | P1-08 | [P1-08-readonly-endpoints.md](P1-08-readonly-endpoints.md) | Read-only MonitoringController endpoints + `SYSTEM_MONITORING` permission |

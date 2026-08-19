@@ -435,6 +435,56 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
     });
   });
 
+  describe('probeSettings asrProbe/ttsProbe (P1-05b)', () => {
+    it('GET: defaults are asrProbe free, ttsProbe free', async () => {
+      const { config } = await getConfigViaApi(authed());
+      expect(config.probeSettings).to.include({ llmProbe: 'models', asrProbe: 'free', ttsProbe: 'free' });
+      expect(config.probeSettings.cooldownMinutes).to.be.a('number').that.is.gte(0);
+    });
+
+    it('PUT: asrProbe/ttsProbe overrides round-trip and bump the version', async () => {
+      const agent = authed();
+      const before = await getConfigViaApi(agent);
+
+      const res = await putConfigViaApi(agent, before.version, {
+        ...before.config,
+        probeSettings: { ...before.config.probeSettings, asrProbe: 'off', ttsProbe: 'off' },
+      });
+      expect(res.status).to.equal(200);
+      expect(res.body.version).to.equal(before.version + 1);
+
+      const after = await getConfigViaApi(agent);
+      expect(after.config.probeSettings).to.include({ asrProbe: 'off', ttsProbe: 'off' });
+
+      // Restore defaults for the remaining tests (the row persists across resets).
+      const restored = await putConfigViaApi(agent, after.version, {
+        ...after.config,
+        probeSettings: { ...after.config.probeSettings, asrProbe: 'free', ttsProbe: 'free' },
+      });
+      expect(restored.status).to.equal(200);
+    });
+
+    it('PUT: rejects invalid asrProbe/ttsProbe enums (400, row untouched)', async () => {
+      const agent = authed();
+      const base = await getConfigViaApi(agent);
+
+      const badAsr = await putConfigViaApi(agent, base.version, {
+        ...base.config,
+        probeSettings: { ...base.config.probeSettings, asrProbe: 'one_token' },
+      });
+      expect(badAsr.status).to.equal(400);
+
+      const badTts = await putConfigViaApi(agent, base.version, {
+        ...base.config,
+        probeSettings: { ...base.config.probeSettings, ttsProbe: 'models' },
+      });
+      expect(badTts.status).to.equal(400);
+
+      const rows = await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, 'global'));
+      expect(rows[0].version).to.equal(base.version);
+    });
+  });
+
   // ─── RBAC ───────────────────────────────────────────────────────────────────
 
   describe('RBAC', () => {

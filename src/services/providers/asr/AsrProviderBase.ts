@@ -248,6 +248,24 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
     return getMetricsRegistry();
   }
 
+  /**
+   * Records one zero-cost liveness probe (P1-05b) as a plain `asr.ping` call-log row.
+   * Probe rows feed the same window stats as real traffic; volume is bounded by the
+   * HealthCheckService probe cooldown + recent-success skip. Callers: `ping()` implementations.
+   */
+  protected recordPingCall(startedAt: number, error?: Error): void {
+    if (!this.providerId || !this.providerApiType) return;
+    this.resolveCallRecorder().record({
+      providerId: this.providerId,
+      providerType: 'asr',
+      apiType: this.providerApiType,
+      operation: 'asr.ping',
+      durationMs: Date.now() - startedAt,
+      ok: !error,
+      error,
+    });
+  }
+
   /** First declared input format — used to estimate sessionAudioMs when sendAudio() omits the format. */
   private defaultInputFormat(): AudioFormat | null {
     try {

@@ -2,6 +2,7 @@ import { AssemblyAI, StreamingTranscriber, StreamingTranscriberParams } from 'as
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -104,6 +105,26 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
     this.turnTranscripts.clear();
     this.audioFormat = this.resolveAudioFormat(this.getAudioFormatFromSampleRate(this.settings.sampleRate));
     logger.info(`[AssemblyAI ASR] Initialized with audio format: ${this.audioFormat}, model: ${this.settings.speechModel}`);
+  }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): lists a single transcript from the REST API.
+   * Uses raw fetch — the session SDK instance is pinned to the streaming base URL.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    const restBase = this.config.region === 'eu'
+      ? 'https://api.eu.assemblyai.com'
+      : 'https://api.assemblyai.com';
+    try {
+      await httpPing(`${restBase}/v2/transcripts?page_size=1`, {
+        Authorization: this.config.apiKey,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
   }
 
   /**

@@ -26670,6 +26670,24 @@
             "default": "models",
             "description": "LLM health probe mode: 'models' = enumerateModels() (free), 'one_token' = 1-token generation (costs money), 'off' = call-log inference only"
           },
+          "asrProbe": {
+            "type": "string",
+            "enum": [
+              "free",
+              "off"
+            ],
+            "default": "free",
+            "description": "ASR health probe mode (P1-05b): 'free' = zero-cost liveness endpoint (providers without one fall back to call-log inference), 'off' = call-log inference only"
+          },
+          "ttsProbe": {
+            "type": "string",
+            "enum": [
+              "free",
+              "off"
+            ],
+            "default": "free",
+            "description": "TTS health probe mode (P1-05b): 'free' = zero-cost liveness endpoint (providers without one fall back to call-log inference), 'off' = call-log inference only"
+          },
           "cooldownMinutes": {
             "type": "number",
             "minimum": 0,
@@ -26679,6 +26697,8 @@
         },
         "default": {
           "llmProbe": "models",
+          "asrProbe": "free",
+          "ttsProbe": "free",
           "cooldownMinutes": 10
         },
         "description": "Provider health probe policy (P1-05 consumes this)"

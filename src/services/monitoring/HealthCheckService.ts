@@ -11,6 +11,8 @@ import { MetricsRegistry } from './MetricsRegistry';
 import { MonitoringConfigService } from './MonitoringConfigService';
 import { LlmProviderFactory } from '../providers/llm/LlmProviderFactory';
 import { StorageProviderFactory } from '../providers/storage/StorageProviderFactory';
+import { AsrProviderFactory } from '../providers/asr/AsrProviderFactory';
+import { TtsProviderFactory } from '../providers/tts/TtsProviderFactory';
 import type { ProbeSettings } from '../../http/contracts/monitoring';
 
 /**
@@ -23,20 +25,28 @@ import type { ProbeSettings } from '../../http/contracts/monitoring';
  *     `event_loop_lag_p95_ms`, `event_loop_lag_max_ms` — max for burst-sensitive
  *     P2-01 rules, since p95 misses isolated stalls)
  *   - `service_heartbeat:<name>` — 6 background services + this service itself
- *   - `provider:<id>` — LLM/storage probed (`enumerateModels()` / `list('', 1)`,
- *     cooldown-gated; probe rows land in `provider_call_logs` via P1-03 wrappers),
- *     everything else inferred from recent `provider_call_logs`
+ *   - `provider:<id>` — LLM/storage/ASR/TTS probed (`enumerateModels()` /
+ *     `list('', 1)` / `ping()` (P1-05b), cooldown-gated; probe rows land in
+ *     `provider_call_logs` via P1-03 wrappers), everything else inferred from
+ *     recent `provider_call_logs`
  *
  * Results are batch-inserted into `health_checks` and kept in an in-memory
  * snapshot for the API (P1-08) and the rule engine (P2-01). `checkReady()`
  * backs the unauthenticated `/health/ready` endpoint.
  *
- * Probe policy (P1-06): `monitoring_config.probeSettings` drives the LLM
- * probe mode (`models` | `one_token` | `off`) and the per-provider cooldown;
- * the settings are fetched once per cycle and fall back to built-in defaults
- * when the config cannot be loaded. `MONITORING_HEALTH_PROBES=off` remains a
- * hard env kill switch (env beats config) — the test env sets it so e2e
- * never sends real outbound probes against fake provider configs.
+ * Probe policy (P1-06, extended P1-05b): `monitoring_config.probeSettings`
+ * drives the LLM probe mode (`models` | `one_token` | `off`), the ASR/TTS
+ * probe toggle (`free` | `off`), and the per-provider cooldown; the settings
+ * are fetched once per cycle and fall back to built-in defaults when the
+ * config cannot be loaded. `MONITORING_HEALTH_PROBES=off` remains a hard env
+ * kill switch (env beats config) — the test env sets it so e2e never sends
+ * real outbound probes against fake provider configs.
+ *
+ * ASR/TTS probes (P1-05b) call the provider's optional zero-cost `ping()` on
+ * a fresh instance (no `init()` — some providers' init has side effects, e.g.
+ * Deepgram TTS opens a WebSocket). Providers without a free liveness endpoint
+ * (Azure, Cartesia) have no `ping()` — the probe is skipped and status falls
+ * back to call-log inference, as before.
  */
 
 export type HealthCheckStatus = 'ok' | 'degraded' | 'down' | 'unknown';
@@ -66,8 +76,8 @@ interface PoolStats {
   poolWaiting: number;
 }
 
-/** Fallback probe policy when monitoring_config cannot be loaded (P1-06). */
-const DEFAULT_PROBE_SETTINGS: ProbeSettings = { llmProbe: 'models', cooldownMinutes: 10 };
+/** Fallback probe policy when monitoring_config cannot be loaded (P1-06/P1-05b). */
+const DEFAULT_PROBE_SETTINGS: ProbeSettings = { llmProbe: 'models', asrProbe: 'free', ttsProbe: 'free', cooldownMinutes: 10 };
 const RECENT_SUCCESS_SKIP_MS = 10 * 60_000;
 const INFERENCE_WINDOW_MS = 30 * 60_000;
 const CHECK_TIMEOUT_MS = 10_000;
@@ -108,6 +118,8 @@ export class HealthCheckService {
     @inject(MetricsRegistry) private readonly metricsRegistry: MetricsRegistry,
     @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
     @inject(StorageProviderFactory) private readonly storageProviderFactory: StorageProviderFactory,
+    @inject(AsrProviderFactory) private readonly asrProviderFactory: AsrProviderFactory,
+    @inject(TtsProviderFactory) private readonly ttsProviderFactory: TtsProviderFactory,
     @inject(MonitoringConfigService) private readonly monitoringConfigService: MonitoringConfigService,
   ) {
     this.intervalMs = this.readIntervalMs();
@@ -318,8 +330,11 @@ export class HealthCheckService {
   ): Promise<HealthCheckResult> {
     const name = `provider:${provider.id}`;
     try {
-      const llmProbeable = provider.providerType === 'llm' && probeSettings.llmProbe !== 'off';
-      if (this.probesEnabled && (provider.providerType === 'storage' || llmProbeable)) {
+      const probeable = provider.providerType === 'storage'
+        || (provider.providerType === 'llm' && probeSettings.llmProbe !== 'off')
+        || (provider.providerType === 'asr' && probeSettings.asrProbe !== 'off')
+        || (provider.providerType === 'tts' && probeSettings.ttsProbe !== 'off');
+      if (this.probesEnabled && probeable) {
         const probeResult = await this.maybeProbe(provider, stats, probeSettings);
         if (probeResult) return probeResult;
       }
@@ -365,9 +380,19 @@ export class HealthCheckService {
         } else {
           await this.withTimeout(instance.enumerateModels(), CHECK_TIMEOUT_MS);
         }
-      } else {
+      } else if (provider.providerType === 'storage') {
         const instance = await this.storageProviderFactory.createProvider(provider, {});
         await this.withTimeout(instance.list('', 1), CHECK_TIMEOUT_MS);
+      } else {
+        // asr | tts (P1-05b): ping() must be self-contained on a fresh, uninitialised
+        // instance — some providers' init() has side effects (Deepgram TTS opens a
+        // persistent WebSocket). Providers without a free liveness endpoint (Azure,
+        // Cartesia) have no ping() — skip and fall back to call-log inference.
+        const instance = provider.providerType === 'asr'
+          ? await this.asrProviderFactory.createProviderForProbing(provider)
+          : await this.ttsProviderFactory.createProviderForProbing(provider);
+        if (typeof instance.ping !== 'function') return null;
+        await this.withTimeout(instance.ping(), CHECK_TIMEOUT_MS);
       }
       this.probeFailures.delete(provider.id);
       return { name, status: 'ok', latencyMs: Date.now() - startedAt, detail: { probed: true } };
