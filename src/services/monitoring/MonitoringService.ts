@@ -13,6 +13,7 @@ import type { ListParams } from '../../http/contracts/common';
 import type {
   AlertEventListResponse,
   AlertEventResponse,
+  AlertRuleCatalogResponse,
   HealthHistoryListResponse,
   HealthSnapshotResponse,
   MetricSeriesQuery,
@@ -25,8 +26,9 @@ import type {
   ProviderStatsResponse,
   ProvidersMonitoringResponse,
 } from '../../http/contracts/monitoring';
-import { alertEventListResponseSchema, alertEventResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
+import { alertEventListResponseSchema, alertEventResponseSchema, alertRuleCatalogResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
 import { AuditService } from '../AuditService';
+import { buildRuleCatalog } from './AlertEvents';
 import { HealthCheckService } from './HealthCheckService';
 import { MonitoringConfigService } from './MonitoringConfigService';
 import logger from '../../utils/logger';
@@ -599,6 +601,17 @@ export class MonitoringService extends BaseService {
   // ---------------------------------------------------------------------
 
   /** Current config + row metadata (version for optimistic locking). */
+  /**
+   * GET /api/monitoring/rules — static catalog of all built-in alert rules
+   * (id, scope, severity, summary, defaultParams). Projected from the engine
+   * rule registry, so it can never drift from the evaluators.
+   */
+  getRuleCatalog(context: RequestContext): AlertRuleCatalogResponse {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    logger.debug({ operatorId: context.operatorId }, 'Getting alert rule catalog');
+    return alertRuleCatalogResponseSchema.parse({ rules: buildRuleCatalog() });
+  }
+
   async getConfig(context: RequestContext): Promise<MonitoringConfigResponse> {
     this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
     // get() validates the row (and creates the default row on first boot).

@@ -4175,6 +4175,27 @@ export const RESOURCES: Record<string, ResourceDef> = {
       },
     ],
   },
+  "monitoring_rules": {
+    name: "monitoring_rules",
+    scope: "global",
+    operations: [
+      {
+        method: "get",
+        path: "/api/monitoring/rules",
+        pathTemplate: "/api/monitoring/rules",
+        pathParams: [],
+        queryParamNames: [],
+        repeatableParams: [],
+        hasBody: false,
+        bodySchemaRef: null,
+        action: "list",
+        summary: "Alert rule catalog",
+        description: "Static catalog of all built-in alert rules (id, scope, severity, one-line summary, default parameters). Served from the engine rule registry — the same source the evaluators run from — so it never drifts from the config keys PUT /api/monitoring/config accepts under `rules`.",
+        isPaginated: false,
+        isUpdateOrDelete: false,
+      },
+    ],
+  },
   "monitoring_metrics": {
     name: "monitoring_metrics",
     scope: "global",

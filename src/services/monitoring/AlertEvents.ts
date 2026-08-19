@@ -112,6 +112,8 @@ export type AlertRuleDef = {
   id: string;
   scope: 'global' | 'per_provider';
   severity: RuleSeverity;
+  /** One-line condition description incl. threshold semantics (served by GET /api/monitoring/rules). */
+  summary: string;
   defaultParams: RuleParams;
   /**
    * Returns one verdict per scope part it considers (per-provider rules: the
@@ -209,6 +211,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'db-down',
     scope: 'global',
     severity: 'critical',
+    summary: 'The db health check has been down for 2 consecutive check cycles — database queries will fail until it recovers.',
     // forMinutes 1: the condition already requires 2 consecutive down cycles (finding 4).
     defaultParams: { threshold: 0, windowMinutes: 0, minSamples: 0, forMinutes: 1, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data) => {
@@ -223,6 +226,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'service-stalled',
     scope: 'global',
     severity: 'warning',
+    summary: 'A background-service heartbeat missed 3× its tick interval (stalled or crashed service loop) — fires once per stalled service.',
     defaultParams: { threshold: 0, windowMinutes: 0, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data) => {
       const stalled = data.health.checks.filter((c) => c.name.startsWith('service_heartbeat:') && c.status === 'down');
@@ -241,6 +245,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'db-pool-saturated',
     scope: 'global',
     severity: 'warning',
+    summary: 'DB pool waiting-connection ratio (waiting/total) exceeds the threshold (default 20%) — sustained for forMinutes.',
     // forMinutes 5: the "for 5 min" semantics come from sustainment (finding 15).
     defaultParams: { threshold: 0.2, windowMinutes: 0, minSamples: 0, forMinutes: 5, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params) => {
@@ -259,6 +264,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'provider-down',
     scope: 'per_provider',
     severity: 'critical',
+    summary: 'Provider appears down: 100% of its calls failed in the window (≥ minSamples), or its circuit breaker is OPEN, or ≥ threshold (default 3) consecutive health-probe failures.',
     // threshold = consecutive probe failures (N=3); minSamples = calls for the 100%-error branch.
     defaultParams: { threshold: 3, windowMinutes: 10, minSamples: 5, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -287,6 +293,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'provider-degraded',
     scope: 'per_provider',
     severity: 'warning',
+    summary: 'Provider error rate exceeds the threshold (default 30%) in the window (≥ minSamples calls), or its p95 duration exceeds the fixed per-provider-type threshold.',
     // threshold = error rate; minSamples applies to BOTH branches (finding 7).
     defaultParams: { threshold: 0.3, windowMinutes: 10, minSamples: 10, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -319,6 +326,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'provider-rate-limited',
     scope: 'per_provider',
     severity: 'warning',
+    summary: 'Upstream quota: ≥ threshold (default 5) rate_limited (429) errors from the provider in the window — distinct from an outage.',
     // threshold = rate_limited error count (upstream quota — distinct from an outage).
     defaultParams: { threshold: 5, windowMinutes: 10, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -340,6 +348,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'provider-auth-failed',
     scope: 'per_provider',
     severity: 'critical',
+    summary: '≥ threshold (default 1) auth error(s) from the provider in the window — misconfigured or expired credentials; will not self-heal.',
     // forMinutes 0: an auth failure does not self-heal — delay buys nothing.
     defaultParams: { threshold: 1, windowMinutes: 5, minSamples: 0, forMinutes: 0, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -361,6 +370,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'api-5xx-spike',
     scope: 'global',
     severity: 'warning',
+    summary: 'Bonsai API 5xx ratio exceeds the threshold (default 5%) of all requests in the window (minSamples on the total-request denominator).',
     // threshold = 5xx ratio; minSamples on the denominator (finding 2: status_class label).
     defaultParams: { threshold: 0.05, windowMinutes: 5, minSamples: 20, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params) => {
@@ -379,6 +389,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'api-429-spike',
     scope: 'global',
     severity: 'warning',
+    summary: 'Bonsai API rate-limit rejections exceed the threshold (default 20) in the window — one dominant key (scoped to it) or broadly distributed rejections.',
     // threshold = API rejection count; per-key scoping via the top-N map (finding 2/3).
     defaultParams: { threshold: 20, windowMinutes: 5, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params) =>
@@ -394,6 +405,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'auth-429-spike',
     scope: 'global',
     severity: 'warning',
+    summary: 'Auth (login/refresh) rate-limit rejections exceed the threshold (default 5) in the window — possible credential stuffing or brute force.',
     // threshold = auth rejection count — security signal (credential stuffing / brute force).
     defaultParams: { threshold: 5, windowMinutes: 15, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params) =>
@@ -403,6 +415,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'oauth-refresh-failing',
     scope: 'per_provider',
     severity: 'warning',
+    summary: '≥ threshold (default 3) OAuth2 token refresh failures for the provider in the window — credentials may be expired or revoked.',
     // threshold = refresh failure count (ok=false label series).
     defaultParams: { threshold: 3, windowMinutes: 60, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -423,6 +436,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'imap-poll-failing',
     scope: 'per_provider',
     severity: 'warning',
+    summary: '≥ threshold (default 5) failed IMAP poll cycles for the provider in the window — inbox connectivity or credentials problem.',
     // threshold = failed poll cycle count.
     defaultParams: { threshold: 5, windowMinutes: 60, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -438,6 +452,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'high-memory',
     scope: 'global',
     severity: 'warning',
+    summary: 'Process RSS (bytes) exceeds the threshold (default 1536 MB) — gauge-like condition, no window.',
     // threshold in BYTES — mirrors the health check's 1536 MB default (finding 14).
     defaultParams: { threshold: 1536 * MB, windowMinutes: 0, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params) => {
@@ -453,6 +468,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'event-loop-lag',
     scope: 'global',
     severity: 'warning',
+    summary: 'Event-loop lag p95 (ms) exceeds the threshold (default 250 ms) — the process is blocked, sustained for forMinutes.',
     // threshold = p95 lag in ms; sustainment comes from forMinutes (PROPOSAL "for 5 min" semantics).
     defaultParams: { threshold: 250, windowMinutes: 0, minSamples: 0, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params) => {
@@ -473,6 +489,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'fallback-active',
     scope: 'per_provider',
     severity: 'info',
+    summary: '≥ threshold (default 1) fallback execution(s) for the provider in the window — the primary path is degrading (data source arrives with Phase 3 failover).',
     // forMinutes 0: early signal — fire on the first fallback execution in the window.
     defaultParams: { threshold: 1, windowMinutes: 10, minSamples: 0, forMinutes: 0, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -489,6 +506,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'stream-slow-ttft',
     scope: 'per_provider',
     severity: 'warning',
+    summary: 'Streaming time-to-first-token p95 exceeds the threshold (default 10 s; TTS fixed at 3 s) over ≥ minSamples streaming calls in the window.',
     // threshold = ttft p95 limit in ms for LLM; TTS uses a fixed 3 s (first audio is tighter).
     defaultParams: { threshold: 10_000, windowMinutes: 10, minSamples: 10, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -512,6 +530,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'stream-stalls',
     scope: 'per_provider',
     severity: 'warning',
+    summary: 'Fraction of streamed calls with a max chunk gap > 10 s exceeds the threshold (default 10% of calls with gap data) — streams feel frozen mid-response.',
     // threshold = fraction of streamed rows with a >10 s chunk gap (denominator per finding 16).
     defaultParams: { threshold: 0.1, windowMinutes: 10, minSamples: 10, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -534,6 +553,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'stream-abort-rate',
     scope: 'per_provider',
     severity: 'warning',
+    summary: 'Fraction of ALL provider calls aborted mid-stream (error after first chunks delivered) exceeds the threshold (default 10%).',
     // threshold = fraction of ALL provider rows with errorPhase='mid_stream' (finding 16).
     defaultParams: { threshold: 0.1, windowMinutes: 10, minSamples: 10, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -556,6 +576,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'tts-rtf-degraded',
     scope: 'per_provider',
     severity: 'warning',
+    summary: 'Fraction of TTS calls with real-time factor > 1 (took longer than the audio they produced) exceeds the threshold (default 10%).',
     // threshold = fraction of TTS rows where duration_ms > audioDurationMs (RTF > 1).
     defaultParams: { threshold: 0.1, windowMinutes: 10, minSamples: 10, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -578,6 +599,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'asr-final-latency',
     scope: 'per_provider',
     severity: 'warning',
+    summary: 'ASR final-transcript latency (end-of-speech → final) p95 exceeds the threshold (default 10 s) over ≥ minSessions sessions in the window.',
     // threshold = p95 eosToFinalMs limit (PROPOSAL 10 s); denominator = rows WITH eosToFinalMs.
     defaultParams: { threshold: 10_000, windowMinutes: 10, minSamples: 5, forMinutes: 2, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -596,6 +618,17 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     },
   },
 ];
+
+/**
+ * Static catalog projection of the rule registry (GET /api/monitoring/rules).
+ * Derived from DEFAULT_RULES so the served catalog can never drift from the
+ * evaluators; `evaluate` functions are stripped.
+ */
+export type AlertRuleCatalogItem = Omit<AlertRuleDef, 'evaluate'>;
+
+export function buildRuleCatalog(): AlertRuleCatalogItem[] {
+  return DEFAULT_RULES.map(({ id, scope, severity, summary, defaultParams }) => ({ id, scope, severity, summary, defaultParams }));
+}
 
 /** Registered rule ids — the config contract refines `rules` keys against this (finding 19). */
 export const RULE_IDS: ReadonlySet<string> = new Set(DEFAULT_RULES.map((rule) => rule.id));

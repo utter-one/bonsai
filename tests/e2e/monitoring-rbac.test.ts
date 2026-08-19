@@ -21,7 +21,7 @@ import { monitoringConfigSchema } from '../../src/http/contracts/monitoring';
 const TEST_OPERATOR_ID = 'test@example.com';
 const WEBHOOK_TOKEN = 'SECRET404TOKEN';
 
-// The 11 monitoring routes (6 P1-08 reads + 3 alerts + 2 config).
+// The monitoring routes (6 P1-08 reads + 3 alerts + 2 config + 1 rule catalog).
 // provider-stats requires a bounded from/to window — supplied per request.
 type MatrixRoute = { method: 'GET' | 'POST' | 'PUT'; path: string; query?: Record<string, string> | (() => Record<string, string>) };
 const ROUTES: MatrixRoute[] = [
@@ -55,6 +55,7 @@ const ROUTES: MatrixRoute[] = [
   { method: 'POST', path: '/api/monitoring/alerts/alrt_rbac/acknowledge' },
   { method: 'GET', path: '/api/monitoring/config' },
   { method: 'PUT', path: '/api/monitoring/config' },
+  { method: 'GET', path: '/api/monitoring/rules' },
 ];
 
 /** Create a single-role operator (survives resetDatabase) and return a token agent. */
@@ -145,7 +146,7 @@ describe('Monitoring RBAC completion (P2-04, e2e)', () => {
     }
   });
 
-  it('super_admin gets 200 on all 11 monitoring routes', async () => {
+  it(`super_admin gets 200 on all ${ROUTES.length} monitoring routes`, async () => {
     const agent = authed();
     const putBody = await noopPutBody();
     for (const route of ROUTES) {
@@ -155,7 +156,7 @@ describe('Monitoring RBAC completion (P2-04, e2e)', () => {
   });
 
   for (const role of ['developer', 'content_manager', 'support', 'viewer']) {
-    it(`${role} gets 403 on all 11 monitoring routes`, async () => {
+    it(`${role} gets 403 on all ${ROUTES.length} monitoring routes`, async () => {
       const putBody = await noopPutBody();
       for (const route of ROUTES) {
         const status = await hit(roles[role], route, putBody);
@@ -164,7 +165,7 @@ describe('Monitoring RBAC completion (P2-04, e2e)', () => {
     });
   }
 
-  it('unauthenticated gets 401 (not 403) on all 11 monitoring routes', async () => {
+  it(`unauthenticated gets 401 (not 403) on all ${ROUTES.length} monitoring routes`, async () => {
     const agent = unauthed();
     const putBody = { version: 1, config: monitoringConfigSchema.parse({}) };
     for (const route of ROUTES) {

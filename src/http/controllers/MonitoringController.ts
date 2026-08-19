@@ -10,6 +10,7 @@ import {
   alertEventListResponseSchema,
   alertEventResponseSchema,
   alertIdParamsSchema,
+  alertRuleCatalogResponseSchema,
   healthSnapshotResponseSchema,
   healthHistoryListResponseSchema,
   monitoringConfigResponseSchema,
@@ -257,6 +258,24 @@ export class MonitoringController {
       },
       {
         method: 'get',
+        path: '/api/monitoring/rules',
+        tags: ['Monitoring'],
+        summary: 'Alert rule catalog',
+        description: 'Static catalog of all built-in alert rules (id, scope, severity, one-line summary, default parameters). Served from the engine rule registry — the same source the evaluators run from — so it never drifts from the config keys PUT /api/monitoring/config accepts under `rules`.',
+        responses: {
+          200: {
+            description: 'All built-in alert rules',
+            content: {
+              'application/json': {
+                schema: alertRuleCatalogResponseSchema,
+              },
+            },
+          },
+          ...commonResponses,
+        },
+      },
+      {
+        method: 'get',
         path: '/api/monitoring/metrics',
         tags: ['Monitoring'],
         summary: 'Metric time series',
@@ -294,6 +313,7 @@ export class MonitoringController {
     router.post('/api/monitoring/alerts/:id/acknowledge', asyncHandler(this.acknowledgeAlert.bind(this)));
     router.get('/api/monitoring/config', asyncHandler(this.getConfig.bind(this)));
     router.put('/api/monitoring/config', asyncHandler(this.updateConfig.bind(this)));
+    router.get('/api/monitoring/rules', asyncHandler(this.getRules.bind(this)));
   }
 
   /**
@@ -391,6 +411,15 @@ export class MonitoringController {
     checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
     const config = await this.monitoringService.getConfig(req.context);
     res.status(200).json(config);
+  }
+
+  /**
+   * GET /api/monitoring/rules
+   */
+  private async getRules(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const catalog = this.monitoringService.getRuleCatalog(req.context);
+    res.status(200).json(catalog);
   }
 
   /**

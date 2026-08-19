@@ -26704,6 +26704,108 @@
           "defaultCooldownMinutes": 15
         },
         "description": "Alert engine settings (P2-01 consumes this)"
+      },
+      "AlertRuleCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertRuleCatalogItem"
+            },
+            "description": "All built-in alert rules (static — no query params, no pagination)"
+          }
+        },
+        "required": [
+          "rules"
+        ]
+      },
+      "AlertRuleCatalogItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Rule id — the key to use in monitoring_config.rules overrides"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "global",
+              "per_provider"
+            ],
+            "description": "global = single alert key; per_provider = one alert key per provider in the evaluation set"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "description": "Default severity (overridable per rule in the config)"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One-line condition description, including threshold semantics"
+          },
+          "defaultParams": {
+            "type": "object",
+            "properties": {
+              "threshold": {
+                "type": "number",
+                "description": "Rule threshold — per-rule semantics (count, ratio, ms, or bytes; see each rule definition)"
+              },
+              "windowMinutes": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Evaluation window in minutes (0 = no window / gauge-like condition)"
+              },
+              "minSamples": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Minimum samples before the rule may fire (0 = no minimum)"
+              },
+              "forMinutes": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Sustainment in minutes before firing (0 = fire on the first met evaluation)"
+              },
+              "resolveAfterGoodChecks": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Consecutive not-met evaluations before auto-resolve"
+              },
+              "cooldownMinutes": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Minimum gap between re-fires of the same key"
+              },
+              "maxUnresolvedHours": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Auto-resolve safety valve in hours (applies even while the condition stays met)"
+              }
+            },
+            "required": [
+              "threshold",
+              "windowMinutes",
+              "minSamples",
+              "forMinutes",
+              "resolveAfterGoodChecks",
+              "cooldownMinutes",
+              "maxUnresolvedHours"
+            ],
+            "description": "Default parameters — config overrides merge over these"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "severity",
+          "summary",
+          "defaultParams"
+        ]
       }
     },
     "parameters": {},
@@ -68905,6 +69007,36 @@
           },
           "409": {
             "description": "Version mismatch (stale version) — re-GET and retry"
+          }
+        }
+      }
+    },
+    "/api/monitoring/rules": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Alert rule catalog",
+        "description": "Static catalog of all built-in alert rules (id, scope, severity, one-line summary, default parameters). Served from the engine rule registry — the same source the evaluators run from — so it never drifts from the config keys PUT /api/monitoring/config accepts under `rules`.",
+        "responses": {
+          "200": {
+            "description": "All built-in alert rules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRuleCatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
           }
         }
       }

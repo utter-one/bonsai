@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listResponseLimitSchema } from './common';
-import { RULE_IDS } from '../../services/monitoring/AlertEvents';
+import { RULE_IDS, ruleParamsSchema } from '../../services/monitoring/AlertEvents';
 
 extendZodWithOpenApi(z);
 
@@ -385,3 +385,36 @@ export type AlertEventListResponse = z.infer<typeof alertEventListResponseSchema
 export type AlertIdParams = z.infer<typeof alertIdParamsSchema>;
 export type MonitoringConfigResponse = z.infer<typeof monitoringConfigResponseSchema>;
 export type MonitoringConfigUpdateRequest = z.infer<typeof monitoringConfigUpdateRequestSchema>;
+
+// ==================
+// P2-03 addendum — alert rule catalog (GET /api/monitoring/rules)
+// ==================
+
+/**
+ * One built-in alert rule. Static catalog served from the engine's rule
+ * registry (single source of truth — the service projects DEFAULT_RULES),
+ * so the Console can render rule names, default parameters, and which
+ * override fields make sense per rule without reading source. `defaultParams`
+ * reuses the engine's own `ruleParamsSchema` (no field drift).
+ */
+export const alertRuleCatalogItemSchema = z
+  .object({
+    id: z.string().min(1).describe('Rule id — the key to use in monitoring_config.rules overrides'),
+    scope: z
+      .enum(['global', 'per_provider'])
+      .describe('global = single alert key; per_provider = one alert key per provider in the evaluation set'),
+    severity: z.enum(['info', 'warning', 'critical']).describe('Default severity (overridable per rule in the config)'),
+    summary: z.string().describe('One-line condition description, including threshold semantics'),
+    defaultParams: ruleParamsSchema.describe('Default parameters — config overrides merge over these'),
+  })
+  .openapi('AlertRuleCatalogItem');
+
+/** GET /api/monitoring/rules response — the full static rule catalog. */
+export const alertRuleCatalogResponseSchema = z
+  .object({
+    rules: z.array(alertRuleCatalogItemSchema).describe('All built-in alert rules (static — no query params, no pagination)'),
+  })
+  .openapi('AlertRuleCatalogResponse');
+
+export type AlertRuleCatalogItem = z.infer<typeof alertRuleCatalogItemSchema>;
+export type AlertRuleCatalogResponse = z.infer<typeof alertRuleCatalogResponseSchema>;

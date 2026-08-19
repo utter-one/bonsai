@@ -279,6 +279,84 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
     });
   });
 
+  describe('GET /api/monitoring/rules', () => {
+    const EXPECTED_RULE_IDS = [
+      'api-429-spike',
+      'api-5xx-spike',
+      'asr-final-latency',
+      'auth-429-spike',
+      'db-down',
+      'db-pool-saturated',
+      'event-loop-lag',
+      'fallback-active',
+      'high-memory',
+      'imap-poll-failing',
+      'oauth-refresh-failing',
+      'provider-auth-failed',
+      'provider-degraded',
+      'provider-down',
+      'provider-rate-limited',
+      'service-stalled',
+      'stream-abort-rate',
+      'stream-slow-ttft',
+      'stream-stalls',
+      'tts-rtf-degraded',
+    ];
+
+    it('returns the full static catalog (20 rules, exact id set)', async () => {
+      const res = await authed().get('/api/monitoring/rules');
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property('rules').that.is.an('array');
+      const ids = res.body.rules.map((rule: { id: string }) => rule.id).sort();
+      // Exact-set pin: adding/removing a built-in rule must update this test on purpose.
+      expect(ids).to.deep.equal(EXPECTED_RULE_IDS);
+    });
+
+    it('serves id, scope, severity, summary, and the 7 default params per rule', async () => {
+      const res = await authed().get('/api/monitoring/rules');
+      expect(res.status).to.equal(200);
+      for (const rule of res.body.rules) {
+        expect(rule.id).to.be.a('string').and.not.empty;
+        expect(rule.scope).to.be.oneOf(['global', 'per_provider']);
+        expect(rule.severity).to.be.oneOf(['info', 'warning', 'critical']);
+        expect(rule.summary).to.be.a('string').and.not.empty;
+        for (const field of ['threshold', 'windowMinutes', 'minSamples', 'forMinutes', 'resolveAfterGoodChecks', 'cooldownMinutes', 'maxUnresolvedHours']) {
+          expect(rule.defaultParams[field], `defaultParams.${field} of ${rule.id}`).to.be.a('number');
+        }
+      }
+      // No evaluate closures or engine internals leak through.
+      for (const rule of res.body.rules) {
+        expect(Object.keys(rule)).to.deep.equal(['id', 'scope', 'severity', 'summary', 'defaultParams']);
+      }
+    });
+
+    it('matches the engine defaults for sampled rules', async () => {
+      const res = await authed().get('/api/monitoring/rules');
+      expect(res.status).to.equal(200);
+      const byId = new Map(res.body.rules.map((rule: { id: string }) => [rule.id, rule]));
+
+      const providerDown = byId.get('provider-down');
+      expect(providerDown.scope).to.equal('per_provider');
+      expect(providerDown.severity).to.equal('critical');
+      expect(providerDown.defaultParams).to.include({ threshold: 3, windowMinutes: 10, minSamples: 5, forMinutes: 2 });
+
+      const highMemory = byId.get('high-memory');
+      expect(highMemory.scope).to.equal('global');
+      // 1536 MB in bytes (mirrors the health-check default).
+      expect(highMemory.defaultParams.threshold).to.equal(1536 * 1024 * 1024);
+
+      const fallbackActive = byId.get('fallback-active');
+      expect(fallbackActive.severity).to.equal('info');
+      expect(fallbackActive.scope).to.equal('per_provider');
+
+      const scopeCounts = res.body.rules.reduce(
+        (acc: Record<string, number>, rule: { scope: string }) => ({ ...acc, [rule.scope]: (acc[rule.scope] ?? 0) + 1 }),
+        {},
+      );
+      expect(scopeCounts).to.deep.equal({ global: 8, per_provider: 12 });
+    });
+  });
+
   describe('PUT /api/monitoring/config', () => {
     it('round-trips: validates, bumps version, persists, sanitizes the audit payload', async () => {
       const agent = authed();
