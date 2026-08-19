@@ -137,8 +137,12 @@ export abstract class EmailConnectionBase implements IClientConnection {
   /**
    * P1-03 template wrapper: records one channel.send call-log row per email send,
    * then delegates to the provider-specific implementation.
+   *
+   * Public (P2-02): the alert EmailNotifier reuses this as the raw-send entry
+   * point for per-delivery connection instances — the call-log row is desired
+   * so alert-mail provider failures feed provider-degraded.
    */
-  protected async sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
+  public async sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
     const startedAt = Date.now();
     try {
       await this.doSendEmail(to, subject, body, attachments, headers);

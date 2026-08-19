@@ -49,7 +49,8 @@ import { CallLogger } from './services/monitoring/CallLogger';
 import { HealthCheckService } from './services/monitoring/HealthCheckService';
 import { RetentionService } from './services/monitoring/RetentionService';
 import { AlertRuleEngine } from './services/monitoring/AlertRuleEngine';
-import { ALERT_EVENT_PUBLISHER_TOKEN, LogAndPersistPublisher } from './services/monitoring/AlertEventPublisher';
+import { ALERT_EVENT_PUBLISHER_TOKEN } from './services/monitoring/AlertEventPublisher';
+import { NotifyingPublisher } from './services/monitoring/notifiers/AlertNotifier';
 import { errorHandler } from './http/middleware/errorHandler';
 import { corsOptions } from './http/middleware/cors';
 import { optionalAuthMiddleware } from './http/middleware/auth';
@@ -417,9 +418,9 @@ export async function createApp(): Promise<express.Application> {
   healthCheckService.start();
   container.resolve(RetentionService).start();
 
-  // P2-01: alert rule engine. The publisher is behind a DI token so P2-02
-  // can swap in a notifying wrapper without touching the engine.
-  container.register(ALERT_EVENT_PUBLISHER_TOKEN, { useClass: LogAndPersistPublisher });
+  // P2-01: alert rule engine. The publisher is behind a DI token — P2-02
+  // registers the notifying wrapper (persist + webhook/email fan-out).
+  container.register(ALERT_EVENT_PUBLISHER_TOKEN, { useClass: NotifyingPublisher });
   container.resolve(AlertRuleEngine).start();
 
   app.use(errorHandler);

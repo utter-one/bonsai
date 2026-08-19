@@ -16,10 +16,10 @@ import type { AlertRuleEngine } from '../../src/services/monitoring/AlertRuleEng
  * HealthCheckService at 1s cycles, engine interval 1s via
  * MONITORING_ALERT_ENGINE_INTERVAL_MS).
  *
- * Config is injected through the engine's `setConfigProviderForTests` seam:
- * the app-world MonitoringConfigService singleton can live in a different
- * module graph than the test's, and its cache would hide test-saved rows.
- * The seam makes the config the engine sees exactly what the test provides.
+ * Config is injected through the engine's `setConfigProviderForTests` seam —
+ * a test-only override so these tests never persist configs. (Since P2-02
+ * the MonitoringConfigService is a shared @singleton, so saving through it
+ * would also be picked up; the seam is kept for hermeticity.)
  *
  * The engine also ticks on its own 1s interval while these tests run — that
  * is intentional: the assertions are on final DB state, which the manual

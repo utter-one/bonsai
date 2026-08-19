@@ -82,6 +82,11 @@ export async function globalSetup(): Promise<void> {
   const { HealthCheckService: AppHealthCheckService } = await import('../src/services/monitoring/HealthCheckService');
   (globalThis as any).__TEST_ALERT_ENGINE__ = iocContainer.resolve(AlertRuleEngine);
   (globalThis as any).__TEST_HEALTH_SERVICE__ = iocContainer.resolve(AppHealthCheckService);
+  // P2-02: app-world alert publisher — read from the engine's own injected
+  // instance. (Resolving the string token directly yields a DIFFERENT
+  // NotifyingPublisher: tsyringe keeps the token provider cache separate from
+  // the @singleton class cache.)
+  (globalThis as any).__TEST_ALERT_PUBLISHER__ = (iocContainer.resolve(AlertRuleEngine) as any).publisher;
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)

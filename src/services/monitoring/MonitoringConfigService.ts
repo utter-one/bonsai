@@ -1,4 +1,4 @@
-import { injectable } from 'tsyringe';
+import { singleton } from 'tsyringe';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { monitoringConfig } from '../../db/schema';
@@ -28,8 +28,13 @@ const MIN_RETENTION_DAYS = 7;
  *
  * No lifecycle hook — `server.ts` starts nothing for this service; the first
  * `get()` (HealthCheckService's first cycle or P2-03's GET) performs the load.
+ *
+ * P2-02: `@singleton` (was `@injectable`) — the cache must be shared so a
+ * `save()`/`reload()` through any injection point (engine, NotifyingPublisher,
+ * P2-03 endpoint) is visible to all of them without a restart. A plain
+ * `@injectable()` gave every injection point its own private cache.
  */
-@injectable()
+@singleton()
 export class MonitoringConfigService {
   private cache: MonitoringConfig | null = null;
 
@@ -52,9 +57,13 @@ export class MonitoringConfigService {
    */
   async save(config: unknown, expectedVersion: number): Promise<void> {
     const parsed = monitoringConfigSchema.parse(config);
-    await this.get(); // ensures the row exists (synthesized defaults if missing)
-
-    const row = (await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, GLOBAL_ID)))[0];
+    // Ensure the row exists from the DB (not the cache — P2-02: the cache can
+    // be stale after an external truncate/restore and would skip the re-insert).
+    let row = (await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, GLOBAL_ID)))[0];
+    if (!row) {
+      await this.load(); // upserts the synthesized default row
+      row = (await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, GLOBAL_ID)))[0];
+    }
     if (!row) {
       throw new OptimisticLockError('Monitoring config row is missing');
     }

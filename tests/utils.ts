@@ -88,6 +88,13 @@ export async function resetDatabase(): Promise<void> {
   // Use raw SQL string since drizzle's sql.template doesn't support dynamic table lists cleanly
   const tableList = TABLES.map((t) => `"${t}"`).join(', ');
   await db.execute(sql`TRUNCATE TABLE ${sql.raw(tableList)} CASCADE`);
+  // P2-02: the shared (singleton) monitoring config cache now outlives the
+  // truncate — reload it so the next get() re-upserts the default row, exactly
+  // like the pre-P2-02 per-instance behavior. Guarded: unit runs have no app.
+  const configService = (globalThis as any).__TEST_MONITORING_CONFIG__ as { reload?: () => Promise<void> } | undefined;
+  if (configService?.reload) {
+    await configService.reload();
+  }
 }
 
 /**
