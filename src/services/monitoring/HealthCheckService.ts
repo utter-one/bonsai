@@ -148,6 +148,15 @@ export class HealthCheckService {
     return this.probeFailures.get(providerId) ?? 0;
   }
 
+  /**
+   * All providers with a non-zero consecutive probe-failure count (P2-01
+   * finding 6): lets probe-only providers (≥N failures, zero call rows) enter
+   * the `provider-down` evaluation set. Returns a copy — callers must not mutate.
+   */
+  getProbeFailureCounts(): Map<string, number> {
+    return new Map(this.probeFailures);
+  }
+
   /** Runs one check cycle immediately (test/manual hook — same path as the interval loop). */
   async runNow(): Promise<void> {
     await this.runCheckCycle();

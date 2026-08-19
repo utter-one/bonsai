@@ -46,6 +46,7 @@ export async function globalSetup(): Promise<void> {
   process.env.RATE_LIMIT_AUTH_MAX = '10000'; // generous limit for tests
   process.env.MONITORING_HEALTH_INTERVAL_MS = '1000'; // fast health loop so health_checks rows appear within e2e tests
   process.env.MONITORING_HEALTH_PROBES = 'off'; // no live provider probes in tests — fake provider configs would hit real APIs
+  process.env.MONITORING_ALERT_ENGINE_INTERVAL_MS = '1000'; // P2-01: fast engine loop so alert e2e tests converge quickly
   process.env.MASTER_ENCRYPTION_KEY = '0000000000000000000000000000000000000000000000000000000000000000'; // 32-byte hex key for test encryption
 
   // 3. Run migrations against the fresh container
@@ -75,6 +76,12 @@ export async function globalSetup(): Promise<void> {
   // P1-07: app-world rate limiter test seams (store reset + top-N rejection map).
   const { resetRateLimitersForTests, getRateLimitRejectionStats } = await import('../src/http/middleware/rateLimiter');
   (globalThis as any).__TEST_RATE_LIMITS__ = { reset: resetRateLimitersForTests, getStats: getRateLimitRejectionStats };
+  // P2-01: app-world alert engine + health service singletons (dual module graph).
+  // Tests use runNow() for deterministic passes and the 1 s background interval otherwise.
+  const { AlertRuleEngine } = await import('../src/services/monitoring/AlertRuleEngine');
+  const { HealthCheckService: AppHealthCheckService } = await import('../src/services/monitoring/HealthCheckService');
+  (globalThis as any).__TEST_ALERT_ENGINE__ = iocContainer.resolve(AlertRuleEngine);
+  (globalThis as any).__TEST_HEALTH_SERVICE__ = iocContainer.resolve(AppHealthCheckService);
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)

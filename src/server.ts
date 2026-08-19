@@ -48,6 +48,8 @@ import { MetricsRegistry } from './services/monitoring/MetricsRegistry';
 import { CallLogger } from './services/monitoring/CallLogger';
 import { HealthCheckService } from './services/monitoring/HealthCheckService';
 import { RetentionService } from './services/monitoring/RetentionService';
+import { AlertRuleEngine } from './services/monitoring/AlertRuleEngine';
+import { ALERT_EVENT_PUBLISHER_TOKEN, LogAndPersistPublisher } from './services/monitoring/AlertEventPublisher';
 import { errorHandler } from './http/middleware/errorHandler';
 import { corsOptions } from './http/middleware/cors';
 import { optionalAuthMiddleware } from './http/middleware/auth';
@@ -414,6 +416,11 @@ export async function createApp(): Promise<express.Application> {
   container.resolve(ProcessingDeferralService).start();
   healthCheckService.start();
   container.resolve(RetentionService).start();
+
+  // P2-01: alert rule engine. The publisher is behind a DI token so P2-02
+  // can swap in a notifying wrapper without touching the engine.
+  container.register(ALERT_EVENT_PUBLISHER_TOKEN, { useClass: LogAndPersistPublisher });
+  container.resolve(AlertRuleEngine).start();
 
   app.use(errorHandler);
 

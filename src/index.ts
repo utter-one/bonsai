@@ -15,6 +15,7 @@ import { ImapInboundService } from "./services/ImapInboundService";
 import { OAuth2TokenRefreshService } from "./services/OAuth2TokenRefreshService";
 import { ProcessingDeferralService } from "./services/ProcessingDeferralService";
 import { HealthCheckService } from "./services/monitoring/HealthCheckService";
+import { AlertRuleEngine } from "./services/monitoring/AlertRuleEngine";
 import { RetentionService } from "./services/monitoring/RetentionService";
 import { WebSocketChannelHost } from "./channels/websocket/WebSocketChannelHost";
 import { TwilioVoiceChannelHost } from "./channels/twilio-voice/TwilioVoiceChannelHost";
@@ -86,6 +87,8 @@ async function main() {
       { name: "OAuth2TokenRefreshService", stop: () => container.resolve(OAuth2TokenRefreshService).stop() },
       { name: "ProcessingDeferralService", stop: () => container.resolve(ProcessingDeferralService).stop() },
       { name: "RetentionService", stop: () => container.resolve(RetentionService).stop() },
+      // Stopped before HealthCheckService — the engine consumes its health data.
+      { name: "AlertRuleEngine", stop: () => container.resolve(AlertRuleEngine).stop() },
       { name: "HealthCheckService", stop: () => container.resolve(HealthCheckService).stop() },
     ],
     websocketHost: container.resolve(WebSocketChannelHost),

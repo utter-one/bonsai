@@ -106,7 +106,7 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 
 ### Background Services
 
-Eight services run continuously after startup (all resolved from the IoC container and started via `.start()` in `server.ts`):
+Nine services run continuously after startup (all resolved from the IoC container and started via `.start()` in `server.ts`):
 - `ConversationTimeoutService` — monitors conversation timeouts (node-cron, every minute)
 - `ScenarioRunExecutorService` — executes scenario runs
 - `BenchmarkExecutorService` — executes benchmark runs
@@ -115,6 +115,7 @@ Eight services run continuously after startup (all resolved from the IoC contain
 - `ProcessingDeferralService` — re-processes deferred conversations
 - `HealthCheckService` — monitoring: db/process/background-service/provider health checks every `MONITORING_HEALTH_INTERVAL_MS` (default 60s) into `health_checks` + gauges; probes llm/storage providers per `monitoring_config.probeSettings` (env `MONITORING_HEALTH_PROBES=off` is a hard kill switch); serves `GET /health/ready`
 - `RetentionService` — monitoring: hourly rollup of `provider_call_logs` → `provider_call_stats_hourly` (`0 * * * *`) + daily purge of retention-aged rows at 03:00 (`0 3 * * *`); `retentionDays` from `monitoring_config`
+- `AlertRuleEngine` — monitoring: evaluates the built-in alert rules (provider down/degraded/rate-limited/auth, db down/pool, 429 spikes, streaming health, etc.) on `setInterval` (`MONITORING_ALERT_ENGINE_INTERVAL_MS`, default from `monitoring_config.alerting.engineIntervalMinutes`); anti-flap state machine (pending→firing→resolved, cooldown, maxUnresolvedHours); persists to `alert_events` via the `AlertEventPublisher` DI token (`LogAndPersistPublisher` in P2-01, notifying wrapper in P2-02); windowed counter reads via an in-memory delta ring (cumulative `MetricsRegistry` counters are not windowable directly)
 
 ### Graceful Shutdown (P1-09)
 

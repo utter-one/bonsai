@@ -228,8 +228,8 @@ Default rules (built-in, overridable in `monitoring_config`):
 | `provider-rate-limited` | warning | ≥5 `rate_limited` errors for a provider in 10 min (quota problem — distinct from outage) |
 | `service-stalled` | warning | heartbeat stale > 3× interval (per service; a dead loop is degraded, not an outage — upgrade severity via config if a specific service is mission-critical for you) |
 | `api-5xx-spike` | warning | 5xx ratio > 5% in 5 min (min 20 reqs) |
-| `api-429-spike` | warning | ≥20 API 429 rejections in 5 min, or 429 ratio > 5% of requests (min 20 reqs) — indicates client abuse, misconfigured polling, or limit set too low; scope per offending key when one operator/IP causes > 50% of rejections |
-| `auth-429-spike` | warning | ≥5 auth (login/refresh) 429 rejections in 15 min — **security signal** (possible credential stuffing / brute force); scoped to the offending IP |
+| `api-429-spike` | warning | ≥20 API 429 rejections in 5 min — indicates client abuse, misconfigured polling, or limit set too low; scope per offending key when one operator/IP causes > 50% of the tracked rejections (the original "429 ratio" variant was dropped in the P2-01 review: `status_class` lumps 429 into 4xx, so no ratio source exists) |
+| `auth-429-spike` | warning | ≥5 auth (login/refresh) 429 rejections in 15 min — **security signal** (possible credential stuffing / brute force); same per-key scoping as `api-429-spike` (dominant operator/IP key) |
 | `oauth-refresh-failing` | warning | ≥3 refresh failures for a provider in 1 h |
 | `imap-poll-failing` | warning | ≥5 failed poll cycles for a provider in 1 h |
 | `high-memory` | warning | `rss_bytes` gauge > `MONITORING_MEMORY_THRESHOLD_MB` (default 1.5 GB) |

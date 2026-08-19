@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { listResponseLimitSchema } from './common';
+import { RULE_IDS } from '../../services/monitoring/AlertEvents';
 
 extendZodWithOpenApi(z);
 
 /**
  * Monitoring configuration stored in the `monitoring_config` singleton row
  * (P1-06). Phase 1 notifier union is `webhook | email`; P4-02 extends the
- * enum with `telegram`/`sms` and their fields. Rule keys are validated
- * structurally here (non-empty string) — P2-01 tightens the schema with a
- * refine against the registered rule ids.
+ * enum with `telegram`/`sms` and their fields. `rules` keys are validated
+ * against the registered rule ids (`RULE_IDS`, P2-01) via `superRefine` —
+ * an unknown id is a config error, not a silent no-op (finding 19).
  *
  * Shared by `MonitoringConfigService` (validation on load/save) and the
  * P2-03 `PUT /api/monitoring/config` endpoint (request body).
@@ -106,6 +107,14 @@ export const monitoringConfigSchema = z.object({
   alerting: alertingSettingsSchema
     .default(() => alertingSettingsSchema.parse({}))
     .describe('Alert engine settings (P2-01 consumes this)'),
+})
+.superRefine((config, ctx) => {
+  // Unknown rule ids are a config error, not a silent no-op (P2-01 finding 19).
+  for (const ruleId of Object.keys(config.rules ?? {})) {
+    if (!RULE_IDS.has(ruleId)) {
+      ctx.addIssue({ code: 'custom', path: ['rules', ruleId], message: `Unknown alert rule id '${ruleId}'` });
+    }
+  }
 });
 
 export type MonitoringConfig = z.infer<typeof monitoringConfigSchema>;
