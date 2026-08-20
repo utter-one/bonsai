@@ -10,6 +10,7 @@ import { MonitoringConfigService } from '../MonitoringConfigService';
 import type { NotifierConfig } from '../../../http/contracts/monitoring';
 import { WebhookNotifier } from './WebhookNotifier';
 import { EmailNotifier } from './EmailNotifier';
+import { ChannelNotifier } from './ChannelNotifier';
 
 /**
  * P2-02 — alert notifiers (spec + soundness review findings in
@@ -31,7 +32,12 @@ export type AlertPhase = 'fired' | 'resolved';
 export type DeliveryResult = { ok: boolean; detail?: string };
 
 export interface AlertNotifier {
-  readonly type: 'webhook' | 'email';
+  /**
+   * Notifier type (matches `MonitoringConfig['notifiers'][n].type`).
+   * `'channel'` is the consolidated provider-row notifier serving
+   * telegram / twilio_sms / whatsapp (see ChannelNotifier).
+   */
+  readonly type: 'webhook' | 'email' | 'telegram' | 'twilio_sms' | 'whatsapp' | 'channel';
   deliver(event: AlertEvent, phase: AlertPhase, config: NotifierConfig): Promise<DeliveryResult>;
 }
 
@@ -54,6 +60,7 @@ export class NotifyingPublisher implements AlertEventPublisher {
     @inject(MonitoringConfigService) private readonly configService: MonitoringConfigService,
     @inject(WebhookNotifier) public readonly webhookNotifier: WebhookNotifier,
     @inject(EmailNotifier) public readonly emailNotifier: EmailNotifier,
+    @inject(ChannelNotifier) public readonly channelNotifier: ChannelNotifier,
   ) {}
 
   /** Test seam — production keeps the 15 s cap. */
@@ -100,6 +107,24 @@ export class NotifyingPublisher implements AlertEventPublisher {
   }
 
   /**
+   * Route a notifier config to its implementation (P4-02: telegram /
+   * twilio_sms / whatsapp all go to the shared ChannelNotifier's strategy
+   * table — one class instead of three near-identical ones).
+   */
+  private notifierFor(config: NotifierConfig): AlertNotifier {
+    switch (config.type) {
+      case 'webhook':
+        return this.webhookNotifier;
+      case 'email':
+        return this.emailNotifier;
+      case 'telegram':
+      case 'twilio_sms':
+      case 'whatsapp':
+        return this.channelNotifier;
+    }
+  }
+
+  /**
    * Parallel fan-out with a publisher-wide cap (finding 6): each notifier
    * self-bounds (10 s per attempt; webhooks retry once on transport failure),
    * and the whole fan-out is raced against the 15 s cap. On overrun the
@@ -115,8 +140,7 @@ export class NotifyingPublisher implements AlertEventPublisher {
     const done = new Set<string>();
 
     const perNotifier = notifiers.map((config) => {
-      const notifier = config.type === 'webhook' ? this.webhookNotifier : this.emailNotifier;
-      return notifier
+      return this.notifierFor(config)
         .deliver(event, phase, config)
         .then(
           (result) => {

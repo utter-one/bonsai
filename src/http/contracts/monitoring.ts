@@ -7,24 +7,30 @@ extendZodWithOpenApi(z);
 
 /**
  * Monitoring configuration stored in the `monitoring_config` singleton row
- * (P1-06). Phase 1 notifier union is `webhook | email`; P4-02 extends the
- * enum with `telegram`/`sms` and their fields. `rules` keys are validated
- * against the registered rule ids (`RULE_IDS`, P2-01) via `superRefine` —
- * an unknown id is a config error, not a silent no-op (finding 19).
+ * (P1-06). Notifier union: `webhook | email` (Phase 1) + `telegram | twilio_sms | whatsapp` (P4-02).
+ * Per-type required fields + `to` format (email vs E.164) are enforced by a
+ * single `superRefine` (P4-02 finding 2 — `to` is a plain string at schema
+ * level so the same field can carry an email address or a phone number).
+ * `rules` keys are validated against the registered rule ids (`RULE_IDS`,
+ * P2-01) via `superRefine` — an unknown id is a config error, not a silent
+ * no-op (finding 19).
  *
  * Shared by `MonitoringConfigService` (validation on load/save) and the
  * P2-03 `PUT /api/monitoring/config` endpoint (request body).
  */
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const E164_REGEX = /^\+[1-9]\d{6,14}$/;
+
 export const notifierConfigSchema = z
   .object({
     id: z.string().min(1).describe('Notifier id (synthesized on first boot for env-derived notifiers)'),
-    type: z.enum(['webhook', 'email']).describe('Notifier type (Phase 1: webhook, email)'),
+    type: z.enum(['webhook', 'email', 'telegram', 'twilio_sms', 'whatsapp']).describe('Notifier type (webhook, email; telegram, twilio_sms, whatsapp since P4-02)'),
     channelProviderId: z
       .string()
       .min(1)
       .optional()
-      .describe('Email channel provider id (required for email notifiers)'),
+      .describe('Channel provider id (required for email/telegram/twilio_sms/whatsapp notifiers)'),
     url: z
       .string()
       .url()
@@ -32,20 +38,45 @@ export const notifierConfigSchema = z
       .describe('Webhook delivery URL, http(s) (required for webhook notifiers)'),
     to: z
       .string()
-      .email()
+      .min(1)
       .optional()
-      .describe('Recipient email address (required for email notifiers)'),
+      .describe('Recipient: email address (email notifiers) or E.164 phone number (twilio_sms/whatsapp notifiers)'),
+    chatId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Telegram chat id (required for telegram notifiers)'),
     minSeverity: z
       .enum(['info', 'warning', 'critical'])
       .optional()
       .describe('Only deliver alerts at or above this severity (default: all)'),
     enabled: z.boolean().describe('Disabled notifiers are skipped by the publisher'),
   })
-  .refine((n) => n.type !== 'webhook' || (n.url ?? '').startsWith('http'), {
-    message: 'Webhook notifiers require an http(s) url',
-  })
-  .refine((n) => n.type !== 'email' || Boolean(n.channelProviderId && n.to), {
-    message: 'Email notifiers require channelProviderId and to',
+  .superRefine((n, ctx) => {
+    const issue = (path: string, message: string): void => {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+    };
+    switch (n.type) {
+      case 'webhook':
+        if (!n.url) issue('url', 'Webhook notifiers require a url');
+        else if (!n.url.startsWith('http')) issue('url', 'Webhook notifiers require an http(s) url');
+        break;
+      case 'email':
+        if (!n.channelProviderId) issue('channelProviderId', 'Email notifiers require a channelProviderId');
+        if (!n.to) issue('to', 'Email notifiers require a to address');
+        else if (!EMAIL_REGEX.test(n.to)) issue('to', 'Email notifier to must be a valid email address');
+        break;
+      case 'telegram':
+        if (!n.channelProviderId) issue('channelProviderId', 'Telegram notifiers require a channelProviderId');
+        if (!n.chatId) issue('chatId', 'Telegram notifiers require a chatId');
+        break;
+      case 'twilio_sms':
+      case 'whatsapp':
+        if (!n.channelProviderId) issue('channelProviderId', `${n.type} notifiers require a channelProviderId`);
+        if (!n.to) issue('to', `${n.type} notifiers require a to address`);
+        else if (!E164_REGEX.test(n.to)) issue('to', `${n.type} notifier to must be an E.164 phone number (e.g. +15551234567)`);
+        break;
+    }
   })
   .openapi('NotifierConfig');
 

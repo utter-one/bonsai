@@ -99,7 +99,7 @@ Phase 4 (polish)
 | ID | File | Title |
 |---|---|---|
 | P4-01 | [P4-01-prometheus-metrics-endpoint.md](P4-01-prometheus-metrics-endpoint.md) | `GET /metrics` Prometheus exposition + token gate |
-| P4-02 | [P4-02-telegram-sms-notifiers.md](P4-02-telegram-sms-notifiers.md) | Telegram + Twilio SMS alert notifiers |
+| P4-02 | [P4-02-telegram-sms-notifiers.md](P4-02-telegram-sms-notifiers.md) | Telegram + Twilio SMS + WhatsApp alert notifiers |
 | P4-03 | [P4-03-webhook-dead-letter.md](P4-03-webhook-dead-letter.md) | Webhook dead-letter table + replay endpoint |
 | P4-04 | [P4-04-console-hooks.md](P4-04-console-hooks.md) | Console (separate repo) monitoring page — backend sufficiency check |
 | P4-05 | [P4-05-docs-env-load-sanity.md](P4-05-docs-env-load-sanity.md) | Docs, env examples, AGENTS.md, load sanity check |

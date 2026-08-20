@@ -19,6 +19,7 @@ import {
   type AlertNotifier,
 } from '../../../src/services/monitoring/notifiers/AlertNotifier';
 import { WebhookNotifier } from '../../../src/services/monitoring/notifiers/WebhookNotifier';
+import { ChannelNotifier } from '../../../src/services/monitoring/notifiers/ChannelNotifier';
 import { EmailNotifier } from '../../../src/services/monitoring/notifiers/EmailNotifier';
 import {
   EmailConnectionBase,
@@ -358,7 +359,10 @@ describe('P2-02 NotifyingPublisher', () => {
     const configService = new FakeConfigService(baseConfig(notifiers));
     const webhook = overrides.webhook ?? new WebhookNotifier();
     const email = (overrides.email ?? new EmailNotifier(fakeSecretRefUtils() as never, {} as SessionManager)) as AlertNotifier;
-    const publisher = new RecordingPublisher(persister as never, configService as never, webhook, email as never);
+    // P4-02 consolidation: the publisher's 3rd channel slot is the shared
+    // ChannelNotifier (telegram/twilio_sms/whatsapp) — p2-02 only dispatches
+    // webhook/email, so a plain instance with all-default seams is fine.
+    const publisher = new RecordingPublisher(persister as never, configService as never, webhook, email as never, new ChannelNotifier(fakeSecretRefUtils() as never) as never);
     return { persister, configService, publisher, webhook, email };
   }
 

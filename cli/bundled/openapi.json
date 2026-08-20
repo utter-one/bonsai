@@ -26563,14 +26563,17 @@
             "type": "string",
             "enum": [
               "webhook",
-              "email"
+              "email",
+              "telegram",
+              "twilio_sms",
+              "whatsapp"
             ],
-            "description": "Notifier type (Phase 1: webhook, email)"
+            "description": "Notifier type (webhook, email; telegram, twilio_sms, whatsapp since P4-02)"
           },
           "channelProviderId": {
             "type": "string",
             "minLength": 1,
-            "description": "Email channel provider id (required for email notifiers)"
+            "description": "Channel provider id (required for email/telegram/twilio_sms/whatsapp notifiers)"
           },
           "url": {
             "type": "string",
@@ -26579,8 +26582,13 @@
           },
           "to": {
             "type": "string",
-            "format": "email",
-            "description": "Recipient email address (required for email notifiers)"
+            "minLength": 1,
+            "description": "Recipient: email address (email notifiers) or E.164 phone number (twilio_sms/whatsapp notifiers)"
+          },
+          "chatId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Telegram chat id (required for telegram notifiers)"
           },
           "minSeverity": {
             "type": "string",
