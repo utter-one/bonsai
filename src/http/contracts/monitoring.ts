@@ -123,6 +123,29 @@ export const alertingSettingsSchema = z
   })
   .openapi('AlertingSettings');
 
+export const circuitBreakerSettingsSchema = z
+  .object({
+    failureThreshold: z
+      .number()
+      .int()
+      .min(1)
+      .default(5)
+      .describe('Qualifying call failures within windowMs that open a provider\'s circuit breaker (P3-01)'),
+    windowMs: z
+      .number()
+      .int()
+      .min(1000)
+      .default(60_000)
+      .describe('Sliding window in milliseconds for counting breaker failures (P3-01)'),
+    cooldownMs: z
+      .number()
+      .int()
+      .min(1000)
+      .default(300_000)
+      .describe('open → half-open cooldown in milliseconds (P3-01)'),
+  })
+  .openapi('CircuitBreakerSettings');
+
 export const monitoringConfigSchema = z.object({
   notifiers: z
     .array(notifierConfigSchema)
@@ -146,6 +169,9 @@ export const monitoringConfigSchema = z.object({
   alerting: alertingSettingsSchema
     .default(() => alertingSettingsSchema.parse({}))
     .describe('Alert engine settings (P2-01 consumes this)'),
+  circuitBreaker: circuitBreakerSettingsSchema
+    .default(() => circuitBreakerSettingsSchema.parse({}))
+    .describe('Per-provider circuit breaker policy (P3-01 consumes this; applied live, no restart)'),
 })
 .superRefine((config, ctx) => {
   // Unknown rule ids are a config error, not a silent no-op (P2-01 finding 19).
@@ -221,6 +247,16 @@ export const providerRollingSchema = z
   .openapi('ProviderRolling')
   .describe('Rolling provider call-log window');
 
+/** In-memory circuit breaker state for one provider (P3-01). */
+export const circuitBreakerStateSchema = z
+  .object({
+    state: z.enum(['closed', 'open', 'half-open']).describe('Breaker state (in-memory — a process restart resets it to closed)'),
+    failuresInWindow: z.number().int().min(0).describe('Qualifying failures in the current sliding window'),
+    lastStateChangeAt: z.coerce.date().describe('When the breaker last changed state'),
+    opensInLast24h: z.number().int().min(0).describe('closed→open transitions in the last 24 hours'),
+  })
+  .openapi('CircuitBreakerState');
+
 /** One provider row of GET /api/monitoring/providers. */
 export const providerOverviewSchema = z.object({
   id: z.string().describe('Provider id'),
@@ -232,6 +268,9 @@ export const providerOverviewSchema = z.object({
     .nullable()
     .describe('Latest health-check status for this provider (provider:<id> check); null when not checked yet'),
   rolling: providerRollingSchema.describe('Rolling 15-minute call-log window'),
+  circuitBreaker: circuitBreakerStateSchema
+    .nullable()
+    .describe('In-memory circuit breaker state; null when the provider has no recorded calls yet (P3-01)'),
 });
 
 /** GET /api/monitoring/providers — per-provider health + rolling window. */

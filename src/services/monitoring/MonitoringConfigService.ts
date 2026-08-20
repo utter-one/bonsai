@@ -1,4 +1,4 @@
-import { singleton } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { monitoringConfig } from '../../db/schema';
@@ -7,6 +7,7 @@ import type { MonitoringConfig } from '../../http/contracts/monitoring';
 import { OptimisticLockError } from '../../errors';
 import { generateId } from '../../utils/idGenerator';
 import logger from '../../utils/logger';
+import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
 
 const GLOBAL_ID = 'global';
 const MIN_RETENTION_DAYS = 7;
@@ -37,6 +38,10 @@ const MIN_RETENTION_DAYS = 7;
 @singleton()
 export class MonitoringConfigService {
   private cache: MonitoringConfig | null = null;
+
+  constructor(
+    @inject(CircuitBreakerRegistry) private readonly breakerRegistry: CircuitBreakerRegistry,
+  ) {}
 
   /** Cached config; first call loads (and upserts the default row if missing). */
   async get(): Promise<MonitoringConfig> {
@@ -82,6 +87,7 @@ export class MonitoringConfigService {
       throw new OptimisticLockError('Failed to update monitoring config due to version conflict');
     }
     this.cache = parsed;
+    this.pushBreakerParams(parsed);
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────
@@ -90,6 +96,7 @@ export class MonitoringConfigService {
     const rows = await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, GLOBAL_ID));
     if (rows.length > 0) {
       this.cache = this.parseRowOrFallback(rows[0].config);
+      this.pushBreakerParams(this.cache);
       return;
     }
 
@@ -102,7 +109,21 @@ export class MonitoringConfigService {
       .onConflictDoNothing();
     const after = await db.select().from(monitoringConfig).where(eq(monitoringConfig.id, GLOBAL_ID));
     this.cache = after.length > 0 ? this.parseRowOrFallback(after[0].config) : defaults;
+    this.pushBreakerParams(this.cache);
     logger.info('MonitoringConfigService: created default monitoring_config row');
+  }
+
+  /**
+   * P3-01: push the stored circuit-breaker settings to the registry so a
+   * config PUT takes effect live (the registry cannot import this service —
+   * circular import through the provider instrumentation chain).
+   */
+  private pushBreakerParams(config: MonitoringConfig): void {
+    try {
+      this.breakerRegistry.setParamsOverride(config.circuitBreaker);
+    } catch (error) {
+      logger.error({ error: (error as Error)?.message }, 'MonitoringConfigService: breaker params push failed');
+    }
   }
 
   /**

@@ -155,6 +155,7 @@ describe('P1-06 monitoringConfigSchema', () => {
       retentionDays: 90,
       probeSettings: { llmProbe: 'models', asrProbe: 'free', ttsProbe: 'free', cooldownMinutes: 10 },
       alerting: { engineIntervalMinutes: 1, defaultCooldownMinutes: 15 },
+      circuitBreaker: { failureThreshold: 5, windowMs: 60_000, cooldownMs: 300_000 },
     });
   });
 
@@ -322,7 +323,7 @@ describe('P1-06 config-driven probe policy (HealthCheckService)', () => {
     expect(calls).to.deep.equal(['generate']);
     const row = byName(service.persisted[0])['provider:prov_llm'];
     expect(row?.status).to.equal('ok');
-    expect(row?.detail).to.deep.equal({ probed: true });
+    expect(row?.detail).to.deep.equal({ probed: true, circuitBreaker: 'closed' }); // P3-01: no registry in this test → 'closed'
   });
 
   it('config cooldownMinutes=0 probes every cycle; a large cooldown skips until cleared', async () => {

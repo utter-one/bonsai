@@ -340,7 +340,7 @@ describe('HealthCheckService (P1-05)', () => {
     expect(calls).to.have.length(1);
     const first = byName(service.persisted[0])['provider:prov_llm'];
     expect(first?.status).to.equal('ok');
-    expect(first?.detail).to.deep.equal({ probed: true });
+    expect(first?.detail).to.deep.equal({ probed: true, circuitBreaker: 'closed' }); // P3-01: no registry in this test → 'closed'
     expect(service.getProbeFailures('prov_llm')).to.equal(0);
 
     // Cooldown: second cycle within 10 min must not probe again (fallback: unknown, no call logs)

@@ -29,6 +29,7 @@ import type {
 import { alertEventListResponseSchema, alertEventResponseSchema, alertRuleCatalogResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
 import { AuditService } from '../AuditService';
 import { buildRuleCatalog } from './AlertEvents';
+import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
 import { HealthCheckService } from './HealthCheckService';
 import { MonitoringConfigService } from './MonitoringConfigService';
 import logger from '../../utils/logger';
@@ -93,6 +94,7 @@ export class MonitoringService extends BaseService {
     @inject(HealthCheckService) private readonly healthCheckService: HealthCheckService,
     @inject(MonitoringConfigService) private readonly monitoringConfigService: MonitoringConfigService,
     @inject(AuditService) private readonly auditService: AuditService,
+    @inject(CircuitBreakerRegistry) private readonly breakerRegistry: CircuitBreakerRegistry,
   ) {
     super();
   }
@@ -211,8 +213,12 @@ export class MonitoringService extends BaseService {
       errorCodesByProvider.set(row.provider_id, list);
     }
 
+    // P3-01: in-memory breaker state per provider (null when no calls recorded yet).
+    const breakerSnapshots = this.breakerRegistry.snapshot();
+
     const overview = providerRows.map((provider) => {
       const rolling = rollingById.get(provider.id);
+      const breaker = breakerSnapshots[provider.id];
       return {
         id: provider.id,
         name: provider.name,
@@ -226,6 +232,9 @@ export class MonitoringService extends BaseService {
           p95DurationMs: rolling?.p95_duration_ms ?? null,
           topErrorCodes: errorCodesByProvider.get(provider.id) ?? [],
         },
+        circuitBreaker: breaker
+          ? { state: breaker.state, failuresInWindow: breaker.failuresInWindow, lastStateChangeAt: breaker.lastStateChangeAt, opensInLast24h: breaker.opensInLast24h }
+          : null,
       };
     });
 

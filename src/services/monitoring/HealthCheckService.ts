@@ -6,6 +6,7 @@ import { healthChecks, providers } from '../../db/schema';
 import type { Provider } from '../../types/models';
 import { generateId } from '../../utils/idGenerator';
 import logger from '../../utils/logger';
+import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
 import { HeartbeatRegistry } from './HeartbeatRegistry';
 import { MetricsRegistry } from './MetricsRegistry';
 import { MonitoringConfigService } from './MonitoringConfigService';
@@ -121,6 +122,10 @@ export class HealthCheckService {
     @inject(AsrProviderFactory) private readonly asrProviderFactory: AsrProviderFactory,
     @inject(TtsProviderFactory) private readonly ttsProviderFactory: TtsProviderFactory,
     @inject(MonitoringConfigService) private readonly monitoringConfigService: MonitoringConfigService,
+    // Always injected in production; optional so test subclasses that construct
+    // positionally (P1-06's TestHealthCheckService) keep working — the state is
+    // then reported as 'closed'.
+    @inject(CircuitBreakerRegistry) private readonly breakerRegistry?: CircuitBreakerRegistry,
   ) {
     this.intervalMs = this.readIntervalMs();
     this.probesEnabled = process.env.MONITORING_HEALTH_PROBES !== 'off';
@@ -334,11 +339,16 @@ export class HealthCheckService {
         || (provider.providerType === 'llm' && probeSettings.llmProbe !== 'off')
         || (provider.providerType === 'asr' && probeSettings.asrProbe !== 'off')
         || (provider.providerType === 'tts' && probeSettings.ttsProbe !== 'off');
+      let result: HealthCheckResult;
       if (this.probesEnabled && probeable) {
         const probeResult = await this.maybeProbe(provider, stats, probeSettings);
-        if (probeResult) return probeResult;
+        result = probeResult ?? this.inferProviderStatus(name, stats);
+      } else {
+        result = this.inferProviderStatus(name, stats);
       }
-      return this.inferProviderStatus(name, stats);
+      // P3-01: surface the in-memory breaker state in the provider detail.
+      const circuitBreaker = this.breakerRegistry?.getState(provider.id) ?? 'closed';
+      return { ...result, detail: { ...result.detail, circuitBreaker } };
     } catch (error) {
       return { name, status: 'down', detail: { error: (error as Error)?.message ?? String(error) } };
     }

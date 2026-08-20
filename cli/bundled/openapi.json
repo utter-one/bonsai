@@ -24592,6 +24592,9 @@
                 "description": "Rolling 15-minute call-log window"
               }
             ]
+          },
+          "circuitBreaker": {
+            "$ref": "#/components/schemas/CircuitBreakerState"
           }
         },
         "required": [
@@ -24600,8 +24603,47 @@
           "providerType",
           "apiType",
           "probeStatus",
-          "rolling"
+          "rolling",
+          "circuitBreaker"
         ]
+      },
+      "CircuitBreakerState": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "open",
+              "half-open"
+            ],
+            "description": "Breaker state (in-memory — a process restart resets it to closed)"
+          },
+          "failuresInWindow": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Qualifying failures in the current sliding window"
+          },
+          "lastStateChangeAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the breaker last changed state"
+          },
+          "opensInLast24h": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "closed→open transitions in the last 24 hours"
+          }
+        },
+        "required": [
+          "state",
+          "failuresInWindow",
+          "lastStateChangeAt",
+          "opensInLast24h"
+        ],
+        "description": "In-memory circuit breaker state; null when the provider has no recorded calls yet (P3-01)"
       },
       "ProvidersMonitoringResponse": {
         "type": "object",
@@ -24648,6 +24690,9 @@
                       "description": "Rolling 15-minute call-log window"
                     }
                   ]
+                },
+                "circuitBreaker": {
+                  "$ref": "#/components/schemas/CircuitBreakerState"
                 }
               },
               "required": [
@@ -24656,7 +24701,8 @@
                 "providerType",
                 "apiType",
                 "probeStatus",
-                "rolling"
+                "rolling",
+                "circuitBreaker"
               ]
             },
             "description": "All providers with their rolling stats"
@@ -26732,6 +26778,35 @@
           "defaultCooldownMinutes": 15
         },
         "description": "Alert engine settings (P2-01 consumes this)"
+      },
+      "CircuitBreakerSettings": {
+        "type": "object",
+        "properties": {
+          "failureThreshold": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 5,
+            "description": "Qualifying call failures within windowMs that open a provider's circuit breaker (P3-01)"
+          },
+          "windowMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "default": 60000,
+            "description": "Sliding window in milliseconds for counting breaker failures (P3-01)"
+          },
+          "cooldownMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "default": 300000,
+            "description": "open → half-open cooldown in milliseconds (P3-01)"
+          }
+        },
+        "default": {
+          "failureThreshold": 5,
+          "windowMs": 60000,
+          "cooldownMs": 300000
+        },
+        "description": "Per-provider circuit breaker policy (P3-01 consumes this; applied live, no restart)"
       },
       "AlertRuleCatalogResponse": {
         "type": "object",
@@ -67796,6 +67871,9 @@
                                 "description": "Rolling 15-minute call-log window"
                               }
                             ]
+                          },
+                          "circuitBreaker": {
+                            "$ref": "#/components/schemas/CircuitBreakerState"
                           }
                         },
                         "required": [
@@ -67804,7 +67882,8 @@
                           "providerType",
                           "apiType",
                           "probeStatus",
-                          "rolling"
+                          "rolling",
+                          "circuitBreaker"
                         ]
                       },
                       "description": "All providers with their rolling stats"
@@ -68865,6 +68944,9 @@
                         },
                         "alerting": {
                           "$ref": "#/components/schemas/AlertingSettings"
+                        },
+                        "circuitBreaker": {
+                          "$ref": "#/components/schemas/CircuitBreakerSettings"
                         }
                       },
                       "description": "The current validated monitoring config"
@@ -68948,6 +69030,9 @@
                       },
                       "alerting": {
                         "$ref": "#/components/schemas/AlertingSettings"
+                      },
+                      "circuitBreaker": {
+                        "$ref": "#/components/schemas/CircuitBreakerSettings"
                       }
                     },
                     "description": "Full replacement config (no partial updates)"
@@ -68999,6 +69084,9 @@
                         },
                         "alerting": {
                           "$ref": "#/components/schemas/AlertingSettings"
+                        },
+                        "circuitBreaker": {
+                          "$ref": "#/components/schemas/CircuitBreakerSettings"
                         }
                       },
                       "description": "The current validated monitoring config"

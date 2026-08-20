@@ -87,6 +87,12 @@ export async function globalSetup(): Promise<void> {
   // NotifyingPublisher: tsyringe keeps the token provider cache separate from
   // the @singleton class cache.)
   (globalThis as any).__TEST_ALERT_PUBLISHER__ = (iocContainer.resolve(AlertRuleEngine) as any).publisher;
+  // P3-01: app-world LLM provider factory — e2e drives the instrumented
+  // generate() path directly (there is no HTTP endpoint that runs an LLM turn
+  // in the e2e process: quick prompts are templates, conversation input is
+  // WebSocket-only) so a bogus-URL provider can trip the circuit breaker.
+  const { LlmProviderFactory } = await import('../src/services/providers/llm/LlmProviderFactory');
+  (globalThis as any).__TEST_LLM_FACTORY__ = iocContainer.resolve(LlmProviderFactory);
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)

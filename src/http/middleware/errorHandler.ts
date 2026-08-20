@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError, ArchivedProjectError, TooManyRequestsError, ConflictError, ValidationError, OAuthTokenRefreshError } from '../../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, RemoteConnectionError, AccessDeniedError, UnauthorizedError, ForbiddenError, ArchivedProjectError, TooManyRequestsError, ConflictError, ValidationError, OAuthTokenRefreshError, CircuitOpenError } from '../../errors';
 import logger from '../../utils/logger';
 
 /**
@@ -62,6 +62,14 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
   }
 
   if (err instanceof RemoteConnectionError) {
+    res.status(502).json({ error: err.message });
+    return;
+  }
+
+  // Safety net only — failover wrappers (P3-03/P3-04) catch CircuitOpenError
+  // before it can reach the handler; raw escape means a missing wrapper.
+  if (err instanceof CircuitOpenError) {
+    logger.error({ providerId: err.providerId }, 'CircuitOpenError escaped the failover wrapper — check P3-03/P3-04 wiring');
     res.status(502).json({ error: err.message });
     return;
   }

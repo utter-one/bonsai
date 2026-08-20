@@ -1,10 +1,11 @@
-import { singleton } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import { db } from '../../db';
 import { providerCallLogs } from '../../db/schema';
 import type { CallMetrics } from '../../db/schema';
 import { generateId } from '../../utils/idGenerator';
 import logger from '../../utils/logger';
 import { MonitoringContext } from './MonitoringContext';
+import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
 
 /**
  * Bounded in-memory buffer for provider_call_logs rows (PROPOSAL §3.2a).
@@ -81,7 +82,12 @@ export class CallLogger {
   private lastOverflowWarnAt = 0;
   lastFlushError: unknown = null;
 
-  constructor() {
+  /**
+   * The registry is always injected in production; the parameter is optional
+   * so test subclasses that use an implicit `super()` (P1-03's QuietCallLogger)
+   * keep working — the hook is simply skipped when no registry was passed.
+   */
+  constructor(@inject(CircuitBreakerRegistry) private readonly breakerRegistry?: CircuitBreakerRegistry) {
     this.bufferSize = readBufferSizeFromEnv();
   }
 
@@ -103,6 +109,12 @@ export class CallLogger {
         projectId: entry.projectId ?? ctx?.projectId ?? null,
         conversationId: entry.conversationId ?? ctx?.conversationId ?? null,
       };
+      // P3-01: feed the per-provider circuit breaker (in-memory, never throws).
+      if (full.ok) {
+        this.breakerRegistry?.recordSuccess(full.providerId);
+      } else {
+        this.breakerRegistry?.recordFailure(full.providerId, full.errorCode);
+      }
       this.buffer.push(full);
       if (this.buffer.length > this.bufferSize) {
         this.buffer.shift(); // bounded: drop oldest

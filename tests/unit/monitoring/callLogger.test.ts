@@ -4,11 +4,36 @@ import { CallLogger, type ProviderCallEntry } from '../../../src/services/monito
 import type { ProviderCallLogRow } from '../../../src/services/monitoring/CallLogger';
 import { MonitoringContext } from '../../../src/services/monitoring/MonitoringContext';
 
+/** P3-01 test double: records the breaker hooks instead of touching real breakers. */
+class FakeBreakerRegistry {
+  successes: string[] = [];
+  failures: Array<{ providerId: string; errorCode: string | null | undefined }> = [];
+
+  recordSuccess(providerId: string): void {
+    this.successes.push(providerId);
+  }
+
+  recordFailure(providerId: string, errorCode: string | null | undefined): void {
+    this.failures.push({ providerId, errorCode });
+  }
+}
+
 /** Test seam: exposes the private buffer and captures rows instead of hitting the DB. */
 class TestCallLogger extends CallLogger {
   rows: any[] = [];
   flushErrors: unknown[] = [];
   failPersists = false;
+  private readonly fakeBreakers: FakeBreakerRegistry;
+
+  constructor(breakerRegistry?: FakeBreakerRegistry) {
+    const fake = breakerRegistry ?? new FakeBreakerRegistry();
+    super(fake as never);
+    this.fakeBreakers = fake;
+  }
+
+  get breakerRegistryForTests(): FakeBreakerRegistry {
+    return this.fakeBreakers;
+  }
 
   get pendingEntries(): ProviderCallEntry[] {
     return this.buffer;
@@ -177,6 +202,31 @@ describe('CallLogger (P1-02)', () => {
       logger = new TestCallLogger();
       for (let i = 0; i < 10; i++) logger.record(validEntry());
       expect(logger.pendingEntries.length).to.equal(10);
+    });
+  });
+
+  describe('circuit breaker wiring (P3-01)', () => {
+    it('feeds successes to the registry', () => {
+      logger.record(validEntry({ ok: true, providerId: 'prov_ok' }));
+      expect(logger.breakerRegistryForTests.successes).to.deep.equal(['prov_ok']);
+      expect(logger.breakerRegistryForTests.failures).to.be.empty;
+    });
+
+    it('feeds failures with their errorCode to the registry', () => {
+      logger.record(validEntry({ ok: false, errorCode: 'timeout', providerId: 'prov_fail' }));
+      expect(logger.breakerRegistryForTests.failures).to.deep.equal([{ providerId: 'prov_fail', errorCode: 'timeout' }]);
+      expect(logger.breakerRegistryForTests.successes).to.be.empty;
+    });
+
+    it('passes null errorCode through (the breaker treats it as unknown)', () => {
+      logger.record(validEntry({ ok: false, errorCode: null, providerId: 'prov_unknown' }));
+      expect(logger.breakerRegistryForTests.failures).to.deep.equal([{ providerId: 'prov_unknown', errorCode: null }]);
+    });
+
+    it('invalid entries are dropped before reaching the breaker', () => {
+      logger.record({ providerId: '', providerType: 'llm', apiType: 'openai', ok: false, durationMs: 1 } as never);
+      expect(logger.breakerRegistryForTests.failures).to.be.empty;
+      expect(logger.breakerRegistryForTests.successes).to.be.empty;
     });
   });
 });

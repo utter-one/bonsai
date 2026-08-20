@@ -313,11 +313,17 @@ describe('Alert notifiers (P2-02, e2e)', () => {
       expect(critical.severity).to.equal('critical');
       expect(critical.notifications[0].ok).to.equal(true);
 
-      await waitFor('webhook delivery', async () => (receiver.received.length >= 1 ? receiver.received[0] : undefined));
-      const body = receiver.received[0].body as Record<string, unknown>;
+      // The app's background engine tick (1 s) can deliver unrelated
+      // fire/resolve events to this receiver (its rules run against the
+      // saved config) — assert on the provider-down delivery itself and on
+      // the absence of the warning one, not on total delivery count.
+      const down = await waitFor('webhook delivery for provider-down', async () =>
+        receiver.received.find((m) => (m.body as Record<string, unknown>).ruleId === 'provider-down'),
+      );
+      const body = down.body as Record<string, unknown>;
       expect(body.ruleId).to.equal('provider-down');
       expect(body.severity).to.equal('critical');
-      expect(receiver.received).to.have.length(1);
+      expect(receiver.received.some((m) => (m.body as Record<string, unknown>).ruleId === 'high-memory')).to.equal(false);
     } finally {
       await receiver.close();
     }

@@ -403,9 +403,9 @@ describe('P1-05b HealthCheckService ASR/TTS probe branches', () => {
 
     const rows = byName(service.persisted[0]);
     expect(rows['provider:prov_asr']?.status).to.equal('ok');
-    expect(rows['provider:prov_asr']?.detail).to.deep.equal({ probed: true });
+    expect(rows['provider:prov_asr']?.detail).to.deep.equal({ probed: true, circuitBreaker: 'closed' }); // P3-01: no registry in this test → 'closed'
     expect(rows['provider:prov_tts']?.status).to.equal('ok');
-    expect(rows['provider:prov_tts']?.detail).to.deep.equal({ probed: true });
+    expect(rows['provider:prov_tts']?.detail).to.deep.equal({ probed: true, circuitBreaker: 'closed' }); // P3-01: no registry in this test → 'closed'
     expect(asrCalls).to.have.length(1);
     expect(ttsCalls).to.have.length(1);
     restoreEnv();

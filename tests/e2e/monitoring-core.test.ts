@@ -25,7 +25,18 @@ describe('Monitoring core (P1-02)', () => {
 
       await registry.flushNow();
 
-      const rows = await db.select().from(metricSamples);
+      // Filter to this test's own (name, labels) series — other suites leave
+      // in-memory series (e.g. circuit_breaker_state gauges) that this
+      // flushNow() also persists.
+      // Sorted-key series identity (jsonb key order is not guaranteed).
+      const seriesKey = (r: { name: string; labels: Record<string, unknown> }) =>
+        `${r.name}|${Object.keys(r.labels).sort().map((k) => `${k}=${String(r.labels[k])}`).join(',')}`;
+      const own = new Set([
+        'api_requests_total|method=GET,route_group=e2e,status_class=2xx',
+        'llm_ttft_ms|provider_id=prov_e2e',
+        'active_conversations|',
+      ]);
+      const rows = (await db.select().from(metricSamples)).filter((r) => own.has(seriesKey(r)));
       const byName = new Map(rows.map((r) => [r.name, r] as const));
       expect(byName.size).to.equal(3);
 
@@ -47,9 +58,9 @@ describe('Monitoring core (P1-02)', () => {
       expect(gauge.min).to.equal(4);
       expect(gauge.max).to.equal(4);
 
-      // flush again with no changes — no new rows
+      // flush again with no changes — no new rows for our series
       await registry.flushNow();
-      const after = await db.select().from(metricSamples);
+      const after = (await db.select().from(metricSamples)).filter((r) => own.has(seriesKey(r)));
       expect(after.length).to.equal(rows.length);
     });
   });
