@@ -5,7 +5,7 @@ import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, 
 import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS } from "../../types/actions";
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
-import { conversations, users, sampleCopies, conversationArtifacts } from "../../db/schema";
+import { conversations, users, sampleCopies, conversationArtifacts, providers } from "../../db/schema";
 import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility, VariablesUpdatedEventData, TurnAbortedEventData } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { ConversationStorageService } from "../ConversationStorageService";
@@ -17,10 +17,15 @@ import { getEffectiveChannelType } from "../../channels/SessionManager";
 import type { IClientConnection } from '../../channels/IClientConnection';
 import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage, CALAbortAiGenerationOutputMessage,   CALUserSpeakingStartedMessage, CALAttachFileOutputMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult, LlmMessage } from "../providers/llm/ILlmProvider";
+import { FailoverLlmProvider } from "../providers/llm/FailoverLlmProvider";
+import { FallbackResolver } from "../providers/FallbackResolver";
 import { buildLlmUsage, LlmProviderInfo, LlmUsageMetadata } from '../../utils/llmUsage';
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
-import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
+import { LlmProviderFactory, LlmSettings } from "../providers/llm/LlmProviderFactory";
+import { CircuitBreakerRegistry } from "../monitoring/CircuitBreakerRegistry";
+import { FallbackEventService } from "../monitoring/FallbackEventService";
+import { MetricsRegistry } from "../monitoring/MetricsRegistry";
 import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { MonitoringContext } from "../monitoring/MonitoringContext";
@@ -301,6 +306,10 @@ export class ConversationRunner {
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
     @inject(ModerationService) private moderationService: ModerationService,
     @inject(ConversationStorageService) private conversationStorageService: ConversationStorageService,
+    @inject(FallbackResolver) private fallbackResolver: FallbackResolver,
+    @inject(CircuitBreakerRegistry) private breakerRegistry: CircuitBreakerRegistry,
+    @inject(FallbackEventService) private fallbackEventService: FallbackEventService,
+    @inject(MetricsRegistry) private metricsRegistry: MetricsRegistry,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -388,7 +397,7 @@ export class ConversationRunner {
     if (stage.llmProviderId) {
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, stage.llmProviderId) });
       if (llmProviderEntity) {
-        stageData.completionLlmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, stage.llmSettings);
+        stageData.completionLlmProvider = await this.createLlmProviderWithFailover(llmProviderEntity, stage.llmSettings);
         stageData.completionLlmProviderInfo = { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType };
       }
     }
@@ -428,7 +437,7 @@ export class ConversationRunner {
       if (!llmProviderEntity) {
         throw new NotFoundError(`LLM Provider with ID ${classifier.llmProviderId} not found for classifier ${classifierId}`);
       }
-      const llmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, classifier.llmSettings);
+      const llmProvider = await this.createLlmProviderWithFailover(llmProviderEntity, classifier.llmSettings);
       stageData.classifiers.push({ classifier, llmProvider, llmProviderInfo: { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType } });
     }
 
@@ -444,7 +453,7 @@ export class ConversationRunner {
       if (!llmProviderEntity) {
         throw new NotFoundError(`LLM Provider with ID ${transformer.llmProviderId} not found for transformer ${transformerId}`);
       }
-      const llmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, transformer.llmSettings);
+      const llmProvider = await this.createLlmProviderWithFailover(llmProviderEntity, transformer.llmSettings);
       stageData.transformers.push({ transformer, llmProvider, llmProviderInfo: { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType } });
     }
 
@@ -511,7 +520,7 @@ export class ConversationRunner {
         }
         stageData.guardrailClassifier = {
           classifier: guardrailClassifierEntity,
-          llmProvider: await this.llmProviderFactory.createProvider(guardrailLlmProviderEntity, guardrailClassifierEntity.llmSettings),
+          llmProvider: await this.createLlmProviderWithFailover(guardrailLlmProviderEntity, guardrailClassifierEntity.llmSettings),
           llmProviderInfo: { id: guardrailLlmProviderEntity.id, apiType: guardrailLlmProviderEntity.apiType },
         };
       } else {
@@ -543,7 +552,7 @@ export class ConversationRunner {
           }
           stageData.sampleCopyClassifier = {
             classifier: sampleCopyClassifierEntity,
-            llmProvider: await this.llmProviderFactory.createProvider(sampleCopyLlmProviderEntity, sampleCopyClassifierEntity.llmSettings),
+            llmProvider: await this.createLlmProviderWithFailover(sampleCopyLlmProviderEntity, sampleCopyClassifierEntity.llmSettings),
             llmProviderInfo: { id: sampleCopyLlmProviderEntity.id, apiType: sampleCopyLlmProviderEntity.apiType },
           };
         } else {
@@ -565,7 +574,7 @@ export class ConversationRunner {
     if (agent.fillerSettings?.llmProviderId) {
       const fillerLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.fillerSettings.llmProviderId) });
       if (fillerLlmProviderEntity) {
-        stageData.fillerLlmProvider = await this.llmProviderFactory.createProvider(fillerLlmProviderEntity, agent.fillerSettings.llmSettings);
+        stageData.fillerLlmProvider = await this.createLlmProviderWithFailover(fillerLlmProviderEntity, agent.fillerSettings.llmSettings);
         stageData.fillerLlmProviderInfo = { id: fillerLlmProviderEntity.id, apiType: fillerLlmProviderEntity.apiType };
       } else {
         logger.warn({ agentId: agent.id, llmProviderId: agent.fillerSettings.llmProviderId }, 'Filler LLM provider not found, filler responses will be skipped');
@@ -2890,6 +2899,26 @@ export class ConversationRunner {
     }
 
     logger.info({ conversationId: this.conversation.id, count: this.pendingFileAttachments.length }, 'Delivered file attachments');
+  }
+
+  /**
+   * Creates the stage's LLM provider and, when the provider has fallbacks
+   * configured (P3-03), wraps it in a FailoverLlmProvider so setup-phase
+   * failures transparently try the rest of the chain. Chains are resolved
+   * once per conversation (the resolver caches by id+version).
+   */
+  private async createLlmProviderWithFailover(entity: typeof providers.$inferSelect, settings: LlmSettings): Promise<ILlmProvider> {
+    const primary = await this.llmProviderFactory.createProvider(entity, settings);
+    const chain = await this.fallbackResolver.resolveChain(entity.id);
+    if (chain.length <= 1) {
+      return primary;
+    }
+    return new FailoverLlmProvider(entity.id, primary, chain.slice(1), settings, {
+      factory: this.llmProviderFactory,
+      breakerRegistry: this.breakerRegistry,
+      fallbackEvents: this.fallbackEventService,
+      metrics: this.metricsRegistry,
+    });
   }
 
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {

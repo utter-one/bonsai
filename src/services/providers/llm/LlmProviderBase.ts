@@ -31,6 +31,8 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   providerId?: string;
   providerApiType?: string;
   providerModel?: string;
+  /** Stamped by FailoverLlmProvider (P3-03) for non-primary attempts — the chain's primary id. */
+  fallbackOfProviderId?: string;
 
   /** Per-call streaming accumulator for the in-flight call (provider instances are per use-site). */
   private activeStats: StreamStats | null = null;
@@ -355,6 +357,7 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
       durationMs: stats.durationMs(),
       ok: error === null,
       error: error ?? undefined,
+      fallbackProviderId: this.fallbackOfProviderId ?? null,
       metrics,
     });
     if (error === null) {
@@ -379,6 +382,7 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
       durationMs: Date.now() - startedAt,
       ok: error === null,
       error: error ?? undefined,
+      fallbackProviderId: this.fallbackOfProviderId ?? null,
     });
   }
 }

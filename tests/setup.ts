@@ -98,6 +98,20 @@ export async function globalSetup(): Promise<void> {
   // ProviderService invalidates hooks into.
   const { FallbackResolver } = await import('../src/services/providers/FallbackResolver');
   (globalThis as any).__TEST_FALLBACK_RESOLVER__ = iocContainer.resolve(FallbackResolver);
+  // P3-03: app-world breaker registry, fallback-event writer, and call logger
+  // (the logger seam lets e2e flushNow() the app's buffered provider_call_logs
+  // rows instead of waiting for the 5 s batch timer).
+  const { CircuitBreakerRegistry } = await import('../src/services/monitoring/CircuitBreakerRegistry');
+  const { FallbackEventService } = await import('../src/services/monitoring/FallbackEventService');
+  const { CallLogger: AppCallLogger } = await import('../src/services/monitoring/CallLogger');
+  const { FailoverLlmProvider: AppFailoverLlmProvider } = await import('../src/services/providers/llm/FailoverLlmProvider');
+  (globalThis as any).__TEST_BREAKER_REGISTRY__ = iocContainer.resolve(CircuitBreakerRegistry);
+  (globalThis as any).__TEST_FALLBACK_EVENTS__ = iocContainer.resolve(FallbackEventService);
+  (globalThis as any).__TEST_CALL_LOGGER__ = iocContainer.resolve(AppCallLogger);
+  // App-world wrapper CLASS: e2e must construct it from the app's module
+  // graph so instanceof checks and CircuitOpenError identity match the
+  // app-world provider instances it wraps.
+  (globalThis as any).__TEST_FAILOVER_PROVIDER__ = AppFailoverLlmProvider;
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)
