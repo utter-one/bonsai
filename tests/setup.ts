@@ -112,6 +112,15 @@ export async function globalSetup(): Promise<void> {
   // graph so instanceof checks and CircuitOpenError identity match the
   // app-world provider instances it wraps.
   (globalThis as any).__TEST_FAILOVER_PROVIDER__ = AppFailoverLlmProvider;
+  // P3-04: app-world TTS/ASR/storage failover wrapper CLASSES (same dual-module
+  // graph reason). Their breaker gate checks `instanceof CircuitOpenError` from
+  // the app graph, so the registry passed in must be the app-world one above.
+  const { FailoverTtsProvider: AppFailoverTtsProvider } = await import('../src/services/providers/tts/FailoverTtsProvider');
+  const { FailoverAsrProvider: AppFailoverAsrProvider } = await import('../src/services/providers/asr/FailoverAsrProvider');
+  const { FailoverStorageProvider: AppFailoverStorageProvider } = await import('../src/services/providers/storage/FailoverStorageProvider');
+  (globalThis as any).__TEST_FAILOVER_TTS__ = AppFailoverTtsProvider;
+  (globalThis as any).__TEST_FAILOVER_ASR__ = AppFailoverAsrProvider;
+  (globalThis as any).__TEST_FAILOVER_STORAGE__ = AppFailoverStorageProvider;
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)

@@ -19,6 +19,14 @@ export abstract class StorageProviderBase<TConfig> implements IStorageProvider {
   providerId?: string;
   providerApiType?: string;
 
+  /** Stamped by the P3-04 failover wrapper on non-primary instances — operation rows carry `fallback_provider_id`. */
+  fallbackOfProviderId?: string;
+
+  /** P3-04 failover attribution — implemented for the `IStorageProvider` interface. */
+  setFallbackOf(providerId: string): void {
+    this.fallbackOfProviderId = providerId;
+  }
+
   constructor(config: TConfig) {
     this.config = config;
   }
@@ -76,6 +84,7 @@ export abstract class StorageProviderBase<TConfig> implements IStorageProvider {
       durationMs: Date.now() - startedAt,
       ok: error === null,
       error: error ?? undefined,
+      fallbackProviderId: this.fallbackOfProviderId ?? null,
       metrics,
     });
   }

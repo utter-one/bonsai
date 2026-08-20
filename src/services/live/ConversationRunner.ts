@@ -18,6 +18,8 @@ import type { IClientConnection } from '../../channels/IClientConnection';
 import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage, CALAbortAiGenerationOutputMessage,   CALUserSpeakingStartedMessage, CALAttachFileOutputMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult, LlmMessage } from "../providers/llm/ILlmProvider";
 import { FailoverLlmProvider } from "../providers/llm/FailoverLlmProvider";
+import { FailoverTtsProvider } from "../providers/tts/FailoverTtsProvider";
+import { FailoverAsrProvider } from "../providers/asr/FailoverAsrProvider";
 import { FallbackResolver } from "../providers/FallbackResolver";
 import { buildLlmUsage, LlmProviderInfo, LlmUsageMetadata } from '../../utils/llmUsage';
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
@@ -585,7 +587,7 @@ export class ConversationRunner {
     if (project.generateVoice && agent.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
       const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.ttsProviderId) });
       if (voiceProviderEntity && ttsSettings) {
-        stageData.ttsProvider = await this.ttsProviderFactory.createProvider(voiceProviderEntity, ttsSettings);
+        stageData.ttsProvider = await this.createTtsProviderWithFailover(voiceProviderEntity, ttsSettings);
       }
     }
 
@@ -595,7 +597,7 @@ export class ConversationRunner {
     if (project.acceptVoice && project.asrConfig?.asrProviderId && this.session.sessionSettings.sendVoiceInput) {
       const asrProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, project.asrConfig.asrProviderId) });
       if (asrProviderEntity) {
-        stageData.asrProvider = await this.asrProviderFactory.createProvider(asrProviderEntity, project.asrConfig.settings ?? {});
+        stageData.asrProvider = await this.createAsrProviderWithFailover(asrProviderEntity, project.asrConfig.settings ?? {});
       } else {
         throw new NotFoundError(`ASR Provider with ID ${project.asrConfig.asrProviderId} not found`);
       }
@@ -2915,6 +2917,67 @@ export class ConversationRunner {
     }
     return new FailoverLlmProvider(entity.id, primary, chain.slice(1), settings, {
       factory: this.llmProviderFactory,
+      breakerRegistry: this.breakerRegistry,
+      fallbackEvents: this.fallbackEventService,
+      metrics: this.metricsRegistry,
+    });
+  }
+
+  /**
+   * P3-04 — creates the conversation TTS provider with its fallback chain
+   * (P3-02) attached. Fallback instances are created eagerly because the
+   * output-format compatibility check needs the instances; an incompatible
+   * fallback is skipped (pino warn + `fallback_incompatible_total`) and the
+   * chain becomes the compatible prefix.
+   */
+  private async createTtsProviderWithFailover(entity: typeof providers.$inferSelect, settings: TtsSettings): Promise<ITtsProvider> {
+    const primary = await this.ttsProviderFactory.createProvider(entity, settings);
+    const chain = await this.fallbackResolver.resolveChain(entity.id);
+    if (chain.length <= 1) {
+      return primary;
+    }
+    const prefix: typeof chain = [];
+    const precreated = new Map<string, ITtsProvider>();
+    const primaryFormat = primary.getOutputFormat();
+    for (const step of chain.slice(1)) {
+      const stepSettings = { ...settings, ...(step.settings ?? {}) } as TtsSettings;
+      const instance = await this.ttsProviderFactory.createProvider(step.provider, stepSettings);
+      if (instance.getOutputFormat() !== primaryFormat) {
+        this.metricsRegistry.inc('fallback_incompatible_total', { provider_id: step.provider.id });
+        logger.warn(
+          { primaryId: entity.id, fallbackProviderId: step.provider.id, primaryFormat, fallbackFormat: instance.getOutputFormat() },
+          'Failover (TTS): incompatible output format — skipping fallback and the rest of the chain',
+        );
+        break;
+      }
+      precreated.set(step.provider.id, instance);
+      prefix.push(step);
+    }
+    if (prefix.length === 0) {
+      return primary;
+    }
+    return new FailoverTtsProvider(entity.id, primary, prefix, settings, {
+      factory: this.ttsProviderFactory,
+      breakerRegistry: this.breakerRegistry,
+      fallbackEvents: this.fallbackEventService,
+      metrics: this.metricsRegistry,
+      precreatedInstances: precreated,
+    });
+  }
+
+  /**
+   * P3-04 — creates the conversation ASR provider with its fallback chain
+   * attached. ASR has no output-format constraint (the chain is type-checked
+   * by P3-02), so fallback instances stay lazy inside the wrapper.
+   */
+  private async createAsrProviderWithFailover(entity: typeof providers.$inferSelect, settings: unknown): Promise<IAsrProvider> {
+    const primary = await this.asrProviderFactory.createProvider(entity, settings);
+    const chain = await this.fallbackResolver.resolveChain(entity.id);
+    if (chain.length <= 1) {
+      return primary;
+    }
+    return new FailoverAsrProvider(entity.id, primary, chain.slice(1), settings, {
+      factory: this.asrProviderFactory,
       breakerRegistry: this.breakerRegistry,
       fallbackEvents: this.fallbackEventService,
       metrics: this.metricsRegistry,

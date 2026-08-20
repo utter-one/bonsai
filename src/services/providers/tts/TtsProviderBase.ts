@@ -49,6 +49,14 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
   providerId?: string;
   providerApiType?: string;
 
+  /** Stamped by the P3-04 failover wrapper on non-primary instances — session rows carry `fallback_provider_id`. */
+  fallbackOfProviderId?: string;
+
+  /** P3-04 failover attribution — implemented for the `ITtsProvider` interface. */
+  setFallbackOf(providerId: string): void {
+    this.fallbackOfProviderId = providerId;
+  }
+
   private activeSession: TtsSessionStats | null = null;
 
   /**
@@ -93,7 +101,14 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
       error: null,
       recorded: false,
     };
-    await this.doStart();
+    try {
+      await this.doStart();
+    } catch (error) {
+      // Failed setup: the session is dead — record the row so the failed
+      // attempt is observable (and P3-04 failover transitions have a trace).
+      this.failSession(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
   }
 
   /**
@@ -133,7 +148,14 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
    * @param text The text content to be converted to speech
    */
   async sendText(text: string): Promise<void> {
-    await this.doSendText(text);
+    try {
+      await this.doSendText(text);
+    } catch (error) {
+      // A rejected send kills the session — record the row (P3-04 failover
+      // decides from here whether to rebuild on the next provider).
+      this.failSession(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
   }
 
   /**
@@ -229,6 +251,7 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
       durationMs: Date.now() - session.startedAt,
       ok,
       error: error ?? undefined,
+      fallbackProviderId: this.fallbackOfProviderId ?? null,
       metrics,
     });
 

@@ -4,6 +4,11 @@ import { db } from '../db/index';
 import { providers, conversationArtifacts } from '../db/schema';
 import type { ArtifactType } from '../db/schema';
 import { StorageProviderFactory } from './providers/storage/StorageProviderFactory';
+import { FailoverStorageProvider } from './providers/storage/FailoverStorageProvider';
+import { FallbackResolver } from './providers/FallbackResolver';
+import { CircuitBreakerRegistry } from './monitoring/CircuitBreakerRegistry';
+import { FallbackEventService } from './monitoring/FallbackEventService';
+import { MetricsRegistry } from './monitoring/MetricsRegistry';
 import type { IStorageProvider } from './providers/storage/IStorageProvider';
 import type { StorageMetadata } from './providers/storage/IStorageProvider';
 import type { ErrorCallback } from '../types/callbacks';
@@ -18,7 +23,13 @@ import { getArtifactExtension } from '../utils/audioFormat';
  */
 @singleton()
 export class ConversationStorageService {
-  constructor(@inject(StorageProviderFactory) private readonly storageFactory: StorageProviderFactory) {}
+  constructor(
+    @inject(StorageProviderFactory) private readonly storageFactory: StorageProviderFactory,
+    @inject(FallbackResolver) private readonly fallbackResolver: FallbackResolver,
+    @inject(CircuitBreakerRegistry) private readonly breakerRegistry: CircuitBreakerRegistry,
+    @inject(FallbackEventService) private readonly fallbackEventService: FallbackEventService,
+    @inject(MetricsRegistry) private readonly metricsRegistry: MetricsRegistry,
+  ) {}
 
   /**
    * Upload a conversation artifact to storage and save metadata to database
@@ -174,7 +185,11 @@ export class ConversationStorageService {
   }
 
   /**
-   * Get storage provider instance
+   * Get storage provider instance.
+   * P3-04: when the provider has a fallback chain (P3-02), the instance is
+   * wrapped in a `FailoverStorageProvider` so `upload`/`download` fail over
+   * per operation (the resolver caches by id+version, so the per-operation
+   * resolve is a cache hit).
    */
   private async getStorageProvider(storageProviderId: string, storageSettings: unknown, errorCallback?: ErrorCallback): Promise<IStorageProvider> {
     const provider = await db.query.providers.findFirst({ where: eq(providers.id, storageProviderId) });
@@ -187,12 +202,27 @@ export class ConversationStorageService {
       throw new InvalidOperationError(`Provider ${storageProviderId} is not a storage provider (type: ${provider.providerType})`);
     }
 
-    const instance = await this.storageFactory.createProvider(provider, storageSettings as Record<string, unknown>);
-    
+    const settings = storageSettings as Record<string, unknown>;
+    const chain = await this.fallbackResolver.resolveChain(provider.id);
+    if (chain.length > 1) {
+      // The wrapper creates (and init()-es) instances per attempt, so a
+      // primary whose init rejects fails over instead of failing the operation.
+      const wrapped = new FailoverStorageProvider(provider, chain.slice(1), settings, {
+        factory: this.storageFactory,
+        breakerRegistry: this.breakerRegistry,
+        fallbackEvents: this.fallbackEventService,
+        metrics: this.metricsRegistry,
+      });
+      if (errorCallback) {
+        wrapped.setOnError(errorCallback);
+      }
+      return wrapped;
+    }
+
+    const instance = await this.storageFactory.createProvider(provider, settings);
     if (errorCallback) {
       instance.setOnError(errorCallback);
     }
-    
     return instance;
   }
 

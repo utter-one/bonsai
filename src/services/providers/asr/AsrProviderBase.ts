@@ -44,6 +44,14 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
   providerId?: string;
   providerApiType?: string;
 
+  /** Stamped by the P3-04 failover wrapper on non-primary instances — session rows carry `fallback_provider_id`. */
+  fallbackOfProviderId?: string;
+
+  /** P3-04 failover attribution — implemented for the `IAsrProvider` interface. */
+  setFallbackOf(providerId: string): void {
+    this.fallbackOfProviderId = providerId;
+  }
+
   private activeSession: AsrSessionStats | null = null;
 
   /** Callback for partial recognition results */
@@ -226,6 +234,7 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
       durationMs: Date.now() - session.startedAt,
       ok,
       error,
+      fallbackProviderId: this.fallbackOfProviderId ?? null,
       metrics,
     });
 

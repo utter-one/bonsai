@@ -133,4 +133,11 @@ export interface IAsrProvider {
    * Must be called when the provider is no longer needed (e.g. on client disconnect).
    */
   cleanup(): Promise<void>;
+
+  /**
+   * Marks this instance as a fallback for another provider (P3-04).
+   * Implemented by the provider bases so their call-log rows carry
+   * `fallback_provider_id`. Absent on plain test doubles.
+   */
+  setFallbackOf?(providerId: string): void;
 }
