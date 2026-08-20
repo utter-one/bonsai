@@ -1,9 +1,9 @@
 ---
 title: "P4-02 — Telegram + Twilio SMS + WhatsApp alert notifiers"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
-updated: 2026-08-19
+updated: 2026-08-20
 assignee: ""
 tags: [monitoring, spec, phase-4]
 ---
