@@ -93,6 +93,11 @@ export async function globalSetup(): Promise<void> {
   // WebSocket-only) so a bogus-URL provider can trip the circuit breaker.
   const { LlmProviderFactory } = await import('../src/services/providers/llm/LlmProviderFactory');
   (globalThis as any).__TEST_LLM_FACTORY__ = iocContainer.resolve(LlmProviderFactory);
+  // P3-02: app-world fallback resolver — its chain cache lives in the app's
+  // singleton, so tests must resolve through the same instance the
+  // ProviderService invalidates hooks into.
+  const { FallbackResolver } = await import('../src/services/providers/FallbackResolver');
+  (globalThis as any).__TEST_FALLBACK_RESOLVER__ = iocContainer.resolve(FallbackResolver);
 
   // 5. Create initial operator and capture tokens
   const res = await request(app)

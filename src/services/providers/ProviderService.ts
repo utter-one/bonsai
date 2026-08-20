@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, desc, sql, SQL } from 'drizzle-orm';
+import { eq, and, desc, sql, SQL, inArray as drizzleInArray } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../../utils/textSearch';
 import { db } from '../../db/index';
 import { providers } from '../../db/schema';
@@ -20,6 +20,9 @@ import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
 import { LlmProviderFactory } from './llm/LlmProviderFactory';
 import type { LlmModelInfo } from './ProviderCatalogService';
 import { SecretRefUtils, SENSITIVE_PROVIDER_CONFIG_FIELDS } from '../secrets/SecretRefUtils';
+import { FallbackResolver } from './FallbackResolver';
+import { validateFallbacks, type FallbackGraphNodes } from './fallbackValidation';
+import type { ProviderFallback } from '../../db/schema';
 
 /**
  * Service for managing provider configurations with full CRUD operations and audit logging
@@ -32,6 +35,7 @@ export class ProviderService extends BaseService {
     @inject(LlmProviderFactory) private readonly llmProviderFactory: LlmProviderFactory,
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
     @inject(ImapInboundService) private readonly imapInboundService: ImapInboundService,
+    @inject(FallbackResolver) private readonly fallbackResolver: FallbackResolver,
   ) {
     super();
   }
@@ -47,10 +51,17 @@ export class ProviderService extends BaseService {
     const providerId = input.id ?? generateId(ID_PREFIXES.PROVIDER);
     logger.info({ providerId, name: input.name, providerType: input.providerType, apiType: input.apiType, operatorId: context?.operatorId }, 'Creating provider');
 
+    // Normalize settings: the contract allows null, the column stores undefined.
+    const fallbacks = input.fallbacks.map((f) => ({ providerId: f.providerId, settings: f.settings ?? undefined }));
+    if (fallbacks.length > 0) {
+      await this.validateFallbacks(providerId, input.providerType, fallbacks);
+    }
+
     const secretizedConfig = await this.secretRefUtils.secretizeObject(input.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS);
-    const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: secretizedConfig as typeof input.config, createdBy: context?.operatorId, tags: input.tags, version: 1 }).returning();
+    const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: secretizedConfig as typeof input.config, fallbacks, createdBy: context?.operatorId, tags: input.tags, version: 1 }).returning();
 
     const createdProvider = provider[0];
+    this.fallbackResolver.invalidate(createdProvider.id);
 
     const { config: _config, ...safeCreatedProvider } = createdProvider;
     await this.auditService.logCreate('provider', createdProvider.id, safeCreatedProvider, context?.operatorId);
@@ -173,11 +184,19 @@ export class ProviderService extends BaseService {
       throw new OptimisticLockError(`Provider version mismatch. Expected ${expectedVersion}, got ${existingProvider.version}`);
     }
 
+    // Normalize settings: the contract allows null, the column stores undefined.
+    const fallbacks = updateData.fallbacks?.map((f) => ({ providerId: f.providerId, settings: f.settings ?? undefined }));
+    if (fallbacks) {
+      const effectiveType = updateData.providerType ?? existingProvider.providerType;
+      await this.validateFallbacks(id, effectiveType, fallbacks);
+    }
+
     const updatePayload: any = {
       name: updateData.name,
       description: updateData.description,
       providerType: updateData.providerType,
       apiType: updateData.apiType,
+      fallbacks,
       config: updateData.config ? await this.secretRefUtils.secretizeObject(
         { ...(updateData.config as Record<string, unknown>), oauth2: (updateData.config as Record<string, unknown>).oauth2 ?? (existingProvider.config as Record<string, unknown>).oauth2 },
         SENSITIVE_PROVIDER_CONFIG_FIELDS,
@@ -204,6 +223,8 @@ export class ProviderService extends BaseService {
     if (provider.apiType === 'smtp_imap') {
       this.imapInboundService.reload(provider.id);
     }
+
+    this.fallbackResolver.invalidate(provider.id);
 
     return providerResponseSchema.parse(provider);
   }
@@ -240,6 +261,11 @@ export class ProviderService extends BaseService {
     await this.auditService.logDelete('provider', id, safeExistingProvider, context?.operatorId);
 
     logger.info({ providerId: id }, 'Provider deleted successfully');
+
+    // Drop this provider's cached chain plus the chains of every provider
+    // that references it as a fallback target.
+    this.fallbackResolver.invalidate(id);
+    await this.fallbackResolver.invalidateReferences(id);
 
     if (existingProvider.apiType === 'smtp_imap') {
       this.imapInboundService.stopSession(id);
@@ -296,5 +322,41 @@ export class ProviderService extends BaseService {
     logger.debug({ providerId }, 'Fetching audit logs for provider');
 
     return await this.auditService.getEntityAuditLogs('provider', providerId);
+  }
+
+  /**
+   * Loads the fallback graph reachable from `fallbacks` (batched BFS over
+   * the providers table) and runs the pure validation rules.
+   * Throws ValidationError (400) on duplicate/self/missing/mismatch/cycle.
+   */
+  private async validateFallbacks(primaryId: string, primaryType: string, fallbacks: ProviderFallback[]): Promise<void> {
+    const graph: FallbackGraphNodes = new Map();
+    const queued = new Set<string>();
+    let batch = fallbacks.map((f) => f.providerId);
+    for (const id of batch) {
+      queued.add(id);
+    }
+
+    while (batch.length > 0) {
+      const rows = await db
+        .select({ id: providers.id, providerType: providers.providerType, fallbacks: providers.fallbacks })
+        .from(providers)
+        .where(drizzleInArray(providers.id, batch));
+
+      const next: string[] = [];
+      for (const row of rows) {
+        const targetIds = (row.fallbacks ?? []).map((f) => f.providerId);
+        graph.set(row.id, { providerType: row.providerType, fallbackTargetIds: targetIds });
+        for (const targetId of targetIds) {
+          if (!queued.has(targetId)) {
+            queued.add(targetId);
+            next.push(targetId);
+          }
+        }
+      }
+      batch = next;
+    }
+
+    validateFallbacks(primaryId, primaryType, fallbacks, graph);
   }
 }

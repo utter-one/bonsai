@@ -13165,6 +13165,9 @@
             ],
             "description": "Provider-specific configuration object (varies by providerType and apiType)"
           },
+          "fallbacks": {
+            "$ref": "#/components/schemas/ProviderFallbacks"
+          },
           "tags": {
             "type": "array",
             "items": {
@@ -13572,6 +13575,39 @@
         "additionalProperties": false,
         "description": "Optional OAuth2/XOAUTH2 configuration. When present, supersedes password-based authentication for both SMTP and IMAP."
       },
+      "ProviderFallbacks": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ProviderFallback"
+        },
+        "maxItems": 3,
+        "default": [],
+        "description": "Ordered fallback providers used when the primary fails during setup phase"
+      },
+      "ProviderFallback": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "$ref": "#/components/schemas/ProviderId"
+          },
+          "settings": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Per-fallback LLM settings override (model, temperature, ...)"
+          }
+        },
+        "required": [
+          "providerId"
+        ]
+      },
+      "ProviderId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Id of the fallback provider (same providerType)"
+      },
       "UpdateProviderRequest": {
         "type": "object",
         "properties": {
@@ -13963,6 +13999,14 @@
               }
             ],
             "description": "Updated provider-specific configuration"
+          },
+          "fallbacks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderFallback"
+            },
+            "maxItems": 3,
+            "description": "Updated ordered fallback chain ([] clears it)"
           },
           "tags": {
             "type": "array",
@@ -14380,6 +14424,13 @@
             ],
             "description": "Provider-specific configuration object"
           },
+          "fallbacks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderFallback"
+            },
+            "description": "Ordered fallback providers (empty when none)"
+          },
           "createdBy": {
             "type": "string",
             "nullable": true,
@@ -14417,6 +14468,7 @@
           "providerType",
           "apiType",
           "config",
+          "fallbacks",
           "createdBy",
           "tags",
           "version",
@@ -14818,6 +14870,13 @@
                   ],
                   "description": "Provider-specific configuration object"
                 },
+                "fallbacks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderFallback"
+                  },
+                  "description": "Ordered fallback providers (empty when none)"
+                },
                 "createdBy": {
                   "type": "string",
                   "nullable": true,
@@ -14855,6 +14914,7 @@
                 "providerType",
                 "apiType",
                 "config",
+                "fallbacks",
                 "createdBy",
                 "tags",
                 "version",
@@ -41520,6 +41580,9 @@
                     ],
                     "description": "Provider-specific configuration object (varies by providerType and apiType)"
                   },
+                  "fallbacks": {
+                    "$ref": "#/components/schemas/ProviderFallbacks"
+                  },
                   "tags": {
                     "type": "array",
                     "items": {
@@ -41932,6 +41995,13 @@
                       ],
                       "description": "Provider-specific configuration object"
                     },
+                    "fallbacks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderFallback"
+                      },
+                      "description": "Ordered fallback providers (empty when none)"
+                    },
                     "createdBy": {
                       "type": "string",
                       "nullable": true,
@@ -41969,6 +42039,7 @@
                     "providerType",
                     "apiType",
                     "config",
+                    "fallbacks",
                     "createdBy",
                     "tags",
                     "version",
@@ -42523,6 +42594,13 @@
                             ],
                             "description": "Provider-specific configuration object"
                           },
+                          "fallbacks": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/ProviderFallback"
+                            },
+                            "description": "Ordered fallback providers (empty when none)"
+                          },
                           "createdBy": {
                             "type": "string",
                             "nullable": true,
@@ -42560,6 +42638,7 @@
                           "providerType",
                           "apiType",
                           "config",
+                          "fallbacks",
                           "createdBy",
                           "tags",
                           "version",
@@ -43017,6 +43096,13 @@
                       ],
                       "description": "Provider-specific configuration object"
                     },
+                    "fallbacks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderFallback"
+                      },
+                      "description": "Ordered fallback providers (empty when none)"
+                    },
                     "createdBy": {
                       "type": "string",
                       "nullable": true,
@@ -43054,6 +43140,7 @@
                     "providerType",
                     "apiType",
                     "config",
+                    "fallbacks",
                     "createdBy",
                     "tags",
                     "version",
@@ -43482,6 +43569,14 @@
                     ],
                     "description": "Updated provider-specific configuration"
                   },
+                  "fallbacks": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ProviderFallback"
+                    },
+                    "maxItems": 3,
+                    "description": "Updated ordered fallback chain ([] clears it)"
+                  },
                   "tags": {
                     "type": "array",
                     "nullable": true,
@@ -43892,6 +43987,13 @@
                       ],
                       "description": "Provider-specific configuration object"
                     },
+                    "fallbacks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderFallback"
+                      },
+                      "description": "Ordered fallback providers (empty when none)"
+                    },
                     "createdBy": {
                       "type": "string",
                       "nullable": true,
@@ -43929,6 +44031,7 @@
                     "providerType",
                     "apiType",
                     "config",
+                    "fallbacks",
                     "createdBy",
                     "tags",
                     "version",
