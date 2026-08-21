@@ -72,6 +72,11 @@ export type EvaluationData = {
   breakers: Map<string, 'open'>;
   probeFailures: Map<string, number>;
   fallbackEventCounts: Map<string, number>;
+  /**
+   * P3-06 — primary providerId → ordered distinct fallback provider ids seen
+   * in the fallback-event window (chain naming context for alert messages).
+   */
+  fallbackChains: Map<string, string[]>;
   /** Cumulative per-process top-N rejecting keys — finding 3. */
   rejections: { topKeys: RateLimitRejectionKeyStats[] };
 };
@@ -356,10 +361,13 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
       const stats = windowStats(data, params, providerId);
       const count = stats?.errorCounts.auth ?? 0;
       if (count >= params.threshold) {
+        // P3-06: name the failover chain when the window has fallback events.
+        const chain = data.fallbackChains.get(providerId) ?? [];
+        const used = chain.length > 0 ? ` — failover chain: ${[providerLabel(data, providerId), ...chain.map((id) => providerLabel(data, id))].join(' → ')}` : '';
         return [
           met(
-            `${providerLabel(data, providerId)}: ${count} auth error(s) in the last ${params.windowMinutes} min — misconfigured or expired credentials (this will not self-heal; check the provider config)`,
-            { providerId, authErrors: count },
+            `${providerLabel(data, providerId)}: ${count} auth error(s) in the last ${params.windowMinutes} min — misconfigured or expired credentials (this will not self-heal; check the provider config)${used}`,
+            { providerId, authErrors: count, failoverChain: [providerId, ...chain] },
           ),
         ];
       }
@@ -496,9 +504,37 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
       if (!providerId) return [notMet()];
       const count = data.fallbackEventCounts.get(providerId) ?? 0;
       if (count >= params.threshold) {
-        return [met(`${providerLabel(data, providerId)}: ${count} fallback execution(s) in the last ${params.windowMinutes} min — the primary path is degrading`, { providerId, fallbacks: count })];
+        // P3-06: name the fallback providers actually used in the window.
+        const chain = data.fallbackChains.get(providerId) ?? [];
+        const used = chain.length > 0 ? ` — fallbacks used: ${chain.map((id) => providerLabel(data, id)).join(', ')}` : '';
+        return [met(`${providerLabel(data, providerId)}: ${count} fallback execution(s) in the last ${params.windowMinutes} min — the primary path is degrading${used}`, { providerId, fallbacks: count, failoverChain: [providerId, ...chain] })];
       }
       return [notMet()];
+    },
+  },
+  {
+    id: 'provider-chain-exhausted',
+    scope: 'per_provider',
+    severity: 'critical',
+    summary: '≥ threshold (default 1) full failover-chain exhaustion(s) for the provider in the window — every provider in the chain failed or was circuit-open (P3-06).',
+    // forMinutes 0: exhaustion is the worst case — no sustainment delay.
+    defaultParams: { threshold: 1, windowMinutes: 5, minSamples: 0, forMinutes: 0, resolveAfterGoodChecks: 3, cooldownMinutes: 10, maxUnresolvedHours: 12 },
+    evaluate: (data, params, providerId) => {
+      if (!providerId) return [notMet()];
+      // The exhaustion counter is the source of truth: it is incremented in
+      // exhaustChain() even when no transition row exists (single-provider
+      // chain, or every step circuit-open), so the rule must not depend on
+      // fallback_events rows to find its providers.
+      const count = data.windowSum('provider_chain_exhausted_total', { provider_id: providerId }, params.windowMinutes * 60_000);
+      if (count < params.threshold) return [notMet()];
+      const chain = data.fallbackChains.get(providerId) ?? [];
+      const chainText = chain.length > 0 ? ` (chain: ${[providerId, ...chain].map((id) => providerLabel(data, id)).join(' → ')})` : '';
+      return [
+        met(
+          `${providerLabel(data, providerId)} exhausted its failover chain ${count} time(s) in the last ${params.windowMinutes} min${chainText} — all providers in the chain failed or were circuit-open`,
+          { providerId, exhausted: count, windowMinutes: params.windowMinutes, failoverChain: [providerId, ...chain] },
+        ),
+      ];
     },
   },
   // ==================== Streaming (5) ====================

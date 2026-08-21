@@ -1,9 +1,9 @@
 ---
 title: "P3-02 — Fallback chains: validation, resolver, provider API contract"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-20
 assignee: ""
 tags: [monitoring, spec, phase-3]
 ---

@@ -56,6 +56,7 @@ const ROUTES: MatrixRoute[] = [
   { method: 'GET', path: '/api/monitoring/config' },
   { method: 'PUT', path: '/api/monitoring/config' },
   { method: 'GET', path: '/api/monitoring/rules' },
+  { method: 'GET', path: '/api/monitoring/fallback-events' },
 ];
 
 /** Create a single-role operator (survives resetDatabase) and return a token agent. */

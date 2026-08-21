@@ -84,12 +84,20 @@ export type AlertEngineDataProviders = {
   getRejectionStats: () => { total: number; topKeys: RateLimitRejectionKeyStats[] };
   getBreakers: () => Map<string, 'open'>; // P3-01 seam — empty in Phase 2
   queryProviderWindows: (sinceIso: string) => Promise<ProviderWindowStats[]>;
-  queryFallbackCounts: (sinceIso: string) => Promise<{ providerId: string; count: number }[]>;
+  queryFallbackCounts: (sinceIso: string) => Promise<{ providerId: string; count: number; fallbackIds: string[] }[]>;
   queryProviderNames: (ids: string[]) => Promise<Map<string, { name: string; providerType: string }>>;
   listFiringAlerts: () => Promise<FiringAlertRow[]>;
 };
 
-const WINDOWED_COUNTERS = ['api_requests_total', 'rate_limit_rejections_total', 'oauth_refresh_total', 'imap_poll_total'] as const;
+const WINDOWED_COUNTERS = ['api_requests_total', 'rate_limit_rejections_total', 'oauth_refresh_total', 'imap_poll_total', 'provider_chain_exhausted_total'] as const;
+
+/**
+ * Counters whose `provider_id`-labeled series must enter the per-provider
+ * evaluation set even when no call-log row, fallback-event row, or breaker
+ * state exists for the provider (P3-06: a chain exhaustion on a
+ * single-provider chain leaves no fallback_events row).
+ */
+const PROVIDER_ID_COUNTERS = ['oauth_refresh_total', 'imap_poll_total', 'provider_chain_exhausted_total'] as const;
 const MIN_INTERVAL_MS = 1000;
 const FALLBACK_INTERVAL_MS = 60_000;
 
@@ -282,6 +290,7 @@ export class AlertRuleEngine {
 
     const callLogs = new Map<number, Map<string, ProviderWindowStats>>();
     let fallbackEventCounts = new Map<string, number>();
+    let fallbackChains = new Map<string, string[]>();
     try {
       const perWindow = await Promise.all(
         [...windowsMs].map(async (windowMs) => {
@@ -291,7 +300,9 @@ export class AlertRuleEngine {
       );
       for (const [windowMs, byProvider] of perWindow) callLogs.set(windowMs, byProvider);
       const fbSinceIso = new Date(now - Math.max(10 * 60_000, ...windowsMs)).toISOString();
-      fallbackEventCounts = new Map((await this.dataProviders.queryFallbackCounts(fbSinceIso)).map((r) => [r.providerId, r.count]));
+      const fallbackRows = await this.dataProviders.queryFallbackCounts(fbSinceIso);
+      fallbackEventCounts = new Map(fallbackRows.map((r) => [r.providerId, r.count]));
+      fallbackChains = new Map(fallbackRows.map((r) => [r.providerId, r.fallbackIds]));
     } catch (error) {
       logger.error({ error }, 'AlertRuleEngine: provider call/fallback data unavailable — dependent rules evaluate to not-met this pass');
     }
@@ -302,8 +313,9 @@ export class AlertRuleEngine {
     for (const byProvider of callLogs.values()) for (const id of byProvider.keys()) ids.add(id);
     for (const id of probeFailures.keys()) ids.add(id);
     for (const id of fallbackEventCounts.keys()) ids.add(id);
+    for (const chain of fallbackChains.values()) for (const id of chain) ids.add(id); // P3-06: name the fallbacks in chain context
     for (const id of breakers.keys()) ids.add(id);
-    for (const counterName of ['oauth_refresh_total', 'imap_poll_total']) {
+    for (const counterName of PROVIDER_ID_COUNTERS) {
       for (const seriesKey of Object.keys(metrics.counters[counterName] ?? {})) {
         const labels = parseSeriesKey(seriesKey);
         if (labels.provider_id) ids.add(labels.provider_id);
@@ -333,6 +345,7 @@ export class AlertRuleEngine {
       breakers,
       probeFailures,
       fallbackEventCounts,
+      fallbackChains,
       rejections: { topKeys: this.dataProviders.getRejectionStats().topKeys },
     };
   }
@@ -387,7 +400,7 @@ export class AlertRuleEngine {
     for (const id of data.breakers.keys()) parts.add(id);
     for (const id of data.probeFailures.keys()) parts.add(id);
     for (const id of data.fallbackEventCounts.keys()) parts.add(id);
-    for (const counterName of ['oauth_refresh_total', 'imap_poll_total']) {
+    for (const counterName of PROVIDER_ID_COUNTERS) {
       for (const seriesKey of Object.keys(data.metrics.counters[counterName] ?? {})) {
         const labels = parseSeriesKey(seriesKey);
         if (labels.provider_id) parts.add(labels.provider_id);
@@ -752,13 +765,31 @@ export class AlertRuleEngine {
         });
       },
       queryFallbackCounts: async (sinceIso) => {
+        // Total row count per primary (fallback-active) plus the ordered
+        // distinct fallback ids per primary (P3-06 chain naming context),
+        // ordered by first appearance in the window.
         const rows = (await db.execute(sql`
-          SELECT provider_id, count(*) AS count
-          FROM fallback_events
-          WHERE created_at >= ${sinceIso}
-          GROUP BY provider_id
-        `)).rows as Array<{ provider_id: string; count: string }>;
-        return rows.map((r) => ({ providerId: r.provider_id, count: Number(r.count) }));
+          WITH fb AS (
+            SELECT provider_id, fallback_provider_id, created_at
+            FROM fallback_events
+            WHERE created_at >= ${sinceIso}
+          ),
+          counts AS (
+            SELECT provider_id, count(*) AS count
+            FROM fb
+            GROUP BY provider_id
+          ),
+          firsts AS (
+            SELECT provider_id, fallback_provider_id, min(created_at) AS first_seen
+            FROM fb
+            GROUP BY provider_id, fallback_provider_id
+          )
+          SELECT c.provider_id, c.count, array_agg(f.fallback_provider_id ORDER BY f.first_seen) AS fallback_ids
+          FROM counts c
+          LEFT JOIN firsts f ON f.provider_id = c.provider_id
+          GROUP BY c.provider_id, c.count
+        `)).rows as Array<{ provider_id: string; count: string; fallback_ids: string[] | null }>;
+        return rows.map((r) => ({ providerId: r.provider_id, count: Number(r.count), fallbackIds: r.fallback_ids ?? [] }));
       },
       queryProviderNames: async (ids) => {
         if (ids.length === 0) return new Map<string, { name: string; providerType: string }>();

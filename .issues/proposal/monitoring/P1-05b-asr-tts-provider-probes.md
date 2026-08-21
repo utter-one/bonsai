@@ -1,9 +1,9 @@
 ---
 title: "P1-05b — ASR/TTS provider liveness probes (closing the provider-monitoring hole)"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-19
-updated: 2026-08-19
+updated: 2026-08-20
 assignee: ""
 tags: [monitoring, spec, phase-1]
 ---

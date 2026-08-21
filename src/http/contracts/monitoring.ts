@@ -316,6 +316,35 @@ export const providerCallListResponseSchema = z.object({
 export type ProviderCallResponse = z.infer<typeof providerCallResponseSchema>;
 export type ProviderCallListResponse = z.infer<typeof providerCallListResponseSchema>;
 
+/** One fallback_events row (a failover transition: primary failed, fallback attempted). */
+export const fallbackEventResponseSchema = z.object({
+  id: z.string().describe('Row id'),
+  providerId: z.string().describe('The failed (primary-side) provider'),
+  fallbackProviderId: z.string().describe('The provider the request fell over to'),
+  providerType: z.string().describe('Provider type (llm, tts, asr, storage, ...)'),
+  operation: z.string().describe('Operation (llm.generate, tts.session, storage.upload, ...)'),
+  reason: z.string().describe('Error class of the failed attempt (auth | rate_limited | timeout | server_error | ...)'),
+  projectId: z.string().nullable().describe('Owning project, when known'),
+  conversationId: z.string().nullable().describe('Owning conversation, when known'),
+  success: z.boolean().nullable().describe('Whether the fallback ultimately served the request'),
+  createdAt: z.coerce.date().describe('When the transition happened'),
+});
+
+/**
+ * Paginated list of fallback_events.
+ * Filters: providerId, fallbackProviderId, providerType, operation, reason, projectId, conversationId,
+ * success, createdAt (operators supported, e.g. filters[createdAt][op]=between&filters[createdAt][value][0]=from&filters[createdAt][value][1]=to).
+ */
+export const fallbackEventListResponseSchema = z.object({
+  items: z.array(fallbackEventResponseSchema).describe('Fallback event rows in the current page'),
+  total: z.number().int().min(0).describe('Total matching rows'),
+  offset: z.number().int().min(0).describe('Starting index of the current page'),
+  limit: listResponseLimitSchema,
+});
+
+export type FallbackEventResponse = z.infer<typeof fallbackEventResponseSchema>;
+export type FallbackEventListResponse = z.infer<typeof fallbackEventListResponseSchema>;
+
 /** GET /api/monitoring/provider-stats query. Window bounded to 14 days (400 beyond). */
 export const providerStatsQuerySchema = z.object({
   from: z.coerce.date().describe('Window start (inclusive). ISO 8601.'),

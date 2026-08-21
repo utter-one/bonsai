@@ -11,6 +11,7 @@ import {
   alertEventResponseSchema,
   alertIdParamsSchema,
   alertRuleCatalogResponseSchema,
+  fallbackEventListResponseSchema,
   healthSnapshotResponseSchema,
   healthHistoryListResponseSchema,
   monitoringConfigResponseSchema,
@@ -118,6 +119,27 @@ export class MonitoringController {
             content: {
               'application/json': {
                 schema: providerCallListResponseSchema,
+              },
+            },
+          },
+          ...commonResponses,
+        },
+      },
+      {
+        method: 'get',
+        path: '/api/monitoring/fallback-events',
+        tags: ['Monitoring'],
+        summary: 'Failover transition events',
+        description: 'Raw fallback_events: every recorded failover transition (primary failed, fallback attempted) — which provider failed, which one served, the error class, and whether the fallback succeeded. Filters: providerId, fallbackProviderId, providerType, operation, reason, projectId, conversationId, success, createdAt.',
+        request: {
+          query: listParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Paginated fallback events',
+            content: {
+              'application/json': {
+                schema: fallbackEventListResponseSchema,
               },
             },
           },
@@ -306,6 +328,7 @@ export class MonitoringController {
     router.get('/api/monitoring/health/history', asyncHandler(this.listHealthHistory.bind(this)));
     router.get('/api/monitoring/providers', asyncHandler(this.getProviders.bind(this)));
     router.get('/api/monitoring/provider-calls', asyncHandler(this.listProviderCalls.bind(this)));
+    router.get('/api/monitoring/fallback-events', asyncHandler(this.listFallbackEvents.bind(this)));
     router.get('/api/monitoring/provider-stats', asyncHandler(this.getProviderStats.bind(this)));
     router.get('/api/monitoring/metrics', asyncHandler(this.getMetrics.bind(this)));
     router.get('/api/monitoring/alerts', asyncHandler(this.listAlerts.bind(this)));
@@ -352,6 +375,16 @@ export class MonitoringController {
     const query = listParamsSchema.parse(req.query);
     const calls = await this.monitoringService.listProviderCalls(req.context, query);
     res.status(200).json(calls);
+  }
+
+  /**
+   * GET /api/monitoring/fallback-events
+   */
+  private async listFallbackEvents(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const query = listParamsSchema.parse(req.query);
+    const events = await this.monitoringService.listFallbackEvents(req.context, query);
+    res.status(200).json(events);
   }
 
   /**

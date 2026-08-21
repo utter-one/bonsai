@@ -3,7 +3,7 @@ title: "P3-06 — `fallback_events` endpoint + failover alert rules"
 severity: proposal
 status: open
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-20
 assignee: ""
 tags: [monitoring, spec, phase-3]
 ---
@@ -56,3 +56,18 @@ Close the loop on Phase 3: the fallback history is queryable through the API, an
 ## Out of scope
 
 - Fallback analytics/dashboards (Console, P4-04), per-fallback SLA reporting.
+
+## Implementation notes (2026-08-20)
+
+Implemented against the P3-03/P3-04 failover data (P3-05's channel-fallback events will simply appear in the same endpoint/rules once that lands — nothing here depends on it). Deviations and decisions from the spec above:
+
+1. **`provider-chain-exhausted` severity = `critical`** (per the spec table). Chosen defaults where the spec was open: `minSamples: 0`, `forMinutes: 0` (exhaustion is the worst case — no sustainment delay), `resolveAfterGoodChecks: 3`, `cooldownMinutes: 10`, `maxUnresolvedHours: 12`.
+2. **Engine wiring — two soundness fixes found in analysis** (`src/services/monitoring/AlertRuleEngine.ts`):
+   - `provider_chain_exhausted_total` had to be added to the engine's `WINDOWED_COUNTERS` whitelist: the delta ring only samples whitelisted counters, so without this the rule's `windowSum` would always read 0 and the rule could never fire.
+   - The counter's `provider_id`-labeled series are swept into the per-provider evaluation set (new `PROVIDER_ID_COUNTERS` const, shared by `assembleData` and `perProviderScopeParts`) alongside `oauth_refresh_total`/`imap_poll_total`. A chain exhaustion on a single-provider chain — or one where every step was circuit-open — leaves no `fallback_events` row and no breaker state, so the provider would otherwise never enter the evaluation set and the rule would silently skip it. The metric is the source of truth (incremented in `exhaustChain()`).
+3. **Chain-naming context**: `queryFallbackCounts` now returns `{ providerId, count, fallbackIds }` — total row count (unchanged semantics for `fallback-active`) plus the ordered distinct fallback ids per primary, ordered by first appearance in the window (CTE: `min(created_at)` per `(provider_id, fallback_provider_id)`, `array_agg` over it). Carried into `EvaluationData.fallbackChains: Map<string, string[]>`; the fallback ids are also swept into the provider-name lookup so messages use names. Note: the fallback query window is `max(10 min, rule windows)` — for rule windows under 10 min the chain context can include fallbacks older than the rule window (context only, never affects firing).
+4. **Message upgrades**: `fallback-active` appends ` — fallbacks used: X, Y`; `provider-auth-failed` appends ` — failover chain: A → B` only when the window has fallback events; both now include `context.failoverChain` (the primary id, plus fallback ids when known). `provider-chain-exhausted` message: `<label> exhausted its failover chain N time(s) in the last X min (chain: A → B → C) — all providers in the chain failed or were circuit-open`, with `context: { providerId, exhausted, windowMinutes, failoverChain }`.
+5. **Endpoint filters are a superset of the spec's list**: `id`, `providerId`, `fallbackProviderId`, `providerType`, `operation`, `reason`, `projectId`, `conversationId`, `success`, `createdAt` (all house-convention filterable); text search over `providerId`, `fallbackProviderId`, `operation`, `reason`.
+6. **Actual changed files** (superset of the spec's "Modified files"): `AlertEvents.ts`, `AlertRuleEngine.ts`, `contracts/monitoring.ts`, `MonitoringService.ts` (new `listFallbackEvents`), `MonitoringController.ts`, plus tests.
+7. **Pinned tests updated on purpose**: the rule-catalog e2e pins the exact id set (20 → 21 rules, `per_provider` scope count 12 → 13); the P2-04 RBAC matrix gained `GET /api/monitoring/fallback-events`; the P2-01 unit harness's fake `queryFallbackCounts` returns the new row shape (empty `fallbackIds`).
+8. **Tests**: 11 unit (`tests/unit/monitoring/p3-06-fallback-rules.test.ts` — catalog defaults, fire/below-threshold/aged-out/threshold, chain naming, per-provider scoping regressions for `provider-auth-failed` + `fallback-active`); 4 e2e (`tests/e2e/fallback-events-rules.test.ts` — 401, empty-page shape, seeded rows with filters/text-search/pagination, and a forced exhaustion through the app-world `FailoverLlmProvider` with two 401 mock endpoints → live engine fires `provider-chain-exhausted:p306_a` as `critical` with the chain named, while the transition row is served by the new endpoint).

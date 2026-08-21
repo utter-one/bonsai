@@ -293,6 +293,7 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
       'imap-poll-failing',
       'oauth-refresh-failing',
       'provider-auth-failed',
+      'provider-chain-exhausted',
       'provider-degraded',
       'provider-down',
       'provider-rate-limited',
@@ -303,7 +304,7 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
       'tts-rtf-degraded',
     ];
 
-    it('returns the full static catalog (20 rules, exact id set)', async () => {
+    it('returns the full static catalog (21 rules, exact id set)', async () => {
       const res = await authed().get('/api/monitoring/rules');
       expect(res.status).to.equal(200);
       expect(res.body).to.have.property('rules').that.is.an('array');
@@ -353,7 +354,7 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
         (acc: Record<string, number>, rule: { scope: string }) => ({ ...acc, [rule.scope]: (acc[rule.scope] ?? 0) + 1 }),
         {},
       );
-      expect(scopeCounts).to.deep.equal({ global: 8, per_provider: 12 });
+      expect(scopeCounts).to.deep.equal({ global: 8, per_provider: 13 }); // P3-06: +provider-chain-exhausted
     });
   });
 

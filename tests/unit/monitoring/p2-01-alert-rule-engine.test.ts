@@ -107,7 +107,7 @@ class Harness {
       }),
       getBreakers: () => this.breakers,
       queryProviderWindows: async () => this.callLogs,
-      queryFallbackCounts: async () => [...this.fallbackCounts.entries()].map(([providerId, count]) => ({ providerId, count })),
+      queryFallbackCounts: async () => [...this.fallbackCounts.entries()].map(([providerId, count]) => ({ providerId, count, fallbackIds: [] })), // P3-06: no chain context in the legacy harness
       queryProviderNames: async () => this.providerNames,
       listFiringAlerts: async () => this.firingAlerts as never,
     };

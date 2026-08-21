@@ -1,7 +1,7 @@
 ---
 title: "P3-03 — FailoverLlmProvider + ConversationRunner integration"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
 updated: 2026-08-20
 assignee: ""

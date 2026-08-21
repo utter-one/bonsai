@@ -6,7 +6,8 @@ id: P3-04
 title: TTS, ASR & storage failover
 severity: medium
 phase: 3
-status: open
+status: resolved
+updated: 2026-08-20
 depends_on: [P3-01, P3-02, P3-03]
 blocks: [P3-05, P3-06]
 effort: 1.5 dev-days

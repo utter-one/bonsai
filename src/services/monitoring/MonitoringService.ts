@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import { and, desc, eq, isNull, SQL, sql } from 'drizzle-orm';
 import { db } from '../../db/index';
-import { alertEvents, healthChecks, metricSamples, monitoringConfig, providerCallLogs, providers } from '../../db/schema';
+import { alertEvents, fallbackEvents, healthChecks, metricSamples, monitoringConfig, providerCallLogs, providers } from '../../db/schema';
 import type { RequestContext } from '../RequestContext';
 import { BaseService } from '../BaseService';
 import { PERMISSIONS } from '../../permissions';
@@ -18,6 +18,7 @@ import type {
   HealthSnapshotResponse,
   MetricSeriesQuery,
   MetricSeriesResponse,
+  FallbackEventListResponse,
   MonitoringConfig,
   MonitoringConfigResponse,
   MonitoringConfigUpdateRequest,
@@ -26,7 +27,7 @@ import type {
   ProviderStatsResponse,
   ProvidersMonitoringResponse,
 } from '../../http/contracts/monitoring';
-import { alertEventListResponseSchema, alertEventResponseSchema, alertRuleCatalogResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
+import { alertEventListResponseSchema, alertEventResponseSchema, alertRuleCatalogResponseSchema, fallbackEventListResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
 import { AuditService } from '../AuditService';
 import { buildRuleCatalog } from './AlertEvents';
 import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
@@ -298,6 +299,67 @@ export class MonitoringService extends BaseService {
     });
 
     return providerCallListResponseSchema.parse({
+      items: rows,
+      total,
+      offset,
+      limit,
+    });
+  }
+
+  /**
+   * Paginated fallback_events (P3-06): every failover transition the wrappers
+   * record — which provider failed, which one served instead, why, and whether
+   * the fallback ultimately succeeded. Newest first by default.
+   */
+  async listFallbackEvents(context: RequestContext, params?: ListParams): Promise<FallbackEventListResponse> {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    logger.debug({ params }, 'Listing fallback events');
+
+    const offset = params?.offset ?? 0;
+    const limit = normalizeListLimit(params?.limit);
+
+    const columnMap = {
+      id: fallbackEvents.id,
+      providerId: fallbackEvents.providerId,
+      fallbackProviderId: fallbackEvents.fallbackProviderId,
+      providerType: fallbackEvents.providerType,
+      operation: fallbackEvents.operation,
+      reason: fallbackEvents.reason,
+      projectId: fallbackEvents.projectId,
+      conversationId: fallbackEvents.conversationId,
+      success: fallbackEvents.success,
+      createdAt: fallbackEvents.createdAt,
+    };
+
+    const conditions: SQL[] = [];
+    if (params?.filters) {
+      for (const [field, filter] of Object.entries(params.filters)) {
+        const condition = buildFilterCondition(field, filter, columnMap, logger);
+        if (condition) conditions.push(condition);
+      }
+    }
+    if (params?.textSearch) {
+      const searchCondition = buildTextSearchCondition(params.textSearch, [
+        fallbackEvents.providerId,
+        fallbackEvents.fallbackProviderId,
+        fallbackEvents.operation,
+        fallbackEvents.reason,
+      ]);
+      if (searchCondition) conditions.push(searchCondition);
+    }
+
+    const orderByClause = buildOrderBy(params?.orderBy, columnMap);
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const total = await countRows(fallbackEvents, whereCondition);
+    const rows = await db.query.fallbackEvents.findMany({
+      where: whereCondition,
+      orderBy: orderByClause.length > 0 ? orderByClause : [desc(fallbackEvents.createdAt)],
+      limit,
+      offset,
+    });
+
+    return fallbackEventListResponseSchema.parse({
       items: rows,
       total,
       offset,
