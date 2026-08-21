@@ -91,7 +91,7 @@ Phase 4 (polish)
 | P3-02 | [P3-02-fallback-resolver-provider-api.md](P3-02-fallback-resolver-provider-api.md) | Fallback chains: validation, resolver, provider API contract |
 | P3-03 | [P3-03-llm-failover.md](P3-03-llm-failover.md) | FailoverLlmProvider + ConversationRunner integration |
 | P3-04 | [P3-04-tts-asr-storage-failover.md](P3-04-tts-asr-storage-failover.md) | TTS/ASR/storage failover wrappers |
-| P3-05 | [P3-05-outbound-channel-fallback.md](P3-05-outbound-channel-fallback.md) | Outbound channel fallback (per-request `fallbackChannelProviderId`) |
+| P3-05 | [P3-05-outbound-channel-fallback.md](P3-05-outbound-channel-fallback.md) | ~~Outbound channel fallback~~ (closed 2026-08-20 — not implemented, reverted) |
 | P3-06 | [P3-06-fallback-events-rules.md](P3-06-fallback-events-rules.md) | `fallback_events` endpoint + failover alert rules |
 
 ### Phase 4 — Polish

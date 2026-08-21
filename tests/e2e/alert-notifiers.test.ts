@@ -257,7 +257,11 @@ describe('Alert notifiers (P2-02, e2e)', () => {
       expect(row.notifications[0].phase).to.equal('fired');
       expect(row.notifications[0].ok).to.equal(false);
       expect(row.notifications[0].detail).to.equal('HTTP 500');
-      expect(receiver.received).to.have.length(1);
+      // Targeted to the high-memory rule: the app-world engine (same process,
+      // 1 s interval) may deliver unrelated alerts to this receiver meanwhile
+      // (e.g. provider-down fired by a breaker left OPEN by an earlier suite).
+      const highMemoryDeliveries = receiver.received.filter((r) => (r.body as { ruleId?: string } | null)?.ruleId === 'high-memory');
+      expect(highMemoryDeliveries).to.have.length(1);
     } finally {
       await receiver.close();
     }
@@ -284,8 +288,13 @@ describe('Alert notifiers (P2-02, e2e)', () => {
       });
       expect(warning.severity).to.equal('warning');
       // Negative assertion: give the (non-existent) delivery a beat to land.
+      // Targeted to the high-memory rule: this IS the app-world engine (1 s
+      // background interval, same process), which may deliver unrelated
+      // alerts to this receiver meanwhile (e.g. provider-down fired by a
+      // breaker left OPEN by an earlier suite) — global emptiness is flaky.
       await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(receiver.received).to.have.length(0);
+      const highMemoryDeliveries = receiver.received.filter((r) => (r.body as { ruleId?: string } | null)?.ruleId === 'high-memory');
+      expect(highMemoryDeliveries).to.have.length(0);
       expect((await alertsFor('high-memory'))[0].notifications).to.have.length(0);
 
       // Critical event (forced failing provider calls) crosses the floor

@@ -1,14 +1,16 @@
 ---
 title: "P3-05 — Outbound channel fallback (per-request `fallbackChannelProviderId`)"
 severity: proposal
-status: open
+status: closed
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-20
 assignee: ""
 tags: [monitoring, spec, phase-3]
 ---
 
 # P3-05 — Outbound channel fallback (per-request `fallbackChannelProviderId`)
+
+> **Closed (2026-08-20) — will not be implemented.** The feature was fully implemented and verified on 2026-08-20 (all gates green), then the user decided outbound channel fallbacks do not make sense for this product; the implementation was reverted in full. Retained for the record.
 
 - **Phase:** 3 — Failover
 - **Depends on:** P1-03 (call-log rows for channel sends), P3-02 (`FallbackEventService`)
