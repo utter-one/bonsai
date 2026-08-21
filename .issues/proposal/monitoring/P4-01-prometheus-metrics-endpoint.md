@@ -59,3 +59,17 @@ Optional external observability hook: standard Prometheus text format from the i
 ## Out of scope
 
 - Running a Prometheus server (user's infra), service discovery/scrape config docs beyond a one-liner in P4-05, `metric_samples`-backed historical queries here (that's the API, P1-08).
+
+## Implementation notes (2026-08-20)
+
+1. **Handler location:** `src/http/middleware/metricsEndpoint.ts` exports `createMetricsHandler()`; `server.ts` registers `app.get('/metrics', ...)` directly after `/health/ready`, before `requestOutcomeMiddleware` — so it bypasses auth, rate limiting, outcome metrics and logs by route order (not by skip list).
+2. **`SKIPPED_PATHS` already contained `/metrics`** (P1-04 reserved it) — no change needed there.
+3. **Descriptions:** `MetricConfig` gained an optional `description` field; the actual descriptions live in a new exported `METRIC_DESCRIPTIONS` map in `MetricsRegistry.ts` (alongside `METRIC_CONFIGS`), covering all 33 registered metrics. The exporter falls back: `METRIC_CONFIGS[name].description` → `METRIC_DESCRIPTIONS[name]` → process-metric descriptions → 'No description available.'
+4. **Histograms:** registry buckets are **non-cumulative** per `(prev, bound]` with a final `+Inf` slot; the exporter accumulates them into Prometheus cumulative `le` buckets plus `_sum`/`_count`.
+5. **Process gauges** (`process_uptime_seconds`, `process_resident_memory_bytes`) are injected at render time from `process.uptime()` / `process.memoryUsage().rss` — not stored in the registry.
+6. **Token check:** length-guarded `crypto.timingSafeEqual`; `Bearer` scheme matched case-insensitively. Token read from `process.env` per request.
+7. **Content-Type:** Express re-serializes the header (parameters come back as `text/plain; charset=utf-8; version=0.0.4` — order differs, parameter set identical). Prometheus scrapers parse parameters order-insensitively; e2e asserts type + both parameters, not the exact string.
+8. **Throttle:** `AuthFailureThrottle` is a fixed-window limiter (10/min default) with an injectable clock; unit-tested standalone.
+9. **No OpenAPI entry** — like `/health`, `/metrics` is not an API route.
+10. **Tests:** 14 unit (`tests/unit/monitoring/p4-01-metrics-endpoint.test.ts` — rendering incl. cumulative buckets/escaping/sanitization/sorting, gate outcomes via stub req/res, throttle) + 5 e2e (`tests/e2e/metrics-endpoint.test.ts` — the three gate outcomes + structural determinism + `api_requests_total` delta = 0).
+11. **Gates:** unit 886, e2e 1049, tsc clean, build clean.

@@ -56,6 +56,7 @@ import { corsOptions } from './http/middleware/cors';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
 import { requestOutcomeMiddleware, isSkippedRequestPath } from './http/middleware/requestOutcome';
+import { createMetricsHandler } from './http/middleware/metricsEndpoint';
 import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
@@ -183,6 +184,11 @@ export async function createApp(): Promise<express.Application> {
       res.status(503).json({ status: 'unavailable', reason: readiness.reason });
     }
   });
+
+  // Prometheus scrape endpoint (P4-01) — disabled unless MONITORING_METRICS_TOKEN is set
+  // (token read per request). Registered before auth/rate-limit middleware, same as /health:
+  // it is not an API route and must not burn rate-limit budget or JWT.
+  app.get('/metrics', createMetricsHandler());
 
   // Request outcome middleware (P1-04) — assigns req.id, counts metrics and logs the outcome on
   // finish. Registered before the incoming-request log so that line can carry the requestId, and

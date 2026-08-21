@@ -27,6 +27,8 @@ export interface CappedLabel {
 
 export interface MetricConfig {
   kind: MetricKind;
+  /** One-line human description — the `# HELP` text in the Prometheus exposition (P4-01). */
+  description?: string;
   /** Histogram bucket upper bounds (ms), ascending. Required for histograms. */
   buckets?: number[];
   /** Max distinct label-sets for this metric (default 50). */
@@ -120,6 +122,47 @@ export const METRIC_CONFIGS: Record<string, MetricConfig> = {
   rate_limit_rejections_total: { kind: 'counter' },
   oauth_refresh_total: { kind: 'counter', maxSeries: 500 },
   imap_poll_total: { kind: 'counter', maxSeries: 500 },
+};
+
+/**
+ * One-line descriptions for every registered metric — the `# HELP` text in the
+ * Prometheus exposition (P4-01). Kept alongside METRIC_CONFIGS so the exporter
+ * has a single place to read both.
+ */
+export const METRIC_DESCRIPTIONS: Record<string, string> = {
+  api_requests_total: 'Total number of API requests by method, route group and status class.',
+  api_request_duration_ms: 'API request duration in milliseconds.',
+  provider_calls_total: 'Total number of third-party provider calls (LLM/TTS/ASR/storage/channels).',
+  provider_call_duration_ms: 'Third-party provider call duration in milliseconds.',
+  llm_ttft_ms: 'Time to first token for LLM generation, in milliseconds.',
+  llm_stream_duration_ms: 'Total duration of a fully streamed LLM response, in milliseconds.',
+  tts_ttfa_ms: 'Time to first audio for TTS synthesis, in milliseconds.',
+  tts_synthesis_ms: 'Total duration of a TTS synthesis, in milliseconds.',
+  asr_setup_ms: 'Time to establish an ASR session, in milliseconds.',
+  asr_eos_to_final_ms: 'Time from end-of-speech to final transcript, in milliseconds.',
+  ai_turn_ttft_ms: 'Time to first token of a full AI turn, including orchestration, in milliseconds.',
+  active_conversations: 'Number of currently active conversations.',
+  active_websocket_connections: 'Number of currently active WebSocket connections.',
+  active_voice_media_streams: 'Number of currently active voice media streams.',
+  voice_media_bytes_total: 'Total bytes of voice media transferred.',
+  voice_media_max_frame_gap_ms: 'Maximum observed gap between voice media frames, in milliseconds.',
+  db_pool_total: 'Total clients in the database pool.',
+  db_pool_idle: 'Idle clients in the database pool.',
+  db_pool_waiting: 'Requests waiting for a database pool client.',
+  rss_bytes: 'Process resident set size in bytes.',
+  event_loop_lag_p95_ms: '95th percentile event loop delay in milliseconds.',
+  event_loop_lag_max_ms: 'Maximum observed event loop delay in milliseconds.',
+  circuit_breaker_state: 'Circuit breaker state per provider (0=closed, 1=open, 2=half-open).',
+  circuit_opens_total: 'Total circuit breaker transitions to the open state.',
+  circuit_open_skips_total: 'Total calls skipped because the circuit breaker was open.',
+  fallback_attempts_total: 'Total fallback attempts made after a primary provider failure.',
+  fallbacks_executed_total: 'Total fallback provider invocations that actually executed.',
+  provider_chain_exhausted_total: 'Total times a provider fallback chain was fully exhausted.',
+  fallback_incompatible_total: 'Total fallback steps skipped due to incompatible configuration.',
+  background_service_last_run_ts: 'Unix timestamp in milliseconds of the last background service run.',
+  rate_limit_rejections_total: 'Total requests rejected by Bonsai own rate limiters.',
+  oauth_refresh_total: 'Total OAuth2 token refresh attempts by provider and result.',
+  imap_poll_total: 'Total IMAP inbox poll attempts by provider and result.',
 };
 
 /**
