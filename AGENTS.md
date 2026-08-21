@@ -16,9 +16,11 @@ Single-package Express 5.x backend (no monorepo). Entry: `src/index.ts`. App fac
 
 | Directory | Purpose |
 |---|---|
-| `src/http/controllers/` | REST API controllers (43 controllers) |
+| `src/http/controllers/` | REST API controllers (45 controllers) |
 | `src/http/contracts/` | Zod schemas for HTTP request/response validation + OpenAPI |
 | `src/services/` | Business logic (one per domain entity) |
+| `src/services/monitoring/` | Monitoring module: `CallLogger`, `MetricsRegistry`, `HealthCheckService`, `AlertRuleEngine`, `RetentionService`, `MonitoringConfigService`, circuit breakers + fallback wrappers (see `PROPOSAL-production-monitoring.md`) |
+| `src/services/monitoring/notifiers/` | Alert notifiers: webhook, email, and the shared `ChannelNotifier` (telegram/twilio_sms/whatsapp strategy table) |
 | `src/channels/` | Communication channels: websocket, webrtc, twilio-voice, twilio-messaging, whatsapp, telegram |
 | `src/channels/websocket/contracts/` | WebSocket message Zod schemas |
 | `src/db/schema.ts` | Drizzle ORM schema — single source of truth for DB |
@@ -210,6 +212,15 @@ Optional but important:
 - `NODE_ENV=test` — suppresses DB connection teardown noise
 - `LOG_LEVEL=silent` — keeps Mocha stdout clean
 - `RATE_LIMIT_API_MAX=10000` — prevents 429s during batch test runs
+- `MONITORING_HEALTH_INTERVAL_MS=1000` — fast health loop so `health_checks` rows appear within e2e tests
+- `MONITORING_HEALTH_PROBES=off` — no live provider probes in tests (fake provider configs would hit real APIs)
+- `MONITORING_ALERT_ENGINE_INTERVAL_MS=1000` — fast alert-engine loop so alert e2e tests converge quickly
+
+**Monitoring test conventions:**
+- **Dual module graph (tsx/ESM vs CJS)**: app-world singletons can only be reached through the `globalThis.__TEST_*` seams in `tests/setup.ts` (e.g. `__TEST_METRICS_REGISTRY__`, `__TEST_RATE_LIMITS__`, `__TEST_MONITORING_CONFIG__`, `__TEST_FALLBACK_RESOLVER__`, `__TEST_FAILOVER_PROVIDER__`, `__TEST_ACCESS_TOKEN__`). In-memory metric series survive `resetDatabase()` — filter assertions to the exact `(name, labels)` series you created, and use **deltas** for counter/rate-limit assertions.
+- **Fake-provider double pattern**: failover e2e tests (LLM/TTS/ASR/storage) create `providers` rows pointing at fake/stub implementations registered in the factory test seam instead of real APIs; the ASR base `stop()` does not flush the session row — call `wrapper.cleanup()` to flush.
+- **E2E health-history fixtures must use a check name the live HealthCheckService never writes** (e.g. `fixture_probe`) — the service ticks every second in tests.
+- **Alert e2e tests must poll** (`waitForAlerts`-style helpers) — the engine's publisher fire/resolve is fire-and-forget, and the app-world engine's 1 s background interval can interleave deliveries; assert on the specific rule's delivery, not global receiver emptiness.
 
 ## Setup Gotcha
 

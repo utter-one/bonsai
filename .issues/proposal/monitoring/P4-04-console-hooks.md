@@ -1,7 +1,7 @@
 ---
 title: "P4-04 — Console monitoring page (cross-repo coordination)"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
 updated: 2026-08-20
 assignee: ""
@@ -43,14 +43,14 @@ Sufficiency check — for each panel, verify against the live API (scripted or m
 - [x] Polling cost at 30 s cadence × 5 panels. **Result: pass.** EXPLAIN (ANALYZE, BUFFERS) on a testcontainer with 3k call-log rows: all 15-min-window queries sub-millisecond to ~1 ms on the `provider_call_logs` composite indexes; the 24 h `day`-grouped worst case is 4.4 ms (seq scan over the window — retention bounds it). Recommended cadences documented in the contract doc (health 15–30 s, alerts 30 s, stats on-demand, prefer `/metrics` pre-aggregates for recurring sparklines).
 - [x] No endpoint leaks more than its RBAC role allows. **Result: pass, with a deviation from the spec's assumption** — see implementation notes (P2-04 restricted monitoring to `super_admin` only, not `developer` read access).
 
-Gap found: panel 5 (webhook dead-letter list + replay/discard buttons) is **not covered by the current API** — delivery *attempts* are auditable inside `alert_events.notifications` (`ok`/`detail` per attempt), but the dead-letter store + replay/discard is P4-03 (already filed; no new P4-06+ issue needed).
+Gap found: panel 5 (webhook dead-letter list + replay/discard buttons) is **not covered by the current API** — delivery *attempts* are auditable inside `alert_events.notifications` (`ok`/`detail` per attempt). The dead-letter store + replay/discard was P4-03, **closed 2026-08-20 as overkill for v1** — the gap is accepted, panel 5 is dropped from the v1 Console page (a read-only "recent failed deliveries" list from `alert_events.notifications` remains possible from existing data).
 
 ## Acceptance criteria
 
 - [x] Contract doc written with real response samples (captured from a running instance, redacted). → `docs/guide/monitoring-api.md` (VitePress, sidebar: Operations; all 13 endpoints with captured redacted samples).
 - [x] Sufficiency checklist complete with results (each item ✅/gap-issued). → above; one gap, already covered by open P4-03.
 - [x] Polling load estimate documented with the `EXPLAIN` evidence. → contract doc §6 (measured plans + guidance).
-- [ ] Console repo receives the doc (link/PR reference recorded in this issue's PR description). → **pending handover**: the doc is in this repo (`docs/guide/monitoring-api.md`, rendered at `/guide/monitoring-api`); hand it to the console team / reference it in the PR description when the branch goes to `dev`.
+- [x] Console repo receives the doc (link/PR reference recorded in this issue's PR description). → the doc is committed in this repo (`docs/guide/monitoring-api.md`, rendered at `/guide/monitoring-api`); per the 2026-08-20 decision it is handed to the console team with the PR to `dev` (doc path referenced in the PR description).
 
 ## Tests
 
@@ -68,4 +68,4 @@ Gap found: panel 5 (webhook dead-letter list + replay/discard buttons) is **not 
 4. **Data freshness numbers** (verified in code, not guessed): call logs flush ≤5 s (`CallLogger`), metric samples ≤60 s (`METRIC_FLUSH_INTERVAL_MS`), health snapshot per cycle (default 60 s, `MONITORING_HEALTH_INTERVAL_MS`), alert engine 1 tick (default 1 min), fallback events real-time, breaker state in-memory (reset on restart).
 5. **EXPLAIN methodology**: fixture script booted the real app + testcontainer, inserted 3,000 call-log rows (3 h) + 30 alerts + 50 fallback events + 100 health checks + 120 metric samples, ran `ANALYZE`, then `EXPLAIN (ANALYZE, BUFFERS)` on each endpoint's actual query shape. Seq scans on the small tables are a fixture artifact (planner-correct at 30–120 rows); the composite indexes covering each access pattern are verified in `drizzle/0068_lively_rage.sql`. Temp fixture/sample scripts were throwaway and deleted.
 6. **Sample capture**: all 13 endpoints exercised against the booted app with fixtures; the first capture round caught two fixture bugs of its own (wrong `notifications` shape → 400, and `/providers` needing real `providers` rows) — the shipped samples are the corrected round (all 200).
-7. **Spec-status convention**: left `open` — the last acceptance criterion (console-repo handover) is a cross-repo step that happens with the PR to `dev`.
+7. **Resolution (2026-08-20)**: marked `resolved` on user decision — the doc is committed and the console-team handover happens with the PR to `dev`. Panel 5 of the proposed layout is dropped with P4-03's closure (no dead-letter queue in v1).

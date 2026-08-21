@@ -1,9 +1,9 @@
 ---
 title: "P4-05 — Docs, env examples, AGENTS.md, load sanity check"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-21
 assignee: ""
 tags: [monitoring, spec, phase-4]
 ---
@@ -57,12 +57,23 @@ Every new var, documented with default + one-line purpose: `MONITORING_METRICS_T
 
 ## Acceptance criteria
 
-- [ ] `docs/guide/monitoring.md` renders in the VitePress build (`npm run build --prefix docs` — there is no root `docs:build` script; no bare-brace build breakage).
-- [ ] Every env var used by monitoring code appears in both `.env.example` and `compose/env.example` with a default; every env var in the examples is actually read by code (no orphans).
-- [ ] AGENTS.md matches the shipped code (module, services, tables, endpoints, test conventions). The stale "Background services" section (it said two; `server.ts` starts six: ConversationTimeoutService, ScenarioRunExecutorService, BenchmarkExecutorService, ImapInboundService, OAuth2TokenRefreshService, ProcessingDeferralService) is **already corrected in this review** — P4-05 only appends the new monitoring services (AlertRuleEngine, RetentionService, HealthCheckService) and the shutdown sequence to that list.
-- [ ] Load sanity numbers recorded (doc + PR) with the partitioning decision made against the pre-agreed rule.
-- [ ] Proposal doc marked implemented with a delta list (anything that changed vs the original design).
-- [ ] Full e2e suite green.
+- [x] `docs/guide/monitoring.md` renders in the VitePress build (`npm run build --prefix docs` — there is no root `docs:build` script; no bare-brace build breakage). — VitePress build green; no bare `{{ }}` outside fenced code blocks (awk check clean).
+- [x] Every env var used by monitoring code appears in both `.env.example` and `compose/env.example` with a default; every env var in the examples is actually read by code (no orphans). — 11 vars in both files (see implementation note 2/3); all read by code (9 via `process.env`, `MONITORING_METRICS_TOKEN` via `metricsEndpoint.ts` constant, `SHUTDOWN_GRACE_MS` via `parseEnvInt` in `src/index.ts`).
+- [x] AGENTS.md matches the shipped code (module, services, tables, endpoints, test conventions). The stale "Background services" section (it said two; `server.ts` starts six: ConversationTimeoutService, ScenarioRunExecutorService, BenchmarkExecutorService, ImapInboundService, OAuth2TokenRefreshService, ProcessingDeferralService) is **already corrected in this review** — P4-05 only appends the new monitoring services (AlertRuleEngine, RetentionService, HealthCheckService) and the shutdown sequence to that list. — AGENTS.md now lists all nine background services incl. the three monitoring ones + the P1-09 Graceful Shutdown section; `src/services/monitoring/` rows added; monitoring test conventions block added; controller count 45.
+- [x] Load sanity numbers recorded (doc + PR) with the partitioning decision made against the pre-agreed rule. — Numbers in doc §8; **decision rule triggered** (both arms) → follow-up filed: `.issues/medium/provider-call-logs-partitioning.md`.
+- [x] Proposal doc marked implemented with a delta list (anything that changed vs the original design). — Status header flipped; §7 "Implementation status & deltas" added (open-question answers + 10 deltas).
+- [x] Full e2e suite green. — run after all P4-05 changes.
+
+## Implementation notes (2026-08-21)
+
+1. **§4/§9 scope adjustment (user decision 2026-08-20):** P3-05 (outbound channel fallback) and P4-03 (webhook dead-letter) were **closed as out of v1 scope** after/before implementation. The spec's original §4 ("outbound channel fallback, webhook dead-letter + replay") and §9 ("webhook dead-letter — when to replay vs discard") requirements were therefore replaced with: §4 "Not in v1 (deliberately closed)" subsection documenting both closures + what still exists (channel providers are instrumented/alerted; outbound alert-webhook delivery trail in `alert_events.notifications`), and §9 runbook "Did my alert get delivered?" covering the delivery-trail audit instead of dead-letter replay.
+2. **Env var inventory (spec list corrected):** `MONITORING_EMAIL_TO` was missing from the spec's list — it is read by the first-boot email-notifier seed (both `MONITORING_EMAIL_PROVIDER_ID` + `MONITORING_EMAIL_TO` are required together) and is documented in both example files. Also added (not in the spec's list): `MONITORING_HEALTH_PROBES` (hard kill switch, P1-05b) and `MONITORING_ALERT_ENGINE_INTERVAL_MS` (env override for the engine tick). Full set of 11: `MONITORING_METRICS_TOKEN`, `MONITORING_HEALTH_INTERVAL_MS`, `MONITORING_HEALTH_PROBES`, `MONITORING_ALERT_ENGINE_INTERVAL_MS`, `MONITORING_CALL_LOG_BUFFER_SIZE`, `MONITORING_MEMORY_THRESHOLD_MB`, `MONITORING_WEBHOOK_URL`, `MONITORING_EMAIL_PROVIDER_ID`, `MONITORING_EMAIL_TO`, `MONITORING_RETENTION_DAYS`, `SHUTDOWN_GRACE_MS`.
+3. **Deliberately NOT documented:** `METRIC_FLUSH_INTERVAL_MS` — it is a hardcoded constant in `MetricsRegistry.ts` (60 s), **not** an env var; putting it in the examples would create an orphan (violates the no-orphans AC).
+4. **Load sanity results (throwaway script `tests/tmp-p405-load.ts`, deleted after run):** Phase A — 100 conversations × 3 provider calls (LLM/TTS/ASR) through the real `CallLogger` over 60 s: 300 rows, 4.54 rows/s, buffer peak 27 (threshold 200, cap 10,000), 11 flushes on the 5 s timer, max inter-flush gap 5.0 s, 0 dropped. Phase B — 100× projection: one hour bucket = 1,635,744 rows bulk-inserted, `ANALYZE`, then `EXPLAIN (ANALYZE, BUFFERS)` of the exact `RetentionService` rollup SQL: **execution time 5,371 ms** (seq scan of the whole in-window table + disk-spilled `percentile_cont` sorts — the literal worst case, whole table inside the 1 h window; with realistic spread over the 90 d retention the window is a small indexed slice). 100× daily projection: **39,257,857 rows/day**.
+5. **Decision rule outcome: TRIGGERED — both arms** (39.3 M > 5 M daily rows AND 5.37 s > 5 s rollup) → partitioning follow-up filed as `.issues/medium/provider-call-logs-partitioning.md` (time partitioning, partition-based purge, re-measure at 100×). Doc §8 records the numbers + the practical revisit trigger (≈100× current volume).
+6. **Extraction gotcha hit (script-level):** node-postgres EXPLAIN results key plan lines under `QUERY PLAN`, not `?column?` — the throwaway script's parser needed the former.
+7. **Docs:** `docs/guide/monitoring.md` (9 sections per spec, with the §4/§9 adjustments above) + sidebar entry under Operations (alongside the P4-04 frontend contract `monitoring-api.md`). No bare `{{ }}` outside fenced code blocks; no links out of the docs root (the partitioning issue is referenced as plain code text, per the VitePress dead-link rule).
+8. **Proposal:** status header flipped to implemented; new §7 records the §6 open-question answers as shipped + 10 deltas (P3-05 closure, P4-03 closure, hybrid schema, ChannelNotifier consolidation, P1-05b probes, rule-catalog endpoint, /health/ready + heartbeats, changeGauge rename, partitioning follow-up, at-most-once delivery decision).
 
 ## Tests
 

@@ -1,9 +1,9 @@
 ---
 title: "P4-01 — `GET /metrics` Prometheus exposition + token gate"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-20
 assignee: ""
 tags: [monitoring, spec, phase-4]
 ---
@@ -45,11 +45,11 @@ Optional external observability hook: standard Prometheus text format from the i
 
 ## Acceptance criteria
 
-- [ ] No env → 404 on `/metrics`.
-- [ ] Env set → 401 without/wrong token (warn-throttled), 200 + `text/plain` exposition with correct token.
-- [ ] Exposition parses with a Prometheus text-format parser (unit test with a reference parser, e.g. `prom-parse`, or hand-verified fixtures — **spec: hand-verified fixtures** to avoid a new dep; CI check via fixtures).
-- [ ] `/metrics` traffic does not appear in `api_requests_total`, does not hit the API rate limiter, and does not appear in request outcome logs.
-- [ ] Existing suite green.
+- [x] No env → 404 on `/metrics`.
+- [x] Env set → 401 without/wrong token (warn-throttled), 200 + `text/plain` exposition with correct token.
+- [x] Exposition parses with a Prometheus text-format parser — implemented as **hand-verified fixtures** per the spec's stated choice (no new dep).
+- [x] `/metrics` traffic does not appear in `api_requests_total`, does not hit the API rate limiter, and does not appear in request outcome logs (e2e asserts the `api_requests_total` delta is 0).
+- [x] Existing suite green (gates: unit 886, e2e 1049, tsc clean, build clean — see implementation notes).
 
 ## Tests
 

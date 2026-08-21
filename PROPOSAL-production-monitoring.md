@@ -1,6 +1,6 @@
 # Proposal: Production Monitoring, Alerting & 3rd-Party Failover
 
-Status: **proposal** (not yet implemented)
+Status: **implemented** (branch `advanced-monitoring`, 2026-08-21) — see [Implementation status & deltas](#7-implementation-status--deltas-2026-08-21)
 Scope: observability + resilience additions to the Bonsai backend
 Date: 2026-08-17
 
@@ -429,3 +429,43 @@ Each phase is independently shippable and keeps the build green (`npm run build`
 4. **LLM probe default**: free `enumerateModels()` only (proposal) vs allow paid 1-token probes by default.
 5. **Retention defaults**: 90 days call logs (proposal), 90 days health checks, alerts/fallback events kept forever (low volume) — OK?
 6. Do you want the **Console UI** for this in scope (separate repo `bonsai-console`), or backend-only for now?
+
+---
+
+## 7. Implementation status & deltas (2026-08-21)
+
+**All four phases are implemented and tested** on branch `advanced-monitoring`
+(unit + e2e suites green; spec index: `.issues/proposal/monitoring/README.md`).
+Operator guide: `docs/guide/monitoring.md`; frontend contract:
+`docs/guide/monitoring-api.md`. Answers to §6's open questions, as shipped:
+
+1. **Notifiers:** webhook + email first (Phase 2); Telegram, Twilio SMS and
+   WhatsApp added in Phase 4 (P4-02), all channel-based ones reusing existing
+   channel providers.
+2. **Prometheus:** Phase 4 (P4-01), as proposed — `GET /metrics`, token-gated
+   via `MONITORING_METRICS_TOKEN`, disabled by default.
+3. **RBAC:** `system:monitoring` = **super_admin only** (P2-04).
+4. **Probes:** free liveness endpoints only — `enumerateModels()` (or a
+   1-token generation where no list endpoint exists), storage `list`, vendor
+   `ping()` for ASR/TTS where available (P1-05b); `MONITORING_HEALTH_PROBES=off`
+   kill switch; no-cost inference from call logs for vendors without free
+   endpoints.
+5. **Retention:** 90 d call logs / health checks, 2× for hourly stats,
+   `alert_events` / `fallback_events` kept forever — as proposed.
+6. **Console UI:** backend-only here; P4-04 ships the endpoint-by-endpoint
+   contract doc for the console team.
+
+### Deltas from this proposal
+
+| # | Delta | Reason |
+|---|---|---|
+| 1 | **Outbound channel fallback (P3-05) — closed, not shipped.** The proposal's failover item included outbound channels (e.g. retry a failed WhatsApp send on Twilio SMS). Implemented once, then **rejected post-implementation**: per-request channel choice belongs to the caller, not the backend. Outbound channel failures are still fully instrumented (call logs + `provider-down`-style alerting on channel providers). | v1 scope decision (2026-08-20) |
+| 2 | **Webhook dead-letter queue (P4-03) — closed, not shipped.** The "optional" Phase 4 item was declined: overkill for v1. Failed *inbound* webhook processing still logs + returns 500; failed *outbound alert* webhook deliveries are auditable in `alert_events.notifications` (at-most-once delivery, 15 s cap — deliberately no retry queue in v1). | v1 scope decision (2026-08-20) |
+| 3 | **Hybrid call-log schema:** `provider_call_logs` = 16 dense flat columns + one `metrics` jsonb for sparse variant fields (streaming phases, tokens), instead of the proposal's wide flat column set. Cheaper to evolve; same query patterns. | schema refinement during P1-01 |
+| 4 | **Channel notifiers consolidated** into one `ChannelNotifier` strategy table (telegram / twilio_sms / whatsapp) instead of three near-identical classes. | P4-02 implementation review |
+| 5 | **ASR/TTS provider probes (P1-05b)** — an addition beyond the original probe design: per-type probe policy (`llmProbe` / `asrProbe` / `ttsProbe`) with zero-cost vendor ping endpoints. | spec added 2026-08-19 |
+| 6 | **Rule catalog endpoint** `GET /api/monitoring/rules` — addendum so UIs can build from the live rule set instead of hardcoding ids. | addendum during P2-03 |
+| 7 | **`GET /health/ready`** (DB-backed readiness probe) + heartbeats for all nine background services — the proposal's health section grew these during P1-05. | P1-05 implementation |
+| 8 | **`incrGauge` → `changeGauge`** metric API rename (gauges can go down). | naming fix during P1-02 |
+| 9 | **Scale follow-up filed:** at 100× the measured call volume (~39 M rows/day) the hourly rollup exceeds 5 s worst-case → `.issues/medium/provider-call-logs-partitioning.md` (time partitioning + partition-based purge). Below that, the single-table design is verified fine (P4-04 EXPLAIN evidence). | P4-05 load sanity, pre-agreed decision rule |
+| 10 | **Notification delivery is at-most-once + audit ledger** (no retry queue) — the proposal's risk table assumed this; it is now an explicit v1 decision with the delivery trail as the audit surface. | reliability review after P2-02 |

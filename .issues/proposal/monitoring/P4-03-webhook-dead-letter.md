@@ -1,14 +1,16 @@
 ---
 title: "P4-03 — Webhook dead-letter table + replay endpoint"
 severity: proposal
-status: open
+status: closed
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-20
 assignee: ""
 tags: [monitoring, spec, phase-4]
 ---
 
 # P4-03 — Webhook dead-letter table + replay endpoint
+
+> **Closed (2026-08-20) — will not be implemented.** User decision: a webhook dead-letter queue is overkill for v1. Failed inbound webhook processing stays logged + 500 (carrier-side retry may or may not happen), and outbound alert-webhook delivery attempts remain auditable in `alert_events.notifications`. Revisit only if webhook reliability becomes an operational problem. Retained for the record.
 
 - **Phase:** 4 — Polish
 - **Depends on:** P1-03 (webhook call sites + call-log rows), P2-03 (API conventions)
