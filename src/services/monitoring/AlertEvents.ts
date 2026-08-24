@@ -22,6 +22,21 @@ export type RuleSeverity = 'info' | 'warning' | 'critical';
  * (one SQL per distinct rule window per engine pass). Variant phase fields
  * are extracted from the `metrics` jsonb in SQL; denominators per finding 16.
  */
+/**
+ * The provider's most recent `provider_call_logs` row within the lookback
+ * horizon (all operations, including the P1-05b liveness-probe pings).
+ * Feeds `provider-auth-failed`'s persistence branch: while the last observed
+ * signal is still an auth failure, the alert stays alive even when traffic
+ * has stopped (breaker OPEN) — it only resolves once something from the
+ * provider succeeds.
+ */
+export type ProviderLastSignal = {
+  providerId: string;
+  at: Date;
+  ok: boolean;
+  errorCode: string | null;
+};
+
 export type ProviderWindowStats = {
   providerId: string;
   calls: number;
@@ -65,6 +80,8 @@ export type EvaluationData = {
   providerNames: Map<string, { name: string; providerType: string }>;
   /** windowMs → providerId → stats (one aggregate query per distinct window). */
   callLogs: Map<number, Map<string, ProviderWindowStats>>;
+  /** providerId → most recent call-log signal in the lookback horizon (24 h). */
+  providerLastSignals: Map<string, ProviderLastSignal>;
   /** P3-01 seam — providerId → 'open'; empty map in Phase 2. */
   breakers: Map<string, 'open'>;
   probeFailures: Map<string, number>;
@@ -350,7 +367,7 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
     id: 'provider-auth-failed',
     scope: 'per_provider',
     severity: 'critical',
-    summary: '≥ threshold (default 1) auth error(s) from the provider in the window — misconfigured or expired credentials; will not self-heal.',
+    summary: '≥ threshold (default 1) auth error(s) in the window, or the provider’s last observed signal (calls + probes, 24 h lookback) is still an auth error — misconfigured or expired credentials; will not self-heal.',
     // forMinutes 0: an auth failure does not self-heal — delay buys nothing.
     defaultParams: { threshold: 1, windowMinutes: 5, minSamples: 0, forMinutes: 0, resolveAfterGoodChecks: 2, cooldownMinutes: 15, maxUnresolvedHours: 6 },
     evaluate: (data, params, providerId) => {
@@ -365,6 +382,25 @@ export const DEFAULT_RULES: AlertRuleDef[] = [
           met(
             `${providerLabel(data, providerId)}: ${count} auth error(s) in the last ${params.windowMinutes} min — misconfigured or expired credentials (this will not self-heal; check the provider config)${used}`,
             { providerId, authErrors: count, failoverChain: [providerId, ...chain] },
+          ),
+        ];
+      }
+      // Persistence branch: a windowed count goes quiet the moment traffic
+      // stops (breaker OPEN → no calls reach the provider), which would make a
+      // "will not self-heal" alert auto-resolve while the credentials are
+      // still broken. Stay met while the provider's last observed signal —
+      // any call or probe ping in the lookback horizon — is an auth failure.
+      // Resolves only once a call or probe from the provider succeeds.
+      const last = data.providerLastSignals.get(providerId);
+      if (last && !last.ok && last.errorCode === 'auth') {
+        const minutesAgo = Math.max(0, Math.round((data.now - last.at.getTime()) / 60_000));
+        const breakerNote = data.breakers.has(providerId) ? '; circuit breaker is OPEN — no new calls are reaching the provider' : '';
+        const chain = data.fallbackChains.get(providerId) ?? [];
+        const used = chain.length > 0 ? ` — failover chain: ${[providerLabel(data, providerId), ...chain.map((id) => providerLabel(data, id))].join(' → ')}` : '';
+        return [
+          met(
+            `${providerLabel(data, providerId)}: last observed signal (${minutesAgo} min ago) was an auth error — credentials are still failing${breakerNote} (this will not self-heal; check the provider config)${used}`,
+            { providerId, lastSignalAt: last.at.toISOString(), lastSignalErrorCode: last.errorCode, failoverChain: [providerId, ...chain] },
           ),
         ];
       }

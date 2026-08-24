@@ -3,7 +3,7 @@ title: "P3-01 — CircuitBreaker + registry, wired into CallLogger outcomes"
 severity: proposal
 status: resolved
 created: 2026-08-17
-updated: 2026-08-20
+updated: 2026-08-24
 assignee: ""
 tags: [monitoring, spec, phase-3]
 ---
@@ -69,3 +69,7 @@ half-open → open     (probe fails; cooldown restarts)
 ## Out of scope
 
 - Using the breaker to gate non-failover calls (only P3-03/P3-04 failover wrappers ever call `beforeCall`; business code paths never do), cross-instance breaker state — **decision: in-memory, single process.** Restart clears breaker state; the `provider-down` rule (P2-01) covers the restart gap via `provider_call_logs` windows + probe failures. Document this here and in P4-05 docs. Persisted breaker history (call logs are the source of truth).
+
+## Implementation notes
+
+1. **(2026-08-24) Alert-engine wiring was missing — fixed.** The P2-01 data seam `getBreakers` shipped as a Phase-2 stub (`new Map<string, 'open'>()` with the comment "P3-01 replaces this"), and P3-01 never replaced it: the `provider-down` **breaker-OPEN branch was dead in production and e2e alike** (no test ever drove that branch through the live engine). Fixed by injecting `CircuitBreakerRegistry` into `AlertRuleEngine` and wiring `getBreakers` to the new `CircuitBreakerRegistry.openProviderIds()` (counts `state === 'open'` only; half-open is transient — the in-flight probe resolves to open or closed on the next engine tick). Regression guard: e2e `provider-down: the breaker-OPEN branch fires live` — 5 `server_error` rows open the breaker, the rows are aged out of the rule window, and only the breaker branch can then fire. Note for e2e authors: breaker state is in-memory and lives in the APP-world module graph — seed it via the exposed `__TEST_CALL_LOGGER__` app-world singleton, not `container.resolve(CallLogger)` (the test world's container instantiates separate singletons; the shared Postgres masks this for DB-backed assertions).

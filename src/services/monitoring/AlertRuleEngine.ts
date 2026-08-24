@@ -7,6 +7,7 @@ import { logger } from '../../utils/logger';
 import { generateId } from '../../utils/idGenerator';
 import { getRateLimitRejectionStats, type RateLimitRejectionKeyStats } from '../../http/middleware/rateLimiter';
 import { HealthCheckService } from './HealthCheckService';
+import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
 import { MetricsRegistry, type MetricsSnapshot } from './MetricsRegistry';
 import { MonitoringConfigService } from './MonitoringConfigService';
 import { monitoringConfigSchema, type MonitoringConfig } from '../../http/contracts/monitoring';
@@ -21,6 +22,7 @@ import {
   type AlertRuleDef,
   type EvaluationData,
   type HealthSnapshot,
+  type ProviderLastSignal,
   type ProviderWindowStats,
   type RuleParams,
   type RuleSeverity,
@@ -80,10 +82,18 @@ export type FiringAlertRow = {
  * is queried inside its own try/catch so one failure degrades only the
  * rules that depend on it).
  */
+/**
+ * How far back the "last observed signal" lookup reaches (provider-auth-failed
+ * persistence branch). 24 h comfortably exceeds the rule's maxUnresolvedHours
+ * (6 h) safety valve, and bounds the scan to one day of call logs.
+ */
+const LAST_SIGNAL_LOOKBACK_MS = 24 * 60 * 60_000;
+
 export type AlertEngineDataProviders = {
   getRejectionStats: () => { total: number; topKeys: RateLimitRejectionKeyStats[] };
   getBreakers: () => Map<string, 'open'>; // P3-01 seam — empty in Phase 2
   queryProviderWindows: (sinceIso: string) => Promise<ProviderWindowStats[]>;
+  queryProviderLastSignals: (sinceIso: string) => Promise<ProviderLastSignal[]>;
   queryFallbackCounts: (sinceIso: string) => Promise<{ providerId: string; count: number; fallbackIds: string[] }[]>;
   queryProviderNames: (ids: string[]) => Promise<Map<string, { name: string; providerType: string }>>;
   listFiringAlerts: () => Promise<FiringAlertRow[]>;
@@ -151,8 +161,9 @@ export class AlertRuleEngine {
     @inject(HealthCheckService) private readonly healthCheckService: HealthCheckService,
     @inject(MonitoringConfigService) private readonly monitoringConfigService: MonitoringConfigService,
     @inject(ALERT_EVENT_PUBLISHER_TOKEN) private readonly publisher: AlertEventPublisher,
+    @inject(CircuitBreakerRegistry) private readonly breakerRegistry: CircuitBreakerRegistry,
   ) {
-    this.dataProviders = AlertRuleEngine.productionDataProviders();
+    this.dataProviders = this.productionDataProviders();
   }
 
   start(): void {
@@ -289,6 +300,7 @@ export class AlertRuleEngine {
     }
 
     const callLogs = new Map<number, Map<string, ProviderWindowStats>>();
+    let providerLastSignals = new Map<string, ProviderLastSignal>();
     let fallbackEventCounts = new Map<string, number>();
     let fallbackChains = new Map<string, string[]>();
     try {
@@ -299,6 +311,18 @@ export class AlertRuleEngine {
         }),
       );
       for (const [windowMs, byProvider] of perWindow) callLogs.set(windowMs, byProvider);
+    } catch (error) {
+      logger.error({ error }, 'AlertRuleEngine: provider call/fallback data unavailable — dependent rules evaluate to not-met this pass');
+    }
+
+    try {
+      const signals = await this.dataProviders.queryProviderLastSignals(new Date(now - LAST_SIGNAL_LOOKBACK_MS).toISOString());
+      providerLastSignals = new Map(signals.map((s) => [s.providerId, s]));
+    } catch (error) {
+      logger.error({ error }, 'AlertRuleEngine: provider last-signal data unavailable — provider-auth-failed persists via the windowed count only this pass');
+    }
+
+    try {
       const fbSinceIso = new Date(now - Math.max(10 * 60_000, ...windowsMs)).toISOString();
       const fallbackRows = await this.dataProviders.queryFallbackCounts(fbSinceIso);
       fallbackEventCounts = new Map(fallbackRows.map((r) => [r.providerId, r.count]));
@@ -311,6 +335,7 @@ export class AlertRuleEngine {
     // evaluation set this pass (finding 7/11).
     const ids = new Set<string>();
     for (const byProvider of callLogs.values()) for (const id of byProvider.keys()) ids.add(id);
+    for (const id of providerLastSignals.keys()) ids.add(id); // a provider whose only recent trace is an old signal still evaluates
     for (const id of probeFailures.keys()) ids.add(id);
     for (const id of fallbackEventCounts.keys()) ids.add(id);
     for (const chain of fallbackChains.values()) for (const id of chain) ids.add(id); // P3-06: name the fallbacks in chain context
@@ -342,6 +367,7 @@ export class AlertRuleEngine {
       previousDbCheckStatus: this.previousDbCheckStatus,
       providerNames,
       callLogs,
+      providerLastSignals,
       breakers,
       probeFailures,
       fallbackEventCounts,
@@ -397,6 +423,7 @@ export class AlertRuleEngine {
   private perProviderScopeParts(data: EvaluationData): Set<string> {
     const parts = new Set<string>();
     for (const byProvider of data.callLogs.values()) for (const id of byProvider.keys()) parts.add(id);
+    for (const id of data.providerLastSignals.keys()) parts.add(id); // old-signal-only providers must still evaluate (auth persistence)
     for (const id of data.breakers.keys()) parts.add(id);
     for (const id of data.probeFailures.keys()) parts.add(id);
     for (const id of data.fallbackEventCounts.keys()) parts.add(id);
@@ -688,10 +715,10 @@ export class AlertRuleEngine {
     return this.ringSum(name, labels, windowMs, this.nowProvider());
   }
 
-  private static productionDataProviders(): AlertEngineDataProviders {
+  private productionDataProviders(): AlertEngineDataProviders {
     return {
       getRejectionStats: () => getRateLimitRejectionStats(),
-      getBreakers: () => new Map<string, 'open'>(), // P3-01 replaces this with the live breaker registry
+      getBreakers: () => new Map(this.breakerRegistry.openProviderIds().map((providerId) => [providerId, 'open'] as const)),
       queryProviderWindows: async (sinceIso) => {
         const rows = (await db.execute(sql`
           WITH base AS (
@@ -763,6 +790,27 @@ export class AlertRuleEngine {
             midStreamRows: Number(r.mid_stream_rows),
           };
         });
+      },
+      queryProviderLastSignals: async (sinceIso) => {
+        // One row per provider: the most recent call-log row in the lookback
+        // horizon (any operation — real calls and probe pings alike). The
+        // (provider_id, created_at) index serves the DISTINCT ON ordering.
+        const rows = (await db.execute(sql`
+          SELECT DISTINCT ON (provider_id)
+            provider_id,
+            created_at,
+            ok,
+            error_code
+          FROM provider_call_logs
+          WHERE created_at >= ${sinceIso}
+          ORDER BY provider_id, created_at DESC, id DESC
+        `)).rows as Array<Record<string, unknown>>;
+        return rows.map((r) => ({
+          providerId: String(r.provider_id),
+          at: new Date(r.created_at as string | Date),
+          ok: Boolean(r.ok),
+          errorCode: r.error_code === null ? null : String(r.error_code),
+        }));
       },
       queryFallbackCounts: async (sinceIso) => {
         // Total row count per primary (fallback-active) plus the ordered
