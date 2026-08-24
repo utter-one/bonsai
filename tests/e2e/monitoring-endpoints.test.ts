@@ -100,6 +100,7 @@ describe('Monitoring endpoints (P1-08)', () => {
       expect(res.status).to.equal(200);
       expect(res.body.checkedAt).to.be.a('string');
       expect(res.body.checks).to.be.an('array').that.is.not.empty;
+      expect(res.body.overall).to.be.oneOf(['ok', 'degraded', 'down', 'unknown']);
 
       const names = res.body.checks.map((c: any) => c.name);
       expect(names).to.include('db');

@@ -59,6 +59,32 @@ export interface HealthCheckResult {
   detail?: Record<string, unknown>;
 }
 
+/**
+ * Global health status for a set of checks: the worst non-`unknown` status
+ * (`down` > `degraded` > `ok`). `unknown` checks (never ticked, no call data
+ * to infer from) are **ignored** so a healthy system with a few not-yet-known
+ * checks still reports `ok`. Returns `unknown` only when there are no checks
+ * or every check is unknown.
+ */
+export function overallHealthStatus(checks: HealthCheckResult[]): HealthCheckStatus {
+  let hasOk = false;
+  let hasDegraded = false;
+  for (const check of checks) {
+    if (check.status === 'down') return 'down';
+    if (check.status === 'degraded') hasDegraded = true;
+    if (check.status === 'ok') hasOk = true;
+  }
+  if (hasDegraded) return 'degraded';
+  return hasOk ? 'ok' : 'unknown';
+}
+
+/** Health snapshot exposed by {@link HealthCheckService.getSnapshot}. */
+export interface HealthSnapshot {
+  checkedAt: Date | null;
+  checks: HealthCheckResult[];
+  overall: HealthCheckStatus;
+}
+
 interface HealthCheck {
   name: string;
   run: () => Promise<HealthCheckResult>;
@@ -109,7 +135,7 @@ export class HealthCheckService {
   private lastProbeAt = new Map<string, number>();
   private probeFailures = new Map<string, number>();
   private readonly eventLoopDelay = monitorEventLoopDelay({ resolution: 20 });
-  private snapshot: { checkedAt: Date | null; checks: HealthCheckResult[] } = { checkedAt: null, checks: [] };
+  private snapshot: HealthSnapshot = { checkedAt: null, checks: [], overall: 'unknown' };
 
   private readonly intervalMs: number;
   private readonly probesEnabled: boolean;
@@ -152,8 +178,8 @@ export class HealthCheckService {
     logger.info('HealthCheckService stopped');
   }
 
-  /** Latest completed cycle; `checkedAt` is null until the first cycle finishes. */
-  getSnapshot(): { checkedAt: Date | null; checks: HealthCheckResult[] } {
+  /** Latest completed cycle; `checkedAt` is null until the first cycle finishes. `overall` ignores `unknown` checks. */
+  getSnapshot(): HealthSnapshot {
     return this.snapshot;
   }
 
@@ -209,7 +235,7 @@ export class HealthCheckService {
       const checks = await this.buildChecks();
       const results = await Promise.all(checks.map((check) => this.runCheckWithTimeout(check)));
       await this.persistResults(results);
-      this.snapshot = { checkedAt: new Date(), checks: results };
+      this.snapshot = { checkedAt: new Date(), checks: results, overall: overallHealthStatus(results) };
       logger.debug({ count: results.length, down: results.filter((r) => r.status === 'down').length }, 'HealthCheckService cycle completed');
     } finally {
       this.isProcessing = false;

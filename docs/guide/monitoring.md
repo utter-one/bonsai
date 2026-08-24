@@ -108,15 +108,24 @@ traffic.
 
 ```json
 {
-  "at": "2026-08-21T14:03:00.000Z",
+  "checkedAt": "2026-08-21T14:03:00.000Z",
   "checks": [
     { "name": "db", "status": "ok", "detail": { "poolTotal": 10, "poolIdle": 9, "poolWaiting": 0 } },
     { "name": "process", "status": "ok", "detail": { "rssBytes": 216268800, "eventLoopLagP95Ms": 0.8, "uptimeSec": 86400 } },
     { "name": "service_heartbeat:ConversationTimeoutService", "status": "ok" },
     { "name": "provider_probe:prov_openai", "status": "ok", "detail": { "probe": "enumerateModels" } }
-  ]
+  ],
+  "overall": "ok"
 }
 ```
+
+`overall` is the **global health status**: the worst non-`unknown` check
+status (`down` > `degraded` > `ok`). `unknown` checks — never-ticked
+background services, providers with no recent call data to infer from — are
+**ignored**, so a healthy system with a few not-yet-known checks still
+reports `ok`. `overall` is `unknown` only before the first cycle or when
+every check is unknown. Per-check `unknown` values stay in `checks` with
+their `detail.reason` so the *why* is still visible.
 
 Statuses: `ok` | `degraded` | `down` | `unknown`. History:
 `GET /api/monitoring/health-history?check=<name>&from=...&to=...` (filterable,
