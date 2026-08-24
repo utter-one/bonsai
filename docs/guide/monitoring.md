@@ -203,7 +203,7 @@ a rule or changing its severity/threshold needs no deploy.
 | `provider-down` | per provider | critical | 100% of calls failed in window (≥ minSamples) **or** breaker OPEN **or** ≥3 consecutive probe failures | window 10 min, minSamples 5, for 2 min |
 | `provider-degraded` | per provider | warning | error rate > threshold **or** p95 duration > per-type cap (llm 20 s / asr 2 s / tts 5 s / channel 10 s) | 30%, window 10 min, minSamples 10 |
 | `provider-rate-limited` | per provider | warning | ≥ N upstream 429 (`rate_limited`) errors in window — quota, not outage | 5, window 10 min |
-| `provider-auth-failed` | per provider | critical | ≥1 auth error in window — credentials misconfigured/expired, **will not self-heal** | window 5 min, for 0 min (no sustainment delay) |
+| `provider-auth-failed` | per provider | critical | ≥1 auth error in window, **or** the provider’s last observed signal (any call or probe, 24 h lookback) is still an auth error — credentials misconfigured/expired, **will not self-heal**; resolves only once a call or probe from the provider succeeds | window 5 min, for 0 min (no sustainment delay) |
 | `api-5xx-spike` | global | warning | Bonsai API 5xx ratio > threshold over ≥ minSamples requests | 5%, window 5 min, minSamples 20 |
 | `api-429-spike` | global (scoped to key when one dominates) | warning | Bonsai's own API rate-limit rejections ≥ threshold | 20, window 5 min |
 | `auth-429-spike` | global (scoped to key when one dominates) | warning | auth (login/refresh) limiter rejections ≥ threshold — brute force / credential stuffing | 5, window 15 min |

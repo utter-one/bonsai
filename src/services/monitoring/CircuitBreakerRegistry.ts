@@ -56,6 +56,15 @@ export class CircuitBreakerRegistry {
     this.safe(providerId, () => this.getBreaker(providerId).recordFailure(errorCode));
   }
 
+  /** Provider ids whose breaker is currently OPEN (alert rule engine, provider-down breaker branch). */
+  openProviderIds(): string[] {
+    const out: string[] = [];
+    for (const [providerId, breaker] of this.breakers) {
+      if (breaker.currentState === 'open') out.push(providerId);
+    }
+    return out;
+  }
+
   /** One snapshot per known provider (P1-08 `/api/monitoring/providers`). */
   snapshot(): Record<string, BreakerSnapshot> {
     const out: Record<string, BreakerSnapshot> = {};

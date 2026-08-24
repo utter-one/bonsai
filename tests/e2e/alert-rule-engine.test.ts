@@ -150,4 +150,96 @@ describe('Alert rule engine (P2-01, e2e)', () => {
     expect(rows[0].status).to.equal('resolved');
     expect(rows[0].context.resolutionReason).to.equal('auto');
   });
+
+  it('provider-down: the breaker-OPEN branch fires live (breaker state survives call-log aging)', async () => {
+    // Guards the production wiring: the engine's `getBreakers` must read the
+    // live CircuitBreakerRegistry (it was a Phase-2 stub returning an empty
+    // map, which silently disabled this branch in production and e2e alike).
+    // `__TEST_CALL_LOGGER__` is the APP-world logger — breaker state is
+    // in-memory, so only the app-world instance feeds the app-world registry.
+    const eng = engine();
+    const callLogger = (globalThis as any).__TEST_CALL_LOGGER__ as CallLogger;
+    expect(callLogger).to.not.equal(undefined, '__TEST_CALL_LOGGER__ is not set — tests/setup.ts must expose the app-world CallLogger');
+    // 5 counting failures (server_error) open the breaker synchronously.
+    for (let i = 0; i < 5; i++) {
+      callLogger.record({
+        providerId: 'prov_e2e_breaker_down',
+        providerType: 'llm',
+        apiType: 'openai',
+        operation: 'llm.generate',
+        ok: false,
+        errorCode: 'server_error',
+        statusHttp: 500,
+        durationMs: 100,
+        errorText: 'HTTP 500',
+      });
+    }
+    await callLogger.flushNow();
+    // Age the rows OUT of the 10-min rule window so the 100%-failure branch
+    // is not met — only the breaker branch can fire now.
+    await db
+      .update(providerCallLogs)
+      .set({ createdAt: sql`created_at - interval '11 minutes'` })
+      .where(eq(providerCallLogs.providerId, 'prov_e2e_breaker_down'));
+
+    await useConfig(eng, 'provider-down', {
+      forMinutes: 0, resolveAfterGoodChecks: 1, cooldownMinutes: 0,
+    });
+    await eng.runNow();
+
+    const rows = await waitForAlerts('provider-down', 'provider-down:prov_e2e_breaker_down', 'firing');
+    expect(rows.length).to.equal(1);
+    expect(rows[0].message).to.contain('circuit breaker is OPEN');
+  });
+
+  it('provider-auth-failed: a stale auth failure outside the window persists via the last-signal branch, resolves on success', async () => {
+    const eng = engine();
+    const callLogger = container.resolve(CallLogger);
+    // Seed ONE auth failure, then age it 30 min — outside the 5-min rule window,
+    // so the windowed count is 0. In the old windowed-only semantics this would
+    // have auto-resolved (the exact bug behind "401s ongoing, alert Resolved").
+    callLogger.record({
+      providerId: 'prov_e2e_auth',
+      providerType: 'tts',
+      apiType: 'elevenlabs',
+      operation: 'tts.generate',
+      ok: false,
+      errorCode: 'auth',
+      statusHttp: 401,
+      durationMs: 80,
+      errorText: 'HTTP 401: invalid xi-api-key',
+    });
+    await callLogger.flushNow();
+    await db
+      .update(providerCallLogs)
+      .set({ createdAt: sql`created_at - interval '30 minutes'` })
+      .where(eq(providerCallLogs.providerId, 'prov_e2e_auth'));
+
+    await useConfig(eng, 'provider-auth-failed', {
+      forMinutes: 0, resolveAfterGoodChecks: 1, cooldownMinutes: 0,
+    });
+    await eng.runNow();
+
+    let rows = await waitForAlerts('provider-auth-failed', 'provider-auth-failed:prov_e2e_auth', 'firing');
+    expect(rows.length).to.equal(1);
+    expect(rows[0].message).to.contain('last observed signal');
+    expect(rows[0].context.lastSignalErrorCode).to.equal('auth');
+
+    // A successful probe (or call) lands → last signal is ok → auto-resolve.
+    callLogger.record({
+      providerId: 'prov_e2e_auth',
+      providerType: 'tts',
+      apiType: 'elevenlabs',
+      operation: 'tts.ping',
+      ok: true,
+      durationMs: 40,
+    });
+    await callLogger.flushNow();
+    await eng.runNow();
+
+    rows = await waitForAlerts('provider-auth-failed', 'provider-auth-failed:prov_e2e_auth', 'resolved');
+    expect(rows.length).to.equal(1);
+    expect(rows[0].status).to.equal('resolved');
+    expect(rows[0].context.resolutionReason).to.equal('auto');
+  });
 });

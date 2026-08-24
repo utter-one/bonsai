@@ -4,7 +4,7 @@ import { monitoringConfigSchema, type MonitoringConfig } from '../../../src/http
 import { AlertRuleEngine, type AlertEngineDataProviders } from '../../../src/services/monitoring/AlertRuleEngine';
 import type { AlertEvent, AlertEventPublisher } from '../../../src/services/monitoring/AlertEventPublisher';
 import type { MetricsSnapshot } from '../../../src/services/monitoring/MetricsRegistry';
-import type { HealthSnapshot, ProviderWindowStats } from '../../../src/services/monitoring/AlertEvents';
+import type { HealthSnapshot, ProviderLastSignal, ProviderWindowStats } from '../../../src/services/monitoring/AlertEvents';
 import type { RateLimitRejectionKeyStats } from '../../../src/http/middleware/rateLimiter';
 
 /**
@@ -59,6 +59,7 @@ class Harness {
   probeFailures = new Map<string, number>();
   providerNames = new Map<string, { name: string; providerType: string }>();
   callLogs: ProviderWindowStats[] = [];
+  lastSignals: ProviderLastSignal[] = [];
   fallbackCounts = new Map<string, number>();
   firingAlerts: unknown[] = [];
   rejectionTopKeys: RateLimitRejectionKeyStats[] = [];
@@ -98,6 +99,9 @@ class Harness {
           this.resolved.push(event);
         },
       } as AlertEventPublisher,
+      {
+        openProviderIds: () => [] as string[],
+      } as never,
     );
     this.engine.setNowProviderForTests(() => this.now);
     const providers: Partial<AlertEngineDataProviders> = {
@@ -107,6 +111,7 @@ class Harness {
       }),
       getBreakers: () => this.breakers,
       queryProviderWindows: async () => this.callLogs,
+      queryProviderLastSignals: async () => this.lastSignals,
       queryFallbackCounts: async () => [...this.fallbackCounts.entries()].map(([providerId, count]) => ({ providerId, count, fallbackIds: [] })), // P3-06: no chain context in the legacy harness
       queryProviderNames: async () => this.providerNames,
       listFiringAlerts: async () => this.firingAlerts as never,
@@ -430,6 +435,50 @@ describe('P2-01 AlertRuleEngine (unit)', () => {
       await h.pass(MIN);
       expect(h.firedFor('provider-auth-failed:prov_1')).to.have.length(1);
       expect(h.fired[0].message).to.contain('will not self-heal');
+    });
+
+    it('provider-auth-failed persists while the last observed signal is an auth error (no recent traffic)', async () => {
+      const h = new Harness();
+      h.fastFire('provider-auth-failed');
+      h.callLogs = []; // window empty — breaker OPEN, no calls reaching the provider
+      h.breakers.set('prov_1', 'open');
+      h.lastSignals = [{ providerId: 'prov_1', at: new Date(h.now - 30 * MIN), ok: false, errorCode: 'auth' }];
+      await h.pass(MIN);
+      expect(h.firedFor('provider-auth-failed:prov_1')).to.have.length(1);
+      expect(h.fired[0].message).to.contain('last observed signal');
+      expect(h.fired[0].message).to.contain('circuit breaker is OPEN');
+      expect(h.fired[0].message).to.contain('will not self-heal');
+      expect(h.fired[0].context.lastSignalErrorCode).to.equal('auth');
+    });
+
+    it('provider-auth-failed resolves once a call or probe from the provider succeeds', async () => {
+      const h = new Harness();
+      h.fastFire('provider-auth-failed');
+      h.lastSignals = [{ providerId: 'prov_1', at: new Date(h.now - 30 * MIN), ok: false, errorCode: 'auth' }];
+      await h.pass(MIN);
+      expect(h.firedFor('provider-auth-failed:prov_1')).to.have.length(1);
+
+      h.lastSignals = [{ providerId: 'prov_1', at: new Date(h.now - MIN), ok: true, errorCode: null }];
+      await h.pass(MIN);
+      expect(h.resolvedFor('provider-auth-failed:prov_1')).to.have.length(1);
+    });
+
+    it('provider-auth-failed stays quiet when the last signal is a non-auth failure', async () => {
+      const h = new Harness();
+      h.fastFire('provider-auth-failed');
+      h.lastSignals = [{ providerId: 'prov_1', at: new Date(h.now - 5 * MIN), ok: false, errorCode: 'network' }];
+      await h.pass(MIN);
+      expect(h.firedFor('provider-auth-failed:prov_1')).to.have.length(0);
+    });
+
+    it('provider-auth-failed prefers the windowed count message when both branches are met', async () => {
+      const h = new Harness();
+      h.fastFire('provider-auth-failed');
+      h.callLogs = [stats({ calls: 20, errors: 1, errorRate: 0.05, errorCounts: { auth: 1 } })];
+      h.lastSignals = [{ providerId: 'prov_1', at: new Date(h.now - MIN), ok: false, errorCode: 'auth' }];
+      await h.pass(MIN);
+      expect(h.firedFor('provider-auth-failed:prov_1')).to.have.length(1);
+      expect(h.fired[0].message).to.contain('1 auth error(s) in the last 5 min');
     });
 
     it('oauth-refresh-failing and imap-poll-failing fire on ok=false counter series', async () => {

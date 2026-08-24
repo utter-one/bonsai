@@ -93,6 +93,9 @@ class Harness {
           this.resolved.push(event);
         },
       } as AlertEventPublisher,
+      {
+        openProviderIds: () => [] as string[],
+      } as never,
     );
     this.engine.setNowProviderForTests(() => this.now);
     const providers: Partial<AlertEngineDataProviders> = {
