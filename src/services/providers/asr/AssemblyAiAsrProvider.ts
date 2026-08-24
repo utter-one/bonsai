@@ -117,7 +117,7 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
       ? 'https://api.eu.assemblyai.com'
       : 'https://api.assemblyai.com';
     try {
-      await httpPing(`${restBase}/v2/transcripts?page_size=1`, {
+      await httpPing(`${restBase}/v2/transcript?limit=1`, {
         Authorization: this.config.apiKey,
       });
       this.recordPingCall(startedAt);

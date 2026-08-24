@@ -194,11 +194,11 @@ describe('P1-05b provider ping() shape (zero-cost liveness endpoints)', () => {
   beforeEach(stubFetch);
   afterEach(() => { globalThis.fetch = realFetch; });
 
-  it('AssemblyAI (us): GET /v2/transcripts?page_size=1 with the raw key (no Bearer prefix)', async () => {
+  it('AssemblyAI (us): GET /v2/transcript?limit=1 with the raw key (no Bearer prefix)', async () => {
     const provider = new AssemblyAiAsrProvider({ apiKey: 'k-assembly' } as AssemblyAiAsrProviderConfig, {} as AssemblyAiAsrSettings);
     const { records } = withRecorder(provider, 'assemblyai');
     await provider.ping();
-    expect(fetchCalls).to.deep.equal([{ url: 'https://api.assemblyai.com/v2/transcripts?page_size=1', headers: { Authorization: 'k-assembly' } }]);
+    expect(fetchCalls).to.deep.equal([{ url: 'https://api.assemblyai.com/v2/transcript?limit=1', headers: { Authorization: 'k-assembly' } }]);
     expect(records).to.have.length(1);
     expect(records[0]).to.include({ operation: 'asr.ping', ok: true, providerId: 'prov_test', providerType: 'asr', apiType: 'assemblyai' });
     expect(records[0].durationMs).to.be.a('number').that.is.gte(0);
@@ -208,7 +208,7 @@ describe('P1-05b provider ping() shape (zero-cost liveness endpoints)', () => {
     const provider = new AssemblyAiAsrProvider({ apiKey: 'k-assembly', region: 'eu' } as AssemblyAiAsrProviderConfig, {} as AssemblyAiAsrSettings);
     withRecorder(provider, 'assemblyai');
     await provider.ping();
-    expect(fetchCalls[0].url).to.equal('https://api.eu.assemblyai.com/v2/transcripts?page_size=1');
+    expect(fetchCalls[0].url).to.equal('https://api.eu.assemblyai.com/v2/transcript?limit=1');
   });
 
   it('Deepgram ASR: GET /v1/projects?limit=1 with Token auth', async () => {
@@ -241,9 +241,17 @@ describe('P1-05b provider ping() shape (zero-cost liveness endpoints)', () => {
     expect(fetchCalls[0].url).to.match(/\/api_keys\?type=batch$/);
     expect(fetchCalls[0].headers.Authorization).to.equal('Bearer k-sm');
     // 2) liveness GET on the Jobs API with the minted temp key
-    const jobsCall = fetchCalls.find((call) => call.url === 'https://usa.asr.api.speechmatics.com/v2/jobs');
+    const jobsCall = fetchCalls.find((call) => call.url === 'https://us1.asr.api.speechmatics.com/v2/jobs');
     expect(jobsCall).to.not.be.undefined;
     expect(jobsCall?.headers.Authorization).to.equal('Bearer temp-key-123');
+  });
+
+  it('Speechmatics ASR: eu region maps to the eu1 batch base', async () => {
+    const provider = new SpeechmaticsAsrProvider({ apiKey: 'k-sm', region: 'eu' } as SpeechmaticsAsrProviderConfig, {} as SpeechmaticsAsrSettings);
+    withRecorder(provider, 'speechmatics');
+    await provider.ping();
+    const jobsCall = fetchCalls.find((call) => call.url === 'https://eu1.asr.api.speechmatics.com/v2/jobs');
+    expect(jobsCall).to.not.be.undefined;
   });
 
   it('Speechmatics ASR: apac region maps to the au1 batch base', async () => {

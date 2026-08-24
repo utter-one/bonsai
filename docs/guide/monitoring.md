@@ -104,6 +104,37 @@ probing. Per-type toggles + failure cooldowns live in
 overrides any config — use it when a vendor is rate-limiting your probe
 traffic.
 
+### What the provider probes actually measure
+
+A probe is **account liveness** — not a guarantee that the conversation path
+works. What each probe type exercises:
+
+| Probe | Endpoint | Same path as real traffic? |
+|---|---|---|
+| LLM | `enumerateModels()` or 1-token generation | ✅ real inference — closest to the work |
+| Storage | `list` on the configured bucket | ✅ real work |
+| TTS (OpenAI, ElevenLabs, Deepgram, Soniox, Polly) | free HTTP listing on the **same API** | ✅ same API + protocol as synthesis |
+| Streaming ASR (AssemblyAI, Deepgram, ElevenLabs, Soniox, Speechmatics) | free **REST control-plane** listing (jobs/models/projects) | ⚠️ different protocol from the WebSocket data plane conversations use (AssemblyAI also uses a different host: `api.*` vs `streaming.*`) |
+
+So for streaming ASR, probe `ok` means: the API key is valid, the account is
+not suspended, and the vendor's control plane is reachable — **not** that the
+streaming endpoint will accept a session. A probe `down` is always actionable;
+an ASR probe `ok` does not clear the data plane.
+
+This is a deliberate trade-off, not an oversight: a true WebSocket handshake
+probe would consume session-creation quota (several vendors enforce
+per-minute session rate limits, and a 60 s cadence × N providers could trip
+them and produce *false* downs), and it still would not catch
+first-audio-frame failures.
+
+**Data-plane liveness is covered by the alert rules, not the probe.**
+`provider-down` fires on any of: 100% of recent *real* calls failed, the
+circuit breaker is OPEN, or ≥3 consecutive probe failures — the first two
+branches need no probe at all and fire from observed WebSocket/synthesis
+failures whenever traffic exists (P3-04 failover covers users in the
+meantime). The probe branch is the only signal for an **idle** provider
+(revoked key, suspended account) where the call logs show nothing.
+
 ### Reading the snapshot
 
 ```json

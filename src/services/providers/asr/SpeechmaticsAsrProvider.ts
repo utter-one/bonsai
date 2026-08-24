@@ -16,7 +16,7 @@ extendZodWithOpenApi(z);
  */
 export const speechmaticsAsrProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with Speechmatics'),
-  region: z.enum(['us', 'eu', 'apac']).default('us').describe('Speechmatics region endpoint: "us" for neu.rt.speechmatics.com, "eu" for eu2.rt.speechmatics.com, or "apac" for au.rt.speechmatics.com'),
+  region: z.enum(['us', 'eu', 'apac']).default('us').describe('Speechmatics region endpoint: "us" for us.rt.speechmatics.com, "eu" for eu.rt.speechmatics.com, or "apac" for the global router (global.rt.speechmatics.com — no dedicated AU realtime host exists)'),
 });
 
 export type SpeechmaticsAsrProviderConfig = z.infer<typeof speechmaticsAsrProviderConfigSchema>;
@@ -120,19 +120,24 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
   }
 
   /**
-   * Gets the Batch REST API base URL for the specified region (P1-05b probe)
+   * Gets the Batch REST API base URL for the specified region (P1-05b probe).
+   * Hosts follow the Batch "Supported endpoints" table in the Speechmatics docs
+   * (docs.speechmatics.com/get-started/authentication, verified 2026-08-24):
+   * eu1/us1/au1 are the all-customer production hosts. eu2/us2 are
+   * enterprise-only, and the legacy `asr.api…`/`usa.asr.api…` hosts are
+   * deprecated (`usa.asr.api…` no longer resolves in DNS).
    * @param region Region identifier
    * @returns Batch REST API base URL
    */
   private getBatchApiBase(region: string): string {
     switch (region) {
       case 'eu':
-        return 'https://asr.api.speechmatics.com/v2';
+        return 'https://eu1.asr.api.speechmatics.com/v2';
       case 'apac':
         return 'https://au1.asr.api.speechmatics.com/v2';
       case 'us':
       default:
-        return 'https://usa.asr.api.speechmatics.com/v2';
+        return 'https://us1.asr.api.speechmatics.com/v2';
     }
   }
 
@@ -433,19 +438,21 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
   }
 
   /**
-   * Gets the WebSocket URL for the specified region
-   * @param region Region identifier
-   * @returns WebSocket endpoint URL for the specified region
+   * Gets the WebSocket URL for the specified region.
+   * Hosts follow the Realtime "Supported endpoints" table (verified 2026-08-24):
+   * eu/us are the all-customer regional pins. There is no dedicated AU realtime
+   * host (the old `au.rt…` no longer resolves), so APAC uses the global router,
+   * which pins each connection to the nearest region.
    */
   private getWebSocketUrl(region: string): string {
     switch (region) {
       case 'eu':
-        return 'wss://eu2.rt.speechmatics.com/v2';
+        return 'wss://eu.rt.speechmatics.com/v2';
       case 'apac':
-        return 'wss://au.rt.speechmatics.com/v2';
+        return 'wss://global.rt.speechmatics.com/v2';
       case 'us':
       default:
-        return 'wss://neu.rt.speechmatics.com/v2';
+        return 'wss://us.rt.speechmatics.com/v2';
     }
   }
 
