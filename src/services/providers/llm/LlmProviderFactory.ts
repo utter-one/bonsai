@@ -2,6 +2,7 @@ import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ILlmProvider } from './ILlmProvider';
+import { LlmProviderBase } from './LlmProviderBase';
 import { OpenAILlmProvider, OpenAILlmProviderConfig, openAILlmProviderConfigSchema, OpenAILlmSettings } from './OpenAILlmProvider';
 import { OpenAILegacyLlmProvider, OpenAILegacyLlmProviderConfig, openAILegacyLlmProviderConfigSchema, OpenAILegacyLlmSettings } from './OpenAILegacyLlmProvider';
 import { AnthropicLlmProvider, AnthropicLlmProviderConfig, anthropicLlmProviderConfigSchema, AnthropicLlmSettings } from './AnthropicLlmProvider';
@@ -95,6 +96,23 @@ export class LlmProviderFactory {
    * @returns Uninitialised LLM provider instance
    */
   private instantiateProvider(provider: Provider, settings: LlmSettings): ILlmProvider {
+    const instance = this.buildInstance(provider, settings);
+    // Stamp provider identity for call-log attribution (P1-03)
+    if (instance instanceof LlmProviderBase) {
+      instance.providerId = provider.id;
+      instance.providerApiType = provider.apiType;
+      instance.providerModel = settings.model || null;
+    }
+    return instance;
+  }
+
+  /**
+   * Maps provider.apiType to a concrete provider instance.
+   * @param provider - Provider entity
+   * @param settings - LLM settings (may have empty model for enumeration)
+   * @returns Uninitialised LLM provider instance
+   */
+  private buildInstance(provider: Provider, settings: LlmSettings): ILlmProvider {
     switch (provider.apiType) {
       case 'openai':
         return new OpenAILlmProvider(openAILlmProviderConfigSchema.parse(provider.config), settings as OpenAILlmSettings);

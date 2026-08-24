@@ -2,6 +2,7 @@ import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IAsrProvider } from './IAsrProvider';
+import { AsrProviderBase } from './AsrProviderBase';
 import { AzureAsrProvider, AzureAsrProviderConfig, azureAsrProviderConfigSchema, AzureAsrSettings, azureAsrSettingsSchema } from './AzureAsrProvider';
 import { ElevenLabsAsrProvider, ElevenLabsAsrProviderConfig, elevenLabsAsrProviderConfigSchema, ElevenLabsAsrSettings, elevenLabsAsrSettingsSchema } from './ElevenLabsAsrProvider';
 import { DeepgramAsrProvider, DeepgramAsrProviderConfig, deepgramAsrProviderConfigSchema, DeepgramAsrSettings, deepgramAsrSettingsSchema } from './DeepgramAsrProvider';
@@ -51,30 +52,58 @@ export class AsrProviderFactory {
     const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
 
     // Create provider instance based on API type
+    let instance: IAsrProvider;
     switch (provider.apiType) {
       case 'azure':
-        return this.createAzureProvider(resolvedProvider, settings as AzureAsrSettings);
+        instance = this.createAzureProvider(resolvedProvider, settings as AzureAsrSettings);
+        break;
 
       case 'elevenlabs':
-        return this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsAsrSettings);
+        instance = this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsAsrSettings);
+        break;
 
       case 'deepgram':
-        return this.createDeepgramProvider(resolvedProvider, settings as DeepgramAsrSettings);
+        instance = this.createDeepgramProvider(resolvedProvider, settings as DeepgramAsrSettings);
+        break;
 
       case 'assemblyai':
-        return this.createAssemblyAiProvider(resolvedProvider, settings as AssemblyAiAsrSettings);
+        instance = this.createAssemblyAiProvider(resolvedProvider, settings as AssemblyAiAsrSettings);
+        break;
 
       case 'speechmatics':
-        return this.createSpeechmaticsProvider(resolvedProvider, settings as SpeechmaticsAsrSettings);
+        instance = this.createSpeechmaticsProvider(resolvedProvider, settings as SpeechmaticsAsrSettings);
+        break;
 
       case 'soniox':
-        return this.createSonioxProvider(resolvedProvider, settings as SonioxAsrSettings);
+        instance = this.createSonioxProvider(resolvedProvider, settings as SonioxAsrSettings);
+        break;
 
       default:
         const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai, speechmatics, soniox`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
+
+    // Stamp provider identity for call-log attribution (P1-03)
+    if (instance instanceof AsrProviderBase) {
+      instance.providerId = provider.id;
+      instance.providerApiType = provider.apiType;
+    }
+
+    return instance;
+  }
+
+  /**
+   * Creates an ASR provider instance for the HealthCheckService liveness probe (P1-05b).
+   * Resolves secrets and constructs the instance with default (empty) settings —
+   * `ping()` implementations never read session settings. The instance is NOT
+   * initialised: probe `ping()` methods must be self-contained on a fresh instance.
+   * @param provider - Provider entity from database containing configuration
+   * @returns ASR provider instance suitable for calling `ping()`
+   * @throws {Error} When provider type is not 'asr' or when API type is not supported
+   */
+  async createProviderForProbing(provider: Provider): Promise<IAsrProvider> {
+    return this.createProvider(provider, {});
   }
 
   /**

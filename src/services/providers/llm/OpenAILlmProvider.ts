@@ -87,7 +87,7 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
   /**
    * Generate a non-streaming response using the Responses API
    */
-  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async doGenerate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -287,7 +287,7 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
   /**
    * Generate a streaming response using the Responses API
    */
-  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+  protected async doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -380,7 +380,7 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
    * Enumerate available models using the OpenAI models API.
    * Falls back to a static list of well-known models if the API call fails or the client is not yet initialized.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();
@@ -401,7 +401,7 @@ export class OpenAILlmProvider extends LlmProviderBase<OpenAILlmProviderConfig> 
    * @param input - User input text to moderate
    * @returns Flagged status and list of violated categories
    */
-  async moderateUserInput(input: string): Promise<{ flagged: boolean; categories: string[] }> {
+  protected async doModerateUserInput(input: string): Promise<{ flagged: boolean; categories: string[] }> {
     this.ensureInitialized();
     const response = await this.client!.moderations.create({ model: 'omni-moderation-latest', input });
     const result = response.results[0];

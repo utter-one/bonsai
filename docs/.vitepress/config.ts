@@ -85,6 +85,8 @@ export default withMermaid({
           items: [
             { text: 'Issues', link: '/guide/issues' },
             { text: 'Audit Logs', link: '/guide/audit-logs' },
+            { text: 'Monitoring API (frontend)', link: '/guide/monitoring-api' },
+            { text: 'Monitoring & Alerting (operator guide)', link: '/guide/monitoring' },
           ],
         },
         {

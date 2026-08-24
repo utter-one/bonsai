@@ -2,6 +2,7 @@ import { AssemblyAI, StreamingTranscriber, StreamingTranscriberParams } from 'as
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -107,9 +108,29 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
   }
 
   /**
+   * Zero-cost liveness probe (P1-05b): lists a single transcript from the REST API.
+   * Uses raw fetch — the session SDK instance is pinned to the streaming base URL.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    const restBase = this.config.region === 'eu'
+      ? 'https://api.eu.assemblyai.com'
+      : 'https://api.assemblyai.com';
+    try {
+      await httpPing(`${restBase}/v2/transcripts?page_size=1`, {
+        Authorization: this.config.apiKey,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * Starts the AssemblyAI speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required AssemblyAI API key';
       logger.error(`[AssemblyAI ASR] ${errorMessage}`);
@@ -204,7 +225,7 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
   /**
    * Stops the AssemblyAI speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[AssemblyAI ASR] Stopping recognition`);
 
     if (!this.transcriber) {
@@ -239,7 +260,7 @@ export class AssemblyAiAsrProvider extends AsrProviderBase<AssemblyAiAsrProvider
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[AssemblyAI ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

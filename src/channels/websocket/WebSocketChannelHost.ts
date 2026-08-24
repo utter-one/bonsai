@@ -10,6 +10,7 @@ import type { BaseInputMessage, BaseOutputMessage } from './contracts/common';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
 import { WebSocketConnection } from './WebSocketConnection';
+import { getMetricsRegistry } from '../../services/monitoring/ProviderCallRecorder';
 
 /**
  * WebSocket server that manages client connections and message routing.
@@ -52,6 +53,7 @@ export class WebSocketChannelHost {
       const clientIp = (Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0]?.trim()) ?? req.socket.remoteAddress ?? '';
       this.trackSocketIp(ws, clientIp);
       logger.info({ ip: clientIp }, 'New WebSocket connection established');
+      getMetricsRegistry()?.changeGauge('active_websocket_connections', undefined, 1);
 
       // Create a new WebSocketConnection and session for the authenticated client
       const wsConnection = new WebSocketConnection(ws, this.sessionManager);
@@ -67,6 +69,7 @@ export class WebSocketChannelHost {
       });
 
       ws.on('close', () => {
+        getMetricsRegistry()?.changeGauge('active_websocket_connections', undefined, -1);
         this.handleDisconnect(ws).catch((err) => {
           logger.error({ error: err.message }, 'WebSocket handleDisconnect unhandled rejection');
         });
@@ -211,9 +214,43 @@ export class WebSocketChannelHost {
   }
 
   /**
+   * Sockets not fully closed (OPEN or CLOSING). Stale map entries from
+   * disconnected sockets are excluded via readyState (P1-09 shutdown drain).
+   */
+  getOpenSocketCount(): number {
+    let count = 0;
+    for (const ws of this.socketMap.keys()) {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) count++;
+    }
+    return count;
+  }
+
+  /**
+   * Force-terminates any sockets still OPEN or CLOSING; returns how many were
+   * terminated (P1-09 shutdown drain grace deadline).
+   */
+  terminateOpenSockets(): number {
+    let count = 0;
+    for (const ws of this.socketMap.keys()) {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+        ws.terminate();
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * Closes the WebSocket server and all active connections.
+   * Each active socket is closed with 1001 "going away" first (P1-09):
+   * wss.close() alone only stops accepting, leaving established sockets open.
    */
   close(): void {
+    for (const ws of this.socketMap.keys()) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1001, 'going away');
+      }
+    }
     if (this.wss) {
       this.wss.close(() => {
         logger.info('WebSocket server closed');

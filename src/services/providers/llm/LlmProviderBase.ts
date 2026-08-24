@@ -3,10 +3,21 @@ import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptio
 import { logger } from '../../../utils/logger';
 import { log } from 'handlebars';
 import { LlmModelInfo } from '../ProviderCatalogService';
+import { MonitoringContext } from '../../monitoring/MonitoringContext';
+import { getMetricsRegistry, getProviderCallRecorder } from '../../monitoring/ProviderCallRecorder';
+import type { ProviderCallRecord } from '../../monitoring/ProviderCallRecorder';
+import type { MetricsRegistry } from '../../monitoring/MetricsRegistry';
+import { StreamStats } from '../../monitoring/StreamStats';
 
 /**
  * Abstract base class for LLM provider implementations
- * Provides common functionality for callback management, lifecycle, and error handling
+ * Provides common functionality for callback management, lifecycle, and error handling.
+ *
+ * Instrumentation (P1-03): `generate`/`generateStream` are concrete template
+ * wrappers that time the call and record exactly one provider_call_logs row
+ * + generic metrics per call; subclasses implement `doGenerate`/`doGenerateStream`
+ * and feed the base's notify* hooks (chunk timing, finish reason, usage).
+ * Provider identity (providerId/apiType/model) is stamped by LlmProviderFactory.
  */
 export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   protected config?: TConfig;
@@ -15,6 +26,16 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   protected onGenerationCompletedCallback?: LlmCompleteCallback;
   protected onGenerationStartedCallback?: SimpleCallback;
   protected onErrorCallback?: ErrorCallback;
+
+  /** Stamped by LlmProviderFactory (P1-03) — null when constructed outside the factory. */
+  providerId?: string;
+  providerApiType?: string;
+  providerModel?: string;
+  /** Stamped by FailoverLlmProvider (P3-03) for non-primary attempts — the chain's primary id. */
+  fallbackOfProviderId?: string;
+
+  /** Per-call streaming accumulator for the in-flight call (provider instances are per use-site). */
+  private activeStats: StreamStats | null = null;
 
   constructor(config: TConfig) {
     this.config = config;
@@ -30,16 +51,53 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   }
 
   /**
-   * Generate a non-streaming response
-   * Must be implemented by subclasses
+   * Generate a non-streaming response.
+   * Template wrapper — times the call and records one call-log row + metrics;
+   * the actual API call lives in `doGenerate`.
    */
-  abstract generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult>;
+  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+    const stats = this.beginCall('llm.generate');
+    try {
+      const result = await this.doGenerate(messages, options);
+      this.applyResultToStats(stats, result);
+      this.recordCall(stats, null);
+      return result;
+    } catch (error) {
+      this.recordCall(stats, error, 'setup');
+      throw error;
+    }
+  }
 
   /**
-   * Generate a streaming response
-   * Must be implemented by subclasses
+   * Generate a streaming response.
+   * Template wrapper — times the call and records one call-log row + metrics
+   * (streaming phase fields from the notify* hooks); the actual API call lives
+   * in `doGenerateStream`. Errors are rethrown after `notifyError` (subclass
+   * contract), so this wrapper's catch is the single recording point.
    */
-  abstract generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void>;
+  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+    const stats = this.beginCall('llm.generate');
+    try {
+      await this.doGenerateStream(messages, options);
+      this.recordCall(stats, null);
+    } catch (error) {
+      // errorPhase: mid_stream once any chunk was delivered (P3 failover boundary)
+      this.recordCall(stats, error, stats.delivered ? 'mid_stream' : 'setup');
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a non-streaming response.
+   * Must be implemented by subclasses (renamed from `generate` — P1-03 template method).
+   */
+  protected abstract doGenerate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult>;
+
+  /**
+   * Generate a streaming response.
+   * Must be implemented by subclasses (renamed from `generateStream` — P1-03 template method).
+   */
+  protected abstract doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void>;
 
   /**
    * Set callback for streaming chunks
@@ -103,6 +161,9 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
    * Notify about a streaming chunk
    */
   protected async notifyChunk(content: string, id: string, role?: 'assistant', finishReason?: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null, usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number }): Promise<void> {
+    this.activeStats?.onUnit();
+    if (usage?.promptTokens != null) this.activeStats.tokensPrompt = usage.promptTokens;
+    if (usage?.completionTokens != null) this.activeStats.tokensCompletion = usage.completionTokens;
     if (this.onChunkCallback) {
       try {
         await this.onChunkCallback({ id, content, role, finishReason, usage });
@@ -116,6 +177,9 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
    * Notify about generation completion
    */
   protected async notifyComplete(result: LlmGenerationResult): Promise<void> {
+    if (this.activeStats) {
+      this.applyResultToStats(this.activeStats, result);
+    }
     if (this.onGenerationCompletedCallback) {
       try {
         await this.onGenerationCompletedCallback(result);
@@ -207,8 +271,21 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   /**
    * Enumerate available models from the provider, returning an array of model information.
    * Must be implemented by subclasses to return provider-specific model details.
+   * The actual API call lives in `doEnumerateModels` (P1-03 template method).
    */
-   abstract enumerateModels(): Promise<LlmModelInfo[]>;
+  async enumerateModels(): Promise<LlmModelInfo[]> {
+    const startedAt = Date.now();
+    try {
+      const models = await this.doEnumerateModels();
+      this.recordPlainCall('llm.models', startedAt, null);
+      return models;
+    } catch (error) {
+      this.recordPlainCall('llm.models', startedAt, error);
+      throw error;
+    }
+  }
+
+  protected abstract doEnumerateModels(): Promise<LlmModelInfo[]>;
 
     /**
      * Moderate user input for content policy violations. Returns whether the input was flagged and any applicable categories.
@@ -217,6 +294,95 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
      * @returns Object containing flagged status and categories of violation
      */
     async moderateUserInput(input: string): Promise<{ flagged: boolean; categories: string[]; }> {
-     throw new Error('Moderation is not supported by this provider');
-   }
+      const startedAt = Date.now();
+      try {
+        const result = await this.doModerateUserInput(input);
+        this.recordPlainCall('llm.moderate', startedAt, null);
+        return result;
+      } catch (error) {
+        // Includes the default "not supported" throw — recorded so unsupported-provider attempts are visible
+        this.recordPlainCall('llm.moderate', startedAt, error);
+        throw error;
+      }
+    }
+
+    protected doModerateUserInput(input: string): Promise<{ flagged: boolean; categories: string[]; }> {
+      return Promise.reject(new Error('Moderation is not supported by this provider'));
+    }
+
+  // --- instrumentation helpers (P1-03) ---
+
+  /** Copies finish reason + usage from a completed result into per-call stats. */
+  private applyResultToStats(stats: StreamStats, result: LlmGenerationResult): void {
+    if (result.finishReason) stats.finishReason = result.finishReason;
+    if (result.usage?.promptTokens != null) stats.tokensPrompt = result.usage.promptTokens;
+    if (result.usage?.completionTokens != null) stats.tokensCompletion = result.usage.completionTokens;
+  }
+
+  /** Test seam — redirects call-log recording (defaults to the container accessor). */
+  protected resolveCallRecorder(): { record(entry: ProviderCallRecord): void } {
+    return getProviderCallRecorder();
+  }
+
+  /** Test seam — redirects metric publication (defaults to the container accessor). */
+  protected resolveMetricsRegistry(): MetricsRegistry | null {
+    return getMetricsRegistry();
+  }
+
+  /** Resolves the operation for a call: an explicit `llm.*` from MonitoringContext wins, else the default. */
+  private resolveOperation(defaultOperation: string): string {
+    const ctx = MonitoringContext.current();
+    return ctx?.operation?.startsWith('llm.') ? ctx.operation : defaultOperation;
+  }
+
+  /** Starts the per-call stats (operation from MonitoringContext if it is an `llm.*` override). */
+  private beginCall(defaultOperation: string): StreamStats {
+    this.activeStats = new StreamStats(this.resolveOperation(defaultOperation));
+    return this.activeStats;
+  }
+
+  /** Records the finished call exactly once and clears per-call state. */
+  private recordCall(stats: StreamStats, error: unknown, errorPhase?: 'setup' | 'mid_stream'): void {
+    this.activeStats = null;
+    if (!this.providerId || !this.providerApiType) return; // constructed outside the factory — nothing to attribute to
+    const metrics = stats.toCallMetrics();
+    if (errorPhase) metrics.errorPhase = errorPhase;
+    const recorder = this.resolveCallRecorder();
+    recorder.record({
+      providerId: this.providerId,
+      providerType: 'llm',
+      apiType: this.providerApiType,
+      operation: stats.operation,
+      model: this.providerModel ?? null,
+      durationMs: stats.durationMs(),
+      ok: error === null,
+      error: error ?? undefined,
+      fallbackProviderId: this.fallbackOfProviderId ?? null,
+      metrics,
+    });
+    if (error === null) {
+      const registry = this.resolveMetricsRegistry();
+      const labels: Record<string, unknown> = { provider_id: this.providerId, provider_type: 'llm', operation: stats.operation, ok: true, error_code: 'none' };
+      if (stats.chunksCount > 0) {
+        if (stats.ttftMs !== null) registry?.observe('llm_ttft_ms', labels, stats.ttftMs);
+        registry?.observe('llm_stream_duration_ms', labels, stats.durationMs());
+      }
+    }
+  }
+
+  /** Records a non-streaming call without per-call stats (models/moderate). */
+  private recordPlainCall(operation: string, startedAt: number, error: unknown): void {
+    if (!this.providerId || !this.providerApiType) return;
+    this.resolveCallRecorder().record({
+      providerId: this.providerId,
+      providerType: 'llm',
+      apiType: this.providerApiType,
+      operation,
+      model: this.providerModel ?? null,
+      durationMs: Date.now() - startedAt,
+      ok: error === null,
+      error: error ?? undefined,
+      fallbackProviderId: this.fallbackOfProviderId ?? null,
+    });
+  }
 }

@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -89,9 +90,25 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   }
 
   /**
+   * Zero-cost liveness probe (P1-05b): lists models from the ElevenLabs API.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.elevenlabs.io/v1/models', {
+        'xi-api-key': this.config.apiKey,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * Starts the ElevenLabs speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required ElevenLabs API key';
       logger.error(`[ElevenLabs ASR] ${errorMessage}`);
@@ -181,7 +198,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   /**
    * Stops the ElevenLabs speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[ElevenLabs ASR] Stopping recognition`);
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
@@ -216,7 +233,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[ElevenLabs ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

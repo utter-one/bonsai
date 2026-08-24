@@ -13165,6 +13165,9 @@
             ],
             "description": "Provider-specific configuration object (varies by providerType and apiType)"
           },
+          "fallbacks": {
+            "$ref": "#/components/schemas/ProviderFallbacks"
+          },
           "tags": {
             "type": "array",
             "items": {
@@ -13572,6 +13575,39 @@
         "additionalProperties": false,
         "description": "Optional OAuth2/XOAUTH2 configuration. When present, supersedes password-based authentication for both SMTP and IMAP."
       },
+      "ProviderFallbacks": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ProviderFallback"
+        },
+        "maxItems": 3,
+        "default": [],
+        "description": "Ordered fallback providers used when the primary fails during setup phase"
+      },
+      "ProviderFallback": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "$ref": "#/components/schemas/ProviderId"
+          },
+          "settings": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Per-fallback LLM settings override (model, temperature, ...)"
+          }
+        },
+        "required": [
+          "providerId"
+        ]
+      },
+      "ProviderId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Id of the fallback provider (same providerType)"
+      },
       "UpdateProviderRequest": {
         "type": "object",
         "properties": {
@@ -13963,6 +13999,14 @@
               }
             ],
             "description": "Updated provider-specific configuration"
+          },
+          "fallbacks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderFallback"
+            },
+            "maxItems": 3,
+            "description": "Updated ordered fallback chain ([] clears it)"
           },
           "tags": {
             "type": "array",
@@ -14380,6 +14424,13 @@
             ],
             "description": "Provider-specific configuration object"
           },
+          "fallbacks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderFallback"
+            },
+            "description": "Ordered fallback providers (empty when none)"
+          },
           "createdBy": {
             "type": "string",
             "nullable": true,
@@ -14417,6 +14468,7 @@
           "providerType",
           "apiType",
           "config",
+          "fallbacks",
           "createdBy",
           "tags",
           "version",
@@ -14818,6 +14870,13 @@
                   ],
                   "description": "Provider-specific configuration object"
                 },
+                "fallbacks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderFallback"
+                  },
+                  "description": "Ordered fallback providers (empty when none)"
+                },
                 "createdBy": {
                   "type": "string",
                   "nullable": true,
@@ -14855,6 +14914,7 @@
                 "providerType",
                 "apiType",
                 "config",
+                "fallbacks",
                 "createdBy",
                 "tags",
                 "version",
@@ -24318,6 +24378,962 @@
         "type": "object",
         "properties": {}
       },
+      "HealthCheckItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Check name (db, process, service_heartbeat:<name>, provider:<id>)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "unknown"
+            ],
+            "description": "Check status"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Check duration in milliseconds, when measured (absent for unmeasured checks)"
+          },
+          "detail": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Check-specific detail payload (absent when none)"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "description": "One health check result"
+      },
+      "HealthMonitoringResponse": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the last check cycle ran (null before the first cycle)"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HealthCheckItem"
+            },
+            "description": "All checks from the last completed cycle"
+          }
+        },
+        "required": [
+          "checkedAt",
+          "checks"
+        ]
+      },
+      "HealthCheckResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Row id"
+          },
+          "checkName": {
+            "type": "string",
+            "description": "Check name"
+          },
+          "status": {
+            "type": "string",
+            "description": "Check status (ok | degraded | down | unknown)"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Check duration in milliseconds"
+          },
+          "detail": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Check-specific detail payload"
+          },
+          "createdAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the check ran"
+          }
+        },
+        "required": [
+          "id",
+          "checkName",
+          "status",
+          "latencyMs",
+          "detail",
+          "createdAt"
+        ]
+      },
+      "HealthMonitoringListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Row id"
+                },
+                "checkName": {
+                  "type": "string",
+                  "description": "Check name"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "Check status (ok | degraded | down | unknown)"
+                },
+                "latencyMs": {
+                  "type": "integer",
+                  "nullable": true,
+                  "description": "Check duration in milliseconds"
+                },
+                "detail": {
+                  "type": "object",
+                  "nullable": true,
+                  "additionalProperties": {
+                    "nullable": true
+                  },
+                  "description": "Check-specific detail payload"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "date-time",
+                  "description": "When the check ran"
+                }
+              },
+              "required": [
+                "id",
+                "checkName",
+                "status",
+                "latencyMs",
+                "detail",
+                "createdAt"
+              ]
+            },
+            "description": "Health check rows in the current page"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching rows"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Starting index of the current page"
+          },
+          "limit": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 1000,
+            "default": 100,
+            "description": "Maximum number of items requested for the current page. Defaults to 100; maximum 1000"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "offset"
+        ]
+      },
+      "ProviderRolling": {
+        "type": "object",
+        "properties": {
+          "windowMinutes": {
+            "type": "integer",
+            "description": "Rolling window length in minutes (15)"
+          },
+          "calls": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Provider calls in the window (0 when none)"
+          },
+          "okRate": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Success ratio in the window (null when no calls)"
+          },
+          "p95DurationMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "95th percentile call duration in the window"
+          },
+          "topErrorCodes": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                ]
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "description": "Top failing error codes in the window as [code, count] pairs, count desc (max 3)"
+          }
+        },
+        "required": [
+          "windowMinutes",
+          "calls",
+          "okRate",
+          "p95DurationMs",
+          "topErrorCodes"
+        ],
+        "description": "Rolling provider call-log window"
+      },
+      "ProviderMonitoringItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Provider id"
+          },
+          "name": {
+            "type": "string",
+            "description": "Provider name"
+          },
+          "providerType": {
+            "type": "string",
+            "description": "Provider type (llm, asr, tts, embeddings, storage)"
+          },
+          "apiType": {
+            "type": "string",
+            "description": "API type (openai, anthropic, elevenlabs, s3, ...)"
+          },
+          "probeStatus": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "ok",
+              "degraded",
+              "down",
+              "unknown",
+              null
+            ],
+            "description": "Latest health-check status for this provider (provider:<id> check); null when not checked yet"
+          },
+          "rolling": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProviderRolling"
+              },
+              {
+                "description": "Rolling 15-minute call-log window"
+              }
+            ]
+          },
+          "circuitBreaker": {
+            "$ref": "#/components/schemas/CircuitBreakerState"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "providerType",
+          "apiType",
+          "probeStatus",
+          "rolling",
+          "circuitBreaker"
+        ]
+      },
+      "CircuitBreakerState": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "open",
+              "half-open"
+            ],
+            "description": "Breaker state (in-memory — a process restart resets it to closed)"
+          },
+          "failuresInWindow": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Qualifying failures in the current sliding window"
+          },
+          "lastStateChangeAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the breaker last changed state"
+          },
+          "opensInLast24h": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "closed→open transitions in the last 24 hours"
+          }
+        },
+        "required": [
+          "state",
+          "failuresInWindow",
+          "lastStateChangeAt",
+          "opensInLast24h"
+        ],
+        "description": "In-memory circuit breaker state; null when the provider has no recorded calls yet (P3-01)"
+      },
+      "ProvidersMonitoringResponse": {
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Provider id"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Provider name"
+                },
+                "providerType": {
+                  "type": "string",
+                  "description": "Provider type (llm, asr, tts, embeddings, storage)"
+                },
+                "apiType": {
+                  "type": "string",
+                  "description": "API type (openai, anthropic, elevenlabs, s3, ...)"
+                },
+                "probeStatus": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "ok",
+                    "degraded",
+                    "down",
+                    "unknown",
+                    null
+                  ],
+                  "description": "Latest health-check status for this provider (provider:<id> check); null when not checked yet"
+                },
+                "rolling": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ProviderRolling"
+                    },
+                    {
+                      "description": "Rolling 15-minute call-log window"
+                    }
+                  ]
+                },
+                "circuitBreaker": {
+                  "$ref": "#/components/schemas/CircuitBreakerState"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "providerType",
+                "apiType",
+                "probeStatus",
+                "rolling",
+                "circuitBreaker"
+              ]
+            },
+            "description": "All providers with their rolling stats"
+          }
+        },
+        "required": [
+          "providers"
+        ]
+      },
+      "ProviderCallResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Row id"
+          },
+          "providerId": {
+            "type": "string",
+            "description": "Provider id"
+          },
+          "providerType": {
+            "type": "string",
+            "description": "Provider type"
+          },
+          "apiType": {
+            "type": "string",
+            "description": "API type"
+          },
+          "operation": {
+            "type": "string",
+            "description": "Operation (llm.generate, channel.send_message, ...)"
+          },
+          "model": {
+            "type": "string",
+            "nullable": true,
+            "description": "Model, when the operation has one"
+          },
+          "projectId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Owning project, when known"
+          },
+          "conversationId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Owning conversation, when known"
+          },
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the call succeeded"
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error class (null on success): auth | rate_limited | timeout | server_error | client_error | network | unknown"
+          },
+          "statusHttp": {
+            "type": "integer",
+            "nullable": true,
+            "description": "HTTP status when the error carried one"
+          },
+          "durationMs": {
+            "type": "integer",
+            "description": "Call duration in milliseconds"
+          },
+          "errorText": {
+            "type": "string",
+            "nullable": true,
+            "description": "Truncated error message (1KB)"
+          },
+          "fallbackProviderId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Set when the call ran on a fallback provider"
+          },
+          "metrics": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Variant phase fields (TTFT, tokens, chunk gaps, ...)"
+          },
+          "createdAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the call happened"
+          }
+        },
+        "required": [
+          "id",
+          "providerId",
+          "providerType",
+          "apiType",
+          "operation",
+          "model",
+          "projectId",
+          "conversationId",
+          "ok",
+          "errorCode",
+          "statusHttp",
+          "durationMs",
+          "errorText",
+          "fallbackProviderId",
+          "metrics",
+          "createdAt"
+        ]
+      },
+      "ProviderCallListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Row id"
+                },
+                "providerId": {
+                  "type": "string",
+                  "description": "Provider id"
+                },
+                "providerType": {
+                  "type": "string",
+                  "description": "Provider type"
+                },
+                "apiType": {
+                  "type": "string",
+                  "description": "API type"
+                },
+                "operation": {
+                  "type": "string",
+                  "description": "Operation (llm.generate, channel.send_message, ...)"
+                },
+                "model": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Model, when the operation has one"
+                },
+                "projectId": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Owning project, when known"
+                },
+                "conversationId": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Owning conversation, when known"
+                },
+                "ok": {
+                  "type": "boolean",
+                  "description": "Whether the call succeeded"
+                },
+                "errorCode": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Error class (null on success): auth | rate_limited | timeout | server_error | client_error | network | unknown"
+                },
+                "statusHttp": {
+                  "type": "integer",
+                  "nullable": true,
+                  "description": "HTTP status when the error carried one"
+                },
+                "durationMs": {
+                  "type": "integer",
+                  "description": "Call duration in milliseconds"
+                },
+                "errorText": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Truncated error message (1KB)"
+                },
+                "fallbackProviderId": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Set when the call ran on a fallback provider"
+                },
+                "metrics": {
+                  "type": "object",
+                  "nullable": true,
+                  "additionalProperties": {
+                    "nullable": true
+                  },
+                  "description": "Variant phase fields (TTFT, tokens, chunk gaps, ...)"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "date-time",
+                  "description": "When the call happened"
+                }
+              },
+              "required": [
+                "id",
+                "providerId",
+                "providerType",
+                "apiType",
+                "operation",
+                "model",
+                "projectId",
+                "conversationId",
+                "ok",
+                "errorCode",
+                "statusHttp",
+                "durationMs",
+                "errorText",
+                "fallbackProviderId",
+                "metrics",
+                "createdAt"
+              ]
+            },
+            "description": "Call log rows in the current page"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total matching rows"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Starting index of the current page"
+          },
+          "limit": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 1000,
+            "default": 100,
+            "description": "Maximum number of items requested for the current page. Defaults to 100; maximum 1000"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "offset"
+        ]
+      },
+      "ProviderStatsQuery": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window start (inclusive). ISO 8601."
+          },
+          "to": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window end (exclusive). ISO 8601."
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ],
+            "default": "hour",
+            "description": "Bucket granularity (default hour)"
+          },
+          "providerId": {
+            "type": "string",
+            "description": "Restrict to one provider"
+          },
+          "operation": {
+            "type": "string",
+            "description": "Restrict to one operation"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      },
+      "ProviderStatsBucket": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Bucket start (top of the hour / top of the day, UTC)"
+          },
+          "providerId": {
+            "type": "string",
+            "description": "Provider id"
+          },
+          "operation": {
+            "type": "string",
+            "description": "Operation"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Call count in the bucket"
+          },
+          "sumDurationMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total call duration in the bucket"
+          },
+          "minDurationMs": {
+            "type": "integer",
+            "description": "Shortest call duration"
+          },
+          "maxDurationMs": {
+            "type": "integer",
+            "description": "Longest call duration"
+          },
+          "p50TtftMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Median time-to-first-token (LLM rows only, null when none)"
+          },
+          "p95TtftMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "95th percentile time-to-first-token"
+          },
+          "p99TtftMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "99th percentile time-to-first-token"
+          },
+          "p95MaxChunkGapMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "95th percentile max streaming chunk gap"
+          },
+          "stalledCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Calls with a chunk gap over 10s"
+          },
+          "rtfOver1Count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "TTS calls slower than real time"
+          }
+        },
+        "required": [
+          "bucket",
+          "providerId",
+          "operation",
+          "count",
+          "sumDurationMs",
+          "minDurationMs",
+          "maxDurationMs",
+          "p50TtftMs",
+          "p95TtftMs",
+          "p99TtftMs",
+          "p95MaxChunkGapMs",
+          "stalledCount",
+          "rtfOver1Count"
+        ],
+        "description": "One provider-stats aggregate row"
+      },
+      "ProviderStatsMonitoringResponse": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window start (inclusive)"
+          },
+          "to": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window end (exclusive)"
+          },
+          "groupBy": {
+            "type": "string",
+            "enum": [
+              "hour",
+              "day"
+            ],
+            "description": "Bucket granularity used"
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderStatsBucket"
+            },
+            "description": "Aggregate rows, oldest bucket first"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "groupBy",
+          "buckets"
+        ]
+      },
+      "MetricSeriesQuery": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Metric name (must be a registered metric)"
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Exact label-set match (e.g. labels[provider_id]=prov_1&labels[ok]=true)"
+          },
+          "from": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window start (inclusive). ISO 8601."
+          },
+          "to": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window end (exclusive). ISO 8601."
+          },
+          "step": {
+            "type": "string",
+            "enum": [
+              "1m",
+              "15m",
+              "1h"
+            ],
+            "default": "15m",
+            "description": "Bucket granularity (default 15m)"
+          }
+        },
+        "required": [
+          "name",
+          "from",
+          "to"
+        ]
+      },
+      "MetricSeriesPoint": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Bucket start"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Summed sample counts in the bucket (counters: delta, gauges: 1 per sample, histograms: delta)"
+          },
+          "sum": {
+            "type": "number",
+            "nullable": true,
+            "description": "Summed sample sums in the bucket"
+          },
+          "min": {
+            "type": "number",
+            "nullable": true,
+            "description": "Minimum sample min in the bucket"
+          },
+          "max": {
+            "type": "number",
+            "nullable": true,
+            "description": "Maximum sample max in the bucket"
+          }
+        },
+        "required": [
+          "bucket",
+          "count",
+          "sum",
+          "min",
+          "max"
+        ],
+        "description": "One metric time-series point"
+      },
+      "MetricSeries": {
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The label set of this series"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetricSeriesPoint"
+            },
+            "description": "Points, oldest bucket first"
+          }
+        },
+        "required": [
+          "labels",
+          "points"
+        ]
+      },
+      "MetricSeriesMonitoringResponse": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Metric name"
+          },
+          "from": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window start (inclusive)"
+          },
+          "to": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Window end (exclusive)"
+          },
+          "step": {
+            "type": "string",
+            "enum": [
+              "1m",
+              "15m",
+              "1h"
+            ],
+            "description": "Bucket granularity used"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "labels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "The label set of this series"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MetricSeriesPoint"
+                  },
+                  "description": "Points, oldest bucket first"
+                }
+              },
+              "required": [
+                "labels",
+                "points"
+              ]
+            },
+            "description": "One series per matching label set"
+          }
+        },
+        "required": [
+          "name",
+          "from",
+          "to",
+          "step",
+          "series"
+        ]
+      },
       "LatencyStatsResponse": {
         "type": "object",
         "properties": {
@@ -25602,6 +26618,357 @@
           "snapshotId"
         ],
         "description": "Snapshot deletion result"
+      },
+      "AlertNotification": {
+        "type": "object",
+        "properties": {
+          "notifierId": {
+            "type": "string",
+            "description": "Notifier id from the monitoring config"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "fired",
+              "resolved"
+            ],
+            "description": "Which event phase this delivery attempted"
+          },
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the delivery attempt succeeded"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Failure detail (HTTP status, error message, cap overrun)"
+          },
+          "at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the attempt happened"
+          }
+        },
+        "required": [
+          "notifierId",
+          "phase",
+          "ok",
+          "at"
+        ],
+        "description": "One alert delivery attempt"
+      },
+      "NotifierConfig": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Notifier id (synthesized on first boot for env-derived notifiers)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "webhook",
+              "email",
+              "telegram",
+              "twilio_sms",
+              "whatsapp"
+            ],
+            "description": "Notifier type (webhook, email; telegram, twilio_sms, whatsapp since P4-02)"
+          },
+          "channelProviderId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Channel provider id (required for email/telegram/twilio_sms/whatsapp notifiers)"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Webhook delivery URL, http(s) (required for webhook notifiers)"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Recipient: email address (email notifiers) or E.164 phone number (twilio_sms/whatsapp notifiers)"
+          },
+          "chatId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Telegram chat id (required for telegram notifiers)"
+          },
+          "minSeverity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "description": "Only deliver alerts at or above this severity (default: all)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Disabled notifiers are skipped by the publisher"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "enabled"
+        ]
+      },
+      "RuleOverride": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Disable the rule without deleting its override"
+          },
+          "threshold": {
+            "type": "number",
+            "description": "Rule threshold (rate, count, or ms — per-rule semantics)"
+          },
+          "windowMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Evaluation window in minutes"
+          },
+          "minSamples": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Minimum samples before the rule may fire"
+          },
+          "forMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Sustainment in minutes before firing"
+          },
+          "resolveAfterGoodChecks": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Consecutive good evaluations to auto-resolve"
+          },
+          "cooldownMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minimum gap between re-fires of the same key"
+          },
+          "maxUnresolvedHours": {
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Auto-resolve safety valve in hours"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "description": "Override the rule default severity"
+          }
+        }
+      },
+      "ProbeSettings": {
+        "type": "object",
+        "properties": {
+          "llmProbe": {
+            "type": "string",
+            "enum": [
+              "models",
+              "one_token",
+              "off"
+            ],
+            "default": "models",
+            "description": "LLM health probe mode: 'models' = enumerateModels() (free), 'one_token' = 1-token generation (costs money), 'off' = call-log inference only"
+          },
+          "asrProbe": {
+            "type": "string",
+            "enum": [
+              "free",
+              "off"
+            ],
+            "default": "free",
+            "description": "ASR health probe mode (P1-05b): 'free' = zero-cost liveness endpoint (providers without one fall back to call-log inference), 'off' = call-log inference only"
+          },
+          "ttsProbe": {
+            "type": "string",
+            "enum": [
+              "free",
+              "off"
+            ],
+            "default": "free",
+            "description": "TTS health probe mode (P1-05b): 'free' = zero-cost liveness endpoint (providers without one fall back to call-log inference), 'off' = call-log inference only"
+          },
+          "cooldownMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "default": 10,
+            "description": "Minimum minutes between probes of the same provider"
+          }
+        },
+        "default": {
+          "llmProbe": "models",
+          "asrProbe": "free",
+          "ttsProbe": "free",
+          "cooldownMinutes": 10
+        },
+        "description": "Provider health probe policy (P1-05 consumes this)"
+      },
+      "AlertingSettings": {
+        "type": "object",
+        "properties": {
+          "engineIntervalMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "default": 1,
+            "description": "Alert rule engine interval in minutes (P2-01)"
+          },
+          "defaultCooldownMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "default": 15,
+            "description": "Default per-key re-fire cooldown in minutes (P2-01)"
+          }
+        },
+        "default": {
+          "engineIntervalMinutes": 1,
+          "defaultCooldownMinutes": 15
+        },
+        "description": "Alert engine settings (P2-01 consumes this)"
+      },
+      "CircuitBreakerSettings": {
+        "type": "object",
+        "properties": {
+          "failureThreshold": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 5,
+            "description": "Qualifying call failures within windowMs that open a provider's circuit breaker (P3-01)"
+          },
+          "windowMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "default": 60000,
+            "description": "Sliding window in milliseconds for counting breaker failures (P3-01)"
+          },
+          "cooldownMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "default": 300000,
+            "description": "open → half-open cooldown in milliseconds (P3-01)"
+          }
+        },
+        "default": {
+          "failureThreshold": 5,
+          "windowMs": 60000,
+          "cooldownMs": 300000
+        },
+        "description": "Per-provider circuit breaker policy (P3-01 consumes this; applied live, no restart)"
+      },
+      "AlertRuleCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlertRuleCatalogItem"
+            },
+            "description": "All built-in alert rules (static — no query params, no pagination)"
+          }
+        },
+        "required": [
+          "rules"
+        ]
+      },
+      "AlertRuleCatalogItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Rule id — the key to use in monitoring_config.rules overrides"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "global",
+              "per_provider"
+            ],
+            "description": "global = single alert key; per_provider = one alert key per provider in the evaluation set"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "description": "Default severity (overridable per rule in the config)"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One-line condition description, including threshold semantics"
+          },
+          "defaultParams": {
+            "type": "object",
+            "properties": {
+              "threshold": {
+                "type": "number",
+                "description": "Rule threshold — per-rule semantics (count, ratio, ms, or bytes; see each rule definition)"
+              },
+              "windowMinutes": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Evaluation window in minutes (0 = no window / gauge-like condition)"
+              },
+              "minSamples": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Minimum samples before the rule may fire (0 = no minimum)"
+              },
+              "forMinutes": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Sustainment in minutes before firing (0 = fire on the first met evaluation)"
+              },
+              "resolveAfterGoodChecks": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Consecutive not-met evaluations before auto-resolve"
+              },
+              "cooldownMinutes": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Minimum gap between re-fires of the same key"
+              },
+              "maxUnresolvedHours": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Auto-resolve safety valve in hours (applies even while the condition stays met)"
+              }
+            },
+            "required": [
+              "threshold",
+              "windowMinutes",
+              "minSamples",
+              "forMinutes",
+              "resolveAfterGoodChecks",
+              "cooldownMinutes",
+              "maxUnresolvedHours"
+            ],
+            "description": "Default parameters — config overrides merge over these"
+          }
+        },
+        "required": [
+          "id",
+          "scope",
+          "severity",
+          "summary",
+          "defaultParams"
+        ]
       }
     },
     "parameters": {},
@@ -40213,6 +41580,9 @@
                     ],
                     "description": "Provider-specific configuration object (varies by providerType and apiType)"
                   },
+                  "fallbacks": {
+                    "$ref": "#/components/schemas/ProviderFallbacks"
+                  },
                   "tags": {
                     "type": "array",
                     "items": {
@@ -40625,6 +41995,13 @@
                       ],
                       "description": "Provider-specific configuration object"
                     },
+                    "fallbacks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderFallback"
+                      },
+                      "description": "Ordered fallback providers (empty when none)"
+                    },
                     "createdBy": {
                       "type": "string",
                       "nullable": true,
@@ -40662,6 +42039,7 @@
                     "providerType",
                     "apiType",
                     "config",
+                    "fallbacks",
                     "createdBy",
                     "tags",
                     "version",
@@ -41216,6 +42594,13 @@
                             ],
                             "description": "Provider-specific configuration object"
                           },
+                          "fallbacks": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/ProviderFallback"
+                            },
+                            "description": "Ordered fallback providers (empty when none)"
+                          },
                           "createdBy": {
                             "type": "string",
                             "nullable": true,
@@ -41253,6 +42638,7 @@
                           "providerType",
                           "apiType",
                           "config",
+                          "fallbacks",
                           "createdBy",
                           "tags",
                           "version",
@@ -41710,6 +43096,13 @@
                       ],
                       "description": "Provider-specific configuration object"
                     },
+                    "fallbacks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderFallback"
+                      },
+                      "description": "Ordered fallback providers (empty when none)"
+                    },
                     "createdBy": {
                       "type": "string",
                       "nullable": true,
@@ -41747,6 +43140,7 @@
                     "providerType",
                     "apiType",
                     "config",
+                    "fallbacks",
                     "createdBy",
                     "tags",
                     "version",
@@ -42175,6 +43569,14 @@
                     ],
                     "description": "Updated provider-specific configuration"
                   },
+                  "fallbacks": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ProviderFallback"
+                    },
+                    "maxItems": 3,
+                    "description": "Updated ordered fallback chain ([] clears it)"
+                  },
                   "tags": {
                     "type": "array",
                     "nullable": true,
@@ -42585,6 +43987,13 @@
                       ],
                       "description": "Provider-specific configuration object"
                     },
+                    "fallbacks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderFallback"
+                      },
+                      "description": "Ordered fallback providers (empty when none)"
+                    },
                     "createdBy": {
                       "type": "string",
                       "nullable": true,
@@ -42622,6 +44031,7 @@
                     "providerType",
                     "apiType",
                     "config",
+                    "fallbacks",
                     "createdBy",
                     "tags",
                     "version",
@@ -66219,6 +67629,2043 @@
           },
           "409": {
             "description": "Project is archived"
+          }
+        }
+      }
+    },
+    "/api/monitoring/health": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Current health snapshot",
+        "description": "The in-memory snapshot of the last completed health check cycle (db, process, service heartbeats, providers).",
+        "responses": {
+          "200": {
+            "description": "Current health snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checkedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the last check cycle ran (null before the first cycle)"
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HealthCheckItem"
+                      },
+                      "description": "All checks from the last completed cycle"
+                    }
+                  },
+                  "required": [
+                    "checkedAt",
+                    "checks"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/health/history": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Health check history",
+        "description": "Persisted health check rows, newest first. Filters: check (alias of checkName), status, latencyMs, createdAt (operators supported, e.g. filters[createdAt][op]=between&filters[createdAt][value][0]=from&filters[createdAt][value][1]=to).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0,
+              "description": "Starting index for pagination (default: 0)"
+            },
+            "required": false,
+            "description": "Starting index for pagination (default: 0)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 1000,
+              "description": "Maximum number of items to return. Defaults to 100; maximum 1000"
+            },
+            "required": false,
+            "description": "Maximum number of items to return. Defaults to 100; maximum 1000",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "description": "Full-text search query string (optional)"
+            },
+            "required": false,
+            "description": "Full-text search query string (optional)",
+            "name": "textSearch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")"
+            },
+            "required": false,
+            "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")",
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to group results by (optional)"
+            },
+            "required": false,
+            "description": "Field(s) to group results by (optional)",
+            "name": "groupBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "nullable": true,
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "boolean"
+                    }
+                  },
+                  {
+                    "$ref": "#/components/schemas/ListFilterOperation"
+                  }
+                ]
+              },
+              "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects"
+            },
+            "required": false,
+            "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects",
+            "name": "filters",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated health check history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Row id"
+                          },
+                          "checkName": {
+                            "type": "string",
+                            "description": "Check name"
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Check status (ok | degraded | down | unknown)"
+                          },
+                          "latencyMs": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "Check duration in milliseconds"
+                          },
+                          "detail": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            },
+                            "description": "Check-specific detail payload"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the check ran"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "checkName",
+                          "status",
+                          "latencyMs",
+                          "detail",
+                          "createdAt"
+                        ]
+                      },
+                      "description": "Health check rows in the current page"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Total matching rows"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Starting index of the current page"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 1000,
+                      "default": 100,
+                      "description": "Maximum number of items requested for the current page. Defaults to 100; maximum 1000"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "offset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/providers": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Provider overview",
+        "description": "Per provider: identity, latest probe status from the health snapshot, and a rolling 15-minute call-log window (calls, okRate, p95 duration, top error codes).",
+        "responses": {
+          "200": {
+            "description": "Provider overview with rolling windows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Provider id"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Provider name"
+                          },
+                          "providerType": {
+                            "type": "string",
+                            "description": "Provider type (llm, asr, tts, embeddings, storage)"
+                          },
+                          "apiType": {
+                            "type": "string",
+                            "description": "API type (openai, anthropic, elevenlabs, s3, ...)"
+                          },
+                          "probeStatus": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "ok",
+                              "degraded",
+                              "down",
+                              "unknown",
+                              null
+                            ],
+                            "description": "Latest health-check status for this provider (provider:<id> check); null when not checked yet"
+                          },
+                          "rolling": {
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/ProviderRolling"
+                              },
+                              {
+                                "description": "Rolling 15-minute call-log window"
+                              }
+                            ]
+                          },
+                          "circuitBreaker": {
+                            "$ref": "#/components/schemas/CircuitBreakerState"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "providerType",
+                          "apiType",
+                          "probeStatus",
+                          "rolling",
+                          "circuitBreaker"
+                        ]
+                      },
+                      "description": "All providers with their rolling stats"
+                    }
+                  },
+                  "required": [
+                    "providers"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/provider-calls": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Provider call logs",
+        "description": "Raw 3rd-party call logs (one row per call, variant streaming fields in `metrics`). Filters: providerId, providerType, apiType, operation, model, projectId, conversationId, ok, errorCode, statusHttp, durationMs, fallbackProviderId, createdAt.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0,
+              "description": "Starting index for pagination (default: 0)"
+            },
+            "required": false,
+            "description": "Starting index for pagination (default: 0)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 1000,
+              "description": "Maximum number of items to return. Defaults to 100; maximum 1000"
+            },
+            "required": false,
+            "description": "Maximum number of items to return. Defaults to 100; maximum 1000",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "description": "Full-text search query string (optional)"
+            },
+            "required": false,
+            "description": "Full-text search query string (optional)",
+            "name": "textSearch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")"
+            },
+            "required": false,
+            "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")",
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to group results by (optional)"
+            },
+            "required": false,
+            "description": "Field(s) to group results by (optional)",
+            "name": "groupBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "nullable": true,
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "boolean"
+                    }
+                  },
+                  {
+                    "$ref": "#/components/schemas/ListFilterOperation"
+                  }
+                ]
+              },
+              "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects"
+            },
+            "required": false,
+            "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects",
+            "name": "filters",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated provider call logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Row id"
+                          },
+                          "providerId": {
+                            "type": "string",
+                            "description": "Provider id"
+                          },
+                          "providerType": {
+                            "type": "string",
+                            "description": "Provider type"
+                          },
+                          "apiType": {
+                            "type": "string",
+                            "description": "API type"
+                          },
+                          "operation": {
+                            "type": "string",
+                            "description": "Operation (llm.generate, channel.send_message, ...)"
+                          },
+                          "model": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Model, when the operation has one"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Owning project, when known"
+                          },
+                          "conversationId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Owning conversation, when known"
+                          },
+                          "ok": {
+                            "type": "boolean",
+                            "description": "Whether the call succeeded"
+                          },
+                          "errorCode": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Error class (null on success): auth | rate_limited | timeout | server_error | client_error | network | unknown"
+                          },
+                          "statusHttp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "HTTP status when the error carried one"
+                          },
+                          "durationMs": {
+                            "type": "integer",
+                            "description": "Call duration in milliseconds"
+                          },
+                          "errorText": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Truncated error message (1KB)"
+                          },
+                          "fallbackProviderId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Set when the call ran on a fallback provider"
+                          },
+                          "metrics": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            },
+                            "description": "Variant phase fields (TTFT, tokens, chunk gaps, ...)"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the call happened"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "providerId",
+                          "providerType",
+                          "apiType",
+                          "operation",
+                          "model",
+                          "projectId",
+                          "conversationId",
+                          "ok",
+                          "errorCode",
+                          "statusHttp",
+                          "durationMs",
+                          "errorText",
+                          "fallbackProviderId",
+                          "metrics",
+                          "createdAt"
+                        ]
+                      },
+                      "description": "Call log rows in the current page"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Total matching rows"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Starting index of the current page"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 1000,
+                      "default": 100,
+                      "description": "Maximum number of items requested for the current page. Defaults to 100; maximum 1000"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "offset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/fallback-events": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Failover transition events",
+        "description": "Raw fallback_events: every recorded failover transition (primary failed, fallback attempted) — which provider failed, which one served, the error class, and whether the fallback succeeded. Filters: providerId, fallbackProviderId, providerType, operation, reason, projectId, conversationId, success, createdAt.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0,
+              "description": "Starting index for pagination (default: 0)"
+            },
+            "required": false,
+            "description": "Starting index for pagination (default: 0)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 1000,
+              "description": "Maximum number of items to return. Defaults to 100; maximum 1000"
+            },
+            "required": false,
+            "description": "Maximum number of items to return. Defaults to 100; maximum 1000",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "description": "Full-text search query string (optional)"
+            },
+            "required": false,
+            "description": "Full-text search query string (optional)",
+            "name": "textSearch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")"
+            },
+            "required": false,
+            "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")",
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to group results by (optional)"
+            },
+            "required": false,
+            "description": "Field(s) to group results by (optional)",
+            "name": "groupBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "nullable": true,
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "boolean"
+                    }
+                  },
+                  {
+                    "$ref": "#/components/schemas/ListFilterOperation"
+                  }
+                ]
+              },
+              "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects"
+            },
+            "required": false,
+            "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects",
+            "name": "filters",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated fallback events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Row id"
+                          },
+                          "providerId": {
+                            "type": "string",
+                            "description": "The failed (primary-side) provider"
+                          },
+                          "fallbackProviderId": {
+                            "type": "string",
+                            "description": "The provider the request fell over to"
+                          },
+                          "providerType": {
+                            "type": "string",
+                            "description": "Provider type (llm, tts, asr, storage, ...)"
+                          },
+                          "operation": {
+                            "type": "string",
+                            "description": "Operation (llm.generate, tts.session, storage.upload, ...)"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "description": "Error class of the failed attempt (auth | rate_limited | timeout | server_error | ...)"
+                          },
+                          "projectId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Owning project, when known"
+                          },
+                          "conversationId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Owning conversation, when known"
+                          },
+                          "success": {
+                            "type": "boolean",
+                            "nullable": true,
+                            "description": "Whether the fallback ultimately served the request"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the transition happened"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "providerId",
+                          "fallbackProviderId",
+                          "providerType",
+                          "operation",
+                          "reason",
+                          "projectId",
+                          "conversationId",
+                          "success",
+                          "createdAt"
+                        ]
+                      },
+                      "description": "Fallback event rows in the current page"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Total matching rows"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Starting index of the current page"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 1000,
+                      "default": 100,
+                      "description": "Maximum number of items requested for the current page. Defaults to 100; maximum 1000"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "offset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/provider-stats": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Aggregated provider stats",
+        "description": "One aggregate row per (bucket, providerId, operation) over the window: counts, duration sum/min/max, TTFT percentiles, chunk-gap p95, stalled and RTF>1 counts. Window span is limited to 14 days.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "format": "date-time",
+              "description": "Window start (inclusive). ISO 8601."
+            },
+            "required": false,
+            "description": "Window start (inclusive). ISO 8601.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "format": "date-time",
+              "description": "Window end (exclusive). ISO 8601."
+            },
+            "required": false,
+            "description": "Window end (exclusive). ISO 8601.",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "day"
+              ],
+              "default": "hour",
+              "description": "Bucket granularity (default hour)"
+            },
+            "required": false,
+            "description": "Bucket granularity (default hour)",
+            "name": "groupBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Restrict to one provider"
+            },
+            "required": false,
+            "description": "Restrict to one provider",
+            "name": "providerId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Restrict to one operation"
+            },
+            "required": false,
+            "description": "Restrict to one operation",
+            "name": "operation",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregate stats buckets, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "Window start (inclusive)"
+                    },
+                    "to": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "Window end (exclusive)"
+                    },
+                    "groupBy": {
+                      "type": "string",
+                      "enum": [
+                        "hour",
+                        "day"
+                      ],
+                      "description": "Bucket granularity used"
+                    },
+                    "buckets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProviderStatsBucket"
+                      },
+                      "description": "Aggregate rows, oldest bucket first"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to",
+                    "groupBy",
+                    "buckets"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/alerts": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Alert events",
+        "description": "Alert event history (P2-01/P2-02), newest fired_at first by default. Items include the full notifications delivery trail. Filters: id, ruleId, scopeKey, severity (info|warning|critical), status (firing|resolved), firedAt, resolvedAt, ackedAt (operators supported, e.g. filters[firedAt][op]=between&filters[firedAt][value][0]=from&filters[firedAt][value][1]=to); textSearch over message, scopeKey, ruleId.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0,
+              "description": "Starting index for pagination (default: 0)"
+            },
+            "required": false,
+            "description": "Starting index for pagination (default: 0)",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 1000,
+              "description": "Maximum number of items to return. Defaults to 100; maximum 1000"
+            },
+            "required": false,
+            "description": "Maximum number of items to return. Defaults to 100; maximum 1000",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "description": "Full-text search query string (optional)"
+            },
+            "required": false,
+            "description": "Full-text search query string (optional)",
+            "name": "textSearch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")"
+            },
+            "required": false,
+            "description": "Field(s) to sort by. Use \"-\" prefix for descending order (e.g., \"-createdAt\")",
+            "name": "orderBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "nullable": true
+                }
+              ],
+              "description": "Field(s) to group results by (optional)"
+            },
+            "required": false,
+            "description": "Field(s) to group results by (optional)",
+            "name": "groupBy",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "nullable": true,
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "boolean"
+                    }
+                  },
+                  {
+                    "$ref": "#/components/schemas/ListFilterOperation"
+                  }
+                ]
+              },
+              "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects"
+            },
+            "required": false,
+            "description": "Dynamic field filters as key-value pairs. Use bracket notation in query string (e.g., filters[projectId]=value, filters[name][op]=like&filters[name][value]=test). Values can be direct values, arrays (for IN), or operation objects",
+            "name": "filters",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated alert events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Alert event id (stable — webhook receivers dedupe on this)"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "description": "Alert rule id that produced this event"
+                          },
+                          "scopeKey": {
+                            "type": "string",
+                            "description": "Rule id + scope part (e.g. provider-down:prov_123)"
+                          },
+                          "scope": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            },
+                            "description": "Scope detail fields (provider, service, …)"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "warning",
+                              "critical"
+                            ],
+                            "description": "Alert severity"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "firing",
+                              "resolved"
+                            ],
+                            "description": "Current alert status"
+                          },
+                          "message": {
+                            "type": "string",
+                            "description": "Human-readable alert message"
+                          },
+                          "context": {
+                            "type": "object",
+                            "nullable": true,
+                            "additionalProperties": {
+                              "nullable": true
+                            },
+                            "description": "Evaluation context (includes resolutionReason on resolve)"
+                          },
+                          "notifications": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/AlertNotification"
+                            },
+                            "description": "All delivery attempts, oldest first"
+                          },
+                          "firedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the alert fired"
+                          },
+                          "resolvedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the alert resolved (null while firing)"
+                          },
+                          "ackedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time",
+                            "description": "When the alert was acknowledged (null if never)"
+                          },
+                          "ackedBy": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Operator id that acknowledged the alert"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "ruleId",
+                          "scopeKey",
+                          "scope",
+                          "severity",
+                          "status",
+                          "message",
+                          "context",
+                          "notifications",
+                          "firedAt",
+                          "resolvedAt",
+                          "ackedAt",
+                          "ackedBy"
+                        ]
+                      },
+                      "description": "Alert events in the current page"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Total matching rows"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Starting index of the current page"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 1000,
+                      "default": 100,
+                      "description": "Maximum number of items requested for the current page. Defaults to 100; maximum 1000"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "offset"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/alerts/{id}": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Alert event by id",
+        "description": "A single alert event with its notification delivery trail and acknowledgment stamps.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Alert event id"
+            },
+            "required": true,
+            "description": "Alert event id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Alert event id (stable — webhook receivers dedupe on this)"
+                    },
+                    "ruleId": {
+                      "type": "string",
+                      "description": "Alert rule id that produced this event"
+                    },
+                    "scopeKey": {
+                      "type": "string",
+                      "description": "Rule id + scope part (e.g. provider-down:prov_123)"
+                    },
+                    "scope": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Scope detail fields (provider, service, …)"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "info",
+                        "warning",
+                        "critical"
+                      ],
+                      "description": "Alert severity"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "firing",
+                        "resolved"
+                      ],
+                      "description": "Current alert status"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable alert message"
+                    },
+                    "context": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Evaluation context (includes resolutionReason on resolve)"
+                    },
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AlertNotification"
+                      },
+                      "description": "All delivery attempts, oldest first"
+                    },
+                    "firedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert fired"
+                    },
+                    "resolvedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert resolved (null while firing)"
+                    },
+                    "ackedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert was acknowledged (null if never)"
+                    },
+                    "ackedBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Operator id that acknowledged the alert"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ruleId",
+                    "scopeKey",
+                    "scope",
+                    "severity",
+                    "status",
+                    "message",
+                    "context",
+                    "notifications",
+                    "firedAt",
+                    "resolvedAt",
+                    "ackedAt",
+                    "ackedBy"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/monitoring/alerts/{id}/acknowledge": {
+      "post": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Acknowledge alert event",
+        "description": "Stamps acked_at + acked_by (the authenticated operator) exactly once — a second ack returns 200 with the existing stamps (idempotent, no overwrite). Writes an audit entry on the first ack.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Alert event id"
+            },
+            "required": true,
+            "description": "Alert event id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert event with acknowledgment stamps",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Alert event id (stable — webhook receivers dedupe on this)"
+                    },
+                    "ruleId": {
+                      "type": "string",
+                      "description": "Alert rule id that produced this event"
+                    },
+                    "scopeKey": {
+                      "type": "string",
+                      "description": "Rule id + scope part (e.g. provider-down:prov_123)"
+                    },
+                    "scope": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Scope detail fields (provider, service, …)"
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "info",
+                        "warning",
+                        "critical"
+                      ],
+                      "description": "Alert severity"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "firing",
+                        "resolved"
+                      ],
+                      "description": "Current alert status"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable alert message"
+                    },
+                    "context": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Evaluation context (includes resolutionReason on resolve)"
+                    },
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AlertNotification"
+                      },
+                      "description": "All delivery attempts, oldest first"
+                    },
+                    "firedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert fired"
+                    },
+                    "resolvedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert resolved (null while firing)"
+                    },
+                    "ackedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the alert was acknowledged (null if never)"
+                    },
+                    "ackedBy": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Operator id that acknowledged the alert"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ruleId",
+                    "scopeKey",
+                    "scope",
+                    "severity",
+                    "status",
+                    "message",
+                    "context",
+                    "notifications",
+                    "firedAt",
+                    "resolvedAt",
+                    "ackedAt",
+                    "ackedBy"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/monitoring/config": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Monitoring config",
+        "description": "The current validated monitoring config (notifiers, rule overrides, retention, probe + alerting settings) plus the optimistic-lock version.",
+        "responses": {
+          "200": {
+            "description": "Monitoring config + version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "notifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/NotifierConfig"
+                          },
+                          "default": [],
+                          "description": "Alert delivery targets (webhook, email in Phase 1)"
+                        },
+                        "rules": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "$ref": "#/components/schemas/RuleOverride"
+                          },
+                          "default": {},
+                          "description": "Per-rule overrides keyed by rule id (P2-01 defines the ids)"
+                        },
+                        "retentionDays": {
+                          "type": "integer",
+                          "minimum": 7,
+                          "default": 90,
+                          "description": "Retention in days for provider_call_logs, health_checks, metric_samples (stats_hourly: 2x)"
+                        },
+                        "probeSettings": {
+                          "$ref": "#/components/schemas/ProbeSettings"
+                        },
+                        "alerting": {
+                          "$ref": "#/components/schemas/AlertingSettings"
+                        },
+                        "circuitBreaker": {
+                          "$ref": "#/components/schemas/CircuitBreakerSettings"
+                        }
+                      },
+                      "description": "The current validated monitoring config"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-lock version — send back unchanged in PUT"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the config row was last written"
+                    }
+                  },
+                  "required": [
+                    "config",
+                    "version",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Replace monitoring config",
+        "description": "Full-replace the monitoring config under optimistic lock. `version` must match the current row version (409 on mismatch); invalid config (unknown rule id, bad notifier, retention < 7) returns 400. On success the running engine and notifiers observe the new config on their next evaluation/delivery — no restart. The audit entry stores sanitized before/after summaries (webhook URLs are replaced by hasUrl).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Current version from GET — mismatch returns 409"
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "notifiers": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/NotifierConfig"
+                        },
+                        "default": [],
+                        "description": "Alert delivery targets (webhook, email in Phase 1)"
+                      },
+                      "rules": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "$ref": "#/components/schemas/RuleOverride"
+                        },
+                        "default": {},
+                        "description": "Per-rule overrides keyed by rule id (P2-01 defines the ids)"
+                      },
+                      "retentionDays": {
+                        "type": "integer",
+                        "minimum": 7,
+                        "default": 90,
+                        "description": "Retention in days for provider_call_logs, health_checks, metric_samples (stats_hourly: 2x)"
+                      },
+                      "probeSettings": {
+                        "$ref": "#/components/schemas/ProbeSettings"
+                      },
+                      "alerting": {
+                        "$ref": "#/components/schemas/AlertingSettings"
+                      },
+                      "circuitBreaker": {
+                        "$ref": "#/components/schemas/CircuitBreakerSettings"
+                      }
+                    },
+                    "description": "Full replacement config (no partial updates)"
+                  }
+                },
+                "required": [
+                  "version",
+                  "config"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated monitoring config + new version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "notifiers": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/NotifierConfig"
+                          },
+                          "default": [],
+                          "description": "Alert delivery targets (webhook, email in Phase 1)"
+                        },
+                        "rules": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "$ref": "#/components/schemas/RuleOverride"
+                          },
+                          "default": {},
+                          "description": "Per-rule overrides keyed by rule id (P2-01 defines the ids)"
+                        },
+                        "retentionDays": {
+                          "type": "integer",
+                          "minimum": 7,
+                          "default": 90,
+                          "description": "Retention in days for provider_call_logs, health_checks, metric_samples (stats_hourly: 2x)"
+                        },
+                        "probeSettings": {
+                          "$ref": "#/components/schemas/ProbeSettings"
+                        },
+                        "alerting": {
+                          "$ref": "#/components/schemas/AlertingSettings"
+                        },
+                        "circuitBreaker": {
+                          "$ref": "#/components/schemas/CircuitBreakerSettings"
+                        }
+                      },
+                      "description": "The current validated monitoring config"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-lock version — send back unchanged in PUT"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "When the config row was last written"
+                    }
+                  },
+                  "required": [
+                    "config",
+                    "version",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          },
+          "409": {
+            "description": "Version mismatch (stale version) — re-GET and retry"
+          }
+        }
+      }
+    },
+    "/api/monitoring/rules": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Alert rule catalog",
+        "description": "Static catalog of all built-in alert rules (id, scope, severity, one-line summary, default parameters). Served from the engine rule registry — the same source the evaluators run from — so it never drifts from the config keys PUT /api/monitoring/config accepts under `rules`.",
+        "responses": {
+          "200": {
+            "description": "All built-in alert rules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertRuleCatalogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/metrics": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Metric time series",
+        "description": "Generic time series over persisted metric samples: one series per exact label set, points bucketed at the requested step (1m/15m/1h). This is the JSON history surface; the Prometheus text format is a separate Phase-4 endpoint.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Metric name (must be a registered metric)"
+            },
+            "required": true,
+            "description": "Metric name (must be a registered metric)",
+            "name": "name",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Exact label-set match (e.g. labels[provider_id]=prov_1&labels[ok]=true)"
+            },
+            "required": false,
+            "description": "Exact label-set match (e.g. labels[provider_id]=prov_1&labels[ok]=true)",
+            "name": "labels",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "format": "date-time",
+              "description": "Window start (inclusive). ISO 8601."
+            },
+            "required": false,
+            "description": "Window start (inclusive). ISO 8601.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "format": "date-time",
+              "description": "Window end (exclusive). ISO 8601."
+            },
+            "required": false,
+            "description": "Window end (exclusive). ISO 8601.",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "15m",
+                "1h"
+              ],
+              "default": "15m",
+              "description": "Bucket granularity (default 15m)"
+            },
+            "required": false,
+            "description": "Bucket granularity (default 15m)",
+            "name": "step",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Time series per label set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Metric name"
+                    },
+                    "from": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "Window start (inclusive)"
+                    },
+                    "to": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time",
+                      "description": "Window end (exclusive)"
+                    },
+                    "step": {
+                      "type": "string",
+                      "enum": [
+                        "1m",
+                        "15m",
+                        "1h"
+                      ],
+                      "description": "Bucket granularity used"
+                    },
+                    "series": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "labels": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "The label set of this series"
+                          },
+                          "points": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/MetricSeriesPoint"
+                            },
+                            "description": "Points, oldest bucket first"
+                          }
+                        },
+                        "required": [
+                          "labels",
+                          "points"
+                        ]
+                      },
+                      "description": "One series per matching label set"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "from",
+                    "to",
+                    "step",
+                    "series"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
           }
         }
       }

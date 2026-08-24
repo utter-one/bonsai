@@ -5,7 +5,7 @@ import { Classifier, ContextTransformer, Conversation, GlobalAction, Guardrail, 
 import { StageAction, LIFECYCLE_ACTION_NAMES, CONVERSATION_LIFECYCLE_ACTION_IDS } from "../../types/actions";
 import type { LifecycleContext } from "../../types/actions";
 import { db } from "../../db";
-import { conversations, users, sampleCopies, conversationArtifacts } from "../../db/schema";
+import { conversations, users, sampleCopies, conversationArtifacts, providers } from "../../db/schema";
 import { MessageEventData, CommandEventData, CommandType, ConversationStartEventData, ConversationResumeEventData, ConversationEndEventData, ConversationAbortedEventData, ConversationFailedEventData, JumpToStageEventData, ToolCallEventData, ModerationEventData, conversationStateSchema, ConversationState, MessageVisibility, VariablesUpdatedEventData, TurnAbortedEventData } from "../../types/conversationEvents";
 import { ConversationService } from "../ConversationService";
 import { ConversationStorageService } from "../ConversationStorageService";
@@ -17,12 +17,21 @@ import { getEffectiveChannelType } from "../../channels/SessionManager";
 import type { IClientConnection } from '../../channels/IClientConnection';
 import type { CALUserTranscribedChunkMessage, CALAiTranscribedChunkMessage, CALStartAiGenerationOutputMessage, CALSendAiVoiceChunkMessage, CALEndAiGenerationOutputMessage, CALConversationEventMessage, CALConversationEventUpdateMessage, CALAbortAiGenerationOutputMessage,   CALUserSpeakingStartedMessage, CALAttachFileOutputMessage } from '../../channels/messages';
 import { ILlmProvider, LlmChunk, LlmGenerationResult, LlmMessage } from "../providers/llm/ILlmProvider";
+import { FailoverLlmProvider } from "../providers/llm/FailoverLlmProvider";
+import { FailoverTtsProvider } from "../providers/tts/FailoverTtsProvider";
+import { FailoverAsrProvider } from "../providers/asr/FailoverAsrProvider";
+import { FallbackResolver } from "../providers/FallbackResolver";
 import { buildLlmUsage, LlmProviderInfo, LlmUsageMetadata } from '../../utils/llmUsage';
 import { IAsrProvider } from "../providers/asr/IAsrProvider";
 import { ITtsProvider } from "../providers/tts/ITtsProvider";
-import { LlmProviderFactory } from "../providers/llm/LlmProviderFactory";
+import { LlmProviderFactory, LlmSettings } from "../providers/llm/LlmProviderFactory";
+import { CircuitBreakerRegistry } from "../monitoring/CircuitBreakerRegistry";
+import { FallbackEventService } from "../monitoring/FallbackEventService";
+import { MetricsRegistry } from "../monitoring/MetricsRegistry";
 import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
+import { MonitoringContext } from "../monitoring/MonitoringContext";
+import { getMetricsRegistry } from "../monitoring/ProviderCallRecorder";
 import { UserInputProcessor } from "./UserInputProcessor";
 import { TtsSettings } from "../providers/tts/TtsProviderFactory";
 import { ActionsExecutionOutcome, ActionsExecutor, EffectEventCallback } from "./ActionsExecutor";
@@ -256,6 +265,8 @@ export class ConversationRunner {
 
   /** Per-turn runtime data: correlation IDs, timing markers, and event tracking for the active input/output turn */
   private turnData: TurnData = { startMs: null, promptRenderStartMs: null, promptRenderEndMs: null, llmStartMs: null, firstTokenMs: null, firstAudioMs: null, assistantMessageEventId: null, fillerDurationMs: null, fillerLlmUsage: null, moderationDurationMs: null, moderationStartMs: null, moderationEndMs: null, asrStartMs: null, stageTransitionStartMs: null, stageTransitionEndMs: null, ttsConnectStartMs: null, ttsConnectEndMs: null, ttsStartMs: null, turnIndex: 0, fillerSentence: null, prescriptedText: null, completionTruncationInfo: null, accumulatedText: null };
+  /** P1-03: whether this runner is currently counted in the active_conversations gauge. */
+  private activeConversationsCounted = false;
 
   /**
    * Executes a function under the runner mutex, serializing all operations.
@@ -297,6 +308,10 @@ export class ConversationRunner {
     @inject(KnowledgeService) private knowledgeService: KnowledgeService,
     @inject(ModerationService) private moderationService: ModerationService,
     @inject(ConversationStorageService) private conversationStorageService: ConversationStorageService,
+    @inject(FallbackResolver) private fallbackResolver: FallbackResolver,
+    @inject(CircuitBreakerRegistry) private breakerRegistry: CircuitBreakerRegistry,
+    @inject(FallbackEventService) private fallbackEventService: FallbackEventService,
+    @inject(MetricsRegistry) private metricsRegistry: MetricsRegistry,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -384,7 +399,7 @@ export class ConversationRunner {
     if (stage.llmProviderId) {
       const llmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, stage.llmProviderId) });
       if (llmProviderEntity) {
-        stageData.completionLlmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, stage.llmSettings);
+        stageData.completionLlmProvider = await this.createLlmProviderWithFailover(llmProviderEntity, stage.llmSettings);
         stageData.completionLlmProviderInfo = { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType };
       }
     }
@@ -424,7 +439,7 @@ export class ConversationRunner {
       if (!llmProviderEntity) {
         throw new NotFoundError(`LLM Provider with ID ${classifier.llmProviderId} not found for classifier ${classifierId}`);
       }
-      const llmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, classifier.llmSettings);
+      const llmProvider = await this.createLlmProviderWithFailover(llmProviderEntity, classifier.llmSettings);
       stageData.classifiers.push({ classifier, llmProvider, llmProviderInfo: { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType } });
     }
 
@@ -440,7 +455,7 @@ export class ConversationRunner {
       if (!llmProviderEntity) {
         throw new NotFoundError(`LLM Provider with ID ${transformer.llmProviderId} not found for transformer ${transformerId}`);
       }
-      const llmProvider = await this.llmProviderFactory.createProvider(llmProviderEntity, transformer.llmSettings);
+      const llmProvider = await this.createLlmProviderWithFailover(llmProviderEntity, transformer.llmSettings);
       stageData.transformers.push({ transformer, llmProvider, llmProviderInfo: { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType } });
     }
 
@@ -507,7 +522,7 @@ export class ConversationRunner {
         }
         stageData.guardrailClassifier = {
           classifier: guardrailClassifierEntity,
-          llmProvider: await this.llmProviderFactory.createProvider(guardrailLlmProviderEntity, guardrailClassifierEntity.llmSettings),
+          llmProvider: await this.createLlmProviderWithFailover(guardrailLlmProviderEntity, guardrailClassifierEntity.llmSettings),
           llmProviderInfo: { id: guardrailLlmProviderEntity.id, apiType: guardrailLlmProviderEntity.apiType },
         };
       } else {
@@ -539,7 +554,7 @@ export class ConversationRunner {
           }
           stageData.sampleCopyClassifier = {
             classifier: sampleCopyClassifierEntity,
-            llmProvider: await this.llmProviderFactory.createProvider(sampleCopyLlmProviderEntity, sampleCopyClassifierEntity.llmSettings),
+            llmProvider: await this.createLlmProviderWithFailover(sampleCopyLlmProviderEntity, sampleCopyClassifierEntity.llmSettings),
             llmProviderInfo: { id: sampleCopyLlmProviderEntity.id, apiType: sampleCopyLlmProviderEntity.apiType },
           };
         } else {
@@ -561,7 +576,7 @@ export class ConversationRunner {
     if (agent.fillerSettings?.llmProviderId) {
       const fillerLlmProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.fillerSettings.llmProviderId) });
       if (fillerLlmProviderEntity) {
-        stageData.fillerLlmProvider = await this.llmProviderFactory.createProvider(fillerLlmProviderEntity, agent.fillerSettings.llmSettings);
+        stageData.fillerLlmProvider = await this.createLlmProviderWithFailover(fillerLlmProviderEntity, agent.fillerSettings.llmSettings);
         stageData.fillerLlmProviderInfo = { id: fillerLlmProviderEntity.id, apiType: fillerLlmProviderEntity.apiType };
       } else {
         logger.warn({ agentId: agent.id, llmProviderId: agent.fillerSettings.llmProviderId }, 'Filler LLM provider not found, filler responses will be skipped');
@@ -572,7 +587,7 @@ export class ConversationRunner {
     if (project.generateVoice && agent.ttsProviderId && this.session.sessionSettings.receiveVoiceOutput) {
       const voiceProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, agent.ttsProviderId) });
       if (voiceProviderEntity && ttsSettings) {
-        stageData.ttsProvider = await this.ttsProviderFactory.createProvider(voiceProviderEntity, ttsSettings);
+        stageData.ttsProvider = await this.createTtsProviderWithFailover(voiceProviderEntity, ttsSettings);
       }
     }
 
@@ -582,7 +597,7 @@ export class ConversationRunner {
     if (project.acceptVoice && project.asrConfig?.asrProviderId && this.session.sessionSettings.sendVoiceInput) {
       const asrProviderEntity = await db.query.providers.findFirst({ where: (providers, { eq }) => eq(providers.id, project.asrConfig.asrProviderId) });
       if (asrProviderEntity) {
-        stageData.asrProvider = await this.asrProviderFactory.createProvider(asrProviderEntity, project.asrConfig.settings ?? {});
+        stageData.asrProvider = await this.createAsrProviderWithFailover(asrProviderEntity, project.asrConfig.settings ?? {});
       } else {
         throw new NotFoundError(`ASR Provider with ID ${project.asrConfig.asrProviderId} not found`);
       }
@@ -818,6 +833,10 @@ export class ConversationRunner {
             // Record the timestamp of the first audio chunk if not already captured
             if (this.turnData.firstAudioMs === null) {
               this.turnData.firstAudioMs = Date.now();
+              // P1-03: end-to-end turn latency to first audio (same value persisted as timeToFirstAudioMs)
+              if (this.turnData.startMs !== null) {
+                getMetricsRegistry()?.observe('ai_turn_ttft_ms', { project_id: this.conversation.projectId }, this.turnData.firstAudioMs - this.turnData.startMs);
+              }
             }
           }
 
@@ -1037,7 +1056,16 @@ export class ConversationRunner {
     }
   }
 
+  /** P1-03: turn-level monitoring context for provider call attribution. */
+  private monitoringContextData() {
+    return { projectId: this.conversation.projectId, conversationId: this.conversation.id, stageId: this.stageData.id };
+  }
+
   async startConversation() {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doStartConversation());
+  }
+
+  private async doStartConversation() {
     this.responseGeneratedInTurn = false;
     this.resetTurnData();
     if (this.conversation.status !== 'initialized') {
@@ -1101,6 +1129,10 @@ export class ConversationRunner {
   }
 
   async resumeConversation() {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doResumeConversation());
+  }
+
+  private async doResumeConversation() {
     // Validate conversation can be resumed (should already be checked in prepareConversation, but double-check)
     if (this.conversation.status === 'finished' || this.conversation.status === 'failed' || this.conversation.status === 'aborted') {
       throw new InvalidOperationError(`Cannot resume conversation in state: ${this.conversation.status}`);
@@ -1133,6 +1165,10 @@ export class ConversationRunner {
    * the conversation_end event.
    */
   async executeEndLifecycleAction(): Promise<void> {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doExecuteEndLifecycleAction());
+  }
+
+  private async doExecuteEndLifecycleAction(): Promise<void> {
     const onConversationEndAction = this.conversationLifecycleActions.get(CONVERSATION_LIFECYCLE_ACTION_IDS.ON_END);
     if (!onConversationEndAction) return;
     logger.debug({ conversationId: this.conversation.id }, 'Executing __conversation_end lifecycle action (client command)');
@@ -1292,6 +1328,8 @@ export class ConversationRunner {
       // guard (status !== 'receiving_user_voice') to bail out early, swallowing the transcript.
       // processUserInput() — called from onRecognitionStopped — is the correct place to
       // transition to processing_user_input, mirroring how handleVadEndOfUtterance works.
+      // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+      this.stageData.asrProvider.markInputEnded(Date.now());
       await this.stageData.asrProvider.stop();
 
       logger.info({ conversationId: this.stageData.conversation.id }, `Stopped voice input for conversation ${this.stageData.conversation.id}`);
@@ -1370,6 +1408,10 @@ export class ConversationRunner {
    * @param sourceActionName - Name of the action that triggered this navigation, if any
    */
   async goToStage(stageId: string, isProcessingUserInput: boolean = false, sourceActionName?: string): Promise<void> {
+    return MonitoringContext.run({ ...this.monitoringContextData(), stageId }, () => this.doGoToStage(stageId, isProcessingUserInput, sourceActionName));
+  }
+
+  private async doGoToStage(stageId: string, isProcessingUserInput: boolean = false, sourceActionName?: string): Promise<void> {
     // Track nesting depth so only the outermost goToStage call resets the per-turn response guard.
     // This prevents chained on_enter stage jumps from each generating their own response.
     const isTopLevel = this.navigationDepth === 0;
@@ -1666,6 +1708,10 @@ export class ConversationRunner {
    * @returns Result of the action execution
    */
   async runAction(actionName: string, parameters: Record<string, any>): Promise<any> {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doRunAction(actionName, parameters));
+  }
+
+  private async doRunAction(actionName: string, parameters: Record<string, any>): Promise<any> {
     return await this.withMutex(async () => {
       // After acquiring the mutex, re-check: conversation may have become terminal while waiting in queue
       if (this.isConversationTerminal()) {
@@ -1758,6 +1804,10 @@ export class ConversationRunner {
    * @returns Result of the tool execution
    */
   async callTool(toolId: string, parameters: Record<string, any>): Promise<any> {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doCallTool(toolId, parameters));
+  }
+
+  private async doCallTool(toolId: string, parameters: Record<string, any>): Promise<any> {
     logger.info({ conversationId: this.conversation.id, toolId, parameterCount: Object.keys(parameters).length }, `Calling tool ${toolId}`);
 
     // Load the tool from the database
@@ -2091,6 +2141,8 @@ export class ConversationRunner {
       }
 
       try {
+        // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+        this.stageData.asrProvider.markInputEnded(Date.now());
         await this.stageData.asrProvider.stop();
         logger.info({ conversationId: this.stageData.conversation.id }, `VAD end-of-utterance, stopped ASR session for conversation ${this.stageData.conversation.id}`);
       } catch (error) {
@@ -2128,6 +2180,8 @@ export class ConversationRunner {
       this.bargeInSilenceTimer = null;
       logger.info({ conversationId: this.stageData.conversation.id }, '**VAD** Barge-in silence timeout reached, stopping ASR');
       try {
+        // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+        this.stageData.asrProvider?.markInputEnded(Date.now());
         await this.stageData.asrProvider?.stop();
         await this.triggerBargeInSilenceResponse();
       } catch (error) {
@@ -2188,6 +2242,8 @@ export class ConversationRunner {
         this.smartTurnContinueTimer = null;
         if (this.conversation.status === 'receiving_user_voice' && this.stageData.asrProvider) {
           try {
+            // P1-03: mark end-of-speech before stopping so the ASR base can compute eosToFinalMs
+            this.stageData.asrProvider.markInputEnded(Date.now());
             await this.stageData.asrProvider.stop();
             logger.info({ conversationId }, 'Smart Turn: continuation timeout, stopped ASR');
           } catch (error) {
@@ -2315,6 +2371,7 @@ export class ConversationRunner {
    */
   private async markAsFailed(reason: string): Promise<void> {
     this.conversation.status = 'failed';
+    this.updateActiveConversationsGauge('failed');
     this.conversation.statusDetails = reason;
     await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, 'failed', reason);
     logger.error({ conversationId: this.stageData.conversation.id, reason }, `Conversation ${this.stageData.conversation.id} marked as failed: ${reason}`);
@@ -2397,6 +2454,12 @@ export class ConversationRunner {
   }
 
   private async processUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
+    // P1-03: every turn (text/voice/barge-in/silence placeholder) runs in a turn-level
+    // monitoring context so all nested 3rd-party calls are attributed to this conversation.
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doProcessUserInput(userInput, userInputSource, asrEndMs));
+  }
+
+  private async doProcessUserInput(userInput: string, userInputSource: 'text' | 'voice', asrEndMs?: number) {
     // Handle barge-in: prepend accumulated partial transcript from previous ASR sessions.
     if (this.isBargeIn && this.bargeInPartialText) {
       const abortedOutputTurnId = this.turnData.outputTurnId || null;
@@ -2840,6 +2903,87 @@ export class ConversationRunner {
     logger.info({ conversationId: this.conversation.id, count: this.pendingFileAttachments.length }, 'Delivered file attachments');
   }
 
+  /**
+   * Creates the stage's LLM provider and, when the provider has fallbacks
+   * configured (P3-03), wraps it in a FailoverLlmProvider so setup-phase
+   * failures transparently try the rest of the chain. Chains are resolved
+   * once per conversation (the resolver caches by id+version).
+   */
+  private async createLlmProviderWithFailover(entity: typeof providers.$inferSelect, settings: LlmSettings): Promise<ILlmProvider> {
+    const primary = await this.llmProviderFactory.createProvider(entity, settings);
+    const chain = await this.fallbackResolver.resolveChain(entity.id);
+    if (chain.length <= 1) {
+      return primary;
+    }
+    return new FailoverLlmProvider(entity.id, primary, chain.slice(1), settings, {
+      factory: this.llmProviderFactory,
+      breakerRegistry: this.breakerRegistry,
+      fallbackEvents: this.fallbackEventService,
+      metrics: this.metricsRegistry,
+    });
+  }
+
+  /**
+   * P3-04 — creates the conversation TTS provider with its fallback chain
+   * (P3-02) attached. Fallback instances are created eagerly because the
+   * output-format compatibility check needs the instances; an incompatible
+   * fallback is skipped (pino warn + `fallback_incompatible_total`) and the
+   * chain becomes the compatible prefix.
+   */
+  private async createTtsProviderWithFailover(entity: typeof providers.$inferSelect, settings: TtsSettings): Promise<ITtsProvider> {
+    const primary = await this.ttsProviderFactory.createProvider(entity, settings);
+    const chain = await this.fallbackResolver.resolveChain(entity.id);
+    if (chain.length <= 1) {
+      return primary;
+    }
+    const prefix: typeof chain = [];
+    const precreated = new Map<string, ITtsProvider>();
+    const primaryFormat = primary.getOutputFormat();
+    for (const step of chain.slice(1)) {
+      const stepSettings = { ...settings, ...(step.settings ?? {}) } as TtsSettings;
+      const instance = await this.ttsProviderFactory.createProvider(step.provider, stepSettings);
+      if (instance.getOutputFormat() !== primaryFormat) {
+        this.metricsRegistry.inc('fallback_incompatible_total', { provider_id: step.provider.id });
+        logger.warn(
+          { primaryId: entity.id, fallbackProviderId: step.provider.id, primaryFormat, fallbackFormat: instance.getOutputFormat() },
+          'Failover (TTS): incompatible output format — skipping fallback and the rest of the chain',
+        );
+        break;
+      }
+      precreated.set(step.provider.id, instance);
+      prefix.push(step);
+    }
+    if (prefix.length === 0) {
+      return primary;
+    }
+    return new FailoverTtsProvider(entity.id, primary, prefix, settings, {
+      factory: this.ttsProviderFactory,
+      breakerRegistry: this.breakerRegistry,
+      fallbackEvents: this.fallbackEventService,
+      metrics: this.metricsRegistry,
+      precreatedInstances: precreated,
+    });
+  }
+
+  /**
+   * P3-04 — creates the conversation ASR provider with its fallback chain
+   * attached. ASR has no output-format constraint (the chain is type-checked
+   * by P3-02), so fallback instances stay lazy inside the wrapper.
+   */
+  private async createAsrProviderWithFailover(entity: typeof providers.$inferSelect, settings: unknown): Promise<IAsrProvider> {
+    const primary = await this.asrProviderFactory.createProvider(entity, settings);
+    const chain = await this.fallbackResolver.resolveChain(entity.id);
+    if (chain.length <= 1) {
+      return primary;
+    }
+    return new FailoverAsrProvider(entity.id, primary, chain.slice(1), settings, {
+      factory: this.asrProviderFactory,
+      breakerRegistry: this.breakerRegistry,
+      fallbackEvents: this.fallbackEventService,
+      metrics: this.metricsRegistry,
+    });
+  }
+
   private async generateResponse(context: ConversationContext, executionOutcome: ActionsExecutionOutcome) {
     // Generate a response when the action succeeded and a generate_response effect is set.
     // Note: shouldAbortConversation no longer suppresses generation — the abort is deferred
@@ -3118,7 +3262,8 @@ export class ConversationRunner {
       const fillerInputCap = fillerLimits?.inputTokensLimits?.filler;
       const { messages: truncatedFillerMessages, ...fillerTruncation } = truncateMessagesToTokenBudget(fillerMessages, fillerInputCap, fillerModel);
       logger.info({ conversationId: this.conversation.id, model: fillerModel, maxTokens: fillerMaxTokens, messageCount: truncatedFillerMessages.length }, 'Filler LLM payload');
-      const result = await fillerLlmProvider.generate(truncatedFillerMessages, fillerMaxTokens !== undefined ? { maxTokens: fillerMaxTokens } : undefined);
+      // P1-03: tag the call as llm.filler (nested in the turn context, which supplies attribution)
+      const result = await MonitoringContext.run({ operation: 'llm.filler' }, () => fillerLlmProvider.generate(truncatedFillerMessages, fillerMaxTokens !== undefined ? { maxTokens: fillerMaxTokens } : undefined));
       const text = extractTextFromContent(result.content).trim();
       if (text.length > 0) {
         this.lastFillerPrompt = renderedPrompt;
@@ -3264,8 +3409,28 @@ export class ConversationRunner {
     await this.receiveUserTextInput(placeholder);
   }
 
+  /**
+   * P1-03: keeps the global active_conversations gauge in sync with this runner's
+   * state transitions. Idempotent per runner (one +1 on the first non-terminal
+   * state, one -1 on the first terminal state).
+   */
+  private updateActiveConversationsGauge(state: ConversationState): void {
+    const TERMINAL: ConversationState[] = ['finished', 'aborted', 'failed'];
+    const terminal = TERMINAL.includes(state);
+    if (terminal) {
+      if (this.activeConversationsCounted) {
+        this.activeConversationsCounted = false;
+        getMetricsRegistry()?.changeGauge('active_conversations', undefined, -1);
+      }
+    } else if (!this.activeConversationsCounted) {
+      this.activeConversationsCounted = true;
+      getMetricsRegistry()?.changeGauge('active_conversations', undefined, 1);
+    }
+  }
+
   private async changeState(newState: ConversationState) {
     this.conversation.status = newState;
+    this.updateActiveConversationsGauge(newState);
     await this.conversationService.saveConversationState(this.conversation.projectId, this.conversation.id, newState);
 
     const TERMINAL_STATES = ['finished', 'aborted', 'failed'] as const;

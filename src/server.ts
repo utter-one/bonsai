@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { createServer } from 'http';
+import type { Server } from 'http';
 import { container } from 'tsyringe';
 import swaggerUi from 'swagger-ui-express';
 import qs from 'qs';
@@ -30,6 +31,7 @@ import { ProjectProviderUsageController } from './http/controllers/ProjectProvid
 import { ChannelCatalogController } from './http/controllers/ChannelCatalogController';
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
+import { MonitoringController } from './http/controllers/MonitoringController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
 import { FunnelController } from './http/controllers/FunnelController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
@@ -42,9 +44,19 @@ import { ScenarioRunExecutorService } from './services/testing/ScenarioRunExecut
 import { ImapInboundService } from './services/ImapInboundService';
 import { ProcessingDeferralService } from './services/ProcessingDeferralService';
 import { OAuth2TokenRefreshService } from './services/OAuth2TokenRefreshService';
+import { MetricsRegistry } from './services/monitoring/MetricsRegistry';
+import { CallLogger } from './services/monitoring/CallLogger';
+import { HealthCheckService } from './services/monitoring/HealthCheckService';
+import { RetentionService } from './services/monitoring/RetentionService';
+import { AlertRuleEngine } from './services/monitoring/AlertRuleEngine';
+import { ALERT_EVENT_PUBLISHER_TOKEN } from './services/monitoring/AlertEventPublisher';
+import { NotifyingPublisher } from './services/monitoring/notifiers/AlertNotifier';
 import { errorHandler } from './http/middleware/errorHandler';
+import { corsOptions } from './http/middleware/cors';
 import { optionalAuthMiddleware } from './http/middleware/auth';
 import { requestContextMiddleware } from './http/middleware/requestContext';
+import { requestOutcomeMiddleware, isSkippedRequestPath } from './http/middleware/requestOutcome';
+import { createMetricsHandler } from './http/middleware/metricsEndpoint';
 import { createApiRateLimiter } from './http/middleware/rateLimiter';
 import { getOpenAPISpec } from './swagger';
 import { setSpecProvider } from './services/VersionService';
@@ -149,13 +161,9 @@ export async function createApp(): Promise<express.Application> {
     xssFilter: true,
   }));
 
-  // CORS configuration
-  app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+  // CORS configuration — see src/http/middleware/cors.ts (CORS_ORIGIN allowlist /
+  // origin-echo default, credentials-compatible, X-Request-Id preflight + exposure)
+  app.use(cors(corsOptions()));
 
   // Health check endpoint - bypasses all middleware for reliability
   app.get('/health', (req, res) => {
@@ -165,8 +173,32 @@ export async function createApp(): Promise<express.Application> {
     });
   });
 
+  // Readiness endpoint (P1-05) — real DB probe with a 3 s timeout; unauthenticated and
+  // bypasses all middleware (same as /health). Single flight inside the service.
+  const healthCheckService = container.resolve(HealthCheckService);
+  app.get('/health/ready', async (req, res) => {
+    const readiness = await healthCheckService.checkReady();
+    if (readiness.ready) {
+      res.status(200).json({ status: 'ready' });
+    } else {
+      res.status(503).json({ status: 'unavailable', reason: readiness.reason });
+    }
+  });
+
+  // Prometheus scrape endpoint (P4-01) — disabled unless MONITORING_METRICS_TOKEN is set
+  // (token read per request). Registered before auth/rate-limit middleware, same as /health:
+  // it is not an API route and must not burn rate-limit budget or JWT.
+  app.get('/metrics', createMetricsHandler());
+
+  // Request outcome middleware (P1-04) — assigns req.id, counts metrics and logs the outcome on
+  // finish. Registered before the incoming-request log so that line can carry the requestId, and
+  // before the rate limiter so limiter rejections (429) are counted too.
+  app.use(requestOutcomeMiddleware);
+
   app.use((req, res, next) => {
-    logger.info({ method: req.method, url: req.url }, 'Incoming request');
+    if (!isSkippedRequestPath(req.path)) {
+      logger.info({ requestId: req.id, method: req.method, url: req.url }, 'Incoming request');
+    }
     next();
   });
 
@@ -240,6 +272,9 @@ export async function createApp(): Promise<express.Application> {
 
   const auditController = container.resolve(AuditController);
   auditController.registerRoutes(app);
+
+  const monitoringController = container.resolve(MonitoringController);
+  monitoringController.registerRoutes(app);
 
   const analyticsController = container.resolve(AnalyticsController);
   analyticsController.registerRoutes(app);
@@ -375,12 +410,24 @@ export async function createApp(): Promise<express.Application> {
     logger.warn({ error: err.message }, 'FireRedVAD failed to preload (non-fatal, will load on first use)');
   }
 
+  // Monitoring core (P1-02) — started first so instrumentation is available to everything below.
+  // P1-09 will wire stop() + flushNow() into the graceful shutdown hook.
+  container.resolve(MetricsRegistry).start();
+  container.resolve(CallLogger).start();
+
   container.resolve(ConversationTimeoutService).start();
   container.resolve(ScenarioRunExecutorService).start();
   container.resolve(BenchmarkExecutorService).start();
   container.resolve(ImapInboundService).start();
   container.resolve(OAuth2TokenRefreshService).start();
   container.resolve(ProcessingDeferralService).start();
+  healthCheckService.start();
+  container.resolve(RetentionService).start();
+
+  // P2-01: alert rule engine. The publisher is behind a DI token — P2-02
+  // registers the notifying wrapper (persist + webhook/email fan-out).
+  container.register(ALERT_EVENT_PUBLISHER_TOKEN, { useClass: NotifyingPublisher });
+  container.resolve(AlertRuleEngine).start();
 
   app.use(errorHandler);
 
@@ -390,7 +437,11 @@ export async function createApp(): Promise<express.Application> {
 /**
  * Starts the HTTP server and initializes WebSocket host
  */
-export async function startServer(port: number = 3000): Promise<void> {
+/**
+ * Boots the HTTP server (with WebSocket + Twilio voice hosts) and returns it so
+ * the caller can wire graceful shutdown (P1-09) around it.
+ */
+export async function startServer(port: number = 3000): Promise<Server> {
   const app = await createApp();
   const server = createServer(app);
 
@@ -404,4 +455,5 @@ export async function startServer(port: number = 3000): Promise<void> {
   server.listen(port, () => {
     logger.info({ port }, 'HTTP server started');
   });
+  return server;
 }

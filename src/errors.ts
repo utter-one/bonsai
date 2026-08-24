@@ -113,9 +113,13 @@ export class BenchmarkExecutionError extends Error {
  * Error thrown when a rate limit has been exceeded
  */
 export class TooManyRequestsError extends Error {
-  constructor(message: string) {
+  /** Which limiter rejected the request — internal only, never serialized into the response body. */
+  scope?: 'auth' | 'api';
+
+  constructor(message: string, scope?: 'auth' | 'api') {
     super(message);
     this.name = 'TooManyRequestsError';
+    this.scope = scope;
   }
 }
 
@@ -126,6 +130,23 @@ export class UserBannedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'UserBannedError';
+  }
+}
+
+/**
+ * P3-01 — thrown by `CircuitBreaker.beforeCall()` while the provider's breaker
+ * is open. Internal by design: the failover wrappers (P3-03/P3-04) catch it and
+ * move to the next chain member; on chain exhaustion it is replaced by the
+ * original provider error. It must never reach the global error handler raw —
+ * as a safety net the handler maps it to 502.
+ */
+export class CircuitOpenError extends Error {
+  providerId: string;
+
+  constructor(providerId: string) {
+    super(`Circuit breaker for provider '${providerId}' is open — call skipped`);
+    this.name = 'CircuitOpenError';
+    this.providerId = providerId;
   }
 }
 

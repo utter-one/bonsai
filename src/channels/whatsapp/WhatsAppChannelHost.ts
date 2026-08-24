@@ -14,6 +14,7 @@ import { WhatsAppConnection } from './WhatsAppConnection';
 import { whatsAppChannelProviderConfigSchema } from '../../services/providers/channel/WhatsAppChannelProvider';
 import { sessionSettingsSchema } from '../websocket/contracts/auth';
 import { logger } from '../../utils/logger';
+import { trackWebhookOutcome } from '../../services/monitoring/ProviderCallRecorder';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { CALInputMessage } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
@@ -225,6 +226,7 @@ export class WhatsAppChannelHost {
       return;
     }
     const { apiKey: rawApiKey, stageId, agentId, channelProviderId } = queryResult.data;
+    trackWebhookOutcome(res, channelProviderId, 'whatsapp');
 
     const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
     if (!apiKeyRecord || !apiKeyRecord.isActive) {
@@ -307,7 +309,7 @@ export class WhatsAppChannelHost {
       this.scheduleTimeout(existingSessionId, phoneKey);
       await this.dispatchCommand(existingSessionId, cmd, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
     } else {
-      const connection = new WhatsAppConnection(senderNumber, phoneNumberId, accessToken, this.sessionManager);
+      const connection = new WhatsAppConnection(senderNumber, phoneNumberId, accessToken, this.sessionManager, channelProviderId);
       const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
       const sessionId = this.sessionManager.registerSession(connection);
       const session = this.sessionManager.getSession(sessionId);

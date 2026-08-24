@@ -6,6 +6,7 @@ import { db } from "../../db";
 import { NotFoundError, InvalidOperationError } from "../../errors";
 import { llmContentSchema, LlmGenerationOptions, LlmMessage, MessageContent } from "../providers/llm/ILlmProvider";
 import { buildLlmUsage, llmUsageMetadataSchema } from '../../utils/llmUsage';
+import { MonitoringContext } from '../monitoring/MonitoringContext';
 import { TemplatingEngine } from "./TemplatingEngine";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import logger from "../../utils/logger";
@@ -103,7 +104,8 @@ export class ToolExecutor {
       const toolInputCap = toolLimits?.inputTokensLimits?.tool;
       const { messages: truncatedToolMessages, ...toolTruncation } = truncateMessagesToTokenBudget(messages, toolInputCap, toolModel);
       const toolOptions = { outputFormat: this.getOutputFormat(tool), ...(toolMaxTokens !== undefined ? { maxTokens: toolMaxTokens } : {}) };
-      const result = await llmProvider.generate(truncatedToolMessages, toolOptions);
+      // P1-03: tag the call as llm.tool (nested in the turn context, which supplies attribution)
+      const result = await MonitoringContext.run({ operation: 'llm.tool' }, () => llmProvider.generate(truncatedToolMessages, toolOptions));
       const endMs = Date.now();
       const durationMs = endMs - toolStartMs;
       return { success: true, toolId: tool.id, parameters, result: result.content, renderedPrompt, llmUsage: buildLlmUsage(result.usage, llmProviderEntity, tool.llmSettings?.model, toolTruncation), durationMs, startMs: toolStartMs, endMs };

@@ -2,6 +2,7 @@ import type { Session, SessionManager } from '../SessionManager';
 import type { IClientConnection } from '../IClientConnection';
 import type { CALOutputMessage } from '../messages';
 import { logger } from '../../utils/logger';
+import { getProviderCallRecorder } from '../../services/monitoring/ProviderCallRecorder';
 
 /** Meta Graph API base URL. */
 const GRAPH_API_BASE = 'https://graph.facebook.com/v17.0';
@@ -30,6 +31,8 @@ export class WhatsAppConnection implements IClientConnection {
     /** Bearer access token for the Meta Graph API. */
     private readonly accessToken: string,
     private readonly sessionManager: SessionManager,
+    /** P1-03: provider id for call-log attribution (passed by the channel host). */
+    private readonly providerId?: string,
   ) {}
 
   /**
@@ -71,6 +74,7 @@ export class WhatsAppConnection implements IClientConnection {
       text: { body },
     };
 
+    const startedAt = Date.now();
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -83,13 +87,31 @@ export class WhatsAppConnection implements IClientConnection {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Graph API responded with ${response.status}: ${errorText}`);
+        const error = new Error(`Graph API responded with ${response.status}: ${errorText}`) as Error & { status?: number };
+        error.status = response.status; // consumed by classifyThirdPartyError for the call-log row
+        throw error;
       }
 
       logger.info({ to: this.senderNumber, sessionId: this.session?.id }, 'WhatsApp message sent');
+      this.recordSend(Date.now() - startedAt, null);
     } catch (error) {
       logger.error({ error, to: this.senderNumber, sessionId: this.session?.id }, 'Failed to send WhatsApp message');
+      this.recordSend(Date.now() - startedAt, error);
       throw error;
     }
+  }
+
+  /** P1-03: one channel.send call-log row per outbound message. Never throws. */
+  private recordSend(durationMs: number, error: unknown): void {
+    if (!this.providerId) return;
+    getProviderCallRecorder().record({
+      providerId: this.providerId,
+      providerType: 'channel',
+      apiType: 'whatsapp',
+      operation: 'channel.send_message',
+      durationMs,
+      ok: error === null,
+      error: error ?? undefined,
+    });
   }
 }

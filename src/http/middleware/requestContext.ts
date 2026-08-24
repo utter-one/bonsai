@@ -27,7 +27,7 @@ export function requestContextMiddleware(req: Request, res: Response, next: Next
       roles: req.user.roles,
       ip: (req.ip || req.socket.remoteAddress || 'unknown'),
       userAgent: req.get('user-agent') || 'unknown',
-      requestId: generateId(ID_PREFIXES.REQUEST),
+      requestId: req.id ?? generateId(ID_PREFIXES.REQUEST),
       timestamp: new Date(),
     };
   }

@@ -16,9 +16,11 @@ Single-package Express 5.x backend (no monorepo). Entry: `src/index.ts`. App fac
 
 | Directory | Purpose |
 |---|---|
-| `src/http/controllers/` | REST API controllers (43 controllers) |
+| `src/http/controllers/` | REST API controllers (45 controllers) |
 | `src/http/contracts/` | Zod schemas for HTTP request/response validation + OpenAPI |
 | `src/services/` | Business logic (one per domain entity) |
+| `src/services/monitoring/` | Monitoring module: `CallLogger`, `MetricsRegistry`, `HealthCheckService`, `AlertRuleEngine`, `RetentionService`, `MonitoringConfigService`, circuit breakers + fallback wrappers (see `PROPOSAL-production-monitoring.md`) |
+| `src/services/monitoring/notifiers/` | Alert notifiers: webhook, email, and the shared `ChannelNotifier` (telegram/twilio_sms/whatsapp strategy table) |
 | `src/channels/` | Communication channels: websocket, webrtc, twilio-voice, twilio-messaging, whatsapp, telegram |
 | `src/channels/websocket/contracts/` | WebSocket message Zod schemas |
 | `src/db/schema.ts` | Drizzle ORM schema — single source of truth for DB |
@@ -85,7 +87,7 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 
 ### Middleware Chain (in order of registration)
 
-1. `/health` — unauthenticated, bypasses all middleware
+1. `/health` + `/health/ready` — unauthenticated, bypass all middleware (`/health/ready` = DB-backed readiness probe)
 2. Swagger UI (`/api-docs`) + OpenAPI JSON (`/openapi.json`) + WebSocket contracts JSON (`/websocket-contracts.json`)
 3. `VersionController` — registered before auth middleware (unauthenticated system endpoint)
 4. `SecretsManagerRegistry` bootstrap — must run before any controller using ProviderService/EnvironmentService
@@ -94,7 +96,7 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 7. `createApiRateLimiter()` — keyed by authenticated operator ID, falls back to IP
 8. All controllers registered via `container.resolve(X).registerRoutes(app)`
 9. Channel hosts register routes: WebRTC, Twilio Messaging, Twilio Voice, WhatsApp, Telegram
-10. Background services start: `ConversationTimeoutService.start()`, `ScenarioRunExecutorService.start()`
+10. Background services start: `ConversationTimeoutService.start()`, `ScenarioRunExecutorService.start()`, `BenchmarkExecutorService.start()`, `ImapInboundService.start()`, `OAuth2TokenRefreshService.start()`, `ProcessingDeferralService.start()`
 11. Global `errorHandler` middleware
 
 ### Express Configuration
@@ -102,15 +104,24 @@ Everything wires through the **tsyringe IoC container**. Controllers are registe
 - **JSON body limit**: 10mb (accommodates migration import bundles)
 - **Query parser**: uses `qs` with `allowDots: true, depth: 10` for nested query params
 - **Trust proxy**: enabled by default (`trust proxy: 1`), set `TRUST_PROXY=false` to disable
-- **CORS**: origin from `CORS_ORIGIN` env var (default `*`), credentials enabled
+- **CORS** (`src/http/middleware/cors.ts`): `CORS_ORIGIN` env var is a comma-separated origin allowlist; unset → every request's origin is echoed back (credentials-compatible — a literal `*` breaks browsers using `credentials: 'include'`). `allowedHeaders` includes `X-Request-Id` (preflight); `exposedHeaders` exposes `X-Request-Id`, `Retry-After`, `RateLimit-*` so browser JS can read them
 
 ### Background Services
 
-Two services run continuously after startup:
-- `ConversationTimeoutService` — monitors conversation timeouts
+Nine services run continuously after startup (all resolved from the IoC container and started via `.start()` in `server.ts`):
+- `ConversationTimeoutService` — monitors conversation timeouts (node-cron, every minute)
 - `ScenarioRunExecutorService` — executes scenario runs
+- `BenchmarkExecutorService` — executes benchmark runs
+- `ImapInboundService` — polls IMAP inboxes
+- `OAuth2TokenRefreshService` — refreshes OAuth2 channel tokens
+- `ProcessingDeferralService` — re-processes deferred conversations
+- `HealthCheckService` — monitoring: db/process/background-service/provider health checks every `MONITORING_HEALTH_INTERVAL_MS` (default 60s) into `health_checks` + gauges; probes llm (`enumerateModels()`/1-token `generate()`), storage (`list`), ASR/TTS (`ping()` — zero-cost liveness endpoints, P1-05b) per `monitoring_config.probeSettings` (`llmProbe`/`asrProbe`/`ttsProbe` + cooldown; env `MONITORING_HEALTH_PROBES=off` is a hard kill switch); providers without a free liveness endpoint (Azure ASR/TTS, Cartesia TTS) fall back to `provider_call_logs` inference; serves `GET /health/ready`
+- `RetentionService` — monitoring: hourly rollup of `provider_call_logs` → `provider_call_stats_hourly` (`0 * * * *`) + daily purge of retention-aged rows at 03:00 (`0 3 * * *`); `retentionDays` from `monitoring_config`
+- `AlertRuleEngine` — monitoring: evaluates the built-in alert rules (provider down/degraded/rate-limited/auth, db down/pool, 429 spikes, streaming health, etc.) on `setInterval` (`MONITORING_ALERT_ENGINE_INTERVAL_MS`, default from `monitoring_config.alerting.engineIntervalMinutes`); anti-flap state machine (pending→firing→resolved, cooldown, maxUnresolvedHours); persists to `alert_events` via the `AlertEventPublisher` DI token (`NotifyingPublisher` since P2-02 — persists via `LogAndPersistPublisher`, then fans out to the notifiers from `monitoring_config` — webhook, email, and a shared `ChannelNotifier` (strategy table) for telegram/twilio_sms/whatsapp — with a 15 s cap; delivery results land in `alert_events.notifications`); windowed counter reads via an in-memory delta ring (cumulative `MetricsRegistry` counters are not windowable directly)
 
-Both are resolved from the IoC container and started via `.start()`.
+### Graceful Shutdown (P1-09)
+
+`src/index.ts` installs `installShutdownHandlers()` (from `src/utils/shutdown.ts`) after `startServer()`. On the first `SIGTERM`/`SIGINT` the sequence runs in order: stop all eight background services → `server.close()` + `closeIdleConnections()` (not awaited yet) → close WebSocket + Twilio voice media-stream sockets with 1001 "going away" (in-flight turns are aborted via the normal disconnect → `runner.cleanup()` path) → grace drain up to `SHUTDOWN_GRACE_MS` (default 10 s, polling every 100 ms) with force-terminate of stragglers → await the `server.close()` callback → per logger: bounded (5 s) flush, `stop()`, `await settled()` (no in-flight insert can race the pool close), final flush → log remaining pending counts honestly → `endPool()` → `exit(0)`. A second signal forces `exit(1)` immediately; a 30 s hard timeout (from signal receipt) forces `exit(1)` if any step hangs. WebRTC sessions are not drained — the final `exit(0)` kills them (their ref'd audio-scheduler intervals would otherwise keep the process alive). Handlers are installed only in `src/index.ts`, never in `createApp()` — the e2e/integration suites don't trigger them.
 
 ## Coding Conventions (detailed in `.github/copilot-instructions.md`)
 
@@ -191,15 +202,25 @@ Required: `DB_CONNECTION_STRING`, `JWT_SECRET` (min 32 chars). See `.env.example
 Optional but important:
 - `MASTER_ENCRYPTION_KEY` — enables automatic migration of plain-text secrets in provider configs/environment passwords on startup; startup **aborts** if migration fails
 - `TRUST_PROXY=false` — disables trust proxy (default: enabled)
-- `CORS_ORIGIN` — CORS allowed origin (default: `*`)
+- `CORS_ORIGIN` — comma-separated CORS origin allowlist (unset: all origins allowed, request origin echoed back)
 - `LOG_LEVEL` — pino log level (default: `info`)
 - `WS_MAX_PAYLOAD_BYTES` — WebSocket max payload size (default: 10MB)
 - `RATE_LIMIT_API_MAX` — max API requests per minute (default: 300; set to 10000+ for tests)
+- `SHUTDOWN_GRACE_MS` — graceful-shutdown drain window for WebSocket/voice sockets (default: 10000; see Graceful Shutdown)
 
 **Test environment vars** (set automatically by `tests/setup.ts`):
 - `NODE_ENV=test` — suppresses DB connection teardown noise
 - `LOG_LEVEL=silent` — keeps Mocha stdout clean
 - `RATE_LIMIT_API_MAX=10000` — prevents 429s during batch test runs
+- `MONITORING_HEALTH_INTERVAL_MS=1000` — fast health loop so `health_checks` rows appear within e2e tests
+- `MONITORING_HEALTH_PROBES=off` — no live provider probes in tests (fake provider configs would hit real APIs)
+- `MONITORING_ALERT_ENGINE_INTERVAL_MS=1000` — fast alert-engine loop so alert e2e tests converge quickly
+
+**Monitoring test conventions:**
+- **Dual module graph (tsx/ESM vs CJS)**: app-world singletons can only be reached through the `globalThis.__TEST_*` seams in `tests/setup.ts` (e.g. `__TEST_METRICS_REGISTRY__`, `__TEST_RATE_LIMITS__`, `__TEST_MONITORING_CONFIG__`, `__TEST_FALLBACK_RESOLVER__`, `__TEST_FAILOVER_PROVIDER__`, `__TEST_ACCESS_TOKEN__`). In-memory metric series survive `resetDatabase()` — filter assertions to the exact `(name, labels)` series you created, and use **deltas** for counter/rate-limit assertions.
+- **Fake-provider double pattern**: failover e2e tests (LLM/TTS/ASR/storage) create `providers` rows pointing at fake/stub implementations registered in the factory test seam instead of real APIs; the ASR base `stop()` does not flush the session row — call `wrapper.cleanup()` to flush.
+- **E2E health-history fixtures must use a check name the live HealthCheckService never writes** (e.g. `fixture_probe`) — the service ticks every second in tests.
+- **Alert e2e tests must poll** (`waitForAlerts`-style helpers) — the engine's publisher fire/resolve is fire-and-forget, and the app-world engine's 1 s background interval can interleave deliveries; assert on the specific rule's delivery, not global receiver emptiness.
 
 ## Setup Gotcha
 

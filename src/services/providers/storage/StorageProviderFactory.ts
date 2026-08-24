@@ -2,6 +2,7 @@ import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { IStorageProvider } from './IStorageProvider';
+import { StorageProviderBase } from './StorageProviderBase';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
 
 export type StorageProviderApiType = 's3' | 'azure-blob' | 'gcs' | 'local';
@@ -53,6 +54,12 @@ export class StorageProviderFactory {
 
       default:
         throw new Error(`Unsupported storage provider API type: ${provider.apiType}`);
+    }
+
+    // Stamp provider identity for call-log attribution (P1-03)
+    if (instance instanceof StorageProviderBase) {
+      instance.providerId = provider.id;
+      instance.providerApiType = provider.apiType;
     }
 
     return instance;

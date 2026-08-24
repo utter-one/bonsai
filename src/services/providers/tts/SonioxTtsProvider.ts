@@ -3,6 +3,7 @@ import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { SonioxNodeClient } from '@soniox/node';
 import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
+import { httpPing } from '../providerPing';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import type { AudioFormat } from '../../../types/audio';
@@ -68,6 +69,23 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     logger.info(`[Soniox TTS] Initialized with audio format: ${this.audioFormat}, sample rate: ${this.sampleRate}`);
   }
 
+  /**
+   * Zero-cost liveness probe (P1-05b): lists models from the Soniox management API.
+   * The management REST base is global — only the realtime endpoints are region-scoped.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.soniox.com/v1/models', {
+        Authorization: `Bearer ${this.config.apiKey}`,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
   getSupportedFormats(): AudioFormat[] {
     return ['pcm_8000', 'pcm_16000', 'pcm_22050', 'pcm_24000', 'pcm_44100', 'mulaw', 'alaw', 'mp3', 'opus', 'flac', 'aac'];
   }
@@ -81,7 +99,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     return requestedFormat;
   }
 
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.textBuffer = '';
@@ -150,7 +168,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     this.handleGenerationStarted();
   }
 
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.stream) {
       logger.warn(`[Soniox TTS] No active stream to end`);
       return;
@@ -180,7 +198,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     }
   }
 
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     if (!this.stream) {
       logger.info(`[Soniox TTS] No active stream to cancel`);
       return;
@@ -204,7 +222,7 @@ export class SonioxTtsProvider extends TtsProviderBase<SonioxTtsProviderConfig, 
     }
   }
 
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.addText(text);
     } else {

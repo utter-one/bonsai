@@ -131,5 +131,19 @@ export function getPoolRef(): Pool {
   return getPool();
 }
 
+/**
+ * Closes the pool and releases all connections (graceful shutdown, P1-09).
+ * Idempotent: no-ops when the pool was never created or already ended.
+ * Nulls the lazy refs so getDb() cannot resurrect the pool mid-shutdown.
+ */
+export async function endPool(): Promise<void> {
+  if (!_pool) return;
+  const pool = _pool;
+  _pool = null;
+  _db = null;
+  await pool.end();
+  logger.info('Database pool closed');
+}
+
 // Export schema for use in other modules
 export * from './schema';
