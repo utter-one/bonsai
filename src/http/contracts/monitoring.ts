@@ -207,6 +207,9 @@ export const healthCheckItemSchema = z
 export const healthSnapshotResponseSchema = z.object({
   checkedAt: z.coerce.date().nullable().describe('When the last check cycle ran (null before the first cycle)'),
   checks: z.array(healthCheckItemSchema).describe('All checks from the last completed cycle'),
+  overall: z
+    .enum(['ok', 'degraded', 'down', 'unknown'])
+    .describe('Global health status: the worst non-unknown check status (down > degraded > ok). Unknown checks (never ticked, no call data) are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no checks or all are unknown'),
 });
 
 export type HealthCheckItem = z.infer<typeof healthCheckItemSchema>;

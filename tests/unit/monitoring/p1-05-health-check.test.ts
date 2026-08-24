@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
 import { HeartbeatRegistry } from '../../../src/services/monitoring/HeartbeatRegistry';
-import { HealthCheckService, type HealthCheckResult } from '../../../src/services/monitoring/HealthCheckService';
+import { HealthCheckService, overallHealthStatus, type HealthCheckResult, type HealthCheckStatus } from '../../../src/services/monitoring/HealthCheckService';
 import { MetricsRegistry, type MetricSampleRow } from '../../../src/services/monitoring/MetricsRegistry';
 import type { LlmProviderFactory } from '../../../src/services/providers/llm/LlmProviderFactory';
 import type { StorageProviderFactory } from '../../../src/services/providers/storage/StorageProviderFactory';
@@ -459,5 +459,44 @@ describe('HealthCheckService (P1-05)', () => {
     expect(calls).to.have.length(1); // probe ran — default on
     if (previous === undefined) delete process.env.MONITORING_HEALTH_PROBES;
     else process.env.MONITORING_HEALTH_PROBES = previous;
+  });
+
+  it('snapshot.overall: worst non-unknown status — unknown checks are ignored', async () => {
+    const { service, hb } = makeService();
+    hb.declareInterval('imap-inbound', 60_000); // known service, never ticked → unknown
+
+    await service.runNow();
+    // unknowns present (unticked services), no down → healthy overall
+    expect(byName(service.persisted[0])['service_heartbeat:imap-inbound']?.status).to.equal('unknown');
+    expect(service.getSnapshot().overall).to.equal('ok');
+
+    service.poolStats = { poolTotal: 5, poolIdle: 0, poolWaiting: 2 };
+    await service.runNow();
+    expect(service.getSnapshot().overall).to.equal('degraded');
+
+    service.pingDbMode = 'error';
+    await service.runNow();
+    expect(service.getSnapshot().overall).to.equal('down');
+  });
+});
+
+describe('overallHealthStatus (global status aggregation)', () => {
+  const check = (status: HealthCheckStatus): HealthCheckResult => ({ name: 'check', status });
+
+  it('ignores unknown checks — a healthy system with not-yet-known checks reports ok', () => {
+    expect(overallHealthStatus([check('ok'), check('ok'), check('unknown')])).to.equal('ok');
+  });
+
+  it('down wins over degraded and ok', () => {
+    expect(overallHealthStatus([check('ok'), check('degraded'), check('down'), check('unknown')])).to.equal('down');
+  });
+
+  it('degraded wins over ok', () => {
+    expect(overallHealthStatus([check('ok'), check('degraded'), check('unknown')])).to.equal('degraded');
+  });
+
+  it('no checks, or all unknown, → unknown', () => {
+    expect(overallHealthStatus([])).to.equal('unknown');
+    expect(overallHealthStatus([check('unknown'), check('unknown')])).to.equal('unknown');
   });
 });

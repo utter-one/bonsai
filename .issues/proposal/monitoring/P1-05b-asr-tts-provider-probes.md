@@ -3,7 +3,7 @@ title: "P1-05b — ASR/TTS provider liveness probes (closing the provider-monito
 severity: proposal
 status: resolved
 created: 2026-08-19
-updated: 2026-08-20
+updated: 2026-08-24
 assignee: ""
 tags: [monitoring, spec, phase-1]
 ---
@@ -41,12 +41,12 @@ All 13 ASR/TTS provider implementations are session/synthesis clients (WebSocket
 
 | `apiType` | Free probe | Endpoint | Auth (reuses stored config) | Notes |
 |---|---|---|---|---|
-| `assemblyai` | ✅ | `GET https://api.assemblyai.com/v2/transcripts?page_size=1` (EU: `api.eu.assemblyai.com`) | `Authorization: <apiKey>` (no Bearer prefix) | REST base differs from the streaming base the session client uses (`streaming.assemblyai.com`) — ping uses raw `fetch`, not the session SDK instance |
+| `assemblyai` | ✅ | `GET https://api.assemblyai.com/v2/transcript?limit=1` (EU: `api.eu.assemblyai.com`) | `Authorization: <apiKey>` (no Bearer prefix) | REST base differs from the streaming base the session client uses (`streaming.assemblyai.com`) — ping uses raw `fetch`, not the session SDK instance |
 | `azure` | ❌ | — | — | `microsoft-cognitiveservices-speech-sdk`; subscription key only validates when a recognition session runs (cost/quota). **Inference-only** |
 | `deepgram` | ✅ | `GET https://api.deepgram.com/v1/projects?limit=1` | `Authorization: Token <apiKey>` | Key-management endpoint, free, no side effects |
 | `elevenlabs` | ✅ | `GET https://api.elevenlabs.io/v1/models` | `xi-api-key: <apiKey>` | Free; same key as the ElevenLabs TTS provider |
 | `soniox` | ✅ | `GET https://api.soniox.com/v1/models` | `Authorization: Bearer <apiKey>` | Free; same key as the Soniox TTS provider |
-| `speechmatics` | ✅ | `GET https://usa.asr.api.speechmatics.com/v2/jobs` (region-mapped: `asr.api…` EU / `eu1.asr.api…` EU1 / `usa.asr.api…` USA) | `Authorization: Bearer <JWT>` — reuse existing `createSpeechmaticsJWT` (region + ttl already parameterized) | List-jobs endpoint, free |
+| `speechmatics` | ✅ | `GET {regionBase}/v2/jobs` (region-mapped to the all-customer production hosts: `eu1.asr.api.speechmatics.com` EU / `us1.asr.api.speechmatics.com` USA / `au1.asr.api.speechmatics.com` AU — see implementation note 7 for the 2026-08-24 correction of the legacy hosts) | `Authorization: Bearer <JWT>` — reuse existing `createSpeechmaticsJWT` (region + ttl already parameterized) | List-jobs endpoint, free |
 
 ### TTS (7)
 
@@ -77,11 +77,11 @@ All 13 ASR/TTS provider implementations are session/synthesis clients (WebSocket
 
 | Provider | `ping()` body | Transport |
 |---|---|---|
-| AssemblyAI ASR | `GET {restBase}/v2/transcripts?page_size=1`, restBase = `api.eu.assemblyai.com` when `config.region === 'eu'` else `api.assemblyai.com` | raw `fetch` (session SDK instance is pinned to the streaming base — do not reuse it) |
+| AssemblyAI ASR | `GET {restBase}/v2/transcript?limit=1`, restBase = `api.eu.assemblyai.com` when `config.region === 'eu'` else `api.assemblyai.com` | raw `fetch` (session SDK instance is pinned to the streaming base — do not reuse it) |
 | Deepgram ASR + TTS | `GET https://api.deepgram.com/v1/projects?limit=1`, header `Authorization: Token <key>` | raw `fetch` |
 | ElevenLabs ASR + TTS | `GET https://api.elevenlabs.io/v1/models`, header `xi-api-key: <key>` | raw `fetch` |
 | Soniox ASR + TTS | `GET https://api.soniox.com/v1/models`, header `Authorization: Bearer <key>` (config also carries `region` us/eu/jp — verify at impl time whether the REST base is region-scoped) | raw `fetch` |
-| Speechmatics ASR | `GET {regionBase}/v2/jobs` with region-mapped base (build the REST base from the provider's existing `getAuthRegion()` output: eu → `asr.api.speechmatics.com`, usa → `usa.asr.api.speechmatics.com`, au → confirm at impl time) + `Authorization: Bearer <createSpeechmaticsJWT({ type: 'batch', apiKey, region, ttl: 60 })>` — `@speechmatics/auth` package, already a dependency | raw `fetch` |
+| Speechmatics ASR | `GET {regionBase}/v2/jobs` with region-mapped base (per the docs' supported-endpoints table, verified 2026-08-24: eu → `eu1.asr.api.speechmatics.com`, us → `us1.asr.api.speechmatics.com`, apac → `au1.asr.api.speechmatics.com`) + `Authorization: Bearer <createSpeechmaticsJWT({ type: 'batch', apiKey, region, ttl: 60 })>` — `@speechmatics/auth` package, already a dependency | raw `fetch` |
 | OpenAI TTS | `GET https://api.openai.com/v1/models`, header `Bearer <key>` | raw `fetch` |
 | Polly TTS | `pollyClient.send(new DescribeVoicesCommand({}))` after `init()` | AWS SDK (no network until send) |
 
@@ -121,11 +121,13 @@ Every `ping()` wraps its call in `this.recordPingCall(<operation>, startedAt, er
 ## Implementation notes (2026-08-19)
 
 1. **Speechmatics batch auth mints a temp key — 2 fetches, not 1.** `createSpeechmaticsJWT(..., 'batch')` requires a `clientRef` (SDK validation) and POSTs to the management platform (`/api_keys?type=batch`) to mint a short-TTL temp key; the Jobs API GET then uses that temp key as `Authorization: Bearer <temp>`. Still free and side-effect-free (temp key, ~15 s TTL), but the probe performs two HTTP calls. Unit tests stub the mint call and assert both requests.
-2. **AssemblyAI endpoint correction.** The spec draft suggested `GET /v2/projects` or a settings call; the implementation uses `GET {base}/v2/transcripts?page_size=1` — a cheap account-scoped listing that requires only the raw API key (AssemblyAI's `Authorization` header carries the raw key, no `Bearer` prefix). EU deployments use the `api.eu.assemblyai.com` base.
+2. **AssemblyAI endpoint correction (2026-08-24: singular path).** The spec draft suggested `GET /v2/projects` or a settings call; the implementation uses `GET {base}/v2/transcript?limit=1` — a cheap account-scoped listing that requires only the raw API key (AssemblyAI's `Authorization` header carries the raw key, no `Bearer` prefix). EU deployments use the `api.eu.assemblyai.com` base. Originally implemented as `GET /v2/transcripts?page_size=1` (plural), which AssemblyAI does not serve — verified 2026-08-24: the plural path returns a generic `404: Not Found` in **both** regions (with and without the `Authorization` header), while the singular `GET /v2/transcript` returns the proper JSON `401 {"error": "Authentication error, ..."}` with an invalid key (route exists, auth checked first) → corrected to the documented list endpoint `GET /v2/transcript` with its documented `limit` parameter. With a valid key it returns 200 (empty list for a fresh account), so the probe is still zero-cost and side-effect-free.
 3. **Polly client is lazily built inside `ping()`.** `init()` is not called by the health service; `ping()` constructs the SDK client on first use (and reuses it across cycles via the shared factory instance) and sends `DescribeVoicesCommand` with an empty input. Unit tests inject a stub client to assert the command + empty input without AWS SDK network calls.
 4. **`probesEnabled` is captured at construction.** `MONITORING_HEALTH_PROBES` is read once in the `HealthCheckService` constructor (not per pass), so tests must set the env var *before* constructing the service — a per-pass read would allow mid-flight env mutation the service never supports.
 5. **Unit runner has no chai-as-promised.** Rejection assertions use a local `expectRejection()` helper (await → catch → return reason) rather than `.to.be.rejectedWith` — the unit runner context does not load chai-as-promised, and unhandled rejections from bare `.to.be.rejected` crash the suite.
 6. **Factory probe configs.** `createProviderForProbing` delegates to `createProvider(provider, {})` for ASR (all ASR settings schemas accept `{}`) and `createProvider(provider, { provider: provider.apiType } as TtsSettings)` for TTS (TTS settings schemas require the `provider` literal, which equals `apiType` for all 7 TTS providers). Secrets are resolved by the factory as usual; no secrets in CI, so probes only ever run against real configs in production.
+7. **Speechmatics endpoint correction (2026-08-24: legacy hosts rot).** Verified against the docs' "Supported endpoints" tables (`docs.speechmatics.com/get-started/authentication`, fetched 2026-08-24) and live DNS: the batch probe's US base `usa.asr.api.speechmatics.com` **no longer resolves in DNS** (the probe would have been permanently `down` for US-region providers), and the EU base `asr.api.speechmatics.com` is a legacy host absent from the supported table. Corrected to the all-customer production hosts: `eu1.asr…` (EU), `us1.asr…` (US), `au1.asr…` (AU, unchanged; `eu2`/`us2` are enterprise-only and were never valid defaults). The same audit found the realtime (real-work) WebSocket mapping used hosts not in the supported table — `eu2.rt…` (EU, enterprise-only), `neu.rt…` (US, undocumented) and `au.rt…` (**no longer resolves in DNS** → APAC conversations could not connect at all). Corrected to the documented all-customer hosts: `eu.rt…` (EU), `us.rt…` (US), `global.rt…` (APAC — there is no dedicated AU realtime host; the global router pins to the nearest region). Caveat: an enterprise contract pinned to EU2/US2 needs its account manager's endpoint (docs: contact support) — the single `us|eu|apac` config cannot express that in v1.
+8. **Probe semantics decision (2026-08-24, approved by user — "Option A").** The streaming-ASR probes deliberately check the vendor's **REST control plane** (account/key liveness), not the WebSocket **data plane** a conversation uses (all 5 streaming ASR providers; AssemblyAI even uses a different host entirely). A WS-handshake probe was evaluated and rejected: it consumes session-creation quota (per-minute session rate limits are common and a 60 s × N-providers cadence could trip them → false `down`), and it still would not catch first-audio-frame failures. Data-plane liveness is covered by the `provider-down` call-log + breaker branches (which need no probe and fire from observed failures whenever traffic exists) and by P3-04 failover; the probe branch exists for the idle-provider case (revoked key / suspended account). Documented in `docs/guide/monitoring.md` ("What the provider probes actually measure").
 
 ## Tests
 

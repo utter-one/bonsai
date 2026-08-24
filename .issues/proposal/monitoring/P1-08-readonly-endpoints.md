@@ -3,7 +3,7 @@ title: "P1-08 — Read-only MonitoringController endpoints + `SYSTEM_MONITORING`
 severity: proposal
 status: resolved
 created: 2026-08-17
-updated: 2026-08-19
+updated: 2026-08-24
 assignee: ""
 tags: [monitoring, spec, phase-1]
 ---
@@ -36,7 +36,7 @@ Controller = `@singleton()`, `static getOpenAPIPaths(): RouteConfig[]`, `registe
 
 | Endpoint | Behavior |
 |---|---|
-| `GET /api/monitoring/health` | `HealthCheckService.getSnapshot()` — `{ checkedAt, checks: [{ name, status, latencyMs?, detail? }] }` |
+| `GET /api/monitoring/health` | `HealthCheckService.getSnapshot()` — `{ checkedAt, checks: [{ name, status, latencyMs?, detail? }], overall }` — `overall` = global status, worst non-`unknown` check (`down` > `degraded` > `ok`); `unknown` checks are ignored (added 2026-08-24, see implementation note 8) |
 | `GET /api/monitoring/health/history` | `listParamsSchema` (offset/limit/textSearch/orderBy/filters) + dedicated `check` (check name) and `status` filters over `health_checks`, newest first, paginated `{ items, total }` |
 | `GET /api/monitoring/providers` | Per provider row: `{ id, name, providerType, apiType, probeStatus (from snapshot), rolling: { windowMinutes: 15, calls, okRate, p95DurationMs, topErrorCodes[] } }` — rolling from `provider_call_logs` |
 | `GET /api/monitoring/provider-calls` | `listParamsSchema` + filters: `providerId`, `providerType`, `apiType`, `model`, `projectId`, `conversationId`, `ok` (bool), `errorCode`, `statusHttp`, `durationMs`, `fallbackProviderId`, `createdAt` (date range via the standard `filters[createdAt][op]=between&filters[createdAt][value][0]=…&filters[createdAt][value][1]=…` operators) + `textSearch` over operation/model/providerId/conversationId; returns rows with `metrics` (variant streaming fields) |
@@ -99,5 +99,6 @@ Implementation findings (pitfalls hit and fixed during implementation — kept f
 5. **`percentile_cont` is float arithmetic** — hand-computed expected values (e.g. 3850) come back as 3849.9999…; assert with `closeTo(…, 1e-6)`.
 6. **`between` filters from query params** use the house `filters[field][op]=between&filters[field][value][0]=…&filters[field][value][1]=…` form (qs parses the `value` array); `filters[field][between]=a,b` fails Zod (object without `op`).
 7. **Test-env provider status is inferred** (`MONITORING_HEALTH_PROBES=off`): a provider with a recent successful call log flips its `provider:<id>` check to `ok` within one 1-second cycle — asserted in the e2e; no probe traffic contaminates the `provider_call_logs` fixtures.
+8. **`overall` global status added (2026-08-24).** The snapshot originally exposed only the per-check list, so consumers (Console) had to derive a global status themselves — and a worst-of reduction that counts `unknown` as a real status made a completely healthy system report globally `unknown` whenever any check was not yet known (never-ticked background services, providers with no recent call data to infer from). Fix: `HealthCheckService` now computes `overall` per cycle via the exported pure helper `overallHealthStatus(checks)` — worst of the **non-`unknown`** checks (`down` > `degraded` > `ok`); `unknown` only when there are no checks or all are unknown (e.g. before the first cycle). Per-check `unknown` values and their `detail.reason` stay in `checks`, so the *why* remains visible. Additive contract change (`healthSnapshotResponseSchema.overall`); the rule engine's `HealthSnapshot` type (now re-exported from `HealthCheckService`) picks the field up structurally with no behavior change.
 
 Gates: `npm run build` 0, unit 613, e2e 969 (949 + 20), integration 35.

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { MetricsSnapshot } from './MetricsRegistry';
-import type { HealthCheckResult } from './HealthCheckService';
+import type { HealthSnapshot } from './HealthCheckService';
+
+export type { HealthSnapshot };
 import type { RateLimitRejectionKeyStats } from '../../http/middleware/rateLimiter';
 
 /**
@@ -14,11 +16,6 @@ import type { RateLimitRejectionKeyStats } from '../../http/middleware/rateLimit
  */
 
 export type RuleSeverity = 'info' | 'warning' | 'critical';
-
-export type HealthSnapshot = {
-  checkedAt: Date | null;
-  checks: HealthCheckResult[];
-};
 
 /**
  * Per-provider rolling-window stats aggregated from `provider_call_logs`
