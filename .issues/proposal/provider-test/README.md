@@ -1,44 +1,51 @@
----
-title: "Provider Connection Testing — Issue Specs (index)"
-severity: proposal
-status: open
-created: 2026-08-24
-updated: 2026-08-24
-assignee: ""
-tags: [providers, spec, index]
----
+# Provider connection testing — issue index
 
-# Provider Connection Testing — Issue Specs
+On-demand "test connection" for every provider type, exercising the
+provider's **own communication protocol** (same code path as the main
+functionality) to verify authentication and availability.
 
-Issue-level breakdown of `PROPOSAL-provider-test-connection.md` (repo root).
-On-demand "test connection" for each provider type, using the **same
-communication protocol as the provider's main functionality** (the provider's
-own production code path) to verify authentication and availability.
+Proposal: [`PROPOSAL-provider-test-connection.md`](../../PROPOSAL-provider-test-connection.md)
 
-## Conventions
+## Specs
 
-- IDs: `TPC-{nn}` — matches the filename prefix.
-- **Definition of done (every issue):** `npm run build` green, `npm run test:unit`
-  green, full e2e suite (`npm run test:e2e`) green, new unit + e2e tests per
-  the issue's Tests section, no regressions.
-- Unit tests live under `tests/unit/providers/*.test.ts`; e2e suites under
-  `tests/e2e/` (house convention).
-- House style is binding: tsyringe DI, Zod + `.describe()` + OpenAPI,
-  controller/service RBAC split, `RequestContext`, Drizzle migrations only,
-  one-line pino loggers, `asyncHandler` on handlers.
-- Prerequisite line: `advanced-monitoring` (P1-03 call logs, P1-05b probes,
-  P2-01 alert engine incl. the 2026-08-24 last-signal branch).
+| ID | Title | Phase | Est. | Status |
+|---|---|---|---|---|
+| [TPC-01](TPC-01-tester-core.md) | Tester core: types, registry, guards, instance construction | 1 | 1 d | open |
+| [TPC-02](TPC-02-llm-strategy.md) | LLM strategy: 1-token real inference | 1 | 0.5 d | open |
+| [TPC-03](TPC-03-asr-strategy.md) | ASR strategy: real WS session + silence | 1 | 1 d | open |
+| [TPC-04](TPC-04-tts-strategy.md) | TTS strategy: real minimal synthesis | 1 | 0.5 d | open |
+| [TPC-05](TPC-05-storage-strategy.md) | Storage strategy: list + optional write round trip | 1 | 0.5 d | open |
+| [TPC-06](TPC-06-http-endpoint-rbac.md) | HTTP endpoint, contracts, RBAC, audit | 2 | 1 d | open |
+| [TPC-07](TPC-07-call-log-integration.md) | Call-log integration + alert interplay + docs | 2 | 0.5–1 d | open |
+| [TPC-08](TPC-08-channel-providers.md) | Channel strategies: same-protocol auth checks | 3 | 1 d | open |
+| [TPC-09](TPC-09-periodic-data-plane-probes.md) | (Optional) Opt-in periodic data-plane probes | 3 | 1 d | open |
+
+Total: ~7–8 dev-days (TPC-09 optional).
 
 ## Dependency graph
 
+Arrows list **direct dependencies only** (transitive ones follow by
+construction).
+
 ```
-TPC-01  (no new deps)
+TPC-01  (no new dependencies)
 TPC-02  ◄── TPC-01
 TPC-03  ◄── TPC-01
 TPC-04  ◄── TPC-01
-TPC-05  ◄── TPC-01, TPC-03     (optional, opt-in)
+TPC-05  ◄── TPC-01
+TPC-06  ◄── TPC-01, TPC-02, TPC-05
+TPC-07  ◄── TPC-01
+TPC-08  ◄── TPC-01, TPC-06
+TPC-09  ◄── TPC-03, TPC-04, TPC-07   (optional)
 ```
 
-Phases are independently shippable: TPC-01+02+03 ship the LLM/ASR/TTS/storage
-feature end-to-end; TPC-04 adds channel providers; TPC-05 is a monitoring
-opt-in and may be deferred.
+## Phases
+
+1. **Core tester** — TPC-01…05 (strategies ship independently once the
+   core lands).
+2. **API + monitoring integration** — TPC-06 + TPC-07 (the feature is
+   end-to-end: endpoint, RBAC, audit, call-log/last-signal interplay).
+3. **Extensions** — TPC-08 (channels), TPC-09 (optional periodic
+   data-plane probes).
+
+Each spec is independently testable and shippable within its phase.

@@ -3,7 +3,7 @@
 - **Status:** proposed
 - **Branch:** `provider-test-connection`
 - **Date:** 2026-08-24
-- **Issue specs:** `.issues/proposal/provider-test/` (TPC-01 … TPC-05)
+- **Issue specs:** `.issues/proposal/provider-test/` (TPC-01 … TPC-09)
 - **Prerequisite line:** `advanced-monitoring` (P1-03 call logs, P1-05b probes, P2-01 alert engine incl. the 2026-08-24 last-signal branch)
 
 ## 1. Problem
@@ -52,7 +52,7 @@ Design principle (this is what makes the requirement hold *structurally*):
 Non-goals (v1):
 
 - No periodic data-plane probing (that is the explicit Option A decision for
-  the 60 s probe cadence; see TPC-05 for the opt-in follow-up).
+  the 60 s probe cadence; see TPC-09 for the opt-in follow-up).
 - No multi-region / multi-model matrix tests (one minimal call per test).
 - No channel *send* tests (no test messages to real numbers/chatbots —
   side-effect-free auth/availability checks only).
@@ -173,7 +173,7 @@ result is reported in `detail` as a bonus signal.
 This is precisely what Option A **refused for the 60 s periodic probe** (session-creation
 rate limits, false downs) — and exactly right for an on-demand, user-initiated
 test with a 5 s cooldown. The Option A doc is updated to point here
-(TPC-03, `docs/guide/monitoring.md`).
+(TPC-07, `docs/guide/monitoring.md`).
 
 ### 4.3 TTS — real minimal synthesis, audio discarded (all 7 apiTypes)
 
@@ -208,7 +208,7 @@ With `write: true`: full round trip on a throwaway key
 | azure-blob | `@azure/storage-blob` |
 | local | local filesystem — `detail.path` reported; always `ok` unless the directory is missing/unwritable (then `ok:false`, `errorCode: 'client_error'`) |
 
-### 4.5 Channel providers — same-protocol auth check, zero side effects (TPC-04, phase 2)
+### 4.5 Channel providers — same-protocol auth check, zero side effects (TPC-08, phase 3)
 
 | apiType | test call (same API the channel uses) |
 |---|---|
@@ -281,14 +281,14 @@ provider quota") is a frontend concern.
   mapping (`classifyThirdPartyError`), error-text sanitization, call-log
   attribution for saved tests.
 - `src/services/providers/connectionTest/strategies/{llm,asr,tts,storage}.ts`
-  (TPC-01) and `strategies/channel.ts` (TPC-04) — one per providerType, each
+  (TPC-02–05) and `strategies/channel.ts` (TPC-08) — one per providerType, each
   driving the production lifecycle described in §4. ASR silence buffer is a
   shared helper (format → byte buffer, reuses `AudioFormat` metadata).
 - `src/http/contracts/providerConnectionTest.ts` — request union +
   `ConnectionTestResult` Zod schemas (`.describe()` on every field,
   `.openapi()` on reusable subschemas) → OpenAPI.
 - `src/services/providers/connectionTest/index.ts` — strategy registry
-  (`Map<providerType, strategy>`) so TPC-04/TPC-05 and future embedding
+  (`Map<providerType, strategy>`) so TPC-08/TPC-09 and future embedding
   providers plug in without touching the tester.
 
 **Changed:**
@@ -309,20 +309,28 @@ provider quota") is a frontend concern.
 
 | ID | Spec | Contents | Est. |
 |---|---|---|---|
-| TPC-01 | connection-test-core | Tester + llm/asr/tts/storage strategies, result type, guards (cooldown/timeout/sanitize), unit tests with local fake servers | 2–3 dev-days |
-| TPC-02 | http-endpoint-rbac | Endpoint + contracts + OpenAPI + RBAC + audit `logEvent` + e2e | 1 dev-day |
-| TPC-03 | call-log-integration | `*.test` call-log rows, alert-engine interplay tests (last-signal), docs updates | 0.5–1 dev-day |
-| TPC-04 | channel-providers | Channel strategy (7 apiTypes), zero side effects | 1 dev-day |
-| TPC-05 | periodic-data-plane-probes (optional) | `probeSettings`: `asrProbe: 'session'`, `ttsProbe: 'synth'` opt-ins reusing the strategies at probe cadence | 1 dev-day |
+| TPC-01 | tester-core | Tester skeleton: result type, strategy registry, guards (cooldown/timeout/sanitize), draft/saved instance construction, CallLogger breaker-exclusion | 1 dev-day |
+| TPC-02 | llm-strategy | LLM strategy: 1-token real inference, model defaulting, fake-HTTP unit tests | 0.5 dev-day |
+| TPC-03 | asr-strategy | ASR strategy: real WS session + silence helper, phase progression, fake-WS unit tests | 1 dev-day |
+| TPC-04 | tts-strategy | TTS strategy: production synthesis lifecycle, chunk counting, fake-server unit tests | 0.5 dev-day |
+| TPC-05 | storage-strategy | Storage strategy: `list` + optional write round trip, `local` variant, temp-dir unit tests | 0.5 dev-day |
+| TPC-06 | http-endpoint-rbac | Endpoint + contracts + OpenAPI + RBAC + audit `logEvent` + e2e | 1 dev-day |
+| TPC-07 | call-log-integration | `*.test` call-log rows, alert-engine interplay tests (last-signal), docs updates | 0.5–1 dev-day |
+| TPC-08 | channel-providers | Channel strategies (7 apiTypes), zero side effects | 1 dev-day |
+| TPC-09 | periodic-data-plane-probes (optional) | `probeSettings`: `asrProbe`/`ttsProbe: 'data_plane'` opt-ins reusing the strategies at probe cadence | 1 dev-day |
 
 Dependencies (direct only; `Blocks` in specs is the exact inverse):
 
 ```
 TPC-01  (no new deps — builds on P1-03/P1-05b line)
 TPC-02  ◄── TPC-01
-TPC-03  ◄── TPC-01          (alert interplay needs TPC-01 recording; rule side already shipped)
+TPC-03  ◄── TPC-01
 TPC-04  ◄── TPC-01
-TPC-05  ◄── TPC-01, TPC-03
+TPC-05  ◄── TPC-01
+TPC-06  ◄── TPC-01, TPC-02, TPC-05   (e2e exercises llm + storage; tts/asr as they land)
+TPC-07  ◄── TPC-01          (alert interplay needs TPC-01 recording; rule side already shipped)
+TPC-08  ◄── TPC-01, TPC-06
+TPC-09  ◄── TPC-03, TPC-04, TPC-07   (optional)
 ```
 
 Definition of done (every spec): `npm run build` green, `npm run test:unit`
@@ -352,14 +360,14 @@ E2e (real app, no vendor creds):
   `errorCode 'network'` (structured failure contract)
 - RBAC: viewer → 403; unauthed → 401; audit row written; call-log row for
   saved test; cooldown → 429 with `Retry-After`
-- TPC-03: a failed auth test keeps `provider-auth-failed` firing; a successful
+- TPC-07: a failed auth test keeps `provider-auth-failed` firing; a successful
   test resolves it (extends the existing alert-rule-engine e2e pattern).
 
 ## 10. Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Vendor session-quota abuse via the endpoint | 5 s per-provider cooldown + global rate limit + operator RBAC; TPC-05 keeps periodic data-plane probing **off by default** |
+| Vendor session-quota abuse via the endpoint | 5 s per-provider cooldown + global rate limit + operator RBAC; TPC-09 keeps periodic data-plane probing **off by default** |
 | Test disturbs live sessions | fresh instance per test (never pooled/pre-warmed); ASR test opens its own session |
 | Secrets leak via `errorText` | sanitizer (truncate + pattern redact) before response/log; audit `details` carry the result summary only |
 | WS tests flaky in CI | all vendor-protocol tests are unit-level against local fake WS/HTTP servers; e2e only uses `local` storage + unreachable-ollama (deterministic) |
@@ -370,7 +378,7 @@ E2e (real app, no vendor creds):
 
 - Console UI (frontend repo; the API + `docs/frontend-monitoring-api.md`
   section are the contract it builds on)
-- Periodic data-plane probes **by default** (Option A stands; TPC-05 is opt-in)
+- Periodic data-plane probes **by default** (Option A stands; TPC-09 is opt-in)
 - Webhook/channel *outbound* delivery tests (send a real message)
 - Benchmark-style multi-model / multi-voice sweeps (existing benchmark suite
   covers quality, not connectivity)
