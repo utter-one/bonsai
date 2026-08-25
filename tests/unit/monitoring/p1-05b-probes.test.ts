@@ -8,13 +8,15 @@ import type { ProviderCallRecord } from '../../../src/services/monitoring/Provid
 import { AsrProviderFactory } from '../../../src/services/providers/asr/AsrProviderFactory';
 import { TtsProviderFactory } from '../../../src/services/providers/tts/TtsProviderFactory';
 import type { SecretRefUtils } from '../../../src/services/secrets/SecretRefUtils';
+import { WebSocketServer } from 'ws';
+import type { AddressInfo } from 'node:net';
 import { AzureAsrProvider } from '../../../src/services/providers/asr/AzureAsrProvider';
 import type { AssemblyAiAsrProviderConfig, AssemblyAiAsrSettings } from '../../../src/services/providers/asr/AssemblyAiAsrProvider';
 import { AssemblyAiAsrProvider } from '../../../src/services/providers/asr/AssemblyAiAsrProvider';
 import type { DeepgramAsrProviderConfig, DeepgramAsrSettings } from '../../../src/services/providers/asr/DeepgramAsrProvider';
 import { DeepgramAsrProvider } from '../../../src/services/providers/asr/DeepgramAsrProvider';
 import type { ElevenLabsAsrProviderConfig, ElevenLabsAsrSettings } from '../../../src/services/providers/asr/ElevenLabsAsrProvider';
-import { ElevenLabsAsrProvider } from '../../../src/services/providers/asr/ElevenLabsAsrProvider';
+import { ElevenLabsAsrProvider, elevenLabsAsrSettingsSchema } from '../../../src/services/providers/asr/ElevenLabsAsrProvider';
 import type { SonioxAsrProviderConfig, SonioxAsrSettings } from '../../../src/services/providers/asr/SonioxAsrProvider';
 import { SonioxAsrProvider } from '../../../src/services/providers/asr/SonioxAsrProvider';
 import type { SpeechmaticsAsrProviderConfig, SpeechmaticsAsrSettings } from '../../../src/services/providers/asr/SpeechmaticsAsrProvider';
@@ -218,11 +220,32 @@ describe('P1-05b provider ping() shape (zero-cost liveness endpoints)', () => {
     expect(fetchCalls).to.deep.equal([{ url: 'https://api.deepgram.com/v1/projects?limit=1', headers: { Authorization: 'Token k-dg' } }]);
   });
 
-  it('ElevenLabs ASR: GET /v1/models with xi-api-key', async () => {
-    const provider = new ElevenLabsAsrProvider({ apiKey: 'k-11' } as ElevenLabsAsrProviderConfig, {} as ElevenLabsAsrSettings);
-    withRecorder(provider, 'elevenlabs');
-    await provider.ping();
-    expect(fetchCalls).to.deep.equal([{ url: 'https://api.elevenlabs.io/v1/models', headers: { 'xi-api-key': 'k-11' } }]);
+  it('ElevenLabs ASR: realtime WS handshake with xi-api-key (no REST — restricted keys lack models_read)', async function () {
+    this.timeout(10_000);
+    const receivedKeys: string[] = [];
+    const receivedPaths: string[] = [];
+    const wss = await new Promise<WebSocketServer>((resolve) => {
+      const server = new WebSocketServer({ port: 0 }, () => resolve(server));
+      server.on('connection', (socket, req) => {
+        receivedKeys.push(String(req.headers['xi-api-key'] ?? ''));
+        receivedPaths.push(req.url ?? '');
+        socket.send(JSON.stringify({ message_type: 'session_started', session_id: 'mock-session' }));
+      });
+    });
+    const port = (wss.address() as AddressInfo).port;
+    try {
+      const provider = new ElevenLabsAsrProvider({ apiKey: 'k-11' } as ElevenLabsAsrProviderConfig, elevenLabsAsrSettingsSchema.parse({}));
+      const { records } = withRecorder(provider, 'elevenlabs');
+      (provider as unknown as { realtimeWsUrl: string }).realtimeWsUrl = `ws://127.0.0.1:${port}/v1/speech-to-text/realtime`;
+      await provider.ping();
+      expect(receivedKeys).to.deep.equal(['k-11']);
+      expect(receivedPaths[0]).to.match(/^\/v1\/speech-to-text\/realtime\?model_id=scribe_v2_realtime&audio_format=pcm_16000$/);
+      expect(fetchCalls).to.deep.equal([]);
+      expect(records).to.have.length(1);
+      expect(records[0]).to.include({ operation: 'asr.ping', ok: true, providerId: 'prov_test', providerType: 'asr', apiType: 'elevenlabs' });
+    } finally {
+      await new Promise<void>((resolve) => wss.close(() => resolve()));
+    }
   });
 
   it('Soniox ASR: GET /v1/models (global management base) with Bearer', async () => {
@@ -270,11 +293,18 @@ describe('P1-05b provider ping() shape (zero-cost liveness endpoints)', () => {
     expect(records).to.have.length(1);
   });
 
-  it('ElevenLabs TTS: GET /v1/models with xi-api-key', async () => {
+  it('ElevenLabs TTS: GET /v1/voices with xi-api-key (no voiceId configured)', async () => {
     const provider = new ElevenLabsTtsProvider({ apiKey: 'k-11-tts' } as ElevenLabsTtsProviderConfig, { provider: 'elevenlabs' } as ElevenLabsTtsSettings);
     withRecorder(provider, 'elevenlabs');
     await provider.ping();
-    expect(fetchCalls).to.deep.equal([{ url: 'https://api.elevenlabs.io/v1/models', headers: { 'xi-api-key': 'k-11-tts' } }]);
+    expect(fetchCalls).to.deep.equal([{ url: 'https://api.elevenlabs.io/v1/voices', headers: { 'xi-api-key': 'k-11-tts' } }]);
+  });
+
+  it('ElevenLabs TTS: GET /v1/voices/{voiceId} when voiceId is configured', async () => {
+    const provider = new ElevenLabsTtsProvider({ apiKey: 'k-11-tts' } as ElevenLabsTtsProviderConfig, { provider: 'elevenlabs', voiceId: 'voice-abc' } as ElevenLabsTtsSettings);
+    withRecorder(provider, 'elevenlabs');
+    await provider.ping();
+    expect(fetchCalls).to.deep.equal([{ url: 'https://api.elevenlabs.io/v1/voices/voice-abc', headers: { 'xi-api-key': 'k-11-tts' } }]);
   });
 
   it('OpenAI TTS: GET /v1/models with Bearer', async () => {

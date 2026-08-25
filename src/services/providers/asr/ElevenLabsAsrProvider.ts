@@ -2,7 +2,6 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
-import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -41,6 +40,11 @@ export type ElevenLabsAsrSettings = z.infer<typeof elevenLabsAsrSettingsSchema>;
  * ElevenLabs ASR provider implementation
  * Provides real-time speech recognition using ElevenLabs streaming API
  */
+const REALTIME_WS_BASE_URL = 'wss://api.elevenlabs.io/v1/speech-to-text/realtime';
+
+/** WS handshake budget for the liveness probe (the health service adds its own on top). */
+const PING_TIMEOUT_MS = 10_000;
+
 export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProviderConfig> {
   /** WebSocket connection to ElevenLabs streaming API */
   private socket: WebSocket | null = null;
@@ -62,6 +66,9 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
 
   /** ASR settings for this provider instance */
   private settings: ElevenLabsAsrSettings;
+
+  /** Realtime endpoint base URL; overridable in tests (points at a local mock). */
+  protected realtimeWsUrl: string = REALTIME_WS_BASE_URL;
 
   constructor(config: ElevenLabsAsrProviderConfig, settings: ElevenLabsAsrSettings) {
     super(config);
@@ -90,19 +97,65 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   }
 
   /**
-   * Zero-cost liveness probe (P1-05b): lists models from the ElevenLabs API.
+   * Zero-cost liveness probe (P1-05b): a WebSocket handshake against the
+   * realtime endpoint — the same auth/permission path as live transcription,
+   * with no audio sent. REST endpoints such as GET /v1/models require the
+   * `models_read` permission, which restricted keys lack (HTTP 401) even
+   * though transcription works — so the probe must not use them.
    */
   async ping(): Promise<void> {
     const startedAt = Date.now();
     try {
-      await httpPing('https://api.elevenlabs.io/v1/models', {
-        'xi-api-key': this.config.apiKey,
-      });
+      await this.probeRealtimeHandshake(PING_TIMEOUT_MS);
       this.recordPingCall(startedAt);
     } catch (error) {
       this.recordPingCall(startedAt, error as Error);
       throw error;
     }
+  }
+
+  /**
+   * Opens the realtime WebSocket, waits for `session_started`, then closes.
+   * Resolves when the session starts; rejects on auth rejection, any other
+   * close without a session, or timeout.
+   */
+  private probeRealtimeHandshake(timeoutMs: number): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const params = new URLSearchParams({
+        model_id: this.settings.modelId,
+        audio_format: this.settings.audioFormat,
+      });
+      const socket = new WebSocket(`${this.realtimeWsUrl}?${params.toString()}`, {
+        headers: {
+          'xi-api-key': this.config.apiKey,
+        },
+      });
+      let settled = false;
+      const finish = (fn: () => void): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        socket.removeAllListeners();
+        socket.close();
+        fn();
+      };
+      const timer = setTimeout(() => {
+        finish(() => reject(new Error(`Liveness probe failed: realtime handshake timed out after ${timeoutMs} ms`)));
+      }, timeoutMs);
+      socket.on('message', (data: Buffer) => {
+        if (data.toString().includes('session_started')) {
+          finish(resolve);
+        }
+      });
+      socket.on('error', (error: Error) => {
+        finish(() => reject(new Error(`Liveness probe failed: ${error.message}`)));
+      });
+      socket.on('close', (code: number, reason: Buffer) => {
+        finish(() => reject(new Error(`Liveness probe failed: realtime connection closed ${code} ${reason.toString()}`.trim())));
+      });
+    });
   }
 
   /**
