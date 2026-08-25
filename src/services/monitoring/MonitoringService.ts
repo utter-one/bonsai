@@ -650,7 +650,7 @@ export class MonitoringService extends BaseService {
     if (updated.length > 0) {
       await this.auditService.logChange({
         userId: context.operatorId,
-        action: 'ACKNOWLEDGE_ALERT',
+        action: 'ACK',
         entityType: 'alert_event',
         entityId: id,
         newEntity: { ackedAt: now, ackedBy: context.operatorId },
@@ -684,13 +684,12 @@ export class MonitoringService extends BaseService {
     }
 
     await db.delete(alertEvents).where(eq(alertEvents.id, id));
-    await this.auditService.logChange({
-      userId: context.operatorId,
-      action: 'DELETE_ALERT',
-      entityType: 'alert_event',
-      entityId: id,
-      oldEntity: { status: rows[0].status, ruleId: rows[0].ruleId, scopeKey: rows[0].scopeKey, firedAt: rows[0].firedAt },
-    });
+    await this.auditService.logDelete(
+      'alert_event',
+      id,
+      { status: rows[0].status, ruleId: rows[0].ruleId, scopeKey: rows[0].scopeKey, firedAt: rows[0].firedAt },
+      context.operatorId,
+    );
     return alertEventResponseSchema.parse(rows[0]);
   }
 
