@@ -233,6 +233,28 @@ export class MonitoringController {
         },
       },
       {
+        method: 'delete',
+        path: '/api/monitoring/alerts/{id}',
+        tags: ['Monitoring'],
+        summary: 'Delete alert event',
+        description: 'Permanently deletes one alert event — for stalled alerts or known situations without an easy resolution (e.g. a deleted provider). Returns the deleted event and writes a DELETE_ALERT audit entry. The alert engine may fire a NEW row for the same rule/scope later if the condition still holds; disable the rule in the monitoring config to silence it permanently.',
+        request: {
+          params: alertIdParamsSchema,
+        },
+        responses: {
+          200: {
+            description: 'Deleted alert event',
+            content: {
+              'application/json': {
+                schema: alertEventResponseSchema,
+              },
+            },
+          },
+          ...notFoundResponse,
+          ...commonResponses,
+        },
+      },
+      {
         method: 'get',
         path: '/api/monitoring/config',
         tags: ['Monitoring'],
@@ -334,6 +356,7 @@ export class MonitoringController {
     router.get('/api/monitoring/alerts', asyncHandler(this.listAlerts.bind(this)));
     router.get('/api/monitoring/alerts/:id', asyncHandler(this.getAlert.bind(this)));
     router.post('/api/monitoring/alerts/:id/acknowledge', asyncHandler(this.acknowledgeAlert.bind(this)));
+    router.delete('/api/monitoring/alerts/:id', asyncHandler(this.deleteAlert.bind(this)));
     router.get('/api/monitoring/config', asyncHandler(this.getConfig.bind(this)));
     router.put('/api/monitoring/config', asyncHandler(this.updateConfig.bind(this)));
     router.get('/api/monitoring/rules', asyncHandler(this.getRules.bind(this)));
@@ -434,6 +457,16 @@ export class MonitoringController {
     checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
     const { id } = alertIdParamsSchema.parse(req.params);
     const alert = await this.monitoringService.acknowledgeAlert(req.context, id);
+    res.status(200).json(alert);
+  }
+
+  /**
+   * DELETE /api/monitoring/alerts/:id
+   */
+  private async deleteAlert(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const { id } = alertIdParamsSchema.parse(req.params);
+    const alert = await this.monitoringService.deleteAlert(req.context, id);
     res.status(200).json(alert);
   }
 
