@@ -31,10 +31,13 @@ export type AlertEvent = {
  * Contract: implementations must NEVER throw (every call is wrapped in
  * try/catch) and must cap their own latency (P2-02: 15 s per notification).
  * The engine invokes them fire-and-forget with a defensive `.catch` anyway.
+ *
+ * `resolve` returns the number of rows transitioned (0 = the row was deleted
+ * or unknown) so wrappers can skip notifications for phantom resolutions.
  */
 export interface AlertEventPublisher {
   fire(event: AlertEvent): Promise<void>;
-  resolve(event: AlertEvent): Promise<void>;
+  resolve(event: AlertEvent): Promise<number>;
 }
 
 /** DI token — registered against `LogAndPersistPublisher` in server.ts. */
@@ -64,7 +67,8 @@ export class LogAndPersistPublisher implements AlertEventPublisher {
     }
   }
 
-  async resolve(event: AlertEvent): Promise<void> {
+  /** @returns the number of rows transitioned (0 = deleted/unknown id — callers must not notify). */
+  async resolve(event: AlertEvent): Promise<number> {
     try {
       const result = await db.update(alertEvents)
         .set({
@@ -75,12 +79,15 @@ export class LogAndPersistPublisher implements AlertEventPublisher {
           context: event.context,
         })
         .where(eq(alertEvents.id, event.id));
-      if (result.rowCount === 0) {
+      if ((result.rowCount ?? 0) === 0) {
         logger.warn({ alertId: event.id }, 'LogAndPersistPublisher.resolve: no firing row to resolve (already resolved or purged)');
+        return 0;
       }
       this.log(event, 'ALERT RESOLVED');
+      return result.rowCount;
     } catch (error) {
       logger.error({ error, alertId: event.id, scopeKey: event.scopeKey }, 'LogAndPersistPublisher.resolve failed');
+      return 0;
     }
   }
 

@@ -58,11 +58,14 @@ class FakeEmailConnection extends EmailConnectionBase {
 class FakePersister {
   readonly fires: AlertEvent[] = [];
   readonly resolves: AlertEvent[] = [];
+  /** Rows transitioned to resolved (0 = the row was deleted out from under the engine). */
+  resolvedRows = 1;
   async fire(event: AlertEvent): Promise<void> {
     this.fires.push(event);
   }
-  async resolve(event: AlertEvent): Promise<void> {
+  async resolve(event: AlertEvent): Promise<number> {
     this.resolves.push(event);
+    return this.resolvedRows;
   }
 }
 
@@ -400,6 +403,18 @@ describe('P2-02 NotifyingPublisher', () => {
     expect(fired.results[0].detail).to.equal(undefined);
     expect(new Date(fired.results[0].at!).toISOString()).to.not.equal('Invalid Date');
     expect(publisher.appended[1].results[0].phase).to.equal('resolved');
+  });
+
+  it('does not notify on resolve when the persister transitioned no row (alert deleted)', async () => {
+    const { persister, publisher } = setup([webhookConfig]);
+    persister.resolvedRows = 0;
+    await publisher.fire(makeEvent());
+    await publisher.resolve({ ...makeEvent(), resolvedAt: new Date('2026-08-19T10:05:00.000Z') });
+
+    expect(persister.resolves).to.have.length(1);
+    // Only the fired phase produced a delivery + results append.
+    expect(publisher.appended).to.have.length(1);
+    expect(publisher.appended[0].results[0].phase).to.equal('fired');
   });
 
   it('skips disabled notifiers entirely (no delivery, no results)', async () => {

@@ -58,8 +58,9 @@ class FakePersister {
   async fire(event: AlertEvent): Promise<void> {
     this.fires.push(event);
   }
-  async resolve(event: AlertEvent): Promise<void> {
+  async resolve(event: AlertEvent): Promise<number> {
     this.resolves.push(event);
+    return 1;
   }
 }
 
