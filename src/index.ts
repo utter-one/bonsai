@@ -27,6 +27,36 @@ import { migrateSecretsToEncrypted } from "./scripts/migrateSecretsToEncrypted";
 import { SnapshotSchemaMigrator } from "./services/snapshot/SnapshotSchemaMigrator";
 import { VersionService } from "./services/VersionService";
 
+/** Bounded walk of the Error.cause chain (max 4 hops) for log payloads. */
+function causeChain(err: unknown): string[] {
+  const chain: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  while (current instanceof Error && chain.length < 4 && !seen.has(current)) {
+    seen.add(current);
+    chain.push(`${current.name}: ${current.message}`);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return chain;
+}
+
+// Last-resort process guards: by default Node 24 exits on unhandled
+// rejections with a cryptic dump (in prod, tsx's minified single-line files
+// leave frames like "LlmProviderBase.ts:1" — undiagnosable). Log with the
+// full cause chain instead. unhandledRejection keeps the process alive (a
+// stray rejection must not drop every live conversation); uncaughtException
+// exits — state is untrustworthy after an uncaught throw, so let the
+// container restart it.
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error({ err, causeChain: causeChain(reason) }, 'Unhandled promise rejection (process continues)');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error({ err, causeChain: causeChain(err) }, 'Uncaught exception (exiting)');
+  process.exit(1);
+});
+
 /**
  * Main application entry point - initializes database connection and starts the backend
  */
