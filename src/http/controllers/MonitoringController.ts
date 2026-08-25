@@ -237,7 +237,7 @@ export class MonitoringController {
         path: '/api/monitoring/alerts/{id}',
         tags: ['Monitoring'],
         summary: 'Delete alert event',
-        description: 'Permanently deletes one alert event — for stalled alerts or known situations without an easy resolution (e.g. a deleted provider). Returns the deleted event and writes a DELETE_ALERT audit entry. The alert engine may fire a NEW row for the same rule/scope later if the condition still holds; disable the rule in the monitoring config to silence it permanently.',
+        description: 'Permanently deletes one alert event — for stalled alerts or known situations without an easy resolution (e.g. a deleted provider). Returns the deleted event and writes a DELETE audit entry for the alert_event entity. The alert engine may fire a NEW row for the same rule/scope later if the condition still holds; disable the rule in the monitoring config to silence it permanently.',
         request: {
           params: alertIdParamsSchema,
         },
