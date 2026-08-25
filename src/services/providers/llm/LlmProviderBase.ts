@@ -1,7 +1,6 @@
 import type { ErrorCallback, SimpleCallback } from '../../../types/callbacks';
 import { ILlmProvider, LlmChunkCallback, LlmCompleteCallback, LlmGenerationOptions, LlmGenerationResult, LlmMessage } from './ILlmProvider';
 import { logger } from '../../../utils/logger';
-import { log } from 'handlebars';
 import { LlmModelInfo } from '../ProviderCatalogService';
 import { MonitoringContext } from '../../monitoring/MonitoringContext';
 import { getMetricsRegistry, getProviderCallRecorder } from '../../monitoring/ProviderCallRecorder';
