@@ -650,7 +650,7 @@ export class MonitoringService extends BaseService {
     if (updated.length > 0) {
       await this.auditService.logChange({
         userId: context.operatorId,
-        action: 'ACKNOWLEDGE_ALERT',
+        action: 'ACK',
         entityType: 'alert_event',
         entityId: id,
         newEntity: { ackedAt: now, ackedBy: context.operatorId },

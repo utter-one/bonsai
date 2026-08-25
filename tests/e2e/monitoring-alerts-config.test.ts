@@ -241,7 +241,7 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
       let audits = await db
         .select()
         .from(auditLogs)
-        .where(eq(auditLogs.action, 'ACKNOWLEDGE_ALERT'));
+        .where(eq(auditLogs.action, 'ACK'));
       expect(audits).to.have.length(1);
       expect(audits[0].entityId).to.equal('alrt_ack');
       expect(audits[0].entityType).to.equal('alert_event');
@@ -253,14 +253,14 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
       expect(second.body.ackedAt).to.equal(first.body.ackedAt);
       expect(second.body.ackedBy).to.equal(TEST_OPERATOR_ID);
 
-      audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACKNOWLEDGE_ALERT'));
+      audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACK'));
       expect(audits).to.have.length(1);
     });
 
     it('404s for an unknown id', async () => {
       const res = await authed().post('/api/monitoring/alerts/alrt_missing/acknowledge');
       expect(res.status).to.equal(404);
-      const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACKNOWLEDGE_ALERT'));
+      const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACK'));
       expect(audits).to.have.length(0);
     });
   });
