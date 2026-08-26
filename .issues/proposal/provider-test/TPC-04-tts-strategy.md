@@ -1,7 +1,7 @@
 ---
 title: "TPC-04 — TTS strategy: real minimal synthesis, audio discarded"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-24
 updated: 2026-08-24
 assignee: ""
@@ -73,3 +73,27 @@ chunking server (WS and HTTP variants, no network):
 
 - Audio quality/latency benchmarks (existing benchmark suite), periodic
   probing (TPC-09), endpoint plumbing (TPC-06).
+
+## Resolution (2026-08-26)
+
+Shipped: `src/services/providers/connectionTest/strategies/tts.ts`
+(registered in `connectionTest/index.ts`), `TtsProviderFactory.createForTest`
+(+ `instantiateProvider` extraction; stamps only for saved providers), the
+`ElevenLabsTtsProvider.wsBaseUrlOverride` test seam, and
+`tests/unit/providers/connection-test-tts.test.ts` (7 tests: a fake
+ElevenLabs TTS WebSocket server in `ok`/`no-audio`/`hang` modes plus a scoped
+`globalThis.fetch` stub for OpenAI in `ok`/`401`/empty modes, a 150 ms
+timeout seam, and a temp-dir assertion proving audio is counted but never
+persisted).
+
+Semantics as specced: a minimal real synthesis — `init → start →
+sendText('Test connection.') → end → await ended → cleanup`; `ok` = at least
+one audio chunk; a clean end with zero chunks → `ok:false, phase 'session',
+'server_error'`; 30 s timeout. Protocol table: websocket (elevenlabs,
+deepgram, cartesia) / http (openai) / sdk (soniox, amazon-polly, azure).
+`detail { voice, bytes }`.
+
+Note: the `createForTest` extraction surfaced a dangling `resolvedProvider`
+reference left in the factory's instantiation switch (all seven `create*
+Provider` call sites referenced the old variable name); fixed to use the
+`provider` parameter.

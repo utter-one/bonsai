@@ -112,6 +112,14 @@ const NOOP_RECORDER = {
  * if the container cannot resolve — monitoring must never break the caller.
  */
 export function getProviderCallRecorder(): ProviderCallRecorder | typeof NOOP_RECORDER {
+  // Test seam (same pattern as rateLimiter.ts): provider base classes can end
+  // up in a different module graph than the test harness (StorageProviderFactory
+  // lazy-loads its providers via `import()`, which under tsx yields a second
+  // module instance with its own container). Unit tests set
+  // `globalThis.__TEST_PROVIDER_CALL_RECORDER__` so the provider graph records
+  // into the harness's CallLogger regardless of graph.
+  const seam = (globalThis as { __TEST_PROVIDER_CALL_RECORDER__?: ProviderCallRecorder }).__TEST_PROVIDER_CALL_RECORDER__;
+  if (seam) return seam;
   if (cachedRecorder) return cachedRecorder;
   try {
     cachedRecorder = container.resolve(ProviderCallRecorder);

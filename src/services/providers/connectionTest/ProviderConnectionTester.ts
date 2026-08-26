@@ -146,6 +146,7 @@ export class ProviderConnectionTester {
         voice: input.voice,
         language: input.language,
         write: input.write,
+        bucket: input.bucket,
       };
     }
     const provider = await this.loadProvider(input.providerId);
@@ -159,6 +160,7 @@ export class ProviderConnectionTester {
       voice: input.voice,
       language: input.language,
       write: input.write,
+      bucket: input.bucket,
     };
   }
 

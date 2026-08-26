@@ -13,8 +13,8 @@ Proposal: [`PROPOSAL-provider-test-connection.md`](../../PROPOSAL-provider-test-
 | [TPC-01](TPC-01-tester-core.md) | Tester core: types, registry, guards, instance construction | 1 | 1 d | resolved |
 | [TPC-02](TPC-02-llm-strategy.md) | LLM strategy: 1-token real inference | 1 | 0.5 d | resolved |
 | [TPC-03](TPC-03-asr-strategy.md) | ASR strategy: real WS session + silence | 1 | 1 d | resolved |
-| [TPC-04](TPC-04-tts-strategy.md) | TTS strategy: real minimal synthesis | 1 | 0.5 d | open |
-| [TPC-05](TPC-05-storage-strategy.md) | Storage strategy: list + optional write round trip | 1 | 0.5 d | open |
+| [TPC-04](TPC-04-tts-strategy.md) | TTS strategy: real minimal synthesis | 1 | 0.5 d | resolved |
+| [TPC-05](TPC-05-storage-strategy.md) | Storage strategy: list + optional write round trip | 1 | 0.5 d | resolved |
 | [TPC-06](TPC-06-http-endpoint-rbac.md) | HTTP endpoint, contracts, RBAC, audit | 2 | 1 d | open |
 | [TPC-07](TPC-07-call-log-integration.md) | Call-log integration + alert interplay + docs | 2 | 0.5–1 d | open |
 | [TPC-08](TPC-08-channel-providers.md) | Channel strategies: same-protocol auth checks | 3 | 1 d | open |

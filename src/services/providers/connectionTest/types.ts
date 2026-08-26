@@ -60,6 +60,8 @@ export interface SavedConnectionTestInput {
   language?: string;
   /** Storage only: run a full upload/download/delete round trip on a throwaway key. */
   write?: boolean;
+  /** Storage only (s3/azure-blob/gcs): the bucket/container to verify — storage settings are per-project in production, so the test takes the target explicitly. */
+  bucket?: string;
 }
 
 /** Mode B — test an unsaved (draft) config before the provider row exists. */
@@ -72,6 +74,7 @@ export interface DraftConnectionTestInput {
   voice?: string;
   language?: string;
   write?: boolean;
+  bucket?: string;
 }
 
 export type ConnectionTestInput = SavedConnectionTestInput | DraftConnectionTestInput;
@@ -89,6 +92,8 @@ export interface ConnectionTestRequest {
   voice?: string;
   language?: string;
   write?: boolean;
+  /** Storage only (s3/azure-blob/gcs): bucket/container to verify (see ConnectionTestInput.bucket). */
+  bucket?: string;
 }
 
 /** Tester → strategy context (never carries secrets). */

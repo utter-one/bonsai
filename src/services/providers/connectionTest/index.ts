@@ -1,5 +1,7 @@
 import { buildAsrConnectionTestStrategy } from './strategies/asr';
 import { buildLlmConnectionTestStrategy } from './strategies/llm';
+import { buildStorageConnectionTestStrategy } from './strategies/storage';
+import { buildTtsConnectionTestStrategy } from './strategies/tts';
 import type { ConnectionTestStrategy } from './types';
 
 /**
@@ -14,6 +16,8 @@ export function buildConnectionTestStrategies(): Map<string, ConnectionTestStrat
   const strategies: ConnectionTestStrategy[] = [
     buildLlmConnectionTestStrategy(),
     buildAsrConnectionTestStrategy(),
+    buildTtsConnectionTestStrategy(),
+    buildStorageConnectionTestStrategy(),
   ];
   return new Map(strategies.map((strategy) => [strategy.providerType, strategy]));
 }

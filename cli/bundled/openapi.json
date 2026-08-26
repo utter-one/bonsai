@@ -2759,6 +2759,10 @@
           "keyFileJson": {
             "type": "string",
             "description": "Service account key file content as JSON string"
+          },
+          "apiEndpoint": {
+            "type": "string",
+            "description": "Custom API endpoint (e.g. an emulator or proxy) — defaults to storage.googleapis.com"
           }
         },
         "required": [

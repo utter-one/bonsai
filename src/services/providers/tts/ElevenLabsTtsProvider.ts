@@ -67,6 +67,9 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /** Audio output format for the current session */
   private audioFormat: AudioFormat = 'pcm_16000';
 
+  /** Test seam (TPC-04): overrides the WS base URL for connection tests; null → production behavior. */
+  protected wsBaseUrlOverride: string | null = null;
+
   constructor(config: ElevenLabsTtsProviderConfig, settings: ElevenLabsTtsSettings) {
     super(config);
     this.settings = settings;
@@ -148,7 +151,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.settings.stability}, similarityBoost: ${this.settings.similarityBoost}, audioFormat: ${this.audioFormat}`);
 
     const useGlobalPreview = this.settings.useGlobalPreview ?? true;
-    const baseUrl = useGlobalPreview ? 'wss://api-global-preview.elevenlabs.io' : 'wss://api.elevenlabs.io';
+    const baseUrl = this.wsBaseUrlOverride ?? (useGlobalPreview ? 'wss://api-global-preview.elevenlabs.io' : 'wss://api.elevenlabs.io');
     const inactivityTimeout = this.settings.inactivityTimeout ?? 180;
     const wsUrl = `${baseUrl}/v1/text-to-speech/${effectiveVoiceId}/stream-input?model_id=${effectiveModel}&output_format=${this.audioFormat}&inactivity_timeout=${inactivityTimeout}`;
 
