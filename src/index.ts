@@ -19,6 +19,7 @@ import { AlertRuleEngine } from "./services/monitoring/AlertRuleEngine";
 import { RetentionService } from "./services/monitoring/RetentionService";
 import { WebSocketChannelHost } from "./channels/websocket/WebSocketChannelHost";
 import { TwilioVoiceChannelHost } from "./channels/twilio-voice/TwilioVoiceChannelHost";
+import { SlackChannelHost } from "./channels/slack/SlackChannelHost";
 import { CallLogger } from "./services/monitoring/CallLogger";
 import { MetricsRegistry } from "./services/monitoring/MetricsRegistry";
 import { SecretsManagerRegistry } from "./services/secrets/SecretsManagerRegistry";
@@ -110,6 +111,8 @@ async function main() {
   installShutdownHandlers({
     server,
     services: [
+      // Stopped first so no new inbound Slack events are accepted while draining.
+      { name: "SlackChannelHost", stop: () => container.resolve(SlackChannelHost).stop() },
       { name: "ConversationTimeoutService", stop: () => container.resolve(ConversationTimeoutService).stop() },
       { name: "ScenarioRunExecutorService", stop: () => container.resolve(ScenarioRunExecutorService).stop() },
       { name: "BenchmarkExecutorService", stop: () => container.resolve(BenchmarkExecutorService).stop() },

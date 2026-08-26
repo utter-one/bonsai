@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, desc, sql, SQL, inArray as drizzleInArray } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../../utils/textSearch';
 import { db } from '../../db/index';
-import { providers } from '../../db/schema';
+import { providers, projects } from '../../db/schema';
 import type { CreateProviderRequest, UpdateProviderRequest, ProviderResponse, ProviderListResponse } from '../../http/contracts/provider';
 import type { ConnectionTestRequestBody, ConnectionTestResponseBody } from '../../http/contracts/providerConnectionTest';
 import { connectionTestResultSchema } from '../../http/contracts/providerConnectionTest';
@@ -11,7 +11,7 @@ import { providerResponseSchema, providerListResponseSchema } from '../../http/c
 import { ProviderConnectionTester } from './connectionTest/ProviderConnectionTester';
 import type { ConnectionTestInput } from './connectionTest/types';
 import { AuditService } from '../AuditService';
-import { OptimisticLockError, NotFoundError, InvalidOperationError } from '../../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, ValidationError } from '../../errors';
 import { buildFilterCondition, buildOrderBy } from '../../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../../utils/pagination';
 import { logger } from '../../utils/logger';
@@ -25,6 +25,8 @@ import { LlmProviderFactory } from './llm/LlmProviderFactory';
 import type { LlmModelInfo } from './ProviderCatalogService';
 import { SecretRefUtils, SENSITIVE_PROVIDER_CONFIG_FIELDS } from '../secrets/SecretRefUtils';
 import { FallbackResolver } from './FallbackResolver';
+import { SlackChannelHost } from '../../channels/slack/SlackChannelHost';
+import { slackChannelProviderConfigSchema } from './channel/SlackChannelProvider';
 import { validateFallbacks, type FallbackGraphNodes } from './fallbackValidation';
 import type { ProviderFallback } from '../../db/schema';
 
@@ -41,6 +43,7 @@ export class ProviderService extends BaseService {
     @inject(ImapInboundService) private readonly imapInboundService: ImapInboundService,
     @inject(FallbackResolver) private readonly fallbackResolver: FallbackResolver,
     @inject(ProviderConnectionTester) private readonly connectionTester: ProviderConnectionTester,
+    @inject(SlackChannelHost) private readonly slackChannelHost: SlackChannelHost,
   ) {
     super();
   }
@@ -62,11 +65,17 @@ export class ProviderService extends BaseService {
       await this.validateFallbacks(providerId, input.providerType, fallbacks);
     }
 
+    await this.assertValidSlackSocketConfig(input.apiType, input.config as Record<string, unknown>);
+
     const secretizedConfig = await this.secretRefUtils.secretizeObject(input.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS);
     const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: secretizedConfig as typeof input.config, fallbacks, createdBy: context?.operatorId, tags: input.tags, version: 1 }).returning();
 
     const createdProvider = provider[0];
     this.fallbackResolver.invalidate(createdProvider.id);
+
+    if (createdProvider.apiType === 'slack') {
+      this.slackChannelHost.onProviderChanged(createdProvider.id);
+    }
 
     const { config: _config, ...safeCreatedProvider } = createdProvider;
     await this.auditService.logCreate('provider', createdProvider.id, safeCreatedProvider, context?.operatorId);
@@ -196,6 +205,13 @@ export class ProviderService extends BaseService {
       await this.validateFallbacks(id, effectiveType, fallbacks);
     }
 
+    // Only re-validate the Slack config when this update actually changes it, so an
+    // unrelated edit (e.g. a rename) is not blocked by a pre-existing invalid config
+    // or a bound project that was archived after the provider was created.
+    if (updateData.config !== undefined || updateData.apiType !== undefined) {
+      await this.assertValidSlackSocketConfig(updateData.apiType ?? existingProvider.apiType, (updateData.config ?? existingProvider.config) as Record<string, unknown>);
+    }
+
     const updatePayload: any = {
       name: updateData.name,
       description: updateData.description,
@@ -227,6 +243,11 @@ export class ProviderService extends BaseService {
 
     if (provider.apiType === 'smtp_imap') {
       this.imapInboundService.reload(provider.id);
+    }
+    // Reconcile the socket connection if the provider is slack now or was slack
+    // before (covers toggling the apiType as well as config changes).
+    if (existingProvider.apiType === 'slack' || provider.apiType === 'slack') {
+      this.slackChannelHost.onProviderChanged(provider.id);
     }
 
     this.fallbackResolver.invalidate(provider.id);
@@ -274,6 +295,10 @@ export class ProviderService extends BaseService {
 
     if (existingProvider.apiType === 'smtp_imap') {
       this.imapInboundService.stopSession(id);
+    }
+    // Close the socket connection if this was a slack provider.
+    if (existingProvider.apiType === 'slack') {
+      this.slackChannelHost.onProviderChanged(id);
     }
 
     // Cancel any pending deferred messages for this provider
@@ -384,5 +409,35 @@ export class ProviderService extends BaseService {
     }
 
     validateFallbacks(primaryId, primaryType, fallbacks, graph);
+  }
+
+  /**
+   * Validates a Slack provider config at write time, failing fast (400) so a
+   * misconfiguration is rejected instead of being stored and silently failing
+   * later. The config must parse as a Slack channel config (it can otherwise be
+   * mis-matched to a different channel by the non-discriminated config union),
+   * and for socket_mode it must carry an appToken bound to an active project.
+   * No-op for non-slack providers.
+   */
+  private async assertValidSlackSocketConfig(apiType: string | undefined, config: Record<string, unknown> | undefined): Promise<void> {
+    if (apiType !== 'slack' || !config) return;
+    const parsed = slackChannelProviderConfigSchema.safeParse(config);
+    if (!parsed.success) {
+      throw new ValidationError('Invalid Slack channel provider config', [{ code: 'custom', path: ['config'], message: 'config does not match the Slack channel provider schema' }]);
+    }
+    if (parsed.data.mode !== 'socket_mode') return;
+    if (!parsed.data.appToken) {
+      throw new ValidationError('appToken is required when mode is "socket_mode"', [{ code: 'custom', path: ['config', 'appToken'], message: 'appToken is required when mode is "socket_mode"' }]);
+    }
+    if (!parsed.data.projectId) {
+      throw new ValidationError('projectId is required when mode is "socket_mode"', [{ code: 'custom', path: ['config', 'projectId'], message: 'projectId is required when mode is "socket_mode"' }]);
+    }
+    const project = await db.query.projects.findFirst({ where: eq(projects.id, parsed.data.projectId) });
+    if (!project) {
+      throw new ValidationError('projectId does not reference an existing project', [{ code: 'custom', path: ['config', 'projectId'], message: `projectId ${parsed.data.projectId} does not reference an existing project` }]);
+    }
+    if (project.archivedAt != null) {
+      throw new ValidationError('projectId references an archived project', [{ code: 'custom', path: ['config', 'projectId'], message: `projectId ${parsed.data.projectId} references an archived project` }]);
+    }
   }
 }

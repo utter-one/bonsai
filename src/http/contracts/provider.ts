@@ -29,6 +29,7 @@ import { azureBlobStorageProviderConfigSchema } from '../../services/providers/s
 import { gcsStorageProviderConfigSchema } from '../../services/providers/storage/GcsStorageProvider';
 import { localStorageProviderConfigSchema } from '../../services/providers/storage/LocalStorageProvider';
 import { telegramChannelProviderConfigSchema } from '../../services/providers/channel/TelegramChannelProvider';
+import { slackChannelProviderConfigSchema } from '../../services/providers/channel/SlackChannelProvider';
 import { twilioMessagingChannelProviderConfigSchema } from '../../services/providers/channel/TwilioMessagingChannelProvider';
 import { twilioVoiceChannelProviderConfigSchema } from '../../services/providers/channel/TwilioVoiceChannelProvider';
 import { whatsAppChannelProviderConfigSchema } from '../../services/providers/channel/WhatsAppChannelProvider';
@@ -94,6 +95,7 @@ export type StorageProviderConfig = z.infer<typeof storageProviderConfigSchema>;
  */
 export const channelProviderConfigSchema = z.union([
   telegramChannelProviderConfigSchema,
+  slackChannelProviderConfigSchema,
   twilioMessagingChannelProviderConfigSchema,
   twilioVoiceChannelProviderConfigSchema,
   whatsAppChannelProviderConfigSchema,

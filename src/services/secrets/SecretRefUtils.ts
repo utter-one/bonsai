@@ -13,6 +13,8 @@ export const SENSITIVE_PROVIDER_CONFIG_FIELDS = new Set([
   'authToken',
   'accessToken',
   'appSecret',
+  'appToken',
+  'signingSecret',
   'verifyToken',
   'keyFileJson',
   'accountSid',

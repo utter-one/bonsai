@@ -146,6 +146,7 @@ import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChann
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
 import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
 import { TelegramChannelHost } from './channels/telegram/TelegramChannelHost';
+import { SlackChannelHost } from './channels/slack/SlackChannelHost';
 // import { SesChannelHost } from './channels/email/ses/SesChannelHost';
 // import { SendGridChannelHost } from './channels/email/sendgrid/SendGridChannelHost';
 import { SmtpImapChannelHost } from './channels/email/smtp-imap/SmtpImapChannelHost';
@@ -697,6 +698,12 @@ export function getOpenAPISpec(): any {
   // Register Telegram webhook route
   const telegramPaths = TelegramChannelHost.getOpenAPIPaths();
   for (const path of telegramPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Slack webhook route
+  const slackPaths = SlackChannelHost.getOpenAPIPaths();
+  for (const path of slackPaths) {
     registry.registerPath(path);
   }
 
