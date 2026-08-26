@@ -146,18 +146,23 @@ function abortingHangingFetch(url: string, init?: RequestInit): Promise<Response
   });
 }
 
-beforeEach(() => {
-  fetchCalls = [];
-  fetchImpl = async () => new Response(null, { status: 200 });
-  (globalThis as any).fetch = (url: string, init?: RequestInit) => {
-    fetchCalls.push({ url, init: init ?? {} });
-    return fetchImpl(url, init);
-  };
-});
+// The fetch stub is scoped to this file's suite: a root-level beforeEach would
+// replace global fetch for EVERY test that runs after this module loads
+// (the unit runner loads all files first), silently breaking any later suite
+// that makes real HTTP calls (e.g. the provider connection-test LLM suite).
+describe('P2-02 notifiers (fetch-stubbed)', () => {
+  beforeEach(() => {
+    fetchCalls = [];
+    fetchImpl = async () => new Response(null, { status: 200 });
+    (globalThis as any).fetch = (url: string, init?: RequestInit) => {
+      fetchCalls.push({ url, init: init ?? {} });
+      return fetchImpl(url, init);
+    };
+  });
 
-after(() => {
-  (globalThis as any).fetch = originalFetch;
-});
+  afterEach(() => {
+    (globalThis as any).fetch = originalFetch;
+  });
 
 // ─── WebhookNotifier ─────────────────────────────────────────────────────────
 
@@ -515,3 +520,4 @@ describe('P2-02 NotifyingPublisher', () => {
     expect(results[0].detail).to.equal('incomplete: 15s publisher cap');
   });
 });
+}); // P2-02 notifiers (fetch-stubbed)

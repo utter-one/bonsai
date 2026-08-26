@@ -1,3 +1,5 @@
+import { buildAsrConnectionTestStrategy } from './strategies/asr';
+import { buildLlmConnectionTestStrategy } from './strategies/llm';
 import type { ConnectionTestStrategy } from './types';
 
 /**
@@ -6,10 +8,12 @@ import type { ConnectionTestStrategy } from './types';
  * ProviderConnectionTester builds its dispatch table from here. New provider
  * types plug in by adding one line — without touching the tester or the HTTP
  * contract: TPC-02 'llm' · TPC-03 'asr' · TPC-04 'tts' · TPC-05 'storage' ·
- * TPC-08 'channel'. Phase-1 strategies land as their specs ship; until then
- * the table is empty and every provider type is an InvalidOperationError.
+ * TPC-08 'channel'.
  */
 export function buildConnectionTestStrategies(): Map<string, ConnectionTestStrategy> {
-  const strategies = new Map<string, ConnectionTestStrategy>();
-  return strategies;
+  const strategies: ConnectionTestStrategy[] = [
+    buildLlmConnectionTestStrategy(),
+    buildAsrConnectionTestStrategy(),
+  ];
+  return new Map(strategies.map((strategy) => [strategy.providerType, strategy]));
 }

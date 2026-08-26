@@ -194,11 +194,21 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
       params.append('language_code', this.settings.languageCode);
     }
 
-    const wsUrl = `wss://api.elevenlabs.io/v1/speech-to-text/realtime?${params.toString()}`;
+    // realtimeWsUrl is the test seam (defaults to the production endpoint —
+    // the same URL as before, overridable to point at a local mock, TPC-03).
+    const wsUrl = `${this.realtimeWsUrl}?${params.toString()}`;
 
     logger.info(`[ElevenLabs ASR] Connecting to WebSocket with model: ${modelId}, audioFormat: ${audioFormat}`);
 
     return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const settle = (fn: () => void): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        fn();
+      };
       this.socket = new WebSocket(wsUrl, {
         headers: {
           'xi-api-key': this.config.apiKey,
@@ -220,7 +230,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
             }
             // Send buffered audio chunks
             await this.flushAudioBuffer();
-            resolve();
+            settle(resolve);
           }
         } catch (error) {
           logger.error(`[ElevenLabs ASR] Error handling message: ${error}`);
@@ -231,7 +241,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
       this.socket.on('error', async (error: Error) => {
         logger.error(`[ElevenLabs ASR] WebSocket error: ${error.message}`);
         await this.handleError(error);
-        reject(error);
+        settle(() => reject(error));
       });
 
       this.socket.on('close', async (code: number, reason: Buffer) => {
@@ -244,6 +254,14 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         if (wasRecognizing) {
           this.handleRecognitionStopped();
         }
+
+        // An early close (before session_started) must reject start() instead of
+        // hanging it forever — e.g. ElevenLabs closes 4401 'invalid api key'
+        // on bad credentials, which the connection test must classify as auth
+        // (TPC-03). The close code/reason travel in the message for classification.
+        if (!settled) {
+          settle(() => reject(new Error(`ElevenLabs realtime WebSocket closed before session started: ${code} ${reason.toString()}`.trim())));
+        }
       });
     });
   }
@@ -254,7 +272,11 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   protected async doStop(): Promise<void> {
     logger.info(`[ElevenLabs ASR] Stopping recognition`);
 
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    // Capture the socket once: the close handler nulls this.socket, and an
+    // inbound close during the 100 ms finalization window must not turn the
+    // close() below into a null dereference (TPC-03 mid-stream close).
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       logger.warn(`[ElevenLabs ASR] Socket not open, cannot stop`);
       return;
     }
@@ -268,7 +290,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         sample_rate: sampleRate,
         commit: true,
       };
-      this.socket.send(JSON.stringify(finalMessage));
+      socket.send(JSON.stringify(finalMessage));
       logger.info(`[ElevenLabs ASR] Sent final commit message`);
     } catch (error) {
       logger.error(`[ElevenLabs ASR] Error sending final commit: ${error}`);
@@ -278,7 +300,9 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Now close the socket (this will trigger handleRecognitionStopped in the close handler)
-    this.socket.close();
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      socket.close();
+    }
   }
 
   /**

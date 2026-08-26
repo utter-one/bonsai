@@ -4,11 +4,11 @@ import { ZodError } from 'zod';
 import { db } from '../../../db';
 import { providers } from '../../../db/schema';
 import type { Provider } from '../../../types/models';
-import { ForbiddenError, InvalidOperationError, NotFoundError, TooManyRequestsError } from '../../../errors';
+import { ForbiddenError, InvalidOperationError, NotFoundError, TooManyRequestsError, ValidationError } from '../../../errors';
 import { logger } from '../../../utils/logger';
+import { MonitoringContext } from '../../monitoring/MonitoringContext';
 import { classifyThirdPartyError, type ClassifiedError, type ThirdPartyErrorCode } from '../../../utils/errorClassification';
 import type { RequestContext } from '../../RequestContext';
-import { CallLogger } from '../../monitoring/CallLogger';
 import { buildConnectionTestStrategies } from './index';
 import {
   buildDraftProvider,
@@ -43,8 +43,13 @@ const COOLDOWN_SWEEP_THRESHOLD = 1_000;
  * - fresh instance per test (strategies build via the factories' test seams)
  * - no vendor outcome escapes: only guard errors (400/404/429) throw
  * - error-text sanitization at the single choke point (response + logs)
- * - saved tests record exactly one provider_call_logs row (`<type>.test`);
- *   draft tests record nothing
+ * - call-log attribution rides the production path: the strategy body runs
+ *   under `MonitoringContext.run({ operation: '<type>.test' })`, so the
+ *   provider base's own instrumentation records exactly one `<type>.test`
+ *   row per saved test (same recording behavior as live calls). Draft
+ *   providers are built un-stamped (factory seam), so draft tests record
+ *   nothing. Auxiliary free calls under the test context (e.g. the llm.models
+ *   enumeration that defaults the tested model) are also breaker-excluded.
  *
  * Test outcomes never feed the circuit breaker (CallLogger guard, TPC-01),
  * so a flaky vendor during manual testing cannot open a breaker and trigger
@@ -56,7 +61,7 @@ export class ProviderConnectionTester {
   /** cooldownKey → timestamp of the last test start (ms). */
   private readonly lastTestAt = new Map<string, number>();
 
-  constructor(@inject(CallLogger) private readonly callLogger: CallLogger) {
+  constructor() {
     this.strategies = buildConnectionTestStrategies();
   }
 
@@ -80,18 +85,32 @@ export class ProviderConnectionTester {
     this.markTestStarted(request.cooldownKey);
 
     const ctx: ConnectionTestContext = { operatorId: context.operatorId };
-    const startedAt = Date.now();
+    // Monotonic clock: latency must not be skewed by wall-clock (NTP) adjustments.
+    const startedAt = performance.now();
     let instance: unknown = null;
     try {
-      // The hard timeout wraps the whole strategy body (build + test), per TPC-01.
-      const outcome = await this.withTimeout(
-        (async () => {
-          instance = await strategy.buildInstance(request, ctx);
-          return await strategy.test(request, instance, ctx);
-        })(),
-        strategy.timeoutMs,
-      );
-      return this.complete(request, outcome, ctx);
+      // The hard timeout wraps the whole strategy body (build + test), per
+      // TPC-01. Body AND cleanup run under the tester's monitoring context so
+      // the production path's instrumentation records the test's own call-log
+      // rows breaker-excluded — including rows flushed by cleanup itself
+      // (e.g. the ASR session row, which hardcodes its operation and is only
+      // excluded via the context at flush time).
+      const outcome = await MonitoringContext.run({ operation: `${request.providerType}.test` }, async () => {
+        try {
+          return await this.withTimeout(
+            (async () => {
+              instance = await strategy.buildInstance(request, ctx);
+              return await strategy.test(request, instance, ctx);
+            })(),
+            strategy.timeoutMs,
+          );
+        } finally {
+          // Always awaited (bounded) — even on timeout, so the instance's own
+          // resources are released (the raced promise may still settle later).
+          await this.boundedCleanup(instance);
+        }
+      });
+      return this.complete(request, outcome, ctx, startedAt);
     } catch (err) {
       if (this.isGuardError(err)) {
         throw err;
@@ -104,16 +123,12 @@ export class ProviderConnectionTester {
         apiType: request.apiType,
         protocol: strategy.protocol,
         phase,
-        latencyMs: Date.now() - startedAt,
+        latencyMs: performance.now() - startedAt,
         errorCode: classified.code,
         statusHttp: classified.statusHttp ?? null,
         errorText: this.errorMessageOf(err),
       };
-      return this.complete(request, outcome, ctx);
-    } finally {
-      // Always awaited (bounded) — even on timeout, so the instance's own
-      // resources are released (the raced promise may still settle later).
-      await this.boundedCleanup(instance);
+      return this.complete(request, outcome, ctx, startedAt);
     }
   }
 
@@ -176,8 +191,8 @@ export class ProviderConnectionTester {
     this.lastTestAt.set(key, now);
   }
 
-  /** Sanitizes the result, records the saved-test call-log row (exactly once per test) and returns the public shape. */
-  private complete(request: ConnectionTestRequest, outcome: ConnectionTestOutcome, ctx: ConnectionTestContext): ConnectionTestResult {
+  /** Sanitizes the result, logs it and returns the public shape (call-log attribution is the production path's job — see class doc). */
+  private complete(request: ConnectionTestRequest, outcome: ConnectionTestOutcome, ctx: ConnectionTestContext, startedAt: number): ConnectionTestResult {
     const errorText = outcome.errorText ? sanitizeErrorText(outcome.errorText) : undefined;
     const result: ConnectionTestResult = {
       ok: outcome.ok,
@@ -185,29 +200,12 @@ export class ProviderConnectionTester {
       apiType: outcome.apiType,
       protocol: outcome.protocol,
       phase: outcome.phase,
-      latencyMs: outcome.latencyMs,
+      // Tester-owned: total elapsed (build + test), identical on ok/fail paths.
+      latencyMs: Math.round(performance.now() - startedAt),
       errorCode: outcome.errorCode,
       ...(errorText ? { errorText } : {}),
       ...(outcome.detail ? { detail: outcome.detail } : {}),
     };
-
-    if (request.mode === 'saved') {
-      // Draft tests are transient (no provider row to attribute to) — no row.
-      // The '<type>.test' operation keeps these rows out of the breaker feed.
-      this.callLogger.record({
-        providerId: request.provider.id,
-        providerType: request.providerType,
-        apiType: request.apiType,
-        operation: `${request.providerType}.test`,
-        model: outcome.model ?? request.model ?? null,
-        ok: result.ok,
-        errorCode: result.errorCode,
-        statusHttp: outcome.statusHttp ?? null,
-        durationMs: result.latencyMs,
-        errorText: errorText ?? null,
-      });
-    }
-
     logger.info(
       { providerType: request.providerType, apiType: request.apiType, mode: request.mode, ok: result.ok, phase: result.phase, latencyMs: result.latencyMs, errorCode: result.errorCode, operatorId: ctx.operatorId },
       'Provider connection test finished',
@@ -261,7 +259,7 @@ export class ProviderConnectionTester {
   }
 
   private isGuardError(err: unknown): boolean {
-    return err instanceof ZodError || err instanceof InvalidOperationError || err instanceof NotFoundError || err instanceof TooManyRequestsError || err instanceof ForbiddenError;
+    return err instanceof ZodError || err instanceof ValidationError || err instanceof InvalidOperationError || err instanceof NotFoundError || err instanceof TooManyRequestsError || err instanceof ForbiddenError;
   }
 
   private errorMessageOf(err: unknown): string {

@@ -10,6 +10,7 @@ import { AssemblyAiAsrProvider, AssemblyAiAsrProviderConfig, assemblyAiAsrProvid
 import { SpeechmaticsAsrProvider, SpeechmaticsAsrProviderConfig, speechmaticsAsrProviderConfigSchema, SpeechmaticsAsrSettings, speechmaticsAsrSettingsSchema } from './SpeechmaticsAsrProvider';
 import { SonioxAsrProvider, SonioxAsrProviderConfig, sonioxAsrProviderConfigSchema, SonioxAsrSettings, sonioxAsrSettingsSchema } from './SonioxAsrProvider';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
+import { CONNECTION_TEST_DRAFT_ID } from '../connectionTest/types';
 
 /**
  * Supported ASR provider API types
@@ -50,42 +51,47 @@ export class AsrProviderFactory {
 
     const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
     const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
-
-    // Create provider instance based on API type
-    let instance: IAsrProvider;
-    switch (provider.apiType) {
-      case 'azure':
-        instance = this.createAzureProvider(resolvedProvider, settings as AzureAsrSettings);
-        break;
-
-      case 'elevenlabs':
-        instance = this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsAsrSettings);
-        break;
-
-      case 'deepgram':
-        instance = this.createDeepgramProvider(resolvedProvider, settings as DeepgramAsrSettings);
-        break;
-
-      case 'assemblyai':
-        instance = this.createAssemblyAiProvider(resolvedProvider, settings as AssemblyAiAsrSettings);
-        break;
-
-      case 'speechmatics':
-        instance = this.createSpeechmaticsProvider(resolvedProvider, settings as SpeechmaticsAsrSettings);
-        break;
-
-      case 'soniox':
-        instance = this.createSonioxProvider(resolvedProvider, settings as SonioxAsrSettings);
-        break;
-
-      default:
-        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai, speechmatics, soniox`;
-        logger.error(errorMessage);
-        throw new Error(errorMessage);
-    }
+    const instance = this.instantiateProvider(resolvedProvider, settings);
 
     // Stamp provider identity for call-log attribution (P1-03)
     if (instance instanceof AsrProviderBase) {
+      instance.providerId = provider.id;
+      instance.providerApiType = provider.apiType;
+    }
+
+    return instance;
+  }
+
+  /**
+   * Creates an ASR provider instance for an on-demand connection test (TPC-03).
+   * Explicit seam for the test path: fresh instance (never pooled/pre-warmed),
+   * secrets resolved, and no production call sites may use it. The session
+   * lifecycle (init/start/...) is the strategy's job — this returns an
+   * uninitialised instance.
+   * Draft providers (id CONNECTION_TEST_DRAFT_ID) are built WITHOUT call-log
+   * identity stamps — the provider base's instrumentation then records
+   * nothing, which is the TPC-01 draft-mode contract (no call-log rows).
+   * Saved providers are stamped so their production wrapper records the
+   * test's own `asr.session` call-log row under the tester's monitoring
+   * context (breaker-excluded via the context at flush time).
+   * @param provider - Provider entity (saved row, or the synthetic draft provider for draft tests)
+   * @param settings - ASR settings (empty object: the test uses provider defaults)
+   * @returns A new, uninitialised ASR provider instance
+   * @throws {Error} When provider type is not 'asr' or API type is not supported
+   */
+  async createForTest(provider: Provider, settings: unknown): Promise<IAsrProvider> {
+    if (provider.providerType !== 'asr') {
+      const errorMessage = `Provider ${provider.id} is not an ASR provider. Expected providerType 'asr', got '${provider.providerType}'`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    logger.info(`Creating test ASR provider instance (${provider.apiType}) for provider ${provider.id}`);
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings);
+
+    // Stamp only for saved providers — draft tests must not produce call-log rows.
+    if (instance instanceof AsrProviderBase && provider.id !== CONNECTION_TEST_DRAFT_ID) {
       instance.providerId = provider.id;
       instance.providerApiType = provider.apiType;
     }
@@ -104,6 +110,41 @@ export class AsrProviderFactory {
    */
   async createProviderForProbing(provider: Provider): Promise<IAsrProvider> {
     return this.createProvider(provider, {});
+  }
+
+  /**
+   * Parses provider config and instantiates the correct provider class (no validation beyond the config schemas, no identity stamping).
+   * @param provider - Provider entity (config already resolved)
+   * @param settings - ASR settings for the concrete apiType
+   * @returns A new, uninitialised ASR provider instance
+   * @throws {Error} When the API type is not supported
+   */
+  private instantiateProvider(provider: Provider, settings: unknown): IAsrProvider {
+    // Create provider instance based on API type
+    switch (provider.apiType) {
+      case 'azure':
+        return this.createAzureProvider(provider, settings as AzureAsrSettings);
+
+      case 'elevenlabs':
+        return this.createElevenLabsProvider(provider, settings as ElevenLabsAsrSettings);
+
+      case 'deepgram':
+        return this.createDeepgramProvider(provider, settings as DeepgramAsrSettings);
+
+      case 'assemblyai':
+        return this.createAssemblyAiProvider(provider, settings as AssemblyAiAsrSettings);
+
+      case 'speechmatics':
+        return this.createSpeechmaticsProvider(provider, settings as SpeechmaticsAsrSettings);
+
+      case 'soniox':
+        return this.createSonioxProvider(provider, settings as SonioxAsrSettings);
+
+      default:
+        const errorMessage = `Unsupported ASR provider API type: ${provider.apiType}. Supported types: azure, elevenlabs, deepgram, assemblyai, speechmatics, soniox`;
+        logger.error(errorMessage);
+        throw new Error(errorMessage);
+    }
   }
 
   /**

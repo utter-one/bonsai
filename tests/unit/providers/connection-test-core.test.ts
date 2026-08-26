@@ -3,6 +3,9 @@ import { describe, it, beforeEach } from 'mocha';
 import { expect } from 'chai';
 import { ZodError } from 'zod';
 import { CallLogger, type ProviderCallEntry, type ProviderCallLogRow } from '../../../src/services/monitoring/CallLogger';
+import { MetricsRegistry } from '../../../src/services/monitoring/MetricsRegistry';
+import { MonitoringContext } from '../../../src/services/monitoring/MonitoringContext';
+import { ProviderCallRecorder } from '../../../src/services/monitoring/ProviderCallRecorder';
 import { ProviderConnectionTester } from '../../../src/services/providers/connectionTest/ProviderConnectionTester';
 import {
   ConnectionTestFailure,
@@ -67,14 +70,21 @@ class TestCallLogger extends CallLogger {
 class TestTester extends ProviderConnectionTester {
   providers = new Map<string, Provider>();
 
-  constructor(callLogger: CallLogger) {
-    super(callLogger);
-  }
-
   protected override async loadProvider(id: string): Promise<Provider> {
     const row = this.providers.get(id);
     if (!row) throw new NotFoundError(`Provider with id ${id} not found`);
     return row;
+  }
+}
+
+/** Quiet metrics double — the production wrapper path touches the registry; discard it. */
+class QuietMetrics extends MetricsRegistry {
+  protected override async persistRows(_rows: unknown[]): Promise<void> {
+    /* discard */
+  }
+
+  protected override onFlushError(): void {
+    /* discard */
   }
 }
 
@@ -96,6 +106,13 @@ class StubStrategy implements ConnectionTestStrategy<StubInstance> {
   buildInstanceCalls = 0;
   cleanupCalls = 0;
   instancesInTest: StubInstance[] = [];
+  /**
+   * Simulates the instrumented production path (TPC-02 design): the provider
+   * base records one row per call — record-then-throw on failure — via the
+   * real ProviderCallRecorder. Draft mode simulates the un-stamped instance:
+   * the base's recorder early-returns, so nothing is recorded.
+   */
+  recorder: { record(entry: ProviderCallEntry): void } | null = null;
 
   constructor(opts: { providerType?: string; timeoutMs?: number; protocol?: TestProtocol } = {}) {
     this.providerType = opts.providerType ?? 'llm';
@@ -114,13 +131,17 @@ class StubStrategy implements ConnectionTestStrategy<StubInstance> {
     switch (this.mode) {
       case 'hang':
         return new Promise<never>(() => undefined);
-      case 'vendor-error':
-        throw this.vendorError ?? new Error('vendor exploded');
+      case 'vendor-error': {
+        const error = this.vendorError ?? new Error('vendor exploded');
+        this.recordProductionCall(request, { ok: false, error });
+        throw error;
+      }
       case 'structured-failure':
         throw new ConnectionTestFailure('session config rejected by vendor', this.failurePhase, undefined, 'client_error');
       case 'guard-error':
         throw new ZodError([]);
-      default:
+      default: {
+        this.recordProductionCall(request, { ok: true, model: this.outcomeOverrides.model ?? request.model ?? null });
         return {
           ok: true,
           providerType: request.providerType,
@@ -131,7 +152,24 @@ class StubStrategy implements ConnectionTestStrategy<StubInstance> {
           errorCode: null,
           ...this.outcomeOverrides,
         };
+      }
     }
+  }
+
+  private recordProductionCall(request: ConnectionTestRequest, fields: { ok: boolean; error?: unknown; model?: string | null }): void {
+    if (request.mode !== 'saved' || !this.recorder) return;
+    this.recorder.record({
+      providerId: request.provider.id,
+      providerType: request.providerType,
+      apiType: request.apiType,
+      // The production base fills the operation from the monitoring context —
+      // under the tester that is '<type>.test' (breaker-excluded).
+      operation: MonitoringContext.current()?.operation,
+      model: fields.model ?? null,
+      durationMs: 12,
+      ok: fields.ok,
+      ...(fields.error !== undefined ? { error: fields.error } : {}),
+    });
   }
 }
 
@@ -172,11 +210,15 @@ const JWT_SAMPLE = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J
 
 describe('ProviderConnectionTester core (TPC-01)', () => {
   let callLogger: TestCallLogger;
+  let quietMetrics: QuietMetrics;
+  let recorder: ProviderCallRecorder;
   let tester: TestTester;
 
   beforeEach(() => {
     callLogger = new TestCallLogger();
-    tester = new TestTester(callLogger);
+    quietMetrics = new QuietMetrics();
+    recorder = new ProviderCallRecorder(callLogger, quietMetrics);
+    tester = new TestTester();
   });
 
   describe('dispatch', () => {
@@ -187,7 +229,15 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
 
       const result = await tester.testConnection({ providerId: 'prov_llm_1' }, context);
 
-      expect(result).to.deep.equal({ ok: true, providerType: 'llm', apiType: 'openai', protocol: 'http', phase: 'first-data', latencyMs: 12, errorCode: null });
+      expect(result.ok).to.equal(true);
+      expect(result.providerType).to.equal('llm');
+      expect(result.apiType).to.equal('openai');
+      expect(result.protocol).to.equal('http');
+      expect(result.phase).to.equal('first-data');
+      expect(result.latencyMs).to.be.a('number').and.to.be.at.least(0);
+      expect(result.errorCode).to.equal(null);
+      expect(result).to.not.have.property('model');
+      expect(result).to.not.have.property('statusHttp');
       expect(strategy.buildInstanceCalls).to.equal(1);
       expect(strategy.instancesInTest[0]).to.not.equal(undefined);
     });
@@ -426,34 +476,37 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
       expect(sanitizeErrorText('model gpt-test not found')).to.equal('model gpt-test not found');
     });
 
-    it('sanitizes at the tester choke point (response AND call-log row)', async () => {
+    it('sanitizes at the tester choke point (response AND the persisted row)', async () => {
       const strategy = new StubStrategy();
-      strategy.outcomeOverrides = {
-        ok: false,
-        phase: 'auth',
-        errorCode: 'auth',
-        errorText: `Authorization: Bearer sk-proj-abc123secret plus ${'y'.repeat(700)}`,
-      };
+      strategy.recorder = recorder;
+      strategy.mode = 'vendor-error';
+      strategy.vendorError = new Error(`Authorization: Bearer sk-proj-abc123secret plus ${'y'.repeat(700)}`);
       tester.registerStrategy(strategy);
       tester.providers.set('prov_llm_1', savedProvider());
 
       const result = await tester.testConnection({ providerId: 'prov_llm_1' }, context);
 
+      // Response path (tester).
       expect(result.errorText).to.include('Bearer [REDACTED]');
       expect(result.errorText).to.not.include('sk-proj-abc123secret');
       expect(result.errorText?.length).to.be.at.most(500);
 
-      const row = callLogger.pendingEntries[0];
-      expect(row).to.not.equal(undefined);
-      expect(row.errorText).to.include('Bearer [REDACTED]');
-      expect(row.errorText).to.not.include('sk-proj-abc123secret');
-      expect(row.errorText?.length).to.be.at.most(500);
+      // Persisted row path (production wrapper → CallLogger write layer).
+      await callLogger.flushNow();
+      expect(callLogger.rows).to.have.length(1);
+      const persisted = callLogger.rows[0].errorText;
+      expect(persisted).to.not.equal(null);
+      expect(persisted).to.include('Bearer [REDACTED]');
+      expect(persisted).to.not.include('sk-proj-abc123secret');
+      expect(persisted!.length).to.be.at.most(500);
     });
   });
 
-  describe('call-log attribution (draft vs saved)', () => {
+  describe('call-log attribution (draft vs saved, via the production recording path)', () => {
     it('saved ok test → exactly one row with <type>.test operation, model and status filled', async () => {
-      tester.registerStrategy(new StubStrategy());
+      const strategy = new StubStrategy();
+      strategy.recorder = recorder;
+      tester.registerStrategy(strategy);
       tester.providers.set('prov_llm_1', savedProvider());
 
       const result = await tester.testConnection({ providerId: 'prov_llm_1', model: 'gpt-test' }, context);
@@ -468,11 +521,12 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
       expect(row.model).to.equal('gpt-test');
       expect(row.ok).to.equal(true);
       expect(row.errorCode).to.equal(null);
-      expect(row.durationMs).to.be.a('number');
+      expect(row.durationMs).to.equal(12);
     });
 
-    it('saved failed test → exactly one row with errorCode/statusHttp/errorText from the vendor outcome', async () => {
+    it('saved failed test → exactly one row with errorCode/statusHttp/errorText from the vendor error', async () => {
       const strategy = new StubStrategy();
+      strategy.recorder = recorder;
       strategy.mode = 'vendor-error';
       strategy.vendorError = vendorError(401, 'Invalid API key provided');
       tester.registerStrategy(strategy);
@@ -489,15 +543,18 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
       expect(row.errorText).to.equal('Invalid API key provided');
     });
 
-    it('draft tests → zero call-log rows (transient, nothing to attribute to)', async () => {
-      tester.registerStrategy(new StubStrategy());
+    it('draft tests → zero call-log rows (un-stamped instances, nothing to attribute to)', async () => {
+      const strategy = new StubStrategy();
+      strategy.recorder = recorder;
+      tester.registerStrategy(strategy);
       const result = await tester.testConnection({ providerType: 'llm', apiType: 'openai', config: { apiKey: 'sk-draft' } }, context);
       expect(result.ok).to.equal(true);
       expect(callLogger.pendingEntries).to.be.empty;
     });
 
-    it('strategy-reported model/voice wins over the request model in the row', async () => {
+    it('the row carries the model the production path stamped (strategy-reported, not the request model)', async () => {
       const strategy = new StubStrategy();
+      strategy.recorder = recorder;
       strategy.outcomeOverrides = { model: 'gpt-defaulted' };
       tester.registerStrategy(strategy);
       tester.providers.set('prov_llm_1', savedProvider());
@@ -526,9 +583,10 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
       expect(elapsed).to.be.at.least(55);
       expect(strategy.cleanupCalls).to.equal(1);
 
-      // A timeout is still a test outcome — exactly one call-log row.
-      expect(callLogger.pendingEntries).to.have.length(1);
-      expect(callLogger.pendingEntries[0].errorCode).to.equal('timeout');
+      // The production path only records on settle; a hard timeout leaves the
+      // vendor call in flight, so no row yet (a late settle would land under
+      // the test context and stay breaker-excluded).
+      expect(callLogger.pendingEntries).to.be.empty;
     });
 
     it('the timeout also wraps buildInstance (no cleanup possible when the instance never materializes)', async function () {
@@ -600,6 +658,16 @@ describe('CallLogger breaker exclusion for connection tests (TPC-01)', () => {
     expect(callLogger.breakerRegistryForTests.failures).to.have.length(1);
     expect(callLogger.pendingEntries).to.have.length(3);
   });
+
+  it('rows made under the tester monitoring context (auxiliary ops, e.g. model enumeration) also skip the breaker', () => {
+    MonitoringContext.run({ operation: 'llm.test' }, () => {
+      callLogger.record(entry({ operation: 'llm.models', ok: false, errorCode: 'auth' }));
+    });
+    expect(callLogger.breakerRegistryForTests.failures).to.be.empty;
+    expect(callLogger.breakerRegistryForTests.successes).to.be.empty;
+    expect(callLogger.pendingEntries).to.have.length(1);
+    expect(callLogger.pendingEntries[0].operation).to.equal('llm.models');
+  });
 });
 
 describe('LlmProviderFactory.createForTest (TPC-01 seam)', () => {
@@ -669,7 +737,9 @@ describe('LlmProviderFactory.createForTest (TPC-01 seam)', () => {
       { model: 'gpt-test' },
     );
     expect(instance).to.be.instanceOf(OpenAILlmProvider);
-    expect((instance as unknown as { providerId?: string }).providerId).to.equal('draft');
+    // Un-stamped on purpose: the production wrapper's recorder early-returns,
+    // so draft tests persist no call-log rows (TPC-01 contract).
+    expect((instance as unknown as { providerId?: string | null }).providerId ?? null).to.equal(null);
   });
 });
 

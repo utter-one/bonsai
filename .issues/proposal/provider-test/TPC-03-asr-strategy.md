@@ -1,9 +1,9 @@
 ---
 title: "TPC-03 — ASR strategy: real WebSocket session + silence"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-26
 assignee: ""
 tags: [providers, spec, connection-test, phase-1, asr]
 ---
@@ -82,3 +82,73 @@ server standing in for the vendor (no network):
 
 - Requiring a transcript (silence test), periodic probing (TPC-09),
   endpoint plumbing (TPC-06).
+
+## Resolution (2026-08-26)
+
+Implemented and green: build ✓, unit 962 passing / 0 failing, e2e
+1054 passing / 0 failing.
+
+**Artifacts**
+
+- `src/services/providers/connectionTest/silence.ts` — `buildAsrSilence(format)`:
+  `pcm_<rate>` → 500 ms of 16-bit mono zeros (rate × 2 bytes); `mulaw` →
+  4 000 bytes of `0xFF` (8 kHz); `alaw` → 4 000 bytes of `0x7F` (8 kHz);
+  throws on unsupported formats. 500 ms constant (`SILENCE_MS`) — shared
+  with TPC-09.
+- `src/services/providers/connectionTest/strategies/asr.ts` — registered
+  for `asr` in `connectionTest/index.ts`. `protocol: 'websocket'`,
+  `timeoutMs: 20_000`. `buildInstance` resolves `AsrProviderFactory` and
+  calls `createForTest` (TPC-01 pattern) — **without `init()`**: the
+  lifecycle below is the test, and an init failure must surface as a
+  classified result. `test` registers `onRecognitionStarted` /
+  `onRecognizing` / `onRecognized` / `onError` **before** `init()`/`start()`
+  because Deepgram fires `onRecognitionStarted` on WS `open` and
+  ElevenLabs resolves `start()` on the `session_started` message — both
+  during `start()`, so registering afterwards would miss the signal.
+  Lifecycle: `init → start → sendAudio(silence of first format) → await
+  sessionLive (started or first inbound) → stop`; returns `phase
+  'first-data'` + `detail: { transcript? }` (bonus only).
+- `src/services/providers/asr/AsrProviderFactory.ts` — extracted
+  `instantiateProvider(provider, settings)` (the apiType switch) and added
+  `createForTest(provider, settings)`: resolves config, instantiates,
+  stamps identity for saved providers only (skipped for
+  `CONNECTION_TEST_DRAFT_ID`). `createProvider` delegates to the same
+  private method — one code path.
+- `ElevenLabsAsrProvider` (3 production fixes, all required to make the
+  spec's test table observable through the real lifecycle):
+  1. `doStart` now connects to `this.realtimeWsUrl` (the seam previously
+     existed for `ping()` only) — same default endpoint, overridable to a
+     local mock in tests.
+  2. **Close-before-session rejection**: a socket close that arrives before
+     `session_started` (the real-world 4401 `invalid api key` shape) now
+     rejects `start()` with `code`/`reason` in the message — previously it
+     hung until the 20 s timeout and misreported `timeout` instead of
+     `auth`.
+  3. `doStop` null-race: the socket is captured once and re-guarded before
+     the final `close()` — an inbound close during the 100 ms finalization
+     window previously nulled `this.socket` and turned the close into a
+     `TypeError` (`Cannot read properties of null (reading 'close')`).
+
+**Notes / known siblings**
+
+- The strategy's `AsrTestInstance` (and `LlmTestInstance`) carries
+  `cleanup()` delegating to the provider — the tester's `boundedCleanup`
+  calls `instance.cleanup()` and the wrapper object itself has none.
+- `DeepgramAsrProvider.doStop` has the same latent null-race shape (close
+  after `await 100ms` without re-guarding); not fixed here (out of
+  scope) — flagged for a follow-up.
+- The silence session records one `asr.session` call-log row with
+  `ok: false` (no finals — production session semantics: a session with
+  no recognized audio is a not-ok session). Breaker exclusion works via
+  the ctx-aware `CallLogger` guard (`ctx.operation = 'asr.test'`), since
+  `AsrProviderBase.flushSession` hardcodes `operation: 'asr.session'`.
+- Unit tests (`tests/unit/providers/connection-test-asr.test.ts`, 11
+  tests) run the real `ElevenLabsAsrProvider` against a local `ws`
+  server speaking the minimal realtime protocol; the factory seam points
+  `realtimeWsUrl` at the mock (vendor-specific code lives in the test,
+  never in the strategy — all six apiTypes are covered by construction).
+  Coverage: ok handshake (silence bytes on the wire verified + row +
+  breaker not fed), 4401 close → `auth`, no-response → `timeout` (150 ms
+  registry seam), mid-stream close → `ok:true`, partial →
+  `detail.transcript`, draft → zero rows / zero breaker, and
+  `buildAsrSilence` byte-exactness (pcm_16000/8000, mulaw, alaw, invalid).

@@ -3,6 +3,7 @@ import { db } from '../../db';
 import { providerCallLogs } from '../../db/schema';
 import type { CallMetrics } from '../../db/schema';
 import { generateId } from '../../utils/idGenerator';
+import { sanitizeErrorText } from '../../utils/errorSanitization';
 import logger from '../../utils/logger';
 import { MonitoringContext } from './MonitoringContext';
 import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
@@ -31,7 +32,7 @@ export interface ProviderCallEntry {
   errorCode?: string | null;
   statusHttp?: number | null;
   durationMs: number;
-  /** Truncated to 1KB at the write layer. */
+  /** Sanitized (secret patterns redacted, truncated to 500 chars) at the write layer (TPC-01). */
   errorText?: string | null;
   /** Set when this call executed on a fallback provider (P3). */
   fallbackProviderId?: string | null;
@@ -41,7 +42,6 @@ export interface ProviderCallEntry {
 
 const FLUSH_INTERVAL_MS = 5_000;
 const FLUSH_THRESHOLD_ROWS = 200;
-const ERROR_TEXT_MAX_CHARS = 1024;
 const DEFAULT_BUFFER_SIZE = 10_000;
 const OVERFLOW_WARN_THROTTLE_MS = FLUSH_INTERVAL_MS;
 
@@ -110,10 +110,14 @@ export class CallLogger {
         conversationId: entry.conversationId ?? ctx?.conversationId ?? null,
       };
       // P3-01: feed the per-provider circuit breaker (in-memory, never throws).
-      // TPC-01: manual connection tests ('<type>.test' operations) are buffered and
-      // persisted like any other row, but never feed the breaker — a flaky vendor
-      // during manual testing must not open a breaker and trigger failover for real users.
-      if (!full.operation.endsWith('.test')) {
+      // TPC-01: manual connection tests are buffered and persisted like any
+      // other row, but never feed the breaker — a flaky vendor during manual
+      // testing must not open a breaker and trigger failover for real users.
+      // Excluded rows: the test's own '<type>.test' operation, and any call
+      // made under the tester's monitoring context (auxiliary free calls, e.g.
+      // the llm.models enumeration used to default the tested model).
+      const inConnectionTest = full.operation.endsWith('.test') || (ctx?.operation?.endsWith('.test') ?? false);
+      if (!inConnectionTest) {
         if (full.ok) {
           this.breakerRegistry?.recordSuccess(full.providerId);
         } else {
@@ -221,9 +225,9 @@ export class CallLogger {
 }
 
 function toRow(entry: ProviderCallEntry): ProviderCallLogRow {
-  const errorText = entry.errorText
-    ? entry.errorText.slice(0, ERROR_TEXT_MAX_CHARS)
-    : null;
+  // TPC-01: single sanitization choke point for every persisted row — vendor
+  // error text may carry tokens/keys (redacted) and must stay bounded.
+  const errorText = entry.errorText ? sanitizeErrorText(entry.errorText) : null;
   return {
     id: generateId('clgl'),
     providerId: entry.providerId,

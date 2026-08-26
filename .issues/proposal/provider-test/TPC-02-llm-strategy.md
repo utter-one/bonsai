@@ -1,9 +1,9 @@
 ---
 title: "TPC-02 — LLM strategy: 1-token real inference"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-26
 assignee: ""
 tags: [providers, spec, connection-test, phase-1, llm]
 ---
@@ -69,3 +69,23 @@ OpenAI-compatible HTTP server (no network):
 
 - Multi-model sweeps (existing benchmark suite), draft/endpoint plumbing
   (TPC-01/TPC-06).
+
+## Resolution (2026-08-26)
+
+Shipped: `src/services/providers/connectionTest/strategies/llm.ts`
+(registered in `connectionTest/index.ts`), `LlmProviderFactory.createForTest`
+(fresh initialized instance; draft → un-stamped so the production wrapper
+records zero rows), and `tests/unit/providers/connection-test-llm.test.ts`
+(9 tests, local fake OpenAI-compatible HTTP server — 200/401/429/500,
+dead endpoint, hang with a 150 ms timeout seam, saved-without-model
+defaults via real `enumerateModels()`, draft-without-model → ValidationError,
+draft-with-model → zero call-log rows + zero breaker feed).
+
+Two deliberate deviations from the wording above:
+
+- The probe payload is `[system, user 'ping']`, not user-only: seven of the
+  16 apiTypes enforce system-first in `LlmProviderBase.validateMessages`,
+  which a user-only probe would trip on perfectly valid credentials.
+- `temperature: 0` is not passed: the production `generate()` API does not
+  expose temperature (it is fixed per provider config) — `maxTokens: 1`
+  is the cost bound the API offers, which is what matters here.
