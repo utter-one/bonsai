@@ -1,9 +1,9 @@
 ---
 title: "TPC-01 — Tester core: types, strategy registry, guards, instance construction"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-26
 assignee: ""
 tags: [providers, spec, connection-test, phase-1]
 ---

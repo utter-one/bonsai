@@ -110,10 +110,15 @@ export class CallLogger {
         conversationId: entry.conversationId ?? ctx?.conversationId ?? null,
       };
       // P3-01: feed the per-provider circuit breaker (in-memory, never throws).
-      if (full.ok) {
-        this.breakerRegistry?.recordSuccess(full.providerId);
-      } else {
-        this.breakerRegistry?.recordFailure(full.providerId, full.errorCode);
+      // TPC-01: manual connection tests ('<type>.test' operations) are buffered and
+      // persisted like any other row, but never feed the breaker — a flaky vendor
+      // during manual testing must not open a breaker and trigger failover for real users.
+      if (!full.operation.endsWith('.test')) {
+        if (full.ok) {
+          this.breakerRegistry?.recordSuccess(full.providerId);
+        } else {
+          this.breakerRegistry?.recordFailure(full.providerId, full.errorCode);
+        }
       }
       this.buffer.push(full);
       if (this.buffer.length > this.bufferSize) {

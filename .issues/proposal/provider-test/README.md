@@ -10,7 +10,7 @@ Proposal: [`PROPOSAL-provider-test-connection.md`](../../PROPOSAL-provider-test-
 
 | ID | Title | Phase | Est. | Status |
 |---|---|---|---|---|
-| [TPC-01](TPC-01-tester-core.md) | Tester core: types, registry, guards, instance construction | 1 | 1 d | open |
+| [TPC-01](TPC-01-tester-core.md) | Tester core: types, registry, guards, instance construction | 1 | 1 d | resolved |
 | [TPC-02](TPC-02-llm-strategy.md) | LLM strategy: 1-token real inference | 1 | 0.5 d | open |
 | [TPC-03](TPC-03-asr-strategy.md) | ASR strategy: real WS session + silence | 1 | 1 d | open |
 | [TPC-04](TPC-04-tts-strategy.md) | TTS strategy: real minimal synthesis | 1 | 0.5 d | open |

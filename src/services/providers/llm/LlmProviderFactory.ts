@@ -75,6 +75,38 @@ export class LlmProviderFactory {
   }
 
   /**
+   * Creates a fresh, fully initialized LLM provider instance for on-demand
+   * connection tests (TPC-01). Mirrors createProvider() but is the explicit
+   * seam for the test path: fresh instance (never pooled/pre-warmed), secrets
+   * resolved, init() awaited so the instance is immediately usable, and no
+   * production call sites may use it.
+   * @param provider - Provider entity (saved row, or the synthetic `id: 'draft'` provider for draft tests)
+   * @param settings - LLM settings including the model to test
+   * @returns A new, initialized LLM provider instance
+   * @throws {Error} When provider type is not 'llm', model is missing, or API type is not supported
+   */
+  async createForTest(provider: Provider, settings: LlmSettings): Promise<ILlmProvider> {
+    if (provider.providerType !== 'llm') {
+      const errorMessage = `Provider ${provider.id} is not an LLM provider. Expected providerType 'llm', got '${provider.providerType}'`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    if (!settings.model) {
+      const errorMessage = `Invalid LLM provider settings for provider ${provider.id}. Required field: model`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    logger.info(`Creating test LLM provider instance (${provider.apiType}) for provider ${provider.id} with model ${settings.model}`);
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings);
+    // Awaited: the test uses the instance immediately (same rationale as createProvider).
+    await instance.init();
+    return instance;
+  }
+
+  /**
    * Creates an LLM provider instance with minimal/default settings for model enumeration purposes.
    * The returned instance should only be used to call `enumerateModels()`, not for generation.
    * @param provider - Provider entity from database containing configuration
