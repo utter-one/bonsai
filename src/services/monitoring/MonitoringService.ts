@@ -650,7 +650,7 @@ export class MonitoringService extends BaseService {
     if (updated.length > 0) {
       await this.auditService.logChange({
         userId: context.operatorId,
-        action: 'ACKNOWLEDGE_ALERT',
+        action: 'ACK',
         entityType: 'alert_event',
         entityId: id,
         newEntity: { ackedAt: now, ackedBy: context.operatorId },
@@ -664,6 +664,32 @@ export class MonitoringService extends BaseService {
     if (rows.length === 0) {
       throw new NotFoundError(`Alert event '${id}' not found`);
     }
+    return alertEventResponseSchema.parse(rows[0]);
+  }
+
+  /**
+   * Permanently delete an alert event — for stalled alerts or known
+   * situations without an easy resolution (e.g. a deleted provider).
+   * Returns the deleted row. The engine's in-memory state machine is
+   * untouched: if the condition still holds it may fire a NEW row later —
+   * disable the rule in the monitoring config to silence it permanently.
+   */
+  async deleteAlert(context: RequestContext, id: string): Promise<AlertEventResponse> {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    logger.debug({ operatorId: context.operatorId, alertId: id }, 'Deleting alert event');
+
+    const rows = await db.select().from(alertEvents).where(eq(alertEvents.id, id));
+    if (rows.length === 0) {
+      throw new NotFoundError(`Alert event '${id}' not found`);
+    }
+
+    await db.delete(alertEvents).where(eq(alertEvents.id, id));
+    await this.auditService.logDelete(
+      'alert_event',
+      id,
+      { status: rows[0].status, ruleId: rows[0].ruleId, scopeKey: rows[0].scopeKey, firedAt: rows[0].firedAt },
+      context.operatorId,
+    );
     return alertEventResponseSchema.parse(rows[0]);
   }
 

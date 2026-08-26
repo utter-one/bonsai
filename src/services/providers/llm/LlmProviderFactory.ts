@@ -67,7 +67,10 @@ export class LlmProviderFactory {
     logger.info(`Creating ${provider.apiType} LLM provider for provider ${provider.id} with model ${settings.model}`);
     const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
     const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings);
-    instance.init();
+    // Awaited: the caller may use the provider immediately; a fire-and-forget
+    // init races with the first call ("must be initialized" / missing client)
+    // and rejects unhandled when it fails.
+    await instance.init();
     return instance;
   }
 

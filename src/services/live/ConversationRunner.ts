@@ -688,25 +688,38 @@ export class ConversationRunner {
           const allTextChunks = asrProvider.getAllTextChunks();
           const fullText = allTextChunks.map(chunk => chunk.text).join(' ').trim();
 
-          if (this.isBargeIn && fullText) {
-            this.bargeInPartialText = this.bargeInPartialText ? `${this.bargeInPartialText} ${fullText}`.trim() : fullText;
-            logger.info({ conversationId }, `Barge-in: processing accumulated text`);
-            await this.processUserInput(this.bargeInPartialText, 'voice', asrEndMs);
-            return;
-          }
+          // This callback is invoked fire-and-forget by AsrProviderBase — an
+          // unhandled rejection here kills the process (Node 24 default). A
+          // turn-level failure must fail the conversation, not the backend.
+          try {
+            if (this.isBargeIn && fullText) {
+              this.bargeInPartialText = this.bargeInPartialText ? `${this.bargeInPartialText} ${fullText}`.trim() : fullText;
+              logger.info({ conversationId }, `Barge-in: processing accumulated text`);
+              await this.processUserInput(this.bargeInPartialText, 'voice', asrEndMs);
+              return;
+            }
 
-          if (fullText) {
-            logger.debug({ conversationId, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}`);
-            await this.processUserInput(fullText, 'voice', asrEndMs);
-          } else if (this.isBargeIn && this.bargeInPartialText) {
-            logger.info({ conversationId }, `Barge-in: ASR timed out with silence, processing accumulated text`);
-            await this.processUserInput(this.bargeInPartialText, 'voice', asrEndMs);
-          } else if (this.isVadMode) {
-            logger.warn({ conversationId }, `No text recognized in VAD mode for conversation ${conversationId}, ignoring unintelligible audio`);
-            await this.triggerBargeInSilenceResponse();
-          } else {
-            logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
-            await this.processUserInput(this.stageData.project.asrConfig.unintelligiblePlaceholder ?? '**inaudible**', 'voice', asrEndMs);
+            if (fullText) {
+              logger.debug({ conversationId, chunkCount: allTextChunks.length }, `ASR complete text for conversation ${conversationId}`);
+              await this.processUserInput(fullText, 'voice', asrEndMs);
+            } else if (this.isBargeIn && this.bargeInPartialText) {
+              logger.info({ conversationId }, `Barge-in: ASR timed out with silence, processing accumulated text`);
+              await this.processUserInput(this.bargeInPartialText, 'voice', asrEndMs);
+            } else if (this.isVadMode) {
+              logger.warn({ conversationId }, `No text recognized in VAD mode for conversation ${conversationId}, ignoring unintelligible audio`);
+              await this.triggerBargeInSilenceResponse();
+            } else {
+              logger.warn({ conversationId }, `No text recognized for conversation ${conversationId}`);
+              await this.processUserInput(this.stageData.project.asrConfig.unintelligiblePlaceholder ?? '**inaudible**', 'voice', asrEndMs);
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.error({ conversationId, error: message }, 'Failed to process user input after recognition stopped');
+            try {
+              await this.markAsFailed(`Failed to process user input: ${message}`);
+            } catch (markError) {
+              logger.error({ conversationId, error: markError instanceof Error ? markError.message : String(markError) }, 'Failed to mark conversation as failed');
+            }
           }
         });
 

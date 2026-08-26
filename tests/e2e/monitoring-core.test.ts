@@ -8,6 +8,7 @@ import { providerCallLogs, metricSamples } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { MetricsRegistry } from '../../src/services/monitoring/MetricsRegistry';
 import { CallLogger } from '../../src/services/monitoring/CallLogger';
+import { getPoolRef } from '../../src/db/index';
 
 describe('Monitoring core (P1-02)', () => {
   beforeEach(async () => {
@@ -162,6 +163,24 @@ describe('Monitoring core (P1-02)', () => {
         .where(eq(providerCallLogs.providerId, 'prov_e2e_fail'));
       expect(rows.length).to.equal(1);
       expect(rows[0].operation).to.equal('tts.synthesize');
+    });
+  });
+
+  describe('pg pool idle-client disconnect', () => {
+    it('survives an idle-client error and keeps serving queries', async () => {
+      const pool = getPoolRef();
+      const prevEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      try {
+        // pg-pool emits 'error' for idle clients dropped by the server
+        // (postgres restart, OOM kill, network blip). The pool self-heals:
+        // it discards the dead client and opens a fresh one on next query.
+        // A transient DB hiccup must not take down the whole backend.
+        pool.emit('error', new Error('Connection terminated unexpectedly'));
+      } finally {
+        process.env.NODE_ENV = prevEnv;
+      }
+      await db.select().from(metricSamples).limit(1);
     });
   });
 });

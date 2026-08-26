@@ -3,7 +3,7 @@ import { describe, it, before, beforeEach, after } from 'mocha';
 import { expect } from 'chai';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import request from 'supertest';
 import { authed, unauthed, resetDatabase } from '../utils';
 import { db } from '../../src/db/index';
@@ -241,7 +241,7 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
       let audits = await db
         .select()
         .from(auditLogs)
-        .where(eq(auditLogs.action, 'ACKNOWLEDGE_ALERT'));
+        .where(eq(auditLogs.action, 'ACK'));
       expect(audits).to.have.length(1);
       expect(audits[0].entityId).to.equal('alrt_ack');
       expect(audits[0].entityType).to.equal('alert_event');
@@ -253,14 +253,55 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
       expect(second.body.ackedAt).to.equal(first.body.ackedAt);
       expect(second.body.ackedBy).to.equal(TEST_OPERATOR_ID);
 
-      audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACKNOWLEDGE_ALERT'));
+      audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACK'));
       expect(audits).to.have.length(1);
     });
 
     it('404s for an unknown id', async () => {
       const res = await authed().post('/api/monitoring/alerts/alrt_missing/acknowledge');
       expect(res.status).to.equal(404);
-      const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACKNOWLEDGE_ALERT'));
+      const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, 'ACK'));
+      expect(audits).to.have.length(0);
+    });
+  });
+
+  describe('DELETE /api/monitoring/alerts/{id}', () => {
+    it('deletes the row, returns the deleted event, and writes one audit entry', async () => {
+      await insertAlertRow({ id: 'alrt_del' });
+      const agent = authed();
+
+      const res = await agent.delete('/api/monitoring/alerts/alrt_del');
+      expect(res.status).to.equal(200);
+      expect(res.body.id).to.equal('alrt_del');
+
+      const rows = await db.select().from(alertEvents).where(eq(alertEvents.id, 'alrt_del'));
+      expect(rows).to.have.length(0);
+
+      const audits = await db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, 'DELETE'), eq(auditLogs.entityType, 'alert_event')));
+      expect(audits).to.have.length(1);
+      expect(audits[0].entityId).to.equal('alrt_del');
+      expect(audits[0].userId).to.equal(TEST_OPERATOR_ID);
+
+      // A second delete is a 404 and writes no further audit entry.
+      const second = await agent.delete('/api/monitoring/alerts/alrt_del');
+      expect(second.status).to.equal(404);
+      const auditsAfter = await db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, 'DELETE'), eq(auditLogs.entityType, 'alert_event')));
+      expect(auditsAfter).to.have.length(1);
+    });
+
+    it('404s for an unknown id (no audit entry)', async () => {
+      const res = await authed().delete('/api/monitoring/alerts/alrt_missing');
+      expect(res.status).to.equal(404);
+      const audits = await db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, 'DELETE'), eq(auditLogs.entityType, 'alert_event')));
       expect(audits).to.have.length(0);
     });
   });
@@ -505,13 +546,15 @@ describe('Alerts + monitoring config API (P2-03, e2e)', () => {
       viewerAgent.set('Authorization', `Bearer ${login.body.accessToken}`);
     });
 
-    it('rejects the viewer role with 403 on all five routes', async () => {
+    it('rejects the viewer role with 403 on all six routes', async () => {
       const resList = await viewerAgent.get('/api/monitoring/alerts');
       expect(resList.status).to.equal(403);
       const resGet = await viewerAgent.get('/api/monitoring/alerts/alrt_x');
       expect(resGet.status).to.equal(403);
       const resAck = await viewerAgent.post('/api/monitoring/alerts/alrt_x/acknowledge');
       expect(resAck.status).to.equal(403);
+      const resDelete = await viewerAgent.delete('/api/monitoring/alerts/alrt_x');
+      expect(resDelete.status).to.equal(403);
       const resConfigGet = await viewerAgent.get('/api/monitoring/config');
       expect(resConfigGet.status).to.equal(403);
       const resConfigPut = await viewerAgent.put('/api/monitoring/config').send({ version: 1, config: monitoringConfigSchema.parse({}) });

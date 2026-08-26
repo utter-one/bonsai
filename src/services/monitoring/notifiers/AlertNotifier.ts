@@ -73,9 +73,14 @@ export class NotifyingPublisher implements AlertEventPublisher {
     await this.notify(event, 'fired');
   }
 
-  async resolve(event: AlertEvent): Promise<void> {
-    await this.persister.resolve(event);
-    await this.notify(event, 'resolved');
+  async resolve(event: AlertEvent): Promise<number> {
+    // A deleted/unknown row transitions nothing — a 'resolved' notification
+    // for it would be a phantom (the operator removed the alert on purpose).
+    const updated = await this.persister.resolve(event);
+    if (updated > 0) {
+      await this.notify(event, 'resolved');
+    }
+    return updated;
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────

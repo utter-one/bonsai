@@ -199,11 +199,11 @@ describe('Monitoring RBAC completion (P2-04, e2e)', () => {
     // A VIEWER (no system:monitoring, has audit:read) reads both entries.
     const viewer = roles.viewer;
 
-    const ackEntries = await viewer.get('/api/audit-logs').query({ 'filters[action]': 'ACKNOWLEDGE_ALERT' });
+    const ackEntries = await viewer.get('/api/audit-logs').query({ 'filters[action]': 'ACK' });
     expect(ackEntries.status).to.equal(200);
     expect(ackEntries.body.total).to.equal(1);
     expect(ackEntries.body.items[0]).to.include({
-      action: 'ACKNOWLEDGE_ALERT',
+      action: 'ACK',
       entityType: 'alert_event',
       entityId: 'alrt_rbac',
       userId: TEST_OPERATOR_ID,

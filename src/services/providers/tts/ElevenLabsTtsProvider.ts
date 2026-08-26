@@ -75,12 +75,19 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   async init(): Promise<void> { }
 
   /**
-   * Zero-cost liveness probe (P1-05b): lists models from the ElevenLabs API.
+   * Zero-cost liveness probe (P1-05b): checks access to the configured voice
+   * (or the voice list when none is configured). REST endpoints such as
+   * GET /v1/models require the `models_read` permission, which TTS-only
+   * keys lack (HTTP 401) even though synthesis works — so the probe must
+   * not use them.
    */
   async ping(): Promise<void> {
     const startedAt = Date.now();
+    const url = this.settings.voiceId
+      ? `https://api.elevenlabs.io/v1/voices/${this.settings.voiceId}`
+      : 'https://api.elevenlabs.io/v1/voices';
     try {
-      await httpPing('https://api.elevenlabs.io/v1/models', {
+      await httpPing(url, {
         'xi-api-key': this.config.apiKey,
       });
       this.recordPingCall(startedAt);

@@ -125,7 +125,9 @@ export class GroqLlmProvider extends OpenAILegacyLlmProvider<GroqLlmProviderConf
   protected override async doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
     const reasoningParams = this.buildGroqReasoningParams();
     if (Object.keys(reasoningParams).length === 0) {
-      return super.generateStream(messages, options);
+      // super.doGenerateStream — the implementation. super.generateStream is the
+      // base template wrapper and would re-dispatch this override (infinite recursion).
+      return super.doGenerateStream(messages, options);
     }
 
     this.ensureInitialized();
