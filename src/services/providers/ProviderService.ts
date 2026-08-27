@@ -4,8 +4,12 @@ import { buildTextSearchCondition } from '../../utils/textSearch';
 import { db } from '../../db/index';
 import { providers } from '../../db/schema';
 import type { CreateProviderRequest, UpdateProviderRequest, ProviderResponse, ProviderListResponse } from '../../http/contracts/provider';
+import type { ConnectionTestRequestBody, ConnectionTestResponseBody } from '../../http/contracts/providerConnectionTest';
+import { connectionTestResultSchema } from '../../http/contracts/providerConnectionTest';
 import type { ListParams } from '../../http/contracts/common';
 import { providerResponseSchema, providerListResponseSchema } from '../../http/contracts/provider';
+import { ProviderConnectionTester } from './connectionTest/ProviderConnectionTester';
+import type { ConnectionTestInput } from './connectionTest/types';
 import { AuditService } from '../AuditService';
 import { OptimisticLockError, NotFoundError, InvalidOperationError } from '../../errors';
 import { buildFilterCondition, buildOrderBy } from '../../utils/queryBuilder';
@@ -36,6 +40,7 @@ export class ProviderService extends BaseService {
     @inject(SecretRefUtils) private readonly secretRefUtils: SecretRefUtils,
     @inject(ImapInboundService) private readonly imapInboundService: ImapInboundService,
     @inject(FallbackResolver) private readonly fallbackResolver: FallbackResolver,
+    @inject(ProviderConnectionTester) private readonly connectionTester: ProviderConnectionTester,
   ) {
     super();
   }
@@ -309,6 +314,27 @@ export class ProviderService extends BaseService {
     } finally {
       await instance.cleanup();
     }
+  }
+
+  /**
+   * Runs an on-demand provider connection test (saved or draft mode, TPC-06).
+   * Vendor failures return a structured 200 result; only guard errors (400/404/
+   * 429) surface as HTTP errors. Read-equivalent: it may write+delete one temp
+   * storage object (server-side cleanup), which `provider:read` scopes.
+   * Audit is logged for saved mode only (drafts are never persisted).
+   * @param input - Saved (providerId) or draft (providerType/apiType/config) request
+   * @param context - Request context for authorization and auditing
+   * @returns The structured connection test result
+   */
+  async testConnection(input: ConnectionTestRequestBody, context: RequestContext): Promise<ConnectionTestResponseBody> {
+    this.requirePermission(context, PERMISSIONS.PROVIDER_READ);
+    const saved = 'providerId' in input;
+    logger.info({ mode: saved ? 'saved' : 'draft', providerId: saved ? input.providerId : undefined, providerType: saved ? undefined : input.providerType, operatorId: context?.operatorId }, 'Running provider connection test');
+    const result = await this.connectionTester.testConnection(input as ConnectionTestInput, context);
+    if (saved) {
+      await this.auditService.logEvent('provider', input.providerId, 'CONNECTION_TEST', result, context?.operatorId);
+    }
+    return connectionTestResultSchema.parse(result);
   }
 
   /**
