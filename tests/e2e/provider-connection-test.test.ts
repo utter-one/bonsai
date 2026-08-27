@@ -195,6 +195,14 @@ describe('Provider connection test API (TPC-06)', () => {
       expect(res.status).to.equal(400);
     });
 
+    it('draft ElevenLabs TTS without a voice → 400 (no safe default voice — the guard, not a vendor failure)', async () => {
+      const res = await authed()
+        .post('/api/providers/test-connection')
+        .send({ providerType: 'tts', apiType: 'elevenlabs', config: { apiKey: 'bogus-key' } });
+      expect(res.status).to.equal(400);
+      expect(res.body.error).to.include('voice');
+    });
+
     it('draft with an invalid config → 400 (create-schema validation)', async () => {
       // `ollama` config is a strictObject with only baseUrl/apiKey — `bogus` fails the union.
       const res = await authed()

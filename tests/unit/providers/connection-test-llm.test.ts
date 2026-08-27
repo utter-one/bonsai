@@ -262,11 +262,15 @@ describe('ProviderConnectionTester LLM strategy (TPC-02)', function () {
     expect(result.detail).to.deep.equal({ model: 'gpt-test-a' });
     expect(result).to.not.have.property('statusHttp');
 
-    // Production request shape: Responses API, maxTokens 1, bearer auth, real prompt.
+    // Production request shape: Responses API, bearer auth, real prompt.
+    // max_output_tokens is the connection-test ceiling — above OpenAI's hard
+    // floor of 16 (a value of 1 is rejected with a 400); the model still emits
+    // a single word for the "ping" prompt.
     const gen = fake.requests.find((r) => r.path === '/v1/responses');
     expect(gen).to.not.equal(undefined);
     expect(gen!.body?.model).to.equal('gpt-test-a');
-    expect(gen!.body?.max_output_tokens).to.equal(1);
+    expect(gen!.body?.max_output_tokens).to.equal(64);
+    expect(gen!.body?.max_output_tokens).to.be.at.least(16);
     expect(String(gen!.body?.input ?? '')).to.include('ping');
     expect(gen!.auth).to.equal('Bearer sk-test');
 
@@ -423,7 +427,8 @@ describe('ProviderConnectionTester LLM strategy (TPC-02)', function () {
     const gen = fake.requests.find((r) => r.path === '/v1/responses');
     expect(gen).to.not.equal(undefined);
     expect(gen!.auth).to.equal('Bearer sk-draft');
-    expect(gen!.body?.max_output_tokens).to.equal(1);
+    expect(gen!.body?.max_output_tokens).to.equal(64);
+    expect(gen!.body?.max_output_tokens).to.be.at.least(16);
 
     // Draft providers are transient — nothing is persisted, nothing feeds the breaker.
     await sharedCallLogger.flushNow();

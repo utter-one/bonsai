@@ -37,7 +37,10 @@ by running the provider's **production streaming synthesis lifecycle** on a
 1. Lifecycle (always; `cleanup()` in `finally`):
    `init() → start() → sendText('Test connection.') → end() → cleanup()`,
    with `setOnSpeechGenerating` chunks dropped into a byte counter.
-2. Voice: provider config default, or the `voice` input param.
+2. Voice: provider config default, or the `voice` input param — **except
+   ElevenLabs, which has no safe default voice** (voices are account-specific;
+   its legacy "Default" voices expire 2026-12-31), so a missing voice for it
+   is a `400` guard error (`TTS_VOICE_REQUIRED`), not a vendor failure.
    `ok` = **at least one audio chunk received** — proves the full round
    trip (auth, voice/model validity, streaming delivery).
    Zero chunks after a clean stream end → `ok:false, errorCode
@@ -98,3 +101,14 @@ Note: the `createForTest` extraction surfaced a dangling `resolvedProvider`
 reference left in the factory's instantiation switch (all seven `create*
 Provider` call sites referenced the old variable name); fixed to use the
 `provider` parameter.
+
+**ElevenLabs voice guard (bugfix, 2026-08-27):** ElevenLabs was the only TTS
+provider with no safe default voice — `ElevenLabsTtsProvider.doStart()` threw
+`"Voice ID must be provided…"` when none was set, which the tester
+misclassified as an `unknown` vendor failure. The tester now requires an
+explicit `voice` for ElevenLabs (a `400` `ValidationError` guard, same shape as
+the draft-LLM missing-model guard) *before* building the instance. The other
+six TTS providers keep stable defaults (alloy / Joanna / thalia-en / Adrian /
+en-US-AriaNeural / a fixed Cartesia voice) and test without one. (The legacy
+ElevenLabs Default voices — Antoni, Aria — are deprecated and expire
+2026-12-31, so hardcoding one as a default was not viable.)

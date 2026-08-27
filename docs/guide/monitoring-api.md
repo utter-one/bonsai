@@ -526,8 +526,8 @@ consume, and it is the UI's "Test connection" action.
 **Saved XOR draft** body (exactly one mode, else `400`):
 
 ```json
-// saved
-{ "providerId": "prov_...", "model": "optional", "write": true, "bucket": "optional" }
+// saved — `voice` is required for ElevenLabs TTS (no safe default voice); other TTS providers default it
+{ "providerId": "prov_...", "model": "optional", "voice": "optional (required for ElevenLabs TTS)", "write": true, "bucket": "optional" }
 
 // draft — config validated by the same per-apiType schema as the create endpoint
 { "providerType": "llm", "apiType": "openai", "config": { "apiKey": "...", "baseUrl": "..." }, "model": "required-for-llm" }
@@ -557,9 +557,9 @@ Twilio Messaging/Voice, WhatsApp, SendGrid), `sdk` (SES), or `smtp`
 are config schemas, not provider classes) and always `phase: "auth"`.
 
 Only guard errors are non-200: `400` (bad payload / draft LLM without
-`model` / unsupported type), `401/403` (RBAC — `provider:read`), `404`
-(saved provider not found), `429` (5 s per-provider cooldown — `Retry-After`
-in seconds).
+`model` / ElevenLabs TTS without `voice` — no safe default voice / unsupported
+type), `401/403` (RBAC — `provider:read`), `404` (saved provider not found),
+`429` (5 s per-provider cooldown — `Retry-After` in seconds).
 
 Monitoring interplay: a **saved** test writes an ordinary
 `provider_call_logs` row (`operation '<type>.test'`) that feeds the

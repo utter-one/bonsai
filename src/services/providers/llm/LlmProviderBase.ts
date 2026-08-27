@@ -10,6 +10,17 @@ import { StreamStats } from '../../monitoring/StreamStats';
 import type { ConnectionTestOutcome } from '../connectionTest/types';
 
 /**
+ * Ceiling for a **minimal LLM generation probe** — used by the on-demand
+ * connection test (TPC-02) and the `one_token` health probe
+ * (HealthCheckService). It is an upper bound, not a target: the "ping →
+ * single word" prompt elicits ~1 token, so cost stays minimal regardless of
+ * the ceiling. But the ceiling must clear every vendor's hard floor: OpenAI
+ * rejects `max_output_tokens` < 16 with a 400 and its docs recommend 50+ for
+ * non-production calls. 64 clears both; the model still emits a single word.
+ */
+export const MINIMAL_GENERATION_MAX_TOKENS = 64;
+
+/**
  * Abstract base class for LLM provider implementations
  * Provides common functionality for callback management, lifecycle, and error handling.
  *
@@ -215,18 +226,19 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
   }
 
   /**
-   * Minimal production-path connection test (TPC-02): one real 1-token
-   * completion through this instance's own `generate` — the same client,
-   * transport and auth a conversation turn uses. The provider owns the test;
-   * the tester owns the guards (timeout, cooldown, cleanup, classification).
-   * Vendor failures escape as raw errors for the tester to classify.
+   * Minimal production-path connection test (TPC-02): one real completion
+   * through this instance's own `generate` — the same client, transport and
+   * auth a conversation turn uses. The provider owns the test; the tester owns
+   * the guards (timeout, cooldown, cleanup, classification). Vendor failures
+   * escape as raw errors for the tester to classify. `maxTokens` is a ceiling
+   * (see MINIMAL_GENERATION_MAX_TOKENS) — the model emits ~1 word for "ping".
    */
   async testConnection(model?: string | null): Promise<ConnectionTestOutcome> {
     const messages: LlmMessage[] = [
       { role: 'system', content: 'You are a connectivity check. Reply with a single word.' },
       { role: 'user', content: 'ping' },
     ];
-    await this.generate(messages, { maxTokens: 1 });
+    await this.generate(messages, { maxTokens: MINIMAL_GENERATION_MAX_TOKENS });
     // Draft instances are built un-stamped (no call-log attribution), so the
     // tested model is passed in by the tester; saved instances read their stamp.
     const testedModel = model ?? this.providerModel ?? null;
