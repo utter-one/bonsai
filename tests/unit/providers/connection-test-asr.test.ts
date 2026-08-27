@@ -8,7 +8,6 @@ import { CallLogger, type ProviderCallEntry, type ProviderCallLogRow } from '../
 import { MetricsRegistry } from '../../../src/services/monitoring/MetricsRegistry';
 import { ProviderCallRecorder, resetMonitoringAccessorsForTests } from '../../../src/services/monitoring/ProviderCallRecorder';
 import { ProviderConnectionTester } from '../../../src/services/providers/connectionTest/ProviderConnectionTester';
-import { buildConnectionTestStrategies } from '../../../src/services/providers/connectionTest';
 import { buildAsrSilence } from '../../../src/services/providers/connectionTest/silence';
 import { AsrProviderFactory } from '../../../src/services/providers/asr/AsrProviderFactory';
 import { ElevenLabsAsrProvider } from '../../../src/services/providers/asr/ElevenLabsAsrProvider';
@@ -318,10 +317,8 @@ describe('ProviderConnectionTester ASR strategy (TPC-03)', function () {
     fake.setMode('no-response');
     const tester = new TestTester();
     tester.providers.set('prov_asr_1', savedProvider());
-    // Shortened-timeout seam: same strategy body, 150ms instead of the 20s guard.
-    const asrStrategy = buildConnectionTestStrategies().get('asr');
-    expect(asrStrategy).to.not.equal(undefined);
-    tester.registerStrategy({ ...asrStrategy!, timeoutMs: 150 });
+    // Shortened-timeout seam: 150ms instead of the 20s guard.
+    tester.setTestTimeout('asr', 150);
 
     const startedAt = Date.now();
     const result = await tester.testConnection({ providerId: 'prov_asr_1' }, context);

@@ -79,6 +79,19 @@ class QuietMetrics extends MetricsRegistry {
 const sharedCallLogger = new QuietCallLogger(sharedBreakers);
 const sharedMetrics = new QuietMetrics();
 
+/**
+ * Rows / buffered entries recorded by STORAGE providers only. Scoped on
+ * purpose: a late row from another suite's abandoned in-flight call (the LLM
+ * hang test's timeout-abandoned generate) can land in this shared logger via
+ * the global recorder seam; only this suite's own storage rows matter here.
+ */
+function storageRows(): ProviderCallLogRow[] {
+  return sharedCallLogger.rows.filter((r) => r.providerType === 'storage');
+}
+function storagePendingEntries(): ProviderCallEntry[] {
+  return sharedCallLogger.pendingEntries.filter((e) => e.providerType === 'storage');
+}
+
 // --- stub object store: one local HTTP server speaking the wire protocol of each SDK ---
 
 /**
@@ -263,9 +276,10 @@ describe('ProviderConnectionTester storage strategy (TPC-05)', function () {
       expect(result.errorCode).to.equal(null);
       expect(result.detail).to.include({ objects: 0, path: dir });
 
-      // Read-only: list/delete are not instrumented by the production base → no rows.
+      // Read-only: list/delete are not instrumented by the production base → no
+      // rows for this provider (storage-scoped — see storageRows()).
       await sharedCallLogger.flushNow();
-      expect(sharedCallLogger.rows).to.have.length(0);
+      expect(storageRows()).to.have.length(0);
       expect(sharedBreakers.failures).to.have.length(0);
       expect(sharedBreakers.successes).to.have.length(0);
     });
@@ -288,11 +302,12 @@ describe('ProviderConnectionTester storage strategy (TPC-05)', function () {
       expect(leftoverFiles).to.have.length(0);
 
       // The round trip records its own storage.upload + storage.download rows
-      // (breaker-excluded via the tester's monitoring context).
+      // (breaker-excluded via the tester's monitoring context). Storage-scoped.
       await sharedCallLogger.flushNow();
-      const operations = sharedCallLogger.rows.map((row) => row.operation).sort();
+      const ownRows = storageRows();
+      const operations = ownRows.map((row) => row.operation).sort();
       expect(operations).to.deep.equal(['storage.download', 'storage.upload']);
-      for (const row of sharedCallLogger.rows) {
+      for (const row of ownRows) {
         expect(row.providerId).to.equal('prov_storage_1');
         expect(row.ok).to.equal(true);
       }
@@ -369,10 +384,10 @@ describe('ProviderConnectionTester storage strategy (TPC-05)', function () {
       // The production SDK really sent ListObjectsV2 (path-style) to the stub.
       expect(storeStub.requests.some((url) => url.startsWith('/test-bucket') && url.includes('list-type=2'))).to.equal(true);
 
-      // Draft: un-stamped instance records nothing.
+      // Draft: un-stamped instance records nothing (storage-scoped).
       await sharedCallLogger.flushNow();
-      expect(sharedCallLogger.rows).to.have.length(0);
-      expect(sharedCallLogger.pendingEntries).to.have.length(0);
+      expect(storageRows()).to.have.length(0);
+      expect(storagePendingEntries()).to.have.length(0);
       expect(sharedBreakers.failures).to.have.length(0);
       expect(sharedBreakers.successes).to.have.length(0);
     });
@@ -404,8 +419,9 @@ describe('ProviderConnectionTester storage strategy (TPC-05)', function () {
       // The production SDK really sent a flat container listing to the stub.
       expect(storeStub.requests.some((url) => url.startsWith('/test-container') && url.includes('comp=list'))).to.equal(true);
 
+      // Draft: un-stamped instance records nothing (storage-scoped).
       await sharedCallLogger.flushNow();
-      expect(sharedCallLogger.rows).to.have.length(0);
+      expect(storageRows()).to.have.length(0);
       expect(sharedBreakers.failures).to.have.length(0);
     });
 
@@ -436,8 +452,9 @@ describe('ProviderConnectionTester storage strategy (TPC-05)', function () {
       // The production SDK really sent the REST objects listing to the stub.
       expect(storeStub.requests.some((url) => url.startsWith('/storage/v1/b/test-bucket/o'))).to.equal(true);
 
+      // Draft: un-stamped instance records nothing (storage-scoped).
       await sharedCallLogger.flushNow();
-      expect(sharedCallLogger.rows).to.have.length(0);
+      expect(storageRows()).to.have.length(0);
       expect(sharedBreakers.failures).to.have.length(0);
     });
   });

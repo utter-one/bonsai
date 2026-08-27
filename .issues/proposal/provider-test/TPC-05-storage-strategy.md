@@ -70,9 +70,10 @@ network) — `local` against a temp dir:
 
 ## Resolution (2026-08-26)
 
-Shipped: `src/services/providers/connectionTest/strategies/storage.ts`
-(registered in `connectionTest/index.ts`), `StorageProviderFactory.createForTest`
-(+ `instantiateProvider` extraction; stamps only for saved providers),
+Shipped: `StorageProviderBase.testConnection()` (the original
+`strategies/storage.ts` was folded into the base — see TPC-01),
+`StorageProviderFactory.createForTest` (+ `instantiateProvider` extraction;
+stamps only for saved providers, duck-typed),
 `GcsStorageProvider` optional `apiEndpoint` passthrough, `bucket` input in
 `types.ts` + tester passthrough, and
 `tests/unit/providers/connection-test-storage.test.ts` (7 tests: local
@@ -86,9 +87,11 @@ compare / delete-in-`finally` → `phase 'write'` with `detail { wrote,
 verified }`. Protocol table: s3/azure-blob/gcs → `'sdk'`, local →
 `'local-fs'`. 15 s timeout. Local pre-checks (missing dir, not a directory,
 unreadable/unwritable) run BEFORE `init()` because `LocalStorageProvider.init()`
-auto-creates a missing dir and `list()` swallows ENOENT — the strategy maps
-them to an explicit `client_error` (the shared classifier would mislabel
-EACCES as `auth` and ENOENT/ENOTDIR as `unknown`).
+auto-creates a missing dir and `list()` swallows ENOENT — the base's
+`testConnection()` maps them to an explicit `client_error` (the shared
+classifier would mislabel EACCES as `auth` and ENOENT/ENOTDIR as
+`unknown`); the tester's graph-proof `ConnectionTestFailure` check
+(matching the class `name`, not `instanceof`) preserves that mapping.
 
 Deliberate deviations / additions:
 

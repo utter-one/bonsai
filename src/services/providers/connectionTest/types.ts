@@ -10,8 +10,10 @@ export { sanitizeErrorText };
  * Provider connection testing (TPC-01) — shared types.
  *
  * The tester reuses each provider's own production code path (same host,
- * transport, auth, SDK) at minimum size. These types define the uniform
- * result contract, the strategy seam and the tester-owned guards' helpers.
+ * transport, auth, SDK) at minimum size. The provider classes own the simple
+ * test (`testConnection()` on each base, TPC-02..05); the tester owns the
+ * cross-cutting guards. These types define the uniform result contract and
+ * the tester-owned guards' helpers.
  */
 
 /** Transport the test exercises — the same protocol as the provider's main functionality. */
@@ -41,11 +43,19 @@ export interface ConnectionTestResult {
 }
 
 /**
- * Internal supertype of ConnectionTestResult returned by strategies.
- * `model`/`statusHttp` feed the saved-test call-log row only (TPC-07) and are
- * stripped before the public result is returned — they never reach the API.
+ * What a provider's `testConnection()` reports — the "simple test" outcome
+ * (TPC-02..05). The tester shapes the public `ConnectionTestResult` on top of
+ * this, adding providerType/apiType/protocol (from the request + its own
+ * protocol table) and latencyMs (total elapsed). `model`/`statusHttp` feed the
+ * saved-test call-log row only (TPC-07) and never reach the public result.
  */
-export interface ConnectionTestOutcome extends ConnectionTestResult {
+export interface ConnectionTestOutcome {
+  ok: boolean;
+  phase: TestPhase;
+  errorCode: ThirdPartyErrorCode | null;
+  /** Sanitized by the tester: truncated to 500 chars, token/key patterns redacted. */
+  errorText?: string;
+  detail?: Record<string, unknown>;
   /** Call-log attribution (saved mode): the model/voice actually exercised. */
   model?: string | null;
   /** Call-log attribution (saved mode): vendor HTTP status, when known. */
@@ -96,37 +106,10 @@ export interface ConnectionTestRequest {
   bucket?: string;
 }
 
-/** Tester → strategy context (never carries secrets). */
+/** Tester context (never carries secrets). */
 export interface ConnectionTestContext {
   /** Operator who initiated the test (logs only). */
   operatorId: string;
-}
-
-/**
- * One strategy per providerType. Strategies drive the production lifecycle at
- * minimum size (TPC-02 LLM, TPC-03 ASR, TPC-04 TTS, TPC-05 storage, TPC-08
- * channel) and plug in via `buildConnectionTestStrategies()` without touching
- * the tester or the HTTP contract.
- */
-export interface ConnectionTestStrategy<TInstance = unknown> {
-  /** Registry key — the providerType this strategy handles. */
-  readonly providerType: string;
-  /** Hard timeout wrapping the whole body (buildInstance + test). */
-  readonly timeoutMs: number;
-  /** Default transport reported for tester-derived failures (strategies override per call in the returned outcome). */
-  readonly protocol: TestProtocol;
-  /**
-   * Build a fresh instance from the (resolved) request — never a pooled or
-   * pre-warmed provider, so a test cannot disturb in-flight conversations.
-   * May throw ZodError (invalid draft config → 400) or InvalidOperationError.
-   */
-  buildInstance(request: ConnectionTestRequest, ctx: ConnectionTestContext): Promise<TInstance>;
-  /**
-   * Drive the production lifecycle at minimum size. Vendor failures may be
-   * returned as an outcome or thrown (raw vendor error or ConnectionTestFailure);
-   * the tester normalizes either way. Must never throw guard errors.
-   */
-  test(request: ConnectionTestRequest, instance: TInstance, ctx: ConnectionTestContext): Promise<ConnectionTestOutcome>;
 }
 
 /** Sentinel: the tester's hard timeout fired. Caught internally, never escapes the tester. */

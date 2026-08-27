@@ -10,11 +10,11 @@ Proposal: [`PROPOSAL-provider-test-connection.md`](../../PROPOSAL-provider-test-
 
 | ID | Title | Phase | Est. | Status |
 |---|---|---|---|---|
-| [TPC-01](TPC-01-tester-core.md) | Tester core: types, registry, guards, instance construction | 1 | 1 d | resolved |
-| [TPC-02](TPC-02-llm-strategy.md) | LLM strategy: 1-token real inference | 1 | 0.5 d | resolved |
-| [TPC-03](TPC-03-asr-strategy.md) | ASR strategy: real WS session + silence | 1 | 1 d | resolved |
-| [TPC-04](TPC-04-tts-strategy.md) | TTS strategy: real minimal synthesis | 1 | 0.5 d | resolved |
-| [TPC-05](TPC-05-storage-strategy.md) | Storage strategy: list + optional write round trip | 1 | 0.5 d | resolved |
+| [TPC-01](TPC-01-tester-core.md) | Tester core: types, dispatch, guards, instance construction | 1 | 1 d | resolved |
+| [TPC-02](TPC-02-llm-strategy.md) | LLM test: 1-token real inference | 1 | 0.5 d | resolved |
+| [TPC-03](TPC-03-asr-strategy.md) | ASR test: real WS session + silence | 1 | 1 d | resolved |
+| [TPC-04](TPC-04-tts-strategy.md) | TTS test: real minimal synthesis | 1 | 0.5 d | resolved |
+| [TPC-05](TPC-05-storage-strategy.md) | Storage test: list + optional write round trip | 1 | 0.5 d | resolved |
 | [TPC-06](TPC-06-http-endpoint-rbac.md) | HTTP endpoint, contracts, RBAC, audit | 2 | 1 d | open |
 | [TPC-07](TPC-07-call-log-integration.md) | Call-log integration + alert interplay + docs | 2 | 0.5–1 d | open |
 | [TPC-08](TPC-08-channel-providers.md) | Channel strategies: same-protocol auth checks | 3 | 1 d | open |
@@ -41,7 +41,7 @@ TPC-09  ◄── TPC-03, TPC-04, TPC-07   (optional)
 
 ## Phases
 
-1. **Core tester** — TPC-01…05 (strategies ship independently once the
+1. **Core tester** — TPC-01…05 (per-type tests ship independently once the
    core lands).
 2. **API + monitoring integration** — TPC-06 + TPC-07 (the feature is
    end-to-end: endpoint, RBAC, audit, call-log/last-signal interplay).
@@ -49,3 +49,24 @@ TPC-09  ◄── TPC-03, TPC-04, TPC-07   (optional)
    data-plane probes).
 
 Each spec is independently testable and shippable within its phase.
+
+## Architecture note (2026-08-26, refinement)
+
+TPC-01…05 shipped first with a **per-type strategy module** per
+`providerType` (`connectionTest/strategies/{llm,asr,tts,storage}.ts` + a
+`Map<providerType, strategy>` registry + a `ConnectionTestStrategy`
+interface). That design was then **refactored (user-directed)**: the
+strategy modules were removed and the **provider base classes now own the
+simple per-type test** via a `testConnection()` method
+(`LlmProviderBase` / `AsrProviderBase` / `TtsProviderBase` /
+`StorageProviderBase`). The `ProviderConnectionTester` dispatches by
+`providerType` → resolves that type's factory → `createForTest()` → the
+instance's own `testConnection()`. The tester keeps **all** cross-cutting
+guards (cooldown, hard timeout, fresh instance, draft handling, monitoring
+context, breaker exclusion, bounded cleanup, classification, sanitization,
+and the public `providerType`/`apiType`/`protocol`/`latencyMs` from a
+tester-owned protocol table); `ConnectionTestOutcome` is the
+provider-produced fields only. Rationale + the cross-module-graph pitfalls
+(dual-graph `instanceof`, the draft "hang" test, provider-scoped row
+assertions) are documented in the TPC-01 Resolution section. The spec file
+names keep the historical `*-strategy` suffix.

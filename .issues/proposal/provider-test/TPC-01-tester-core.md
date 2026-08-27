@@ -105,3 +105,40 @@ its own (guards + a stubbed strategy).
 - The ASR/TTS/storage strategies themselves (TPC-03/04/05 — LLM ships in
   TPC-02 to prove the seam), HTTP endpoint (TPC-06), alert interplay
   (TPC-07), channels (TPC-08), periodic probing (TPC-09).
+
+## Resolution (2026-08-26)
+
+Shipped: `ProviderConnectionTester.ts` + `types.ts` (guards, cooldown,
+timeouts, sanitization, draft/saved construction, breaker-exclusion in
+`CallLogger.record`), the factories' `createForTest` seams, and
+`tests/unit/providers/connection-test-core.test.ts`.
+
+**Architecture refinement (2026-08-26, user-directed):** the per-type
+"strategy" modules (`strategies/{llm,asr,tts,storage}.ts` + the `index.ts`
+registry + the `ConnectionTestStrategy` interface) were removed. The
+**provider base classes now own the simple test** via a `testConnection()`
+method on each base; the tester dispatches by `providerType` → resolves that
+type's factory → `createForTest()` → the instance's own `testConnection()`.
+The "judgment" (what success looks like for the protocol) stays next to the
+production code it exercises, with a per-vendor override escape hatch for
+genuinely weird cases. The tester still owns **all** cross-cutting guards
+(cooldown, hard timeout wrapping build + test, fresh instance, draft
+handling, monitoring context, breaker exclusion, bounded cleanup, error
+classification, sanitization, and shaping the public `providerType`/
+`apiType`/`protocol`/`latencyMs` from the request + a tester-owned protocol
+table). `ConnectionTestOutcome` is reduced to the provider-produced fields
+only (`ok`, `phase`, `errorCode`, `errorText?`, `detail?`, `model?`). The
+core test stubs via a protected `buildInstanceAndTest(request, onBuilt)`
+seam (`TestTester.stub`) rather than a registered strategy; the timeout seam
+is `setTestTimeout(providerType, ms)`.
+
+Two cross-module-graph pitfalls handled under tsx (ESM vs CJS): the storage
+factory stamps identity **duck-typed** (not `instanceof StorageProviderBase`
+— the dynamically imported provider can live in a second graph), and the
+tester's `ConnectionTestFailure` check matches on the class's `name` (an own
+property set in the constructor) instead of `instanceof` (dual-graph
+`instanceof` is unreliable). A known test-isolation rule: the LLM
+"hang" timeout test runs in **draft** mode (un-stamped → the abandoned in-flight
+SDK promise records no late row whose reject timing is non-deterministic and
+would otherwise leak into a later suite's recorder); provider-scoped row
+assertions in the storage suite are a second line of defense.

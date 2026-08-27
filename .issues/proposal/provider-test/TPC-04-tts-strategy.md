@@ -76,9 +76,10 @@ chunking server (WS and HTTP variants, no network):
 
 ## Resolution (2026-08-26)
 
-Shipped: `src/services/providers/connectionTest/strategies/tts.ts`
-(registered in `connectionTest/index.ts`), `TtsProviderFactory.createForTest`
-(+ `instantiateProvider` extraction; stamps only for saved providers), the
+Shipped: `TtsProviderBase.testConnection()` (the original
+`strategies/tts.ts` was folded into the base — see TPC-01),
+`TtsProviderFactory.createForTest` (+ `instantiateProvider` extraction;
+stamps only for saved providers), the
 `ElevenLabsTtsProvider.wsBaseUrlOverride` test seam, and
 `tests/unit/providers/connection-test-tts.test.ts` (7 tests: a fake
 ElevenLabs TTS WebSocket server in `ok`/`no-audio`/`hang` modes plus a scoped

@@ -7,6 +7,8 @@ import { getMetricsRegistry, getProviderCallRecorder } from '../../monitoring/Pr
 import type { ProviderCallRecord } from '../../monitoring/ProviderCallRecorder';
 import type { MetricsRegistry } from '../../monitoring/MetricsRegistry';
 import { classifyThirdPartyError } from '../../../utils/errorClassification';
+import type { ConnectionTestOutcome } from '../connectionTest/types';
+import { buildAsrSilence } from '../connectionTest/silence';
 
 /** Per-session (per-utterance) instrumentation state — P1-03. */
 interface AsrSessionStats {
@@ -438,5 +440,67 @@ export abstract class AsrProviderBase<TConfig = Record<string, any>> implements 
     this.onRecognizedCallback = undefined;
     this.onRecognitionStoppedCallback = undefined;
     this.onErrorCallback = undefined;
+  }
+
+  /**
+   * Minimal production-path connection test (TPC-03): open a real streaming
+   * session over this provider's own WebSocket data plane and feed ~500 ms of
+   * silence — the exact lifecycle a conversation turn runs: init → start →
+   * sendAudio(silence) → await session-live → stop. The provider owns the test;
+   * the tester owns the guards. The session-live signal is the recognition-
+   * started callback, the first partial/final, or a fatal error (listeners are
+   * registered BEFORE start). Vendor failures escape as raw errors for the
+   * tester to classify.
+   */
+  async testConnection(): Promise<ConnectionTestOutcome> {
+    const format = this.getSupportedInputFormats()[0];
+    if (!format) {
+      // Defensive — every shipped ASR provider declares at least one format.
+      throw new Error('ASR provider declares no supported input formats');
+    }
+
+    let transcript = '';
+    const sessionLive = new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const ok = (): void => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+      // ErrorCallback contract: (error) => Promise<void>.
+      const fail = (err: Error): Promise<void> => {
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
+        return Promise.resolve();
+      };
+      this.setOnRecognitionStarted(ok);
+      this.setOnRecognizing((_chunkId, text) => {
+        transcript += text;
+        ok();
+      });
+      this.setOnRecognized((_chunkId, text) => {
+        transcript += text;
+        ok();
+      });
+      this.setOnError(fail);
+    });
+
+    // The production wrapper (start/sendAudio/stop) runs the session lifecycle
+    // and records the `asr.session` row — the same path a conversation turn uses.
+    await this.init();
+    await this.start(); // WS/session established — auth accepted
+    await this.sendAudio(buildAsrSilence(format));
+    await sessionLive; // server confirmed the session / accepted the audio
+    await this.stop();
+
+    return {
+      ok: true,
+      phase: 'first-data',
+      errorCode: null,
+      ...(transcript ? { detail: { transcript } } : {}),
+    };
   }
 }

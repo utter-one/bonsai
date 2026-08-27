@@ -14,9 +14,8 @@ import {
   connectionTestDraftKey,
   type ConnectionTestOutcome,
   type ConnectionTestRequest,
-  type ConnectionTestStrategy,
+  type ConnectionTestResult,
   type TestPhase,
-  type TestProtocol,
 } from '../../../src/services/providers/connectionTest/types';
 import { LlmProviderFactory } from '../../../src/services/providers/llm/LlmProviderFactory';
 import { OpenAILlmProvider } from '../../../src/services/providers/llm/OpenAILlmProvider';
@@ -66,14 +65,23 @@ class TestCallLogger extends CallLogger {
   }
 }
 
-/** Tester with the DB row load replaced by an in-memory map (unit: no network, no DB). */
+/** Tester with the DB row load replaced by an in-memory map (unit: no network, no DB) and the test body replaced by a configurable stub (guard tests). */
 class TestTester extends ProviderConnectionTester {
   providers = new Map<string, Provider>();
+  stub: StubBody | null = null;
 
   protected override async loadProvider(id: string): Promise<Provider> {
     const row = this.providers.get(id);
     if (!row) throw new NotFoundError(`Provider with id ${id} not found`);
     return row;
+  }
+
+  /** Guard-test seam: run the configurable stub instead of a real provider. */
+  protected override async buildInstanceAndTest(request: ConnectionTestRequest, onBuilt: (instance: unknown) => void): Promise<ConnectionTestOutcome> {
+    if (!this.stub) {
+      throw new InvalidOperationError(`No stub registered for provider type '${request.providerType}'`);
+    }
+    return this.stub.run(request, onBuilt);
   }
 }
 
@@ -94,11 +102,13 @@ interface StubInstance {
 
 type StubMode = 'ok' | 'vendor-error' | 'structured-failure' | 'hang' | 'hang-build' | 'guard-error';
 
-/** Configurable strategy standing in for TPC-02..05 (proves the seam + guards). */
-class StubStrategy implements ConnectionTestStrategy<StubInstance> {
-  readonly providerType: string;
-  readonly timeoutMs: number;
-  readonly protocol: TestProtocol;
+/**
+ * Configurable test body standing in for a provider's `testConnection()`
+ * (TPC-02..05) — proves the tester's guard seam (build → test → timeout →
+ * cleanup → result). The tester's `buildInstanceAndTest` is the seam; this is
+ * what the core test drives it with.
+ */
+class StubBody {
   mode: StubMode = 'ok';
   vendorError: unknown = null;
   failurePhase: TestPhase = 'session';
@@ -107,26 +117,17 @@ class StubStrategy implements ConnectionTestStrategy<StubInstance> {
   cleanupCalls = 0;
   instancesInTest: StubInstance[] = [];
   /**
-   * Simulates the instrumented production path (TPC-02 design): the provider
-   * base records one row per call — record-then-throw on failure — via the
-   * real ProviderCallRecorder. Draft mode simulates the un-stamped instance:
-   * the base's recorder early-returns, so nothing is recorded.
+   * Simulates the instrumented production path: the provider base records one
+   * row per call via the real ProviderCallRecorder. Draft mode simulates the
+   * un-stamped instance: the base's recorder early-returns, so nothing is recorded.
    */
   recorder: { record(entry: ProviderCallEntry): void } | null = null;
 
-  constructor(opts: { providerType?: string; timeoutMs?: number; protocol?: TestProtocol } = {}) {
-    this.providerType = opts.providerType ?? 'llm';
-    this.timeoutMs = opts.timeoutMs ?? 1000;
-    this.protocol = opts.protocol ?? 'http';
-  }
-
-  async buildInstance(): Promise<StubInstance> {
+  async run(request: ConnectionTestRequest, onBuilt: (instance: unknown) => void): Promise<ConnectionTestOutcome> {
     this.buildInstanceCalls += 1;
     if (this.mode === 'hang-build') return new Promise<never>(() => undefined);
-    return { cleanup: async () => void (this.cleanupCalls += 1) };
-  }
-
-  async test(request: ConnectionTestRequest, instance: StubInstance): Promise<ConnectionTestOutcome> {
+    const instance: StubInstance = { cleanup: async () => void (this.cleanupCalls += 1) };
+    onBuilt(instance);
     this.instancesInTest.push(instance);
     switch (this.mode) {
       case 'hang':
@@ -144,11 +145,7 @@ class StubStrategy implements ConnectionTestStrategy<StubInstance> {
         this.recordProductionCall(request, { ok: true, model: this.outcomeOverrides.model ?? request.model ?? null });
         return {
           ok: true,
-          providerType: request.providerType,
-          apiType: request.apiType,
-          protocol: this.protocol,
           phase: 'first-data',
-          latencyMs: 12,
           errorCode: null,
           ...this.outcomeOverrides,
         };
@@ -223,8 +220,8 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
 
   describe('dispatch', () => {
     it('runs a registered strategy and returns a uniform result for a saved provider', async () => {
-      const strategy = new StubStrategy();
-      tester.registerStrategy(strategy);
+      const strategy = new StubBody();
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       const result = await tester.testConnection({ providerId: 'prov_llm_1' }, context);
@@ -274,9 +271,9 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('propagates guard errors from buildInstance (invalid draft config → ZodError, not a vendor result)', async () => {
-      const strategy = new StubStrategy({ providerType: 'llm' });
+      const strategy = new StubBody({ providerType: 'llm' });
       strategy.mode = 'guard-error';
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
 
       let err: unknown = null;
       try {
@@ -290,8 +287,8 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('builds a fresh instance per test (never a pooled/shared instance)', async () => {
-      const strategy = new StubStrategy();
-      tester.registerStrategy(strategy);
+      const strategy = new StubBody();
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       await tester.testConnection({ providerId: 'prov_llm_1' }, context);
@@ -304,11 +301,11 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
   });
 
   describe('vendor outcome classification (uniform result for every class)', () => {
-    async function runVendorCase(error: unknown): Promise<ConnectionTestOutcome> {
-      const strategy = new StubStrategy();
+    async function runVendorCase(error: unknown): Promise<ConnectionTestResult> {
+      const strategy = new StubBody();
       strategy.mode = 'vendor-error';
       strategy.vendorError = error;
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
       return tester.testConnection({ providerType: 'llm', apiType: 'openai', config: { apiKey: 'sk' } }, context);
     }
 
@@ -343,10 +340,10 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('structured ConnectionTestFailure carries the phase the test reached (mid-stream close)', async () => {
-      const strategy = new StubStrategy();
+      const strategy = new StubBody();
       strategy.mode = 'structured-failure';
       strategy.failurePhase = 'session';
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
 
       const result = await tester.testConnection({ providerType: 'llm', apiType: 'openai', config: { apiKey: 'sk' } }, context);
 
@@ -359,7 +356,7 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
 
   describe('cooldown (5s per saved provider id / draft key)', () => {
     it('second test for the same saved provider within 5s → TooManyRequestsError with Retry-After', async () => {
-      tester.registerStrategy(new StubStrategy());
+      tester.stub = new StubBody();
       tester.providers.set('prov_llm_1', savedProvider());
       await tester.testConnection({ providerId: 'prov_llm_1' }, context);
 
@@ -377,8 +374,8 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('keys are per saved provider id (one provider does not block another)', async () => {
-      const strategy = new StubStrategy();
-      tester.registerStrategy(strategy);
+      const strategy = new StubBody();
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
       tester.providers.set('prov_llm_2', savedProvider({ id: 'prov_llm_2', name: 'Groq' }));
 
@@ -390,8 +387,8 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('keys drafts by apiType + stable config hash (key order does not matter)', async () => {
-      const strategy = new StubStrategy();
-      tester.registerStrategy(strategy);
+      const strategy = new StubBody();
+      tester.stub = strategy;
       const configA = { apiKey: 'sk-1', baseUrl: 'https://api.example.com' };
       const configAReordered = { baseUrl: 'https://api.example.com', apiKey: 'sk-1' };
       const configB = { apiKey: 'sk-2', baseUrl: 'https://api.example.com' };
@@ -420,8 +417,8 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('saved and draft keys never collide', async () => {
-      const strategy = new StubStrategy();
-      tester.registerStrategy(strategy);
+      const strategy = new StubBody();
+      tester.stub = strategy;
       const config = { apiKey: 'sk-1' };
       tester.providers.set('prov_llm_1', savedProvider({ config: config as Provider['config'] }));
 
@@ -432,8 +429,8 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('allows a new test once the cooldown has expired', async () => {
-      const strategy = new StubStrategy();
-      tester.registerStrategy(strategy);
+      const strategy = new StubBody();
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
       await tester.testConnection({ providerId: 'prov_llm_1' }, context);
 
@@ -477,11 +474,11 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('sanitizes at the tester choke point (response AND the persisted row)', async () => {
-      const strategy = new StubStrategy();
+      const strategy = new StubBody();
       strategy.recorder = recorder;
       strategy.mode = 'vendor-error';
       strategy.vendorError = new Error(`Authorization: Bearer sk-proj-abc123secret plus ${'y'.repeat(700)}`);
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       const result = await tester.testConnection({ providerId: 'prov_llm_1' }, context);
@@ -504,9 +501,9 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
 
   describe('call-log attribution (draft vs saved, via the production recording path)', () => {
     it('saved ok test → exactly one row with <type>.test operation, model and status filled', async () => {
-      const strategy = new StubStrategy();
+      const strategy = new StubBody();
       strategy.recorder = recorder;
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       const result = await tester.testConnection({ providerId: 'prov_llm_1', model: 'gpt-test' }, context);
@@ -525,11 +522,11 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('saved failed test → exactly one row with errorCode/statusHttp/errorText from the vendor error', async () => {
-      const strategy = new StubStrategy();
+      const strategy = new StubBody();
       strategy.recorder = recorder;
       strategy.mode = 'vendor-error';
       strategy.vendorError = vendorError(401, 'Invalid API key provided');
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       await tester.testConnection({ providerId: 'prov_llm_1', model: 'gpt-test' }, context);
@@ -544,19 +541,19 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
     });
 
     it('draft tests → zero call-log rows (un-stamped instances, nothing to attribute to)', async () => {
-      const strategy = new StubStrategy();
+      const strategy = new StubBody();
       strategy.recorder = recorder;
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
       const result = await tester.testConnection({ providerType: 'llm', apiType: 'openai', config: { apiKey: 'sk-draft' } }, context);
       expect(result.ok).to.equal(true);
       expect(callLogger.pendingEntries).to.be.empty;
     });
 
     it('the row carries the model the production path stamped (strategy-reported, not the request model)', async () => {
-      const strategy = new StubStrategy();
+      const strategy = new StubBody();
       strategy.recorder = recorder;
       strategy.outcomeOverrides = { model: 'gpt-defaulted' };
-      tester.registerStrategy(strategy);
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       await tester.testConnection({ providerId: 'prov_llm_1' }, context);
@@ -565,11 +562,12 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
   });
 
   describe('timeout wrap (hard timeout per strategy)', () => {
-    it('a hanging strategy returns ok:false timeout and its cleanup() was awaited', async function () {
+    it('a hanging test body returns ok:false timeout and its cleanup() was awaited', async function () {
       this.timeout(5_000);
-      const strategy = new StubStrategy({ timeoutMs: 60 });
+      const strategy = new StubBody();
       strategy.mode = 'hang';
-      tester.registerStrategy(strategy);
+      tester.setTestTimeout('llm', 60);
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       const startedAt = Date.now();
@@ -589,11 +587,12 @@ describe('ProviderConnectionTester core (TPC-01)', () => {
       expect(callLogger.pendingEntries).to.be.empty;
     });
 
-    it('the timeout also wraps buildInstance (no cleanup possible when the instance never materializes)', async function () {
+    it('the timeout also wraps the build (no cleanup possible when the instance never materializes)', async function () {
       this.timeout(5_000);
-      const strategy = new StubStrategy({ timeoutMs: 60 });
+      const strategy = new StubBody();
       strategy.mode = 'hang-build';
-      tester.registerStrategy(strategy);
+      tester.setTestTimeout('llm', 60);
+      tester.stub = strategy;
       tester.providers.set('prov_llm_1', savedProvider());
 
       const result = await tester.testConnection({ providerId: 'prov_llm_1' }, context);

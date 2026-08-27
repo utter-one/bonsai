@@ -7,6 +7,7 @@ import { getMetricsRegistry, getProviderCallRecorder } from '../../monitoring/Pr
 import type { ProviderCallRecord } from '../../monitoring/ProviderCallRecorder';
 import type { MetricsRegistry } from '../../monitoring/MetricsRegistry';
 import { StreamStats } from '../../monitoring/StreamStats';
+import type { ConnectionTestOutcome } from '../connectionTest/types';
 
 /**
  * Abstract base class for LLM provider implementations
@@ -211,6 +212,31 @@ export abstract class LlmProviderBase<TConfig> implements ILlmProvider {
     this.onGenerationCompletedCallback = undefined;
     this.onGenerationStartedCallback = undefined;
     this.onErrorCallback = undefined;
+  }
+
+  /**
+   * Minimal production-path connection test (TPC-02): one real 1-token
+   * completion through this instance's own `generate` — the same client,
+   * transport and auth a conversation turn uses. The provider owns the test;
+   * the tester owns the guards (timeout, cooldown, cleanup, classification).
+   * Vendor failures escape as raw errors for the tester to classify.
+   */
+  async testConnection(model?: string | null): Promise<ConnectionTestOutcome> {
+    const messages: LlmMessage[] = [
+      { role: 'system', content: 'You are a connectivity check. Reply with a single word.' },
+      { role: 'user', content: 'ping' },
+    ];
+    await this.generate(messages, { maxTokens: 1 });
+    // Draft instances are built un-stamped (no call-log attribution), so the
+    // tested model is passed in by the tester; saved instances read their stamp.
+    const testedModel = model ?? this.providerModel ?? null;
+    return {
+      ok: true,
+      phase: 'first-data',
+      errorCode: null,
+      model: testedModel,
+      detail: { model: testedModel },
+    };
   }
 
   /**

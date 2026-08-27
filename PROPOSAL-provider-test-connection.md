@@ -223,9 +223,10 @@ With `write: true`: full round trip on a throwaway key
 ### 4.6 Embeddings
 
 `providerType: 'embeddings'` is declared in the schema but **no embedding
-provider is implemented yet** — out of scope; the strategy seam
-(`registerStrategy(type)`) means the first embedding provider adds a
-minimal `embed(['ping'])` test for free.
+provider is implemented yet** — out of scope; the provider-base seam (a
+`testConnection()` method on the base, dispatched by the tester via that
+type's factory) means the first embedding provider adds a minimal
+`embed(['ping'])` test for free.
 
 ## 5. Monitoring integration (the payoff)
 
@@ -275,21 +276,28 @@ provider quota") is a frontend concern.
 **New:**
 
 - `src/services/providers/connectionTest/ProviderConnectionTester.ts` —
-  `@singleton`; owns cooldown map, timeouts, fresh-instance construction
-  (saved: DB row + `secretRefUtils.resolveObject`; draft: synthetic Provider
-  from validated config), strategy dispatch, result normalization, error-code
-  mapping (`classifyThirdPartyError`), error-text sanitization, call-log
-  attribution for saved tests.
-- `src/services/providers/connectionTest/strategies/{llm,asr,tts,storage}.ts`
-  (TPC-02–05) and `strategies/channel.ts` (TPC-08) — one per providerType, each
-  driving the production lifecycle described in §4. ASR silence buffer is a
-  shared helper (format → byte buffer, reuses `AudioFormat` metadata).
+  `@singleton`; owns cooldown map, timeouts (a per-`providerType` timeout
+  table), fresh-instance construction (saved: DB row +
+  `secretRefUtils.resolveObject`; draft: synthetic Provider from validated
+  config), **provider-base dispatch** (by `providerType` → that type's
+  factory → `createForTest()` → the instance's own `testConnection()`), a
+  per-`providerType` protocol table, result normalization (the public
+  `providerType`/`apiType`/`protocol`/`latencyMs` are added to the
+  provider-produced `ConnectionTestOutcome`), error-code mapping
+  (`classifyThirdPartyError`), error-text sanitization, call-log attribution
+  for saved tests.
+- `src/services/providers/connectionTest/silence.ts` — shared ASR silence
+  helper (format → byte buffer, reuses `AudioFormat` metadata); imported by
+  `AsrProviderBase.testConnection()`.
 - `src/http/contracts/providerConnectionTest.ts` — request union +
   `ConnectionTestResult` Zod schemas (`.describe()` on every field,
   `.openapi()` on reusable subschemas) → OpenAPI.
-- `src/services/providers/connectionTest/index.ts` — strategy registry
-  (`Map<providerType, strategy>`) so TPC-08/TPC-09 and future embedding
-  providers plug in without touching the tester.
+- **Provider bases gain a `testConnection()` method** (TPC-02–05):
+  `LlmProviderBase`, `AsrProviderBase`, `TtsProviderBase`,
+  `StorageProviderBase` each drive the production lifecycle described in §4
+  and return the provider-produced `ConnectionTestOutcome`. Channels (TPC-08)
+  follow the same per-base pattern; TPC-09 and future embedding providers
+  plug in without touching the tester.
 
 **Changed:**
 
@@ -299,9 +307,9 @@ provider quota") is a frontend concern.
 - `src/services/AuditService.ts` — public `logEvent(entityType, entityId, action, details, userId)`
   (wraps the existing `logChange`); used with `action: 'TEST_CONNECTION'`
   (saved mode only; `newEntity` carries the result summary, never secrets).
-- Provider bases: **no changes** — the strategies call the existing public
-  lifecycle methods (`getSupportedInputFormats()` / `getSupportedFormats()`
-  are already public).
+- Provider bases: **gain a `testConnection()` method** (above); they keep
+  using the existing public lifecycle methods (`getSupportedInputFormats()`
+  / `getSupportedFormats()` are already public).
 - `docs/guide/monitoring.md` (Option A cross-ref), `docs/frontend-monitoring-api.md`
   (endpoint reference for the Console), specs in `.issues/proposal/provider-test/`.
 
@@ -309,15 +317,15 @@ provider quota") is a frontend concern.
 
 | ID | Spec | Contents | Est. |
 |---|---|---|---|
-| TPC-01 | tester-core | Tester skeleton: result type, strategy registry, guards (cooldown/timeout/sanitize), draft/saved instance construction, CallLogger breaker-exclusion | 1 dev-day |
-| TPC-02 | llm-strategy | LLM strategy: 1-token real inference, model defaulting, fake-HTTP unit tests | 0.5 dev-day |
-| TPC-03 | asr-strategy | ASR strategy: real WS session + silence helper, phase progression, fake-WS unit tests | 1 dev-day |
-| TPC-04 | tts-strategy | TTS strategy: production synthesis lifecycle, chunk counting, fake-server unit tests | 0.5 dev-day |
-| TPC-05 | storage-strategy | Storage strategy: `list` + optional write round trip, `local` variant, temp-dir unit tests | 0.5 dev-day |
+| TPC-01 | tester-core | Tester skeleton: result type, provider-base dispatch + protocol table, guards (cooldown/timeout/sanitize), draft/saved instance construction, CallLogger breaker-exclusion | 1 dev-day |
+| TPC-02 | llm-strategy | LLM test (`LlmProviderBase.testConnection`): 1-token real inference, model defaulting, fake-HTTP unit tests | 0.5 dev-day |
+| TPC-03 | asr-strategy | ASR test (`AsrProviderBase.testConnection`): real WS session + silence helper, phase progression, fake-WS unit tests | 1 dev-day |
+| TPC-04 | tts-strategy | TTS test (`TtsProviderBase.testConnection`): production synthesis lifecycle, chunk counting, fake-server unit tests | 0.5 dev-day |
+| TPC-05 | storage-strategy | Storage test (`StorageProviderBase.testConnection`): `list` + optional write round trip, `local` variant, temp-dir unit tests | 0.5 dev-day |
 | TPC-06 | http-endpoint-rbac | Endpoint + contracts + OpenAPI + RBAC + audit `logEvent` + e2e | 1 dev-day |
 | TPC-07 | call-log-integration | `*.test` call-log rows, alert-engine interplay tests (last-signal), docs updates | 0.5–1 dev-day |
-| TPC-08 | channel-providers | Channel strategies (7 apiTypes), zero side effects | 1 dev-day |
-| TPC-09 | periodic-data-plane-probes (optional) | `probeSettings`: `asrProbe`/`ttsProbe: 'data_plane'` opt-ins reusing the strategies at probe cadence | 1 dev-day |
+| TPC-08 | channel-providers | Channel tests (per-base `testConnection`, 7 apiTypes), zero side effects | 1 dev-day |
+| TPC-09 | periodic-data-plane-probes (optional) | `probeSettings`: `asrProbe`/`ttsProbe: 'data_plane'` opt-ins reusing the base `testConnection()` at probe cadence | 1 dev-day |
 
 Dependencies (direct only; `Blocks` in specs is the exact inverse):
 
@@ -340,13 +348,13 @@ green, `npm run test:e2e` green, unit + e2e tests per the spec, no regressions.
 
 Unit (no network, no vendor creds):
 
-- **ASR/TTS WS strategies:** in-test `ws` server standing in for the vendor —
+- **ASR/TTS WS tests:** in-test `ws` server standing in for the vendor —
   accept the handshake, assert the session-config message, echo one message
   / one audio chunk; negative cases: close-with-auth-error frame → `errorCode 'auth'`,
   no response → `timeout`, mid-stream close → structured result.
-- **LLM strategy:** fake HTTP (OpenAI-compatible) via a local server — 200
+- **LLM test:** fake HTTP (OpenAI-compatible) via a local server — 200
   stream, 401, 429, 500, hang → `timeout`.
-- **Storage strategy:** `local` against a temp dir (real); s3/gcs/azure-blob
+- **Storage test:** `local` against a temp dir (real); s3/gcs/azure-blob
   via injected fake SDK clients (constructor injection already exists in the
   provider classes for DI).
 - **Tester:** cooldown 429, fresh-instance guarantee (no shared state with a

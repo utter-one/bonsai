@@ -10,7 +10,6 @@ import { CallLogger, type ProviderCallEntry, type ProviderCallLogRow } from '../
 import { MetricsRegistry } from '../../../src/services/monitoring/MetricsRegistry';
 import { ProviderCallRecorder, resetMonitoringAccessorsForTests } from '../../../src/services/monitoring/ProviderCallRecorder';
 import { ProviderConnectionTester } from '../../../src/services/providers/connectionTest/ProviderConnectionTester';
-import { buildConnectionTestStrategies } from '../../../src/services/providers/connectionTest';
 import { TtsProviderFactory } from '../../../src/services/providers/tts/TtsProviderFactory';
 import { ElevenLabsTtsProvider } from '../../../src/services/providers/tts/ElevenLabsTtsProvider';
 import type { ITtsProvider } from '../../../src/services/providers/tts/ITtsProvider';
@@ -298,10 +297,8 @@ describe('ProviderConnectionTester TTS strategy (TPC-04)', function () {
       wsFake.setMode('hang');
       const tester = new TestTester();
       tester.providers.set('prov_tts_1', savedProvider());
-      // Shortened-timeout seam: same strategy body, 150ms instead of the 30s guard.
-      const ttsStrategy = buildConnectionTestStrategies().get('tts');
-      expect(ttsStrategy).to.not.equal(undefined);
-      tester.registerStrategy({ ...ttsStrategy!, timeoutMs: 150 });
+      // Shortened-timeout seam: 150ms instead of the 30s guard.
+      tester.setTestTimeout('tts', 150);
 
       const startedAt = Date.now();
       const result = await tester.testConnection({ providerId: 'prov_tts_1', voice: 'voice-123' }, context);
