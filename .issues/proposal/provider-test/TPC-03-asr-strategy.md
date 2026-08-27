@@ -90,15 +90,16 @@ Implemented and green: build ✓, unit 962 passing / 0 failing, e2e
 
 **Artifacts**
 
-- `src/services/providers/connectionTest/silence.ts` — `buildAsrSilence(format)`:
+- `src/services/providers/connectionTest/silence.ts` — `buildAsrSilence(format)` (imported by `AsrProviderBase.testConnection()`):
   `pcm_<rate>` → 500 ms of 16-bit mono zeros (rate × 2 bytes); `mulaw` →
   4 000 bytes of `0xFF` (8 kHz); `alaw` → 4 000 bytes of `0x7F` (8 kHz);
   throws on unsupported formats. 500 ms constant (`SILENCE_MS`) — shared
   with TPC-09.
-- `src/services/providers/connectionTest/strategies/asr.ts` — registered
-  for `asr` in `connectionTest/index.ts`. `protocol: 'websocket'`,
-  `timeoutMs: 20_000`. `buildInstance` resolves `AsrProviderFactory` and
-  calls `createForTest` (TPC-01 pattern) — **without `init()`**: the
+- `AsrProviderBase.testConnection()` (the original `strategies/asr.ts` was
+  folded into the base — see TPC-01). `protocol: 'websocket'` (tester
+  protocol table), timeout 20_000 (tester timeout table). The tester
+  resolves `AsrProviderFactory.createForTest` (TPC-01 pattern) — **without
+  `init()`**: the
   lifecycle below is the test, and an init failure must surface as a
   classified result. `test` registers `onRecognitionStarted` /
   `onRecognizing` / `onRecognized` / `onError` **before** `init()`/`start()`
@@ -131,9 +132,8 @@ Implemented and green: build ✓, unit 962 passing / 0 failing, e2e
 
 **Notes / known siblings**
 
-- The strategy's `AsrTestInstance` (and `LlmTestInstance`) carries
-  `cleanup()` delegating to the provider — the tester's `boundedCleanup`
-  calls `instance.cleanup()` and the wrapper object itself has none.
+- The provider bases expose `cleanup()`; the tester's `boundedCleanup`
+  awaits `instance.cleanup()` (bounded) after the timeout/finally.
 - `DeepgramAsrProvider.doStop` has the same latent null-race shape (close
   after `await 100ms` without re-guarding); not fixed here (out of
   scope) — flagged for a follow-up.
@@ -146,7 +146,8 @@ Implemented and green: build ✓, unit 962 passing / 0 failing, e2e
   tests) run the real `ElevenLabsAsrProvider` against a local `ws`
   server speaking the minimal realtime protocol; the factory seam points
   `realtimeWsUrl` at the mock (vendor-specific code lives in the test,
-  never in the strategy — all six apiTypes are covered by construction).
+  never in the base's `testConnection` — all six apiTypes are covered by
+  construction).
   Coverage: ok handshake (silence bytes on the wire verified + row +
   breaker not fed), 4401 close → `auth`, no-response → `timeout` (150 ms
   registry seam), mid-stream close → `ok:true`, partial →

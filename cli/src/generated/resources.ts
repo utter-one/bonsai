@@ -1586,6 +1586,27 @@ export const RESOURCES: Record<string, ResourceDef> = {
       },
     ],
   },
+  "providers_test_connection": {
+    name: "providers_test_connection",
+    scope: "global",
+    operations: [
+      {
+        method: "post",
+        path: "/api/providers/test-connection",
+        pathTemplate: "/api/providers/test-connection",
+        pathParams: [],
+        queryParamNames: [],
+        repeatableParams: [],
+        hasBody: true,
+        bodySchemaRef: "ConnectionTestRequest",
+        action: "create",
+        summary: "Test provider connection",
+        description: "On-demand connection test for a saved or draft provider, exercising the provider own protocol at minimum size. Vendor failures return a structured 200 result; only guard errors (400/404/429) are non-200.",
+        isPaginated: false,
+        isUpdateOrDelete: false,
+      },
+    ],
+  },
   "provider_catalog": {
     name: "provider_catalog",
     scope: "global",

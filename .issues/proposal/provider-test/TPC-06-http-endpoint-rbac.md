@@ -1,9 +1,9 @@
 ---
 title: "TPC-06 — HTTP endpoint: POST /api/providers/test-connection, contracts, RBAC, audit"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-26
 assignee: ""
 tags: [providers, spec, connection-test, phase-2, http, rbac]
 ---
@@ -19,6 +19,48 @@ tags: [providers, spec, connection-test, phase-2, http, rbac]
 Expose the tester as a REST endpoint with house-convention contracts, RBAC,
 audit, and OpenAPI — `POST /api/providers/test-connection`, in **saved
 provider** and **unsaved draft** modes.
+
+## Resolution (2026-08-26)
+
+Shipped: `src/http/contracts/providerConnectionTest.ts` (discriminated
+`saved XOR draft` union — `z.discriminator`-free strict objects so exactly
+one mode is present, else 400; draft `config` **reuses** the create endpoint's
+`providerConfigSchema` from `provider.ts`, no duplicate), `AuditService.logEvent()`
+(thin public wrapper over `logChange()`), `ProviderService.testConnection()`
+(`requirePermission(PROVIDER_READ)` → tester → audit **saved mode only** →
+`connectionTestResultSchema.parse`), the `ProviderController` route + handler
+(`POST /api/providers/test-connection`, `checkPermissions(PROVIDER_READ)`,
+`asyncHandler`, Zod parse), and
+`tests/e2e/provider-connection-test.test.ts` (14 tests: saved local / ollama
+dead-port / channel-400 / 404 / 429+Retry-After / audit-row; draft no-model-
+400 / invalid-config-400 / ok:true+no-audit; both-modes-400 / neither-400 /
+unsupported-type-400; support-403 / super_admin-200).
+
+Vendor failures stay `200 ok:false`; only guard errors are non-200 (400/403/
+404/429). The 5 s per-provider cooldown (in-memory in the tester) and
+`Retry-After` come from TPC-01.
+
+Deliberate deviations from the spec:
+
+1. **Audit action is `CONNECTION_TEST`**, not `provider.connection_test` —
+   the codebase's audit actions are UPPER_SNAKE verbs (CREATE/UPDATE/DELETE,
+   CONNECTION_TEST fits), so the Console's existing audit filters/UI work
+   unchanged. `newEntity` carries the structured result.
+2. **RBAC 403 uses the `support` role, not `viewer`** — `viewer` actually has
+   `provider:read`; only `support` lacks it (verified in
+   `src/permissions.ts`). The 403 test asserts on `support`.
+3. **Draft mode writes no audit row** (requirement #4: "saved mode only").
+   The scope note's `provider:draft:<apiType>` entity was deliberately not
+   implemented — a draft is never persisted, so there is no entity to audit
+   (consistent with "no audit for uncreated entities").
+4. **The ollama dead-port e2e passes an explicit `model`** — saved-mode model
+   resolution otherwise defaults to catalog enumeration, which would 400 on a
+   dead port *before* reaching the inference call. Passing `model` goes
+   straight to the generate → `network` (the specced failure mode).
+5. **OpenAPI wiring via the controller, not `provider.ts`** — the contract
+   imports `providerConfigSchema` from `provider.ts`; importing the contract
+   *back* into `provider.ts` would be circular. The controller imports both
+   (the existing pattern), which is enough for the OpenAPI generator.
 
 ## Scope
 

@@ -4,6 +4,7 @@ import type { RouteConfig } from '@asteasolutions/zod-to-openapi';
 import { PERMISSIONS } from '../../permissions';
 import { ProviderService } from '../../services/providers/ProviderService';
 import { createProviderSchema, updateProviderBodySchema, deleteProviderBodySchema, providerRouteParamsSchema, providerResponseSchema, providerListResponseSchema, providerModelsResponseSchema } from '../contracts/provider';
+import { connectionTestRequestSchema, connectionTestResultSchema } from '../contracts/providerConnectionTest';
 import { listParamsSchema } from '../contracts/common';
 import { checkPermissions } from '../../utils/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -181,6 +182,35 @@ export class ProviderController {
           404: { description: 'Provider not found' },
         },
       },
+      {
+        method: 'post',
+        path: '/api/providers/test-connection',
+        tags: ['Providers'],
+        summary: 'Test provider connection',
+        description: 'On-demand connection test for a saved or draft provider, exercising the provider own protocol at minimum size. Vendor failures return a structured 200 result; only guard errors (400/404/429) are non-200.',
+        request: {
+          body: {
+            content: {
+              'application/json': {
+                schema: connectionTestRequestSchema,
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Connection test ran (structured result; vendor failure is data, not an HTTP error)',
+            content: {
+              'application/json': {
+                schema: connectionTestResultSchema,
+              },
+            },
+          },
+          400: { description: 'Invalid payload, unsupported type, or draft LLM without a model' },
+          404: { description: 'Provider not found (saved mode)' },
+          429: { description: 'On cooldown (5 s per provider) — see Retry-After' },
+        },
+      },
     ];
   }
 
@@ -195,6 +225,7 @@ export class ProviderController {
     router.delete('/api/providers/:id', asyncHandler(this.deleteProvider.bind(this)));
     router.get('/api/providers/:id/audit-logs', asyncHandler(this.getProviderAuditLogs.bind(this)));
     router.get('/api/providers/:id/models', asyncHandler(this.enumerateModels.bind(this)));
+    router.post('/api/providers/test-connection', asyncHandler(this.testConnection.bind(this)));
   }
 
   /**
@@ -275,5 +306,17 @@ export class ProviderController {
     const params = providerRouteParamsSchema.parse(req.params);
     const models = await this.providerService.enumerateModels(params.id, req.context);
     res.status(200).json({ models });
+  }
+
+  /**
+   * POST /api/providers/test-connection
+   * On-demand connection test for a saved or draft provider (TPC-06). Vendor
+   * failures return a structured 200 result; only guard errors are non-200.
+   */
+  private async testConnection(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.PROVIDER_READ]);
+    const body = connectionTestRequestSchema.parse(req.body);
+    const result = await this.providerService.testConnection(body, req.context);
+    res.status(200).json(result);
   }
 }

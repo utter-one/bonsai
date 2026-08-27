@@ -72,14 +72,21 @@ OpenAI-compatible HTTP server (no network):
 
 ## Resolution (2026-08-26)
 
-Shipped: `src/services/providers/connectionTest/strategies/llm.ts`
-(registered in `connectionTest/index.ts`), `LlmProviderFactory.createForTest`
-(fresh initialized instance; draft → un-stamped so the production wrapper
-records zero rows), and `tests/unit/providers/connection-test-llm.test.ts`
-(9 tests, local fake OpenAI-compatible HTTP server — 200/401/429/500,
-dead endpoint, hang with a 150 ms timeout seam, saved-without-model
+Shipped: `LlmProviderBase.testConnection(model?)` (the test lives in the
+base; the tester's LLM branch resolves the factory → `createForTest` → the
+instance's `testConnection()`), `LlmProviderFactory.createForTest` (fresh
+initialized instance; draft → un-stamped so the production wrapper records
+zero rows), and `tests/unit/providers/connection-test-llm.test.ts` (10 tests,
+local fake OpenAI-compatible HTTP server — 200/401/429/500, dead endpoint,
+draft+hang timeout via a 150 ms `setTestTimeout` seam, saved-without-model
 defaults via real `enumerateModels()`, draft-without-model → ValidationError,
 draft-with-model → zero call-log rows + zero breaker feed).
+
+**Refinement:** the original `strategies/llm.ts` was folded into
+`LlmProviderBase.testConnection()` (see TPC-01 for the rationale). The
+base reports the tested model as `model ?? this.providerModel ?? null`
+(a draft has no stamped `providerModel`, so the tester passes the resolved
+model in).
 
 Two deliberate deviations from the wording above:
 

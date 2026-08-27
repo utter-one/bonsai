@@ -1,9 +1,9 @@
 ---
 title: "TPC-08 — Channel provider strategies: same-protocol auth checks, zero side effects"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-27
 assignee: ""
 tags: [providers, spec, connection-test, phase-3, channels]
 ---
@@ -88,3 +88,44 @@ provider with a bogus token → 200 `ok:false, errorCode 'auth'`.
 
 - Outbound-channel fallback (closed P3-05), channel health in the 60 s
   cycle (not part of this plan).
+
+## Resolution (2026-08-27)
+
+Implemented as a **per-`apiType` sub-strategy table** in
+`src/services/providers/connectionTest/channelStrategy.ts` (the spec's
+`strategies/channel.ts` path — the `strategies/` subdir was removed in the
+base-class refactor). Channels are config schemas (no provider class), so
+there is no base-class `testConnection()` to own; the tester's `case
+'channel'` dispatches to `testChannelConnection(apiType, config)` and records
+the `channel.test` row directly via the `CallLogger` (the row's `errorCode` is
+the sub-strategy's classified code; the `CallLogger`'s connection-test guard
+excludes it from the breaker). `protocol` is set by the tester
+(`http` / `sdk` / `smtp`).
+
+Deviations from the draft, each verified against the codebase:
+
+1. **File location** — `channelStrategy.ts` in the `connectionTest/` dir (the
+   `strategies/` subdir was deleted in the base-class refactor).
+2. **whatsapp** — the codebase's `WhatsAppConnection` uses the **Meta Graph
+   API** (`GET {graph}/v17.0/{phoneNumberId}`, `Bearer accessToken`), *not*
+   Twilio. Tested those credentials (the spec anticipated this: "if it uses
+   different credentials, test those").
+3. **ses** — the codebase uses **SESv1** (`@aws-sdk/client-ses` `SESClient`),
+   not SESv2. The credential check is SESv1 `ListIdentitiesCommand` (1 free
+   call, no side effects) in place of the spec's "SESv2 `GetAccount`". 401/403
+   (or the AWS auth error names) → `auth`.
+4. **smtp-imap** — SMTP via `nodemailer` `createTransport().verify()`
+   (connect → `EHLO` → `AUTH PLAIN` → `QUIT`, **no `MAIL FROM`**); IMAP via a
+   raw socket (`LOGIN` → `LOGOUT`, no folders opened) — a raw socket is
+   cleaner + transcript-capturable than the production `imap` library (same
+   protocol). `phase` is the furthest reached; `detail`
+   `{ smtp: 'ok'|'error', imap: 'ok'|'error'|'not-configured' }`.
+5. **Test seam** — `setChannelApiBaseForTests` is **`globalThis`-backed**
+   (`__TEST_CHANNEL_API_BASE__`) so it crosses the tsx/ESM-vs-CJS module graph
+   boundary: the unit world and the e2e (test) world can point the app-world
+   channel strategy at a local fake server without importing the app-world
+   module.
+6. **E2e** — the saved/draft telegram tests run against a **local fake** Bot
+   API (401 for `getMe`) via the seam, not the real `api.telegram.org` —
+   CI-safe, no external network, and it exercises the full path (endpoint →
+   tester → sub-strategy → `auth` → structured result).

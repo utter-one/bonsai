@@ -4,6 +4,7 @@ import type { Provider } from '../../../types/models';
 import type { IStorageProvider } from './IStorageProvider';
 import { StorageProviderBase } from './StorageProviderBase';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
+import { CONNECTION_TEST_DRAFT_ID } from '../connectionTest/types';
 
 export type StorageProviderApiType = 's3' | 'azure-blob' | 'gcs' | 'local';
 
@@ -33,33 +34,76 @@ export class StorageProviderFactory {
 
     const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
     const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
-    let instance: IStorageProvider;
-
-    switch (provider.apiType as StorageProviderApiType) {
-      case 's3':
-        instance = await this.createS3Provider(resolvedProvider, settings);
-        break;
-
-      case 'azure-blob':
-        instance = await this.createAzureBlobProvider(resolvedProvider, settings);
-        break;
-
-      case 'gcs':
-        instance = await this.createGcsProvider(resolvedProvider, settings);
-        break;
-
-      case 'local':
-        instance = await this.createLocalProvider(resolvedProvider, settings);
-        break;
-
-      default:
-        throw new Error(`Unsupported storage provider API type: ${provider.apiType}`);
-    }
+    const instance = await this.instantiateProvider(resolvedProvider, settings);
 
     // Stamp provider identity for call-log attribution (P1-03)
     if (instance instanceof StorageProviderBase) {
       instance.providerId = provider.id;
       instance.providerApiType = provider.apiType;
+    }
+
+    return instance;
+  }
+
+  /**
+   * Creates a storage provider instance for a connection test (TPC-05).
+   * Same construction as `createProvider` (including init), but call-log
+   * stamping is skipped for draft tests — un-stamped instances record
+   * nothing, so plaintext draft secrets never produce attributed rows.
+   * @param provider - Provider entity (saved row or synthetic draft)
+   * @param settings - Storage provider-specific settings (bucket, subPath, ...)
+   * @returns Initialised storage provider instance (stamped only for saved providers)
+   */
+  async createForTest(provider: Provider, settings: StorageSettings): Promise<IStorageProvider> {
+    if (provider.providerType !== 'storage') {
+      throw new Error(`Provider ${provider.id} is not a storage provider (type: ${provider.providerType})`);
+    }
+
+    logger.info(`Creating test storage provider instance (${provider.apiType}) for provider ${provider.id}`);
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
+    const instance = await this.instantiateProvider(resolvedProvider, settings);
+
+    // Stamp only for saved providers — draft tests must not produce call-log rows.
+    // No `instanceof` gate on purpose: every apiType above instantiates a
+    // StorageProviderBase subclass, and under tsx (dev/tests) the dynamically
+    // imported provider module can live in a different module graph than this
+    // factory, which would make `instanceof StorageProviderBase` unreliable.
+    if (provider.id !== CONNECTION_TEST_DRAFT_ID) {
+      const base = instance as StorageProviderBase<Record<string, unknown>>;
+      base.providerId = provider.id;
+      base.providerApiType = provider.apiType;
+    }
+
+    return instance;
+  }
+
+  /**
+   * Constructs (and init-s) the concrete provider for an apiType — shared by
+   * `createProvider` and `createForTest` (one code path).
+   */
+  private async instantiateProvider(provider: Provider, settings: StorageSettings): Promise<IStorageProvider> {
+    let instance: IStorageProvider;
+
+    switch (provider.apiType as StorageProviderApiType) {
+      case 's3':
+        instance = await this.createS3Provider(provider, settings);
+        break;
+
+      case 'azure-blob':
+        instance = await this.createAzureBlobProvider(provider, settings);
+        break;
+
+      case 'gcs':
+        instance = await this.createGcsProvider(provider, settings);
+        break;
+
+      case 'local':
+        instance = await this.createLocalProvider(provider, settings);
+        break;
+
+      default:
+        throw new Error(`Unsupported storage provider API type: ${provider.apiType}`);
     }
 
     return instance;

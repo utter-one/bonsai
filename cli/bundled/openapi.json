@@ -2759,6 +2759,10 @@
           "keyFileJson": {
             "type": "string",
             "description": "Service account key file content as JSON string"
+          },
+          "apiEndpoint": {
+            "type": "string",
+            "description": "Custom API endpoint (e.g. an emulator or proxy) — defaults to storage.googleapis.com"
           }
         },
         "required": [
@@ -26045,6 +26049,528 @@
           "createdAt"
         ]
       },
+      "ConnectionTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the connection test succeeded"
+          },
+          "providerType": {
+            "type": "string",
+            "description": "Provider category (llm, asr, tts, storage)"
+          },
+          "apiType": {
+            "type": "string",
+            "description": "Specific provider implementation"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "http",
+              "websocket",
+              "sdk",
+              "smtp",
+              "imap",
+              "local-fs"
+            ],
+            "description": "Transport the test exercised (the same protocol as the provider main functionality)"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "auth",
+              "session",
+              "first-data",
+              "write"
+            ],
+            "description": "How far the test got (furthest stage reached)"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total elapsed time in milliseconds"
+          },
+          "errorCode": {
+            "$ref": "#/components/schemas/ConnectionTestErrorCode"
+          },
+          "errorText": {
+            "type": "string",
+            "description": "Sanitized error message (present on failure; tokens/keys redacted, truncated to 500 chars)"
+          },
+          "detail": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Type-specific detail (model, bytes, objects, path, ...)"
+          }
+        },
+        "required": [
+          "ok",
+          "providerType",
+          "apiType",
+          "protocol",
+          "phase",
+          "latencyMs",
+          "errorCode"
+        ]
+      },
+      "ConnectionTestErrorCode": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "auth",
+          "client_error",
+          "rate_limited",
+          "timeout",
+          "network",
+          "server_error",
+          "unknown",
+          null
+        ],
+        "description": "Third-party error code (null on success)"
+      },
+      "ConnectionTestRequest": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/SavedConnectionTestBody"
+          },
+          {
+            "$ref": "#/components/schemas/DraftConnectionTestBody"
+          }
+        ]
+      },
+      "SavedConnectionTestBody": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Id of the saved provider to test"
+          },
+          "model": {
+            "type": "string",
+            "description": "LLM only: the model to test (defaults to the first model from the provider catalog when omitted)"
+          },
+          "voice": {
+            "type": "string",
+            "description": "TTS only: the voice to test"
+          },
+          "write": {
+            "type": "boolean",
+            "description": "Storage only: run a full upload/download/delete round trip on a throwaway key"
+          },
+          "bucket": {
+            "type": "string",
+            "description": "Storage (s3/azure-blob/gcs) only: the bucket/container to verify"
+          }
+        },
+        "required": [
+          "providerId"
+        ],
+        "additionalProperties": false
+      },
+      "DraftConnectionTestBody": {
+        "type": "object",
+        "properties": {
+          "providerType": {
+            "type": "string",
+            "enum": [
+              "asr",
+              "tts",
+              "llm",
+              "embeddings",
+              "storage",
+              "channel"
+            ],
+            "description": "Provider category (llm, asr, tts, or storage — the types with a connection test)"
+          },
+          "apiType": {
+            "type": "string",
+            "description": "Specific provider implementation (e.g. openai, azure, s3, local)"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "OpenAI API key"
+                  },
+                  "organizationId": {
+                    "type": "string",
+                    "description": "Optional organization ID"
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "description": "Optional base URL for OpenAI-compatible APIs"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "OpenAI API key"
+                  },
+                  "organizationId": {
+                    "type": "string",
+                    "description": "Optional organization ID"
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "description": "Optional base URL for OpenAI-compatible APIs"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "Anthropic API key"
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "description": "Optional base URL for custom endpoints"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "Google API key"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "baseUrl": {
+                    "type": "string",
+                    "description": "Base URL of the Ollama server (defaults to http://localhost:11434 for local, or https://ollama.com for cloud)"
+                  },
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key — required for Ollama Cloud (ollama.com); ignored by local Ollama instances"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "OVH AI Endpoints API key"
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "description": "Optional base URL override (defaults to https://oai.endpoints.kepler.ai.cloud.ovh.net/v1)"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "Scaleway API key"
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "description": "Optional base URL override (defaults to https://api.scaleway.ai/v1)"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with ElevenLabs"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with OpenAI"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Deepgram"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Cartesia"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "The Azure region to use for the speech service (e.g., \"eastus\", \"westeurope\")"
+                  },
+                  "subscriptionKey": {
+                    "type": "string",
+                    "description": "The subscription key to use for the speech service"
+                  }
+                },
+                "required": [
+                  "region",
+                  "subscriptionKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (default), \"eu\", or \"jp\""
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "region": {
+                    "type": "string",
+                    "description": "The Azure region to use for the speech recognition service"
+                  },
+                  "subscriptionKey": {
+                    "type": "string",
+                    "description": "The subscription key to use for the speech recognition service"
+                  }
+                },
+                "required": [
+                  "region",
+                  "subscriptionKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with ElevenLabs"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Deepgram"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with AssemblyAI"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu"
+                    ],
+                    "default": "us",
+                    "description": "AssemblyAI region endpoint: \"us\" for streaming.assemblyai.com or \"eu\" for streaming.eu.assemblyai.com"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Speechmatics"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "apac"
+                    ],
+                    "default": "us",
+                    "description": "Speechmatics region endpoint: \"us\" for us.rt.speechmatics.com, \"eu\" for eu.rt.speechmatics.com, or \"apac\" for the global router (global.rt.speechmatics.com — no dedicated AU realtime host exists)"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "apiKey": {
+                    "type": "string",
+                    "description": "API key for authenticating with Soniox"
+                  },
+                  "region": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "eu",
+                      "jp"
+                    ],
+                    "default": "us",
+                    "description": "Soniox region: \"us\" (stt-rt.soniox.com), \"eu\" (stt-rt.eu.soniox.com), or \"jp\" (stt-rt.jp.soniox.com)"
+                  }
+                },
+                "required": [
+                  "apiKey"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/components/schemas/S3StorageConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureBlobStorageConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GcsStorageConfig"
+              },
+              {
+                "$ref": "#/components/schemas/LocalStorageConfig"
+              },
+              {
+                "$ref": "#/components/schemas/TelegramChannelConfig"
+              },
+              {
+                "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
+              },
+              {
+                "$ref": "#/components/schemas/TwilioVoiceChannelConfig"
+              },
+              {
+                "$ref": "#/components/schemas/WhatsAppChannelConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SmtpImapChannelConfig"
+              }
+            ],
+            "description": "Provider-specific configuration object (validated by the create-endpoint schema)"
+          },
+          "model": {
+            "type": "string",
+            "description": "LLM only: the model to test (required for a draft LLM — there is no saved row to enumerate a default from)"
+          },
+          "voice": {
+            "type": "string",
+            "description": "TTS only: the voice to test"
+          },
+          "write": {
+            "type": "boolean",
+            "description": "Storage only: run a full upload/download/delete round trip on a throwaway key"
+          },
+          "bucket": {
+            "type": "string",
+            "description": "Storage (s3/azure-blob/gcs) only: the bucket/container to verify"
+          }
+        },
+        "required": [
+          "providerType",
+          "apiType",
+          "config"
+        ],
+        "additionalProperties": false
+      },
       "DeployTelegramWebhookResponse": {
         "type": "object",
         "properties": {
@@ -44194,6 +44720,45 @@
           },
           "404": {
             "description": "Provider not found"
+          }
+        }
+      }
+    },
+    "/api/providers/test-connection": {
+      "post": {
+        "tags": [
+          "Providers"
+        ],
+        "summary": "Test provider connection",
+        "description": "On-demand connection test for a saved or draft provider, exercising the provider own protocol at minimum size. Vendor failures return a structured 200 result; only guard errors (400/404/429) are non-200.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionTestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connection test ran (structured result; vendor failure is data, not an HTTP error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload, unsupported type, or draft LLM without a model"
+          },
+          "404": {
+            "description": "Provider not found (saved mode)"
+          },
+          "429": {
+            "description": "On cooldown (5 s per provider) — see Retry-After"
           }
         }
       }

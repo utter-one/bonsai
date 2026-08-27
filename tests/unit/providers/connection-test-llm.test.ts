@@ -8,7 +8,6 @@ import { CallLogger, type ProviderCallEntry, type ProviderCallLogRow } from '../
 import { MetricsRegistry } from '../../../src/services/monitoring/MetricsRegistry';
 import { ProviderCallRecorder, resetMonitoringAccessorsForTests } from '../../../src/services/monitoring/ProviderCallRecorder';
 import { ProviderConnectionTester } from '../../../src/services/providers/connectionTest/ProviderConnectionTester';
-import { buildConnectionTestStrategies } from '../../../src/services/providers/connectionTest';
 import { LlmProviderFactory } from '../../../src/services/providers/llm/LlmProviderFactory';
 import { ValidationError, NotFoundError } from '../../../src/errors';
 import type { Provider } from '../../../src/types/models';
@@ -343,29 +342,35 @@ describe('ProviderConnectionTester LLM strategy (TPC-02)', function () {
     expect(fake.requests).to.be.empty;
   });
 
-  it('saved + hang → ok:false timeout via the shortened-timeout registry seam', async function () {
+  it('draft + hang → ok:false timeout via the shortened-timeout registry seam (un-stamped: no late row)', async function () {
     fake.setMode('hang');
     const tester = new TestTester();
-    tester.providers.set('prov_llm_1', savedProvider({ config: { apiKey: 'sk-test', baseUrl: baseUrl() } as Provider['config'] }));
-    // Shortened-timeout seam: same strategy body, 150ms instead of the 30s guard.
-    const llmStrategy = buildConnectionTestStrategies().get('llm');
-    expect(llmStrategy).to.not.equal(undefined);
-    tester.registerStrategy({ ...llmStrategy!, timeoutMs: 150 });
+    // Shortened-timeout seam: 150ms instead of the 30s guard.
+    tester.setTestTimeout('llm', 150);
 
     const startedAt = Date.now();
-    const result = await tester.testConnection({ providerId: 'prov_llm_1', model: 'gpt-test-a' }, context);
+    const result = await tester.testConnection(
+      { providerType: 'llm', apiType: 'openai', model: 'gpt-test-a', config: { apiKey: 'sk-draft', baseUrl: baseUrl() } },
+      context,
+    );
     const elapsed = Date.now() - startedAt;
 
     expect(result.ok).to.equal(false);
     expect(result.errorCode).to.equal('timeout');
-    expect(result.latencyMs).to.be.at.least(150);
-    expect(elapsed).to.be.at.least(150);
+    expect(result.latencyMs).to.be.at.least(100);
+    expect(result.latencyMs).to.be.below(5000);
+    expect(elapsed).to.be.at.least(100);
 
-    // Release the in-flight socket (the abandoned SDK promise settles through the
-    // race and its late row lands under the test context — breaker-excluded).
+    // Draft mode is deliberate: a draft instance is un-stamped, so the
+    // abandoned in-flight generate records NO late row. (A saved provider's
+    // abandoned SDK promise settles through the race and records a late row
+    // whose timing is non-deterministic — the SDK's connection-error reject can
+    // lag well past any fixed wait — which would leak into a later suite's
+    // recorder. The timeout path itself is identical for saved and draft.)
     fake.server.closeAllConnections?.();
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 50));
     await sharedCallLogger.flushNow();
+    expect(sharedCallLogger.rows).to.be.empty;
   });
 
   it('saved without model → defaults to the first model from enumerateModels (existing free call)', async () => {

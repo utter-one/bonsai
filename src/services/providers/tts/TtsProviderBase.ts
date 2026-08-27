@@ -7,6 +7,10 @@ import { getMetricsRegistry, getProviderCallRecorder } from '../../monitoring/Pr
 import type { ProviderCallRecord } from '../../monitoring/ProviderCallRecorder';
 import type { MetricsRegistry } from '../../monitoring/MetricsRegistry';
 import { classifyThirdPartyError } from '../../../utils/errorClassification';
+import type { ConnectionTestOutcome } from '../connectionTest/types';
+
+/** The fixed minimum-size test text (2–3 words, one sentence). */
+const TTS_TEST_TEXT = 'Test connection.';
 
 /** Per-session instrumentation state (one TTS session per AI output turn) — P1-03. */
 interface TtsSessionStats {
@@ -391,5 +395,73 @@ export abstract class TtsProviderBase<TConfig = Record<string, any>, TChunk exte
     this.onGenerationEndedCallback = undefined;
     this.onErrorCallback = undefined;
     this.onSpeechGeneratingCallback = undefined;
+  }
+
+  /**
+   * Minimal production-path connection test (TPC-04): the provider's own
+   * streaming synthesis lifecycle on a 2–3 word test string — the same
+   * transport, session and callbacks a conversation turn uses. Audio chunks
+   * are counted, never persisted, returned, or played. The provider owns the
+   * test; the tester owns the guards. `ok` = at least one audio chunk; zero
+   * chunks after a clean end → structured server_error. Vendor failures
+   * surface via the error callback and are rethrown for the tester to classify.
+   * @param voice The voice input param, if any (null → the provider's default).
+   */
+  async testConnection(voice: string | null): Promise<ConnectionTestOutcome> {
+    let bytes = 0;
+    let vendorError: Error | null = null;
+    // Some providers (e.g. ElevenLabs WS) deliver audio only AFTER end() returns
+    // (EOS is fire-and-send), so completion = the provider's generation-ended
+    // signal. The tester's hard timeout bounds this wait.
+    let resolveEnded: () => void = () => undefined;
+    const ended = new Promise<void>((resolve) => {
+      resolveEnded = resolve;
+    });
+
+    this.setOnSpeechGenerating((chunk) => {
+      bytes += chunk.audio.length; // counted, then discarded
+      return Promise.resolve();
+    });
+    this.setOnError((err) => {
+      vendorError = err;
+      return Promise.resolve();
+    });
+    this.setOnGenerationEnded(() => {
+      resolveEnded();
+      return Promise.resolve();
+    });
+
+    // The production wrapper (init/start/sendText/end) runs the session
+    // lifecycle and records the `tts.session` row — the same path a
+    // conversation turn uses.
+    await this.init();
+    await this.start();
+    await this.sendText(TTS_TEST_TEXT);
+    await this.end();
+    await ended;
+
+    // Vendor failures surface through the error callback (the base wrapper
+    // swallows them there) — rethrow so the tester classifies.
+    if (vendorError) {
+      throw vendorError;
+    }
+    if (bytes === 0) {
+      // Clean stream end with no audio: auth and the session worked, but the
+      // round trip produced nothing (bad voice/model, or a swallowed failure).
+      return {
+        ok: false,
+        phase: 'session',
+        errorCode: 'server_error',
+        errorText: `TTS stream ended without producing any audio (voice: ${voice ?? 'provider default'})`,
+        model: voice,
+      };
+    }
+    return {
+      ok: true,
+      phase: 'first-data',
+      errorCode: null,
+      model: voice,
+      detail: { voice, bytes },
+    };
   }
 }
