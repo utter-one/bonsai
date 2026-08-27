@@ -8,6 +8,7 @@ import type { Provider } from '../../../types/models';
 import { ForbiddenError, InvalidOperationError, NotFoundError, TooManyRequestsError, ValidationError } from '../../../errors';
 import { logger } from '../../../utils/logger';
 import { MonitoringContext } from '../../monitoring/MonitoringContext';
+import { CallLogger } from '../../monitoring/CallLogger';
 import { classifyThirdPartyError, type ClassifiedError, type ThirdPartyErrorCode } from '../../../utils/errorClassification';
 import type { RequestContext } from '../../RequestContext';
 import { LlmProviderFactory, type LlmSettings } from '../llm/LlmProviderFactory';
@@ -18,6 +19,7 @@ import { TtsProviderFactory, type TtsSettings } from '../tts/TtsProviderFactory'
 import type { TtsProviderBase } from '../tts/TtsProviderBase';
 import { StorageProviderFactory, type StorageSettings } from '../storage/StorageProviderFactory';
 import type { StorageProviderBase } from '../storage/StorageProviderBase';
+import { testChannelConnection } from './channelStrategy';
 import {
   buildDraftProvider,
   connectionTestDraftKey,
@@ -41,8 +43,8 @@ const CLEANUP_BOUND_MS = 5_000;
 /** Above this many tracked keys, expired cooldown entries are swept (draft keys are unbounded in variety). */
 const COOLDOWN_SWEEP_THRESHOLD = 1_000;
 
-/** Provider types that have a connection test (the provider base owns the test body). */
-const SUPPORTED_TYPES = ['llm', 'asr', 'tts', 'storage'] as const;
+/** Provider types that have a connection test (the provider base owns the test body; channels via the sub-strategy table). */
+const SUPPORTED_TYPES = ['llm', 'asr', 'tts', 'storage', 'channel'] as const;
 
 /** Default hard timeouts per providerType (the whole body: build + test). */
 const DEFAULT_TIMEOUTS: Record<string, number> = {
@@ -50,6 +52,7 @@ const DEFAULT_TIMEOUTS: Record<string, number> = {
   asr: 20_000,
   tts: 30_000,
   storage: 15_000,
+  channel: 15_000,
 };
 
 /**
@@ -113,6 +116,11 @@ export class ProviderConnectionTester {
     }
     if (request.providerType === 'asr') {
       return 'websocket';
+    }
+    if (request.providerType === 'channel') {
+      if (request.apiType === 'ses') return 'sdk';
+      if (request.apiType === 'smtp-imap') return 'smtp';
+      return 'http'; // telegram, twilio-*, whatsapp, sendgrid
     }
     return 'http'; // llm (and the defensive default)
   }
@@ -225,6 +233,31 @@ export class ProviderConnectionTester {
         const instance = await factory.createForTest(provider, settings);
         onBuilt(instance);
         return (instance as StorageProviderBase<Record<string, unknown>>).testConnection({ write: request.write === true, path: basePath });
+      }
+      case 'channel': {
+        // No provider instance — channels are config schemas (the real
+        // connection logic lives in `src/channels/`), so there is no base-class
+        // `testConnection()` to own. The sub-strategy performs the protocol
+        // check directly (zero side effects, no instance to clean up).
+        const startedAt = performance.now();
+        const outcome = await testChannelConnection(request.apiType, request.provider.config as Record<string, unknown>);
+        // Channels have no provider base to record the call-log row, so record it
+        // here (the operation falls back to the surrounding MonitoringContext:
+        // 'channel.test'; the CallLogger's connection-test guard excludes it from
+        // the breaker). The outcome already carries the classified errorCode, so
+        // the row records it directly (no re-classification).
+        container.resolve(CallLogger).record({
+          providerId: request.provider.id,
+          providerType: 'channel',
+          apiType: request.apiType,
+          model: null,
+          ok: outcome.ok,
+          errorCode: outcome.ok ? null : outcome.errorCode,
+          statusHttp: outcome.statusHttp ?? null,
+          durationMs: Math.round(performance.now() - startedAt),
+          errorText: outcome.errorText ?? null,
+        });
+        return outcome;
       }
       default:
         throw new InvalidOperationError(`No connection test available for provider type '${request.providerType}'`);

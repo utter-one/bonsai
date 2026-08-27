@@ -550,6 +550,12 @@ Console renders:
 }
 ```
 
+`protocol` reflects the transport the test used: `http`, `websocket`, `sdk`,
+`local-fs`, or `smtp`. For a **channel** provider it is `http` (Telegram,
+Twilio Messaging/Voice, WhatsApp, SendGrid), `sdk` (SES), or `smtp`
+(SMTP-IMAP); channel checks are a per-`apiType` sub-strategy table (channels
+are config schemas, not provider classes) and always `phase: "auth"`.
+
 Only guard errors are non-200: `400` (bad payload / draft LLM without
 `model` / unsupported type), `401/403` (RBAC — `provider:read`), `404`
 (saved provider not found), `429` (5 s per-provider cooldown — `Retry-After`

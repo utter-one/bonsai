@@ -147,8 +147,14 @@ unsaved draft (`providerType` + `apiType` + `config`; exactly one mode,
 else `400`). It exercises the provider's **own production path** at minimum
 size: LLM → 1-token generation (or catalog enumeration to default the model),
 ASR/TTS → a real session handshake + first frame / minimal synthesis, storage
-→ a real `list` (+ optional 1 KB write round trip when `write: true`), all
-under a hard per-type timeout.
+→ a real `list` (+ optional 1 KB write round trip when `write: true`),
+channel → a single free, read-only vendor **credential check over the
+provider's own protocol** (Telegram Bot API `getMe`, Twilio
+`Accounts.json`, WhatsApp Graph API, SendGrid `/api/v3/`, SES `ListIdentities`,
+or SMTP `EHLO`/`AUTH`/`QUIT` + optional IMAP `LOGIN`/`LOGOUT` — nothing is
+sent, no `MAIL FROM`, no mailbox opened), all under a hard per-type timeout.
+Channels have no provider class (config schemas only), so their check is a
+per-`apiType` sub-strategy table rather than a base-class method.
 
 Semantics:
 

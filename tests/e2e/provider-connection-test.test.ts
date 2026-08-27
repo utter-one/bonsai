@@ -4,8 +4,9 @@ import request from 'supertest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createServer } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import { authed, unauthed, resetDatabase } from '../utils';
+import { setChannelApiBaseForTests, resetChannelApiBasesForTests } from '../../src/services/providers/connectionTest/channelStrategy';
 
 const app = () => (globalThis as any).__TEST_APP__;
 
@@ -94,12 +95,6 @@ describe('Provider connection test API (TPC-06)', () => {
       expect(res.body.providerType).to.equal('llm');
     });
 
-    it('saved channel provider → 400 (no connection test for channel yet — TPC-08)', async () => {
-      const id = await createSavedProvider({ name: 'Telegram', providerType: 'channel', apiType: 'telegram', config: { botToken: '123:abc' } });
-      const res = await authed().post('/api/providers/test-connection').send({ providerId: id });
-      expect(res.status).to.equal(400);
-    });
-
     it('non-existent providerId → 404', async () => {
       const res = await authed().post('/api/providers/test-connection').send({ providerId: 'prov_does_not_exist' });
       expect(res.status).to.equal(404);
@@ -129,6 +124,66 @@ describe('Provider connection test API (TPC-06)', () => {
       expect(row.newEntity.ok).to.equal(true);
       expect(row.newEntity.providerType).to.equal('storage');
       await rm(basePath, { recursive: true, force: true });
+    });
+  });
+
+  describe('channel (TPC-08)', () => {
+    let server: Server;
+    let baseUrl: string;
+
+    before(async () => {
+      // A local fake Telegram Bot API returning 401 for getMe (a well-formed
+      // but invalid token). No real network — CI-safe.
+      server = createServer((req, res) => {
+        if (req.method === 'GET' && (req.url ?? '').includes('/getMe')) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error_code: 401, description: 'Unauthorized' }));
+          return;
+        }
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end('{}');
+      });
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      baseUrl = `http://127.0.0.1:${port}`;
+    });
+
+    after(async () => {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+
+    beforeEach(() => {
+      // Point the app-world channel strategy at the local fake. The seam is
+      // globalThis-backed so it crosses the tsx/ESM-vs-CJS module graph boundary.
+      resetChannelApiBasesForTests();
+      setChannelApiBaseForTests('telegram', baseUrl);
+    });
+
+    afterEach(() => {
+      resetChannelApiBasesForTests();
+    });
+
+    it('saved telegram (bogus token, local fake 401) → 200 ok:false, errorCode auth, protocol http', async () => {
+      const id = await createSavedProvider({ name: 'Telegram', providerType: 'channel', apiType: 'telegram', config: { botToken: '123:abc' } });
+      const res = await authed().post('/api/providers/test-connection').send({ providerId: id });
+      expect(res.status).to.equal(200);
+      expect(res.body.ok).to.equal(false);
+      expect(res.body.errorCode).to.equal('auth');
+      expect(res.body.providerType).to.equal('channel');
+      expect(res.body.apiType).to.equal('telegram');
+      expect(res.body.protocol).to.equal('http');
+      expect(res.body.phase).to.equal('auth');
+    });
+
+    it('draft telegram (bogus token, local fake 401) → 200 ok:false, errorCode auth (no saved row)', async () => {
+      const res = await authed()
+        .post('/api/providers/test-connection')
+        .send({ providerType: 'channel', apiType: 'telegram', config: { botToken: '123:abc' } });
+      expect(res.status).to.equal(200);
+      expect(res.body.ok).to.equal(false);
+      expect(res.body.errorCode).to.equal('auth');
+      expect(res.body.providerType).to.equal('channel');
     });
   });
 
