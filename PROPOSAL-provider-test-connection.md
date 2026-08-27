@@ -325,7 +325,7 @@ provider quota") is a frontend concern.
 | TPC-06 | http-endpoint-rbac | Endpoint + contracts + OpenAPI + RBAC + audit `logEvent` + e2e | 1 dev-day |
 | TPC-07 | call-log-integration | `*.test` call-log rows, alert-engine interplay tests (last-signal), docs updates | 0.5–1 dev-day |
 | TPC-08 | channel-providers | Channel tests (per-base `testConnection`, 7 apiTypes), zero side effects | 1 dev-day |
-| TPC-09 | periodic-data-plane-probes (optional) | `probeSettings`: `asrProbe`/`ttsProbe: 'data_plane'` opt-ins reusing the base `testConnection()` at probe cadence | 1 dev-day |
+| TPC-09 | periodic-data-plane-probes (optional) | ~~`probeSettings`: `asrProbe`/`ttsProbe: 'data_plane'` opt-ins~~ — **closed (2026-08-27), won't do**: superseded by the monitoring module's `HealthCheckService`, which already probes every provider type on its 60 s cycle (LLM `models`/`one_token`, ASR/TTS zero-cost `ping()`, storage `list`, call-log inference fallback) | n/a |
 
 Dependencies (direct only; `Blocks` in specs is the exact inverse):
 

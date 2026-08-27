@@ -1,9 +1,9 @@
 ---
 title: "TPC-09 — (Optional) Opt-in periodic data-plane probes for ASR/TTS"
 severity: proposal
-status: open
+status: closed
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-27
 assignee: ""
 tags: [providers, spec, connection-test, phase-3, monitoring, optional]
 ---
@@ -74,3 +74,26 @@ endpoint → provider check `down` after 3 cycles + `asr.probe` rows.
 
 - Making `data_plane` the default (revisiting Option A), mid-stream
   quality assertions.
+
+## Closed (2026-08-27) — won't do: superseded by the monitoring module
+
+Not implemented, by decision. The periodic provider-availability signal TPC-09
+would add is **already provided by the monitoring module's
+`HealthCheckService`** on its 60 s cycle (`MONITORING_HEALTH_INTERVAL_MS`),
+per `monitoring_config.probeSettings` (P1-05b/P1-06):
+
+- **LLM** — `llmProbe`: `'models'` (`enumerateModels()`) or `'one_token'`
+  (1-token `generate()`) on a fresh instance.
+- **ASR/TTS** — `asrProbe`/`ttsProbe`: the provider's **zero-cost `ping()`**
+  liveness endpoint on a fresh, uninitialised instance.
+- **Storage** — `list('', 1)`.
+- Providers with **no free liveness endpoint** (Azure ASR/TTS, Cartesia TTS)
+  fall back to `provider_call_logs` inference instead of a probe.
+- All probe rows are **cooldown-gated** (default 10 min) and feed the same
+  `provider-down`/`provider-degraded` alert branches as on-demand tests.
+
+A per-cycle **data-plane** probe (a real ASR streaming session / a short TTS
+synthesis) would add vendor cost + session-quota pressure for a marginal
+availability signal the zero-cost liveness probes already deliver. Revisit
+only if a vendor's liveness endpoint is found to be unreliable as an
+availability signal for its data plane.

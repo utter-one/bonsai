@@ -18,9 +18,10 @@ Proposal: [`PROPOSAL-provider-test-connection.md`](../../PROPOSAL-provider-test-
 | [TPC-06](TPC-06-http-endpoint-rbac.md) | HTTP endpoint, contracts, RBAC, audit | 2 | 1 d | resolved |
 | [TPC-07](TPC-07-call-log-integration.md) | Call-log integration + alert interplay + docs | 2 | 0.5–1 d | resolved |
 | [TPC-08](TPC-08-channel-providers.md) | Channel strategies: same-protocol auth checks | 3 | 1 d | resolved |
-| [TPC-09](TPC-09-periodic-data-plane-probes.md) | (Optional) Opt-in periodic data-plane probes | 3 | 1 d | open |
+| [TPC-09](TPC-09-periodic-data-plane-probes.md) | (Optional) Opt-in periodic data-plane probes | 3 | 1 d | closed (superseded) |
 
-Total: ~7–8 dev-days (TPC-09 optional).
+Total: ~7–8 dev-days (TPC-09 closed — superseded by the monitoring module's
+existing periodic provider probes).
 
 ## Dependency graph
 
@@ -45,8 +46,9 @@ TPC-09  ◄── TPC-03, TPC-04, TPC-07   (optional)
    core lands).
 2. **API + monitoring integration** — TPC-06 + TPC-07 (the feature is
    end-to-end: endpoint, RBAC, audit, call-log/last-signal interplay).
-3. **Extensions** — TPC-08 (channels), TPC-09 (optional periodic
-   data-plane probes).
+3. **Extensions** — TPC-08 (channels). TPC-09 (optional periodic data-plane
+   probes) was closed as superseded: the monitoring module's `HealthCheckService`
+   already probes every provider type on its 60 s cycle (see the TPC-09 spec).
 
 Each spec is independently testable and shippable within its phase.
 
