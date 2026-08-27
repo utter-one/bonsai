@@ -516,6 +516,52 @@ fallback applied when the config has no override for that rule.
 - The PUT replaces the whole config verbatim — send back every notifier you
   want to keep, unchanged, or it is gone.
 
+### 4.14 `POST /api/providers/test-connection` (cross-reference)
+
+Not a `/api/monitoring/*` endpoint — it lives under `/api/providers` and
+requires **`provider:read`** (not `system:monitoring`). It is documented here
+because it is the source of the `provider_call_logs` rows the panels above
+consume, and it is the UI's "Test connection" action.
+
+**Saved XOR draft** body (exactly one mode, else `400`):
+
+```json
+// saved
+{ "providerId": "prov_...", "model": "optional", "write": true, "bucket": "optional" }
+
+// draft — config validated by the same per-apiType schema as the create endpoint
+{ "providerType": "llm", "apiType": "openai", "config": { "apiKey": "...", "baseUrl": "..." }, "model": "required-for-llm" }
+```
+
+**Always `200` on a vendor failure** — the body is the structured result the
+Console renders:
+
+```json
+{
+  "ok": false,
+  "providerType": "llm",
+  "apiType": "openai",
+  "protocol": "http",
+  "phase": "first-data",
+  "latencyMs": 812,
+  "errorCode": "auth",
+  "errorText": "OpenAI 401: invalid api key (redacted)",
+  "detail": { "model": "gpt-4o-mini" }
+}
+```
+
+Only guard errors are non-200: `400` (bad payload / draft LLM without
+`model` / unsupported type), `401/403` (RBAC — `provider:read`), `404`
+(saved provider not found), `429` (5 s per-provider cooldown — `Retry-After`
+in seconds).
+
+Monitoring interplay: a **saved** test writes an ordinary
+`provider_call_logs` row (`operation '<type>.test'`) that feeds the
+`provider-auth-failed` last-signal branch (a failed auth test keeps the alert
+firing) but is **excluded from the circuit breaker**. A **draft** test leaves
+zero rows. Saved tests write a `CONNECTION_TEST` audit row; drafts write none.
+See [On-demand connection tests](./monitoring.md#on-demand-connection-tests).
+
 ---
 
 ## 5. Panel → endpoint mapping (P4-04)

@@ -16,7 +16,7 @@ Proposal: [`PROPOSAL-provider-test-connection.md`](../../PROPOSAL-provider-test-
 | [TPC-04](TPC-04-tts-strategy.md) | TTS test: real minimal synthesis | 1 | 0.5 d | resolved |
 | [TPC-05](TPC-05-storage-strategy.md) | Storage test: list + optional write round trip | 1 | 0.5 d | resolved |
 | [TPC-06](TPC-06-http-endpoint-rbac.md) | HTTP endpoint, contracts, RBAC, audit | 2 | 1 d | resolved |
-| [TPC-07](TPC-07-call-log-integration.md) | Call-log integration + alert interplay + docs | 2 | 0.5–1 d | open |
+| [TPC-07](TPC-07-call-log-integration.md) | Call-log integration + alert interplay + docs | 2 | 0.5–1 d | resolved |
 | [TPC-08](TPC-08-channel-providers.md) | Channel strategies: same-protocol auth checks | 3 | 1 d | open |
 | [TPC-09](TPC-09-periodic-data-plane-probes.md) | (Optional) Opt-in periodic data-plane probes | 3 | 1 d | open |
 

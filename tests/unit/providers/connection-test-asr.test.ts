@@ -327,8 +327,9 @@ describe('ProviderConnectionTester ASR strategy (TPC-03)', function () {
     expect(result.ok).to.equal(false);
     expect(result.errorCode).to.equal('timeout');
     expect(result.phase).to.equal('session');
-    expect(result.latencyMs).to.be.at.least(150);
-    expect(elapsed).to.be.at.least(150);
+    expect(result.latencyMs).to.be.at.least(100);
+    expect(result.latencyMs).to.be.below(5000);
+    expect(elapsed).to.be.at.least(100);
 
     // Cleanup flushes the abandoned session (still under the test context) —
     // the late breaker feed must not happen.

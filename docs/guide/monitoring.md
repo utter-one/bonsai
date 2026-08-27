@@ -135,6 +135,45 @@ failures whenever traffic exists (P3-04 failover covers users in the
 meantime). The probe branch is the only signal for an **idle** provider
 (revoked key, suspended account) where the call logs show nothing.
 
+When you need an on-demand data-plane answer (not the 60 s probe cadence),
+use the [on-demand connection test](#on-demand-connection-tests) — it
+exercises the real ASR/TTS/inference path at minimum size.
+
+### On-demand connection tests
+
+`POST /api/providers/test-connection` runs a **manual, on-demand**
+connection test for a provider — either a saved provider (`providerId`) or an
+unsaved draft (`providerType` + `apiType` + `config`; exactly one mode,
+else `400`). It exercises the provider's **own production path** at minimum
+size: LLM → 1-token generation (or catalog enumeration to default the model),
+ASR/TTS → a real session handshake + first frame / minimal synthesis, storage
+→ a real `list` (+ optional 1 KB write round trip when `write: true`), all
+under a hard per-type timeout.
+
+Semantics:
+
+- **Vendor failures are data, not HTTP errors** — the response is always
+  `200` with a structured `{ ok, providerType, apiType, protocol, phase,
+  latencyMs, errorCode, errorText?, detail? }`. Only guard errors are
+  non-200: `400` (bad payload / draft LLM without a model / unsupported
+type), `401/403` (RBAC — requires `provider:read`), `404` (saved provider
+  not found), `429` (5 s per-provider cooldown, `Retry-After` header).
+- **Cost:** each test consumes a small, bounded amount of vendor quota (one
+token, one session, one object). It is not free — the 5 s cooldown keeps it
+  manual by design.
+- **Saved tests** record an ordinary `provider_call_logs` row
+  (`operation '<type>.test'`) — it feeds the alert engine's last-signal
+  branch (e.g. a failed auth test keeps `provider-auth-failed` firing) but is
+  **excluded from the circuit breaker** (a flaky vendor during manual testing
+  must not open a breaker and fail over real users).
+- **Draft tests** (unsaved) are never stamped → they leave **zero** call-log
+  rows and no audit trail.
+- **Audit:** saved tests write a `CONNECTION_TEST` audit row carrying the
+  structured result; drafts write none.
+
+The test is read-equivalent (`provider:read`): the only side effect is one
+temporary storage object (written + deleted server-side) when `write: true`.
+
 ### Reading the snapshot
 
 ```json

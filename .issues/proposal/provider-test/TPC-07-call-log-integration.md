@@ -1,9 +1,9 @@
 ---
 title: "TPC-07 — Call-log integration and alert-engine interplay"
 severity: proposal
-status: open
+status: resolved
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-26
 assignee: ""
 tags: [providers, spec, connection-test, phase-2, monitoring]
 ---
@@ -75,6 +75,43 @@ breaker influence, and accurate docs.
 - draft test → zero rows in `provider_call_logs`.
 
 **Docs:** VitePress build passes (no bare `{{ }}`).
+
+## Resolution (2026-08-26)
+
+No source changes were needed. The CallLogger attribution (operation
+`<type>.test`, breaker feed excluded for any `operation`/context ending in
+`.test`) shipped in TPC-01; the alert engine's last-signal branch shipped in
+P2-01. TPC-07 is the verification + docs spec, and the interplay is now
+proven end-to-end:
+
+- **`tests/e2e/provider-connection-test-monitoring.test.ts`** (3 e2e tests,
+  reuses the app-world seams from `alert-rule-engine.test.ts`):
+  1. **Last-signal interplay** — a saved ollama LLM test against a stateful
+     local server (401 → then 200): the failed auth test records an ordinary
+     `llm.test` row; the row is aged 30 min (outside the 5-min rule window,
+     so the windowed auth count is 0 and only the last-signal branch can fire
+     — proving the branch, not the window); `provider-auth-failed` fires
+     (`message` contains "last observed signal", `context.lastSignalErrorCode
+     === 'auth'`); a successful test then auto-resolves it. No alert code
+     changes.
+  2. **Breaker exclusion** — 5 failed `*.test` rows (inserted via the
+     app-world `CallLogger.record`) leave the provider's breaker **not open**;
+     a control (5 failed non-test rows on a different provider) **does** open
+     it — proving the `.test` exclusion specifically.
+  3. **Draft zero rows** — a draft `storage/local` test leaves **zero** rows
+     in `provider_call_logs` (un-stamped instances record nothing).
+
+  Cross-test hygiene: the CallLogger's in-memory buffer survives
+  `resetDatabase()`, so `beforeEach` does `flushNow()` then `resetDatabase()`
+  so row-count assertions are not polluted by other suites.
+
+- **Docs** — `docs/guide/monitoring.md`: new *On-demand connection tests*
+  subsection (endpoint, semantics, cost, call-log/breaker/audit interplay)
+  + the *data-plane liveness* note now points at the tester (60 s probe stays
+  on the control plane; TPC-09 is the opt-in periodic data-plane probe).
+  `docs/guide/monitoring-api.md`: new §4.14 cross-reference for
+  `POST /api/providers/test-connection` (response shape, guard errors,
+  cooldown, monitoring interplay). VitePress build passes.
 
 ## Out of scope
 

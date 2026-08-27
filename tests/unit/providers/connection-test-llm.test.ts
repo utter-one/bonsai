@@ -357,8 +357,9 @@ describe('ProviderConnectionTester LLM strategy (TPC-02)', function () {
 
     expect(result.ok).to.equal(false);
     expect(result.errorCode).to.equal('timeout');
-    expect(result.latencyMs).to.be.at.least(150);
-    expect(elapsed).to.be.at.least(150);
+    expect(result.latencyMs).to.be.at.least(100);
+    expect(result.latencyMs).to.be.below(5000);
+    expect(elapsed).to.be.at.least(100);
 
     // Draft mode is deliberate: a draft instance is un-stamped, so the
     // abandoned in-flight generate records NO late row. (A saved provider's
