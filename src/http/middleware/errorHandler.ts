@@ -20,7 +20,7 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
 
   if (err instanceof TooManyRequestsError) {
     if (!res.getHeader('Retry-After')) {
-      res.setHeader('Retry-After', '60');
+      res.setHeader('Retry-After', String(err.retryAfterSeconds ?? 60));
     }
     res.status(429).json({ error: err.message });
     return;

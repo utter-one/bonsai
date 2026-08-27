@@ -115,11 +115,14 @@ export class BenchmarkExecutionError extends Error {
 export class TooManyRequestsError extends Error {
   /** Which limiter rejected the request — internal only, never serialized into the response body. */
   scope?: 'auth' | 'api';
+  /** When set, the error handler advertises it as the Retry-After header (seconds). Defaults to 60. */
+  retryAfterSeconds?: number;
 
-  constructor(message: string, scope?: 'auth' | 'api') {
+  constructor(message: string, scope?: 'auth' | 'api', retryAfterSeconds?: number) {
     super(message);
     this.name = 'TooManyRequestsError';
     this.scope = scope;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 

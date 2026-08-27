@@ -20,6 +20,7 @@ import { OllamaLlmProvider, OllamaLlmProviderConfig, ollamaLlmProviderConfigSche
 import { OVHLlmProvider, OVHLlmProviderConfig, ovhLlmProviderConfigSchema, OVHLlmSettings } from './OVHLlmProvider';
 import { ScalewayLlmProvider, ScalewayLlmProviderConfig, scalewayLlmProviderConfigSchema, ScalewayLlmSettings } from './ScalewayLlmProvider';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
+import { CONNECTION_TEST_DRAFT_ID } from '../connectionTest/types';
 
 /**
  * Supported LLM provider API types
@@ -75,6 +76,44 @@ export class LlmProviderFactory {
   }
 
   /**
+   * Creates a fresh, fully initialized LLM provider instance for on-demand
+   * connection tests (TPC-01/TPC-02). Mirrors createProvider() but is the
+   * explicit seam for the test path: fresh instance (never pooled/pre-warmed),
+   * secrets resolved, init() awaited so the instance is immediately usable,
+   * and no production call sites may use it.
+   * Draft providers (id CONNECTION_TEST_DRAFT_ID) are built WITHOUT call-log
+   * identity stamps — the provider bases' instrumentation then records
+   * nothing, which is the TPC-01 draft-mode contract (no call-log rows).
+   * Saved providers are stamped so their production wrappers record the
+   * test's own '<type>.test' call-log row(s) under the tester's monitoring
+   * context (breaker-excluded).
+   * @param provider - Provider entity (saved row, or the synthetic draft provider for draft tests)
+   * @param settings - LLM settings including the model to test
+   * @returns A new, initialized LLM provider instance
+   * @throws {Error} When provider type is not 'llm', model is missing, or API type is not supported
+   */
+  async createForTest(provider: Provider, settings: LlmSettings): Promise<ILlmProvider> {
+    if (provider.providerType !== 'llm') {
+      const errorMessage = `Provider ${provider.id} is not an LLM provider. Expected providerType 'llm', got '${provider.providerType}'`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    if (!settings.model) {
+      const errorMessage = `Invalid LLM provider settings for provider ${provider.id}. Required field: model`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    logger.info(`Creating test LLM provider instance (${provider.apiType}) for provider ${provider.id} with model ${settings.model}`);
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings, provider.id !== CONNECTION_TEST_DRAFT_ID);
+    // Awaited: the test uses the instance immediately (same rationale as createProvider).
+    await instance.init();
+    return instance;
+  }
+
+  /**
    * Creates an LLM provider instance with minimal/default settings for model enumeration purposes.
    * The returned instance should only be used to call `enumerateModels()`, not for generation.
    * @param provider - Provider entity from database containing configuration
@@ -96,12 +135,13 @@ export class LlmProviderFactory {
    * Parses provider config and instantiates the correct provider class without validation or init.
    * @param provider - Provider entity
    * @param settings - LLM settings (may have empty model for enumeration)
+   * @param stampIdentity - Stamp provider identity for call-log attribution (P1-03); off for draft test instances (TPC-01: no rows)
    * @returns Uninitialised LLM provider instance
    */
-  private instantiateProvider(provider: Provider, settings: LlmSettings): ILlmProvider {
+  private instantiateProvider(provider: Provider, settings: LlmSettings, stampIdentity: boolean = true): ILlmProvider {
     const instance = this.buildInstance(provider, settings);
     // Stamp provider identity for call-log attribution (P1-03)
-    if (instance instanceof LlmProviderBase) {
+    if (stampIdentity && instance instanceof LlmProviderBase) {
       instance.providerId = provider.id;
       instance.providerApiType = provider.apiType;
       instance.providerModel = settings.model || null;

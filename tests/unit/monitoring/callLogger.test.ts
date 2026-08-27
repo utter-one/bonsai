@@ -114,10 +114,12 @@ describe('CallLogger (P1-02)', () => {
       expect(logger.pendingEntries[0].conversationId).to.equal('conv_explicit');
     });
 
-    it('truncates errorText to 1KB on flush', async () => {
-      logger.record(validEntry({ ok: false, errorCode: 'server_error', errorText: 'x'.repeat(5000) }));
+    it('sanitizes and truncates errorText to 500 chars on flush (TPC-01 write-layer guard)', async () => {
+      logger.record(validEntry({ ok: false, errorCode: 'server_error', errorText: `Bearer sk-proj-abc123secret ${'x'.repeat(5000)}` }));
       await logger.flushNow();
-      expect(logger.rows[0].errorText.length).to.equal(1024);
+      expect(logger.rows[0].errorText.length).to.equal(500);
+      expect(logger.rows[0].errorText).to.include('Bearer [REDACTED]');
+      expect(logger.rows[0].errorText).to.not.include('sk-proj-abc123secret');
     });
 
     it('auto-flushes at the 200-row threshold', async () => {
