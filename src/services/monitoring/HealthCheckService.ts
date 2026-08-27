@@ -11,6 +11,7 @@ import { HeartbeatRegistry } from './HeartbeatRegistry';
 import { MetricsRegistry } from './MetricsRegistry';
 import { MonitoringConfigService } from './MonitoringConfigService';
 import { LlmProviderFactory } from '../providers/llm/LlmProviderFactory';
+import { MINIMAL_GENERATION_MAX_TOKENS } from '../providers/llm/LlmProviderBase';
 import { StorageProviderFactory } from '../providers/storage/StorageProviderFactory';
 import { AsrProviderFactory } from '../providers/asr/AsrProviderFactory';
 import { TtsProviderFactory } from '../providers/tts/TtsProviderFactory';
@@ -409,8 +410,10 @@ export class HealthCheckService {
         await instance.init();
         if (probeSettings.llmProbe === 'one_token') {
           // Costs money (config opt-in) — a single-token generation end-to-end.
+          // maxTokens is a ceiling above the vendor floor (OpenAI rejects
+          // < 16); the model emits ~1 word for the probe.
           await this.withTimeout(
-            instance.generate([{ role: 'user', content: 'Health probe' }], { maxTokens: 1 }),
+            instance.generate([{ role: 'user', content: 'Health probe' }], { maxTokens: MINIMAL_GENERATION_MAX_TOKENS }),
             CHECK_TIMEOUT_MS,
           );
         } else {

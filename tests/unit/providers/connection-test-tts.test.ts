@@ -14,7 +14,7 @@ import { TtsProviderFactory } from '../../../src/services/providers/tts/TtsProvi
 import { ElevenLabsTtsProvider } from '../../../src/services/providers/tts/ElevenLabsTtsProvider';
 import type { ITtsProvider } from '../../../src/services/providers/tts/ITtsProvider';
 import type { SecretRefUtils } from '../../../src/services/secrets/SecretRefUtils';
-import { NotFoundError } from '../../../src/errors';
+import { NotFoundError, ValidationError } from '../../../src/errors';
 import type { Provider } from '../../../src/types/models';
 import type { RequestContext } from '../../../src/services/RequestContext';
 
@@ -239,6 +239,26 @@ describe('ProviderConnectionTester TTS strategy (TPC-04)', function () {
   });
 
   describe('WS variant (ElevenLabs stream-input against local mock)', () => {
+    it('saved ElevenLabs WITHOUT a voice → ValidationError (→ 400), no vendor call (no safe default voice)', async () => {
+      const tester = new TestTester();
+      tester.providers.set('prov_tts_1', savedProvider());
+      let err: unknown = null;
+      try {
+        await tester.testConnection({ providerId: 'prov_tts_1' }, context);
+      } catch (e) {
+        err = e;
+      }
+      expect(err).to.be.instanceOf(ValidationError);
+      expect((err as Error).message).to.include('voice');
+
+      // The guard fires before the lifecycle — no WS connection, no row, no breaker feed.
+      expect(wsFake.paths).to.be.empty;
+      await sharedCallLogger.flushNow();
+      expect(sharedCallLogger.rows).to.be.empty;
+      expect(sharedBreakers.failures).to.have.length(0);
+      expect(sharedBreakers.successes).to.have.length(0);
+    });
+
     it('saved + audio frame → ok:true, detail.bytes > 0, voice in URL + bos key, row recorded, breaker NOT fed, no temp files', async () => {
       const tester = new TestTester();
       tester.providers.set('prov_tts_1', savedProvider());

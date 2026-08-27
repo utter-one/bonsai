@@ -161,8 +161,9 @@ Semantics:
 - **Vendor failures are data, not HTTP errors** — the response is always
   `200` with a structured `{ ok, providerType, apiType, protocol, phase,
   latencyMs, errorCode, errorText?, detail? }`. Only guard errors are
-  non-200: `400` (bad payload / draft LLM without a model / unsupported
-type), `401/403` (RBAC — requires `provider:read`), `404` (saved provider
+  non-200: `400` (bad payload / draft LLM without a model / ElevenLabs TTS
+  without a `voice` — it has no safe default voice / unsupported type),
+  `401/403` (RBAC — requires `provider:read`), `404` (saved provider
   not found), `429` (5 s per-provider cooldown, `Retry-After` header).
 - **Cost:** each test consumes a small, bounded amount of vendor quota (one
 token, one session, one object). It is not free — the 5 s cooldown keeps it

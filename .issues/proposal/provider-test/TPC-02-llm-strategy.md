@@ -94,5 +94,12 @@ Two deliberate deviations from the wording above:
   16 apiTypes enforce system-first in `LlmProviderBase.validateMessages`,
   which a user-only probe would trip on perfectly valid credentials.
 - `temperature: 0` is not passed: the production `generate()` API does not
-  expose temperature (it is fixed per provider config) — `maxTokens: 1`
-  is the cost bound the API offers, which is what matters here.
+  expose temperature (it is fixed per provider config) — a small `maxTokens`
+  ceiling is the cost bound the API offers, which is what matters here.
+- **`maxTokens` ceiling raised 1 → 64 (bugfix, 2026-08-27):** `1` was rejected
+  by OpenAI (`400: max_output_tokens integer below minimum value, expected >=
+  16`) and its docs recommend 50+ for non-production calls. The value is a
+  ceiling, not a target — the "ping → single word" prompt still elicits ~1
+  token, so the cost bound is unchanged. The probe now sends `maxTokens: 64`
+  (a shared `MINIMAL_GENERATION_MAX_TOKENS` constant in the base, also used by
+  the `one_token` health probe) to clear every vendor's floor.

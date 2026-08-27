@@ -71,6 +71,18 @@ const TTS_PROTOCOL_BY_API_TYPE: Record<string, TestProtocol> = {
 };
 
 /**
+ * TTS apiTypes whose provider has **no safe universal default voice**, so the
+ * connection test requires an explicit `voice` (a 400 guard error if missing).
+ * Every other TTS provider falls back to a stable default (OpenAI `alloy`,
+ * Amazon Polly `Joanna`, Deepgram `thalia-en`, Soniox `Adrian`, Azure
+ * `en-US-AriaNeural`, a fixed Cartesia voice) and tests fine without one.
+ * ElevenLabs is the exception: voices are account-specific and its legacy
+ * "Default" voices expire 2026-12-31, so there is no safe hardcoded default
+ * — the test must use a voice the operator knows exists in their account.
+ */
+const TTS_VOICE_REQUIRED: Record<string, boolean> = { elevenlabs: true };
+
+/**
  * On-demand provider connection testing (TPC-01 core).
  *
  * The provider classes own the simple test (`testConnection()` on each base,
@@ -210,6 +222,13 @@ export class ProviderConnectionTester {
       }
       case 'tts': {
         const factory = container.resolve(TtsProviderFactory);
+        // Providers with no safe default voice need an explicit voice to
+        // synthesise (ElevenLabs) — a missing one is an incomplete request, a
+        // 400 guard error (same shape as the draft-LLM missing-model guard),
+        // not a vendor failure.
+        if (TTS_VOICE_REQUIRED[request.apiType] && !request.voice) {
+          throw new ValidationError(`TTS connection test for '${request.apiType}' requires a voice (this provider has no safe default voice) — pass a 'voice' in the test input`, []);
+        }
         // Every TTS settings schema requires the `provider` literal (== apiType);
         // all other fields take schema defaults. No init() here — the lifecycle
         // inside testConnection is the test.

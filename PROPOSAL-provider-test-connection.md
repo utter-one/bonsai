@@ -44,7 +44,7 @@ Design principle (this is what makes the requirement hold *structurally*):
 
 > **The test reuses the provider's existing session/call lifecycle methods** —
 > `init() → start() → sendAudio() → stop() → cleanup()` for ASR,
-> `start() → sendText() → end()` for TTS, `generate({ maxTokens: 1 })` for LLM,
+> `start() → sendText() → end()` for TTS, `generate({ maxTokens: 64 })` for LLM
 > `list() / upload() / download() / delete()` for storage — never a
 > re-implementation of the protocol. Whatever a conversation does, the test
 > does, at minimum size.
@@ -124,9 +124,14 @@ candidate for the RBAC follow-up, not v1.
 
 ### 4.1 LLM — 1-token real inference (all 16 apiTypes)
 
-`generate([{ role: 'user', content: 'ping' }], { maxTokens: 1, temperature: 0 })`
+`generate([system, { role: 'user', content: 'ping' }], { maxTokens: 64 })`
 through the production template wrapper (same HTTP path, headers, streaming
 SSE where the provider uses it, and the same call-log recording).
+
+`maxTokens` is a **ceiling**, not a target — the "ping → single word" prompt
+elicits ~1 token, but the ceiling must clear each vendor's hard floor (OpenAI
+rejects `max_output_tokens` < 16 with a 400; 64 clears it and the 50+ non-
+production recommendation). See TPC-02.
 
 | apiType | transport | note |
 |---|---|---|
@@ -141,9 +146,10 @@ existing free call — reused, not duplicated).
 
 Why not `enumerateModels()` as the test: it is a *different endpoint* than
 inference (some vendors meter/limit it separately, and a models endpoint can
-work while the inference quota is exhausted). `maxTokens: 1` is what
-conversations actually do; `HealthCheckService` already offers it as
-`llmProbe: 'one_token'` for exactly this reason. Cost: one output token.
+work while the inference quota is exhausted). A small `maxTokens` ceiling is
+what conversations actually do; `HealthCheckService` already offers it as
+`llmProbe: 'one_token'` for exactly this reason. Cost: one output token (the
+ceiling is 64 to clear vendor floors — see above).
 
 ### 4.2 ASR — real WebSocket session + silence (all 6 apiTypes)
 
@@ -182,6 +188,13 @@ Each provider runs its **production streaming lifecycle** at minimum size —
 `setOnSpeechGenerating` chunks dropped into a byte counter (no audio
 persisted, returned, or played). `ok` = **at least one audio chunk received**
 (proves the full round trip: auth, voice/model validity, streaming delivery).
+
+> **ElevenLabs requires a `voice`** — it is the only TTS provider with no
+> safe default (voices are account-specific; its legacy Default voices expire
+> 2026-12-31). A missing voice for it is a `400` guard error, not a vendor
+> failure. The other six providers fall back to a stable default (alloy /
+> Joanna / thalia-en / Adrian / en-US-AriaNeural / a fixed Cartesia voice).
+> See TPC-04.
 
 | apiType | transport the test exercises |
 |---|---|
