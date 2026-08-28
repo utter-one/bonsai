@@ -36,6 +36,7 @@
     "@mistralai/mistralai": "^1.14.1",
     "@roamhq/wrtc": "^0.10.0",
     "@sendgrid/mail": "^8.1.6",
+    "@slack/socket-mode": "^3.0.0",
     "@soniox/node": "^2.2.0",
     "@speechmatics/auth": "^0.1.0",
     "@speechmatics/real-time-client": "^8.3.0",
@@ -81,6 +82,7 @@
     "tsx": "^4.21.0",
     "tsyringe": "^4.10.0",
     "twilio": "^5.13.1",
+    "undici": "^7.29.0",
     "uuid": "^13.0.0",
     "ws": "^8.18.3",
     "zod": "^4.2.1"

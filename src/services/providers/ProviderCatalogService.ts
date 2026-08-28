@@ -12184,6 +12184,12 @@ export class ProviderCatalogService {
         description: 'Telegram Bot API for text-based conversations via Telegram bots',
         features: ['Telegram messaging', 'Webhook support', 'Inbound/outbound text messages', 'Slash-command interface'],
       },
+      {
+        apiType: 'slack',
+        displayName: 'Slack (Events API)',
+        description: 'Slack Events API webhook for text-based, reply-only conversations in direct messages and @-mentioned channels',
+        features: ['Slack messaging', 'Events API webhook', 'Webhook signature validation', 'Reply-only text messages with threading'],
+      },
       // {
       //   apiType: 'sendgrid',
       //   displayName: 'SendGrid Email',

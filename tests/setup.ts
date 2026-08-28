@@ -44,6 +44,8 @@ export async function globalSetup(): Promise<void> {
   process.env.RATE_LIMIT_API_MAX = '10000'; // generous limit for tests
   process.env.RATE_LIMIT_AUTH_WINDOW_MS = '60000';
   process.env.RATE_LIMIT_AUTH_MAX = '10000'; // generous limit for tests
+  process.env.RATE_LIMIT_WS_AUTH_WINDOW_MS = '60000';
+  process.env.RATE_LIMIT_WS_AUTH_MAX = '10000'; // generous limit for tests (channel webhook rate limiter)
   process.env.MONITORING_HEALTH_INTERVAL_MS = '1000'; // fast health loop so health_checks rows appear within e2e tests
   process.env.MONITORING_HEALTH_PROBES = 'off'; // no live provider probes in tests — fake provider configs would hit real APIs
   process.env.MONITORING_ALERT_ENGINE_INTERVAL_MS = '1000'; // P2-01: fast engine loop so alert e2e tests converge quickly
@@ -137,8 +139,8 @@ export async function globalSetup(): Promise<void> {
 
 export async function globalTeardown(): Promise<void> {
   // Best-effort cleanup — don't block test exit
-  migrationPool?.end().catch(() => {});
-  container?.stop().catch(() => {});
+  migrationPool?.end().catch(() => { });
+  container?.stop().catch(() => { });
 }
 
 // Register as Mocha root hook

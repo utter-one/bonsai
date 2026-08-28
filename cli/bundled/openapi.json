@@ -13155,6 +13155,9 @@
                 "$ref": "#/components/schemas/TelegramChannelConfig"
               },
               {
+                "$ref": "#/components/schemas/SlackChannelConfig"
+              },
+              {
                 "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
               },
               {
@@ -13210,6 +13213,50 @@
         "required": [
           "botToken"
         ],
+        "additionalProperties": false
+      },
+      "SlackChannelConfig": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "events_api",
+              "socket_mode"
+            ],
+            "default": "events_api",
+            "description": "Inbound transport. \"events_api\" receives signed HTTP webhook events (production); \"socket_mode\" opens an outbound WebSocket to Slack via an app-level token (local development, no public URL needed)"
+          },
+          "botToken": {
+            "type": "string",
+            "description": "Slack Bot Token (xoxb-). Required in both modes: authenticates replies (chat.postMessage) and resolving the bot user id (auth.test) for @-mention detection/stripping in channels"
+          },
+          "signingSecret": {
+            "type": "string",
+            "description": "Slack App Signing Secret (SEC...). Required for \"events_api\" (verifies X-Slack-Signature on inbound webhook requests); unused in \"socket_mode\""
+          },
+          "appToken": {
+            "type": "string",
+            "description": "Slack App-Level Token (xapp-) with the connections:write scope. Required for \"socket_mode\"; unused by \"events_api\""
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Bonsai project ID this provider serves. Required for \"socket_mode\"; ignored for \"events_api\" (the project is chosen per-request via the webhook apiKey)"
+          },
+          "processingDelayMinMs": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Minimum delay in milliseconds before processing an incoming message. 0 means immediate processing."
+          },
+          "processingDelayMaxMs": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Maximum delay in milliseconds before processing an incoming message. Must be >= processingDelayMinMs."
+          }
+        },
         "additionalProperties": false
       },
       "TwilioMessagingChannelConfig": {
@@ -13990,6 +14037,9 @@
                 "$ref": "#/components/schemas/TelegramChannelConfig"
               },
               {
+                "$ref": "#/components/schemas/SlackChannelConfig"
+              },
+              {
                 "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
               },
               {
@@ -14412,6 +14462,9 @@
               },
               {
                 "$ref": "#/components/schemas/TelegramChannelConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SlackChannelConfig"
               },
               {
                 "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
@@ -14858,6 +14911,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TelegramChannelConfig"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SlackChannelConfig"
                     },
                     {
                       "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
@@ -15904,6 +15960,7 @@
                 "twilio_messaging",
                 "whatsapp",
                 "telegram",
+                "slack",
                 "sendgrid",
                 "ses",
                 "smtp_imap",
@@ -16071,6 +16128,7 @@
                     "twilio_messaging",
                     "whatsapp",
                     "telegram",
+                    "slack",
                     "sendgrid",
                     "ses",
                     "smtp_imap",
@@ -16190,6 +16248,7 @@
                           "twilio_messaging",
                           "whatsapp",
                           "telegram",
+                          "slack",
                           "sendgrid",
                           "ses",
                           "smtp_imap",
@@ -26531,6 +26590,9 @@
               },
               {
                 "$ref": "#/components/schemas/TelegramChannelConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SlackChannelConfig"
               },
               {
                 "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
@@ -42103,6 +42165,9 @@
                         "$ref": "#/components/schemas/TelegramChannelConfig"
                       },
                       {
+                        "$ref": "#/components/schemas/SlackChannelConfig"
+                      },
+                      {
                         "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
                       },
                       {
@@ -42516,6 +42581,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/TelegramChannelConfig"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SlackChannelConfig"
                         },
                         {
                           "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
@@ -43117,6 +43185,9 @@
                                 "$ref": "#/components/schemas/TelegramChannelConfig"
                               },
                               {
+                                "$ref": "#/components/schemas/SlackChannelConfig"
+                              },
+                              {
                                 "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
                               },
                               {
@@ -43619,6 +43690,9 @@
                           "$ref": "#/components/schemas/TelegramChannelConfig"
                         },
                         {
+                          "$ref": "#/components/schemas/SlackChannelConfig"
+                        },
+                        {
                           "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
                         },
                         {
@@ -44092,6 +44166,9 @@
                         "$ref": "#/components/schemas/TelegramChannelConfig"
                       },
                       {
+                        "$ref": "#/components/schemas/SlackChannelConfig"
+                      },
+                      {
                         "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
                       },
                       {
@@ -44508,6 +44585,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/TelegramChannelConfig"
+                        },
+                        {
+                          "$ref": "#/components/schemas/SlackChannelConfig"
                         },
                         {
                           "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
@@ -55949,6 +56029,7 @@
                               "twilio_messaging",
                               "whatsapp",
                               "telegram",
+                              "slack",
                               "sendgrid",
                               "ses",
                               "smtp_imap",
@@ -56221,6 +56302,7 @@
                                     "twilio_messaging",
                                     "whatsapp",
                                     "telegram",
+                                    "slack",
                                     "sendgrid",
                                     "ses",
                                     "smtp_imap",
@@ -56388,6 +56470,7 @@
                               "twilio_messaging",
                               "whatsapp",
                               "telegram",
+                              "slack",
                               "sendgrid",
                               "ses",
                               "smtp_imap",
@@ -56589,6 +56672,7 @@
                               "twilio_messaging",
                               "whatsapp",
                               "telegram",
+                              "slack",
                               "sendgrid",
                               "ses",
                               "smtp_imap",
@@ -56922,6 +57006,7 @@
                                     "twilio_messaging",
                                     "whatsapp",
                                     "telegram",
+                                    "slack",
                                     "sendgrid",
                                     "ses",
                                     "smtp_imap",
@@ -62221,6 +62306,75 @@
           },
           "502": {
             "description": "Failed to communicate with the Telegram Bot API"
+          }
+        }
+      }
+    },
+    "/api/slack/webhook": {
+      "post": {
+        "tags": [
+          "Slack"
+        ],
+        "summary": "Receive incoming Slack events",
+        "description": "Webhook endpoint for receiving inbound Slack Events API payloads (url_verification and message events). The Request URL must be configured in the Slack app; payloads are verified via the provider signing secret.",
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "API key used to authenticate and identify the project"
+            },
+            "required": true,
+            "description": "API key used to authenticate and identify the project",
+            "name": "apiKey",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Stage ID to start new conversations at. When omitted, falls back to the project-level default starting stage."
+            },
+            "required": false,
+            "description": "Stage ID to start new conversations at. When omitted, falls back to the project-level default starting stage.",
+            "name": "stageId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Optional agent ID override"
+            },
+            "required": false,
+            "description": "Optional agent ID override",
+            "name": "agentId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "ID of the Slack channel provider record"
+            },
+            "required": true,
+            "description": "ID of the Slack channel provider record",
+            "name": "channelProviderId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event received and acknowledged"
+          },
+          "400": {
+            "description": "Missing or invalid query parameters or channel provider"
+          },
+          "401": {
+            "description": "Invalid or inactive API key, or invalid request signature"
+          },
+          "403": {
+            "description": "API key does not permit slack channel"
           }
         }
       }

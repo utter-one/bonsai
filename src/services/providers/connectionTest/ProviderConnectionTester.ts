@@ -132,7 +132,7 @@ export class ProviderConnectionTester {
     if (request.providerType === 'channel') {
       if (request.apiType === 'ses') return 'sdk';
       if (request.apiType === 'smtp-imap') return 'smtp';
-      return 'http'; // telegram, twilio-*, whatsapp, sendgrid
+      return 'http'; // telegram, slack, twilio-*, whatsapp, sendgrid
     }
     return 'http'; // llm (and the defensive default)
   }

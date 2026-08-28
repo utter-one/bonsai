@@ -25,6 +25,7 @@ import { classifyThirdPartyError, type ThirdPartyErrorCode } from '../../../util
 /** Default vendor base URLs (production). `ses` is region-derived by the SDK when empty. */
 const CHANNEL_API_BASE: Record<string, string> = {
   telegram: 'https://api.telegram.org',
+  slack: 'https://slack.com/api',
   'twilio-messaging': 'https://api.twilio.com',
   'twilio-voice': 'https://api.twilio.com',
   whatsapp: 'https://graph.facebook.com/v17.0',
@@ -92,6 +93,37 @@ async function testTelegram(config: Record<string, unknown>): Promise<Connection
   const botToken = str(config.botToken);
   if (!botToken) return { ok: false, phase: 'auth', errorCode: 'client_error', errorText: 'Missing botToken' };
   return httpCheck('telegram', `/bot${botToken}/getMe`, { method: 'GET', headers: { Accept: 'application/json' } });
+}
+
+/**
+ * slack — Web API `auth.test` (1 free call, no side effects). Slack reports an
+ * invalid token via HTTP 401 *and* in the JSON body (`ok: false, error:
+ * 'invalid_auth'`), so success requires the body `ok: true` and the
+ * auth-failure check inspects both the status and the body. Uses the same bot
+ * token the channel uses for `auth.test`/`chat.postMessage` in production.
+ */
+async function testSlack(config: Record<string, unknown>): Promise<ConnectionTestOutcome> {
+  const botToken = str(config.botToken);
+  if (!botToken) return { ok: false, phase: 'auth', errorCode: 'client_error', errorText: 'Missing botToken' };
+  const url = `${baseUrlFor('slack')}/auth.test`;
+  try {
+    const res = await fetch(url, { method: 'GET', headers: { Authorization: `Bearer ${botToken}`, Accept: 'application/json' } });
+    let body: { ok?: boolean; error?: string } = {};
+    try {
+      body = (await res.json()) as { ok?: boolean; error?: string };
+    } catch {
+      /* non-JSON body — fall back to the HTTP status below */
+    }
+    if (res.ok && body.ok === true) {
+      return { ok: true, phase: 'auth', errorCode: null, statusHttp: res.status };
+    }
+    const code: ThirdPartyErrorCode = res.status === 401 || res.status === 403 || body.error === 'invalid_auth' ? 'auth' : res.status >= 500 ? 'server_error' : 'client_error';
+    return { ok: false, phase: 'auth', errorCode: code, statusHttp: res.status, errorText: `Slack auth.test failed: ${body.error || `HTTP ${res.status}`}` };
+  } catch (err) {
+    const classified = classifyThirdPartyError(err);
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, phase: 'auth', errorCode: classified.code, errorText: message };
+  }
 }
 
 /** twilio-messaging / twilio-voice — REST `GET /2010-04-01/Accounts.json` (1 free call, Basic auth). */
@@ -272,6 +304,7 @@ async function testSmtpImap(config: Record<string, unknown>): Promise<Connection
 /** Sub-strategies keyed by apiType. */
 const CHANNEL_SUBSTRATEGIES: Record<string, (config: Record<string, unknown>) => Promise<ConnectionTestOutcome>> = {
   telegram: (config) => testTelegram(config),
+  slack: (config) => testSlack(config),
   'twilio-messaging': (config) => testTwilio('twilio-messaging', config),
   'twilio-voice': (config) => testTwilio('twilio-voice', config),
   whatsapp: (config) => testWhatsApp(config),

@@ -10,10 +10,10 @@ import { z } from 'zod';
  */
 
 /** Permitted transport channel types for an API key. */
-export type ApiKeyChannel = 'websocket' | 'webrtc' | 'twilio_voice' | 'twilio_messaging' | 'whatsapp' | 'telegram' | 'sendgrid' | 'ses' | 'smtp_imap' | 'testing';
+export type ApiKeyChannel = 'websocket' | 'webrtc' | 'twilio_voice' | 'twilio_messaging' | 'whatsapp' | 'telegram' | 'slack' | 'sendgrid' | 'ses' | 'smtp_imap' | 'testing';
 
 /** All supported API key channel values. */
-export const ALL_API_KEY_CHANNELS: Array<ApiKeyChannel> = ['websocket', 'webrtc', 'twilio_voice', 'twilio_messaging', 'whatsapp', 'telegram', 'sendgrid', 'ses', 'smtp_imap', 'testing'];
+export const ALL_API_KEY_CHANNELS: Array<ApiKeyChannel> = ['websocket', 'webrtc', 'twilio_voice', 'twilio_messaging', 'whatsapp', 'telegram', 'slack', 'sendgrid', 'ses', 'smtp_imap', 'testing'];
 
 /** Zod schema for API key channel type. */
 export const apiKeyChannelSchema = z.enum(ALL_API_KEY_CHANNELS);

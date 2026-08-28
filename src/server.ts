@@ -66,6 +66,7 @@ import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMe
 import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
 import { TelegramChannelHost } from './channels/telegram/TelegramChannelHost';
+import { SlackChannelHost } from './channels/slack/SlackChannelHost';
 // import { SendGridChannelHost } from './channels/email/sendgrid/SendGridChannelHost';
 // import { SesChannelHost } from './channels/email/ses/SesChannelHost';
 import { SmtpImapChannelHost } from './channels/email/smtp-imap/SmtpImapChannelHost';
@@ -382,6 +383,7 @@ export async function createApp(): Promise<express.Application> {
   container.resolve(TwilioVoiceChannelHost).registerRoutes(app);
   container.resolve(WhatsAppChannelHost).registerRoutes(app);
   container.resolve(TelegramChannelHost).registerRoutes(app);
+  container.resolve(SlackChannelHost).registerRoutes(app);
   // container.resolve(SendGridChannelHost).registerRoutes(app);
   // container.resolve(SesChannelHost).registerRoutes(app);
   container.resolve(SmtpImapChannelHost).registerRoutes(app);
@@ -428,6 +430,11 @@ export async function createApp(): Promise<express.Application> {
   // registers the notifying wrapper (persist + webhook/email fan-out).
   container.register(ALERT_EVENT_PUBLISHER_TOKEN, { useClass: NotifyingPublisher });
   container.resolve(AlertRuleEngine).start();
+
+  // Slack Socket Mode (optional transport): opens an outbound WebSocket per
+  // provider configured with mode "socket_mode". The method self-gates on
+  // NODE_ENV (no-ops in tests) and is a no-op when no such provider exists.
+  await container.resolve(SlackChannelHost).initialize();
 
   app.use(errorHandler);
 
