@@ -140,6 +140,11 @@ describe('Provider connection test API (TPC-06)', () => {
           res.end(JSON.stringify({ ok: false, error_code: 401, description: 'Unauthorized' }));
           return;
         }
+        if (req.method === 'GET' && (req.url ?? '').includes('/auth.test')) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'invalid_auth' }));
+          return;
+        }
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end('{}');
       });
@@ -158,6 +163,7 @@ describe('Provider connection test API (TPC-06)', () => {
       // globalThis-backed so it crosses the tsx/ESM-vs-CJS module graph boundary.
       resetChannelApiBasesForTests();
       setChannelApiBaseForTests('telegram', baseUrl);
+      setChannelApiBaseForTests('slack', baseUrl);
     });
 
     afterEach(() => {
@@ -184,6 +190,18 @@ describe('Provider connection test API (TPC-06)', () => {
       expect(res.body.ok).to.equal(false);
       expect(res.body.errorCode).to.equal('auth');
       expect(res.body.providerType).to.equal('channel');
+    });
+
+    it('saved slack (bogus bot token, local fake 401 invalid_auth) → 200 ok:false, errorCode auth, protocol http', async () => {
+      const id = await createSavedProvider({ name: 'Slack', providerType: 'channel', apiType: 'slack', config: { botToken: 'xoxb-bogus', signingSecret: 'x' } });
+      const res = await authed().post('/api/providers/test-connection').send({ providerId: id });
+      expect(res.status).to.equal(200);
+      expect(res.body.ok).to.equal(false);
+      expect(res.body.errorCode).to.equal('auth');
+      expect(res.body.providerType).to.equal('channel');
+      expect(res.body.apiType).to.equal('slack');
+      expect(res.body.protocol).to.equal('http');
+      expect(res.body.phase).to.equal('auth');
     });
   });
 

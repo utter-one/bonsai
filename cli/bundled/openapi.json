@@ -26592,6 +26592,9 @@
                 "$ref": "#/components/schemas/TelegramChannelConfig"
               },
               {
+                "$ref": "#/components/schemas/SlackChannelConfig"
+              },
+              {
                 "$ref": "#/components/schemas/TwilioMessagingChannelConfig"
               },
               {

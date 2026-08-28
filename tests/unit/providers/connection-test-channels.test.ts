@@ -165,6 +165,10 @@ function createFakeImapServer(): FakeImap {
   let loginOk = true;
   let lastTranscript = '';
   const server = net.createServer((socket) => {
+    // The client destroys its end mid-LOGOUT (before reading the final response),
+    // which resets this end; without a listener that surfaces as an uncaught
+    // ECONNRESET after the test has already resolved.
+    socket.on('error', () => { /* no-op */ });
     lastTranscript = '';
     socket.write('* OK [CAPABILITY IMAP4rev1] fake\r\n');
     socket.on('data', (chunk) => {
@@ -308,6 +312,48 @@ describe('Channel connection tests (TPC-08)', function () {
       base('telegram');
       const before = fakeHttp.seen.length;
       const outcome = await testChannelConnection('telegram', {});
+      expect(outcome.ok).to.equal(false);
+      expect(outcome.errorCode).to.equal('client_error');
+      expect(fakeHttp.seen.length).to.equal(before);
+    });
+  });
+
+  // --- slack (Web API auth.test) ---
+
+  describe('slack (Web API auth.test)', () => {
+    it('200 + ok:true → ok:true, phase auth (Bearer bot token, GET /auth.test)', async () => {
+      base('slack');
+      fakeHttp.setStatus(200, JSON.stringify({ ok: true, team: 'T123', user: 'U123', user_id: 'U123', team_id: 'T123' }));
+      const outcome = await testChannelConnection('slack', { botToken: 'xoxb-test-token' });
+      expect(outcome.ok).to.equal(true);
+      expect(outcome.phase).to.equal('auth');
+      expect(outcome.errorCode).to.equal(null);
+      const req = fakeHttp.seen.find((r) => r.path === '/auth.test');
+      expect(req).to.not.equal(undefined);
+      expect(req!.auth).to.equal('Bearer xoxb-test-token');
+    });
+
+    it('401 + invalid_auth → ok:false, errorCode auth', async () => {
+      base('slack');
+      fakeHttp.setStatus(401, JSON.stringify({ ok: false, error: 'invalid_auth' }));
+      const outcome = await testChannelConnection('slack', { botToken: 'xoxb-bad' });
+      expect(outcome.ok).to.equal(false);
+      expect(outcome.errorCode).to.equal('auth');
+      expect(outcome.phase).to.equal('auth');
+    });
+
+    it('200 + ok:false invalid_auth → ok:false, errorCode auth (body signal, not just HTTP status)', async () => {
+      base('slack');
+      fakeHttp.setStatus(200, JSON.stringify({ ok: false, error: 'invalid_auth' }));
+      const outcome = await testChannelConnection('slack', { botToken: 'xoxb-bad' });
+      expect(outcome.ok).to.equal(false);
+      expect(outcome.errorCode).to.equal('auth');
+    });
+
+    it('missing botToken → client_error (no network call)', async () => {
+      base('slack');
+      const before = fakeHttp.seen.length;
+      const outcome = await testChannelConnection('slack', {});
       expect(outcome.ok).to.equal(false);
       expect(outcome.errorCode).to.equal('client_error');
       expect(fakeHttp.seen.length).to.equal(before);
@@ -489,8 +535,8 @@ describe('Channel connection tests (TPC-08)', function () {
   // --- dispatcher ---
 
   describe('dispatcher', () => {
-    it('exposes all seven channel apiTypes', () => {
-      expect(CHANNEL_API_TYPES.sort()).to.deep.equal(['sendgrid', 'ses', 'smtp-imap', 'telegram', 'twilio-messaging', 'twilio-voice', 'whatsapp']);
+    it('exposes all eight channel apiTypes', () => {
+      expect(CHANNEL_API_TYPES.sort()).to.deep.equal(['sendgrid', 'ses', 'slack', 'smtp-imap', 'telegram', 'twilio-messaging', 'twilio-voice', 'whatsapp']);
     });
 
     it('unknown apiType → throws (the tester maps to 400)', async () => {
