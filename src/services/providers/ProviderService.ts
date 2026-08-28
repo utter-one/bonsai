@@ -65,7 +65,7 @@ export class ProviderService extends BaseService {
       await this.validateFallbacks(providerId, input.providerType, fallbacks);
     }
 
-    await this.assertValidSlackSocketConfig(input.apiType, input.config as Record<string, unknown>);
+    await this.assertValidSlackConfig(input.apiType, input.config as Record<string, unknown>);
 
     const secretizedConfig = await this.secretRefUtils.secretizeObject(input.config as Record<string, unknown>, SENSITIVE_PROVIDER_CONFIG_FIELDS);
     const provider = await db.insert(providers).values({ id: providerId, name: input.name, description: input.description, providerType: input.providerType, apiType: input.apiType, config: secretizedConfig as typeof input.config, fallbacks, createdBy: context?.operatorId, tags: input.tags, version: 1 }).returning();
@@ -209,7 +209,7 @@ export class ProviderService extends BaseService {
     // unrelated edit (e.g. a rename) is not blocked by a pre-existing invalid config
     // or a bound project that was archived after the provider was created.
     if (updateData.config !== undefined || updateData.apiType !== undefined) {
-      await this.assertValidSlackSocketConfig(updateData.apiType ?? existingProvider.apiType, (updateData.config ?? existingProvider.config) as Record<string, unknown>);
+      await this.assertValidSlackConfig(updateData.apiType ?? existingProvider.apiType, (updateData.config ?? existingProvider.config) as Record<string, unknown>);
     }
 
     const updatePayload: any = {
@@ -414,24 +414,19 @@ export class ProviderService extends BaseService {
   /**
    * Validates a Slack provider config at write time, failing fast (400) so a
    * misconfiguration is rejected instead of being stored and silently failing
-   * later. The config must parse as a Slack channel config (it can otherwise be
-   * mis-matched to a different channel by the non-discriminated config union),
-   * and for socket_mode it must carry an appToken bound to an active project.
-   * No-op for non-slack providers.
+   * later. The schema's `superRefine` enforces the per-mode required credentials
+   * (botToken + signingSecret for events_api; appToken + projectId for
+   * socket_mode); this adds the one check the schema can't — that a socket_mode
+   * `projectId` references an existing, non-archived project. No-op for
+   * non-slack providers.
    */
-  private async assertValidSlackSocketConfig(apiType: string | undefined, config: Record<string, unknown> | undefined): Promise<void> {
+  private async assertValidSlackConfig(apiType: string | undefined, config: Record<string, unknown> | undefined): Promise<void> {
     if (apiType !== 'slack' || !config) return;
     const parsed = slackChannelProviderConfigSchema.safeParse(config);
     if (!parsed.success) {
-      throw new ValidationError('Invalid Slack channel provider config', [{ code: 'custom', path: ['config'], message: 'config does not match the Slack channel provider schema' }]);
+      throw new ValidationError('Invalid Slack channel provider config', parsed.error.issues.map((i) => ({ code: i.code, path: i.path as (string | number)[], message: i.message })));
     }
     if (parsed.data.mode !== 'socket_mode') return;
-    if (!parsed.data.appToken) {
-      throw new ValidationError('appToken is required when mode is "socket_mode"', [{ code: 'custom', path: ['config', 'appToken'], message: 'appToken is required when mode is "socket_mode"' }]);
-    }
-    if (!parsed.data.projectId) {
-      throw new ValidationError('projectId is required when mode is "socket_mode"', [{ code: 'custom', path: ['config', 'projectId'], message: 'projectId is required when mode is "socket_mode"' }]);
-    }
     const project = await db.query.projects.findFirst({ where: eq(projects.id, parsed.data.projectId) });
     if (!project) {
       throw new ValidationError('projectId does not reference an existing project', [{ code: 'custom', path: ['config', 'projectId'], message: `projectId ${parsed.data.projectId} does not reference an existing project` }]);

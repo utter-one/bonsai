@@ -25,7 +25,7 @@ export class SlackCommunicationChannel implements ICommunicationChannel {
   }
 
   /** @inheritdoc */
-  getConfigSchema(): z.ZodObject<any> {
+  getConfigSchema(): z.ZodType {
     return slackChannelProviderConfigSchema;
   }
 

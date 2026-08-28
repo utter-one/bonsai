@@ -70,10 +70,10 @@ export class ChannelCatalog {
   /**
    * Returns the Zod schema for validating the configuration of a given channel type.
    * @param channelType - The type of channel to get the config schema for.
-   * @returns A Zod object schema for the channel configuration.
+   * @returns A Zod schema for the channel configuration.
    * @throws Error if the channel type is not supported.
    */
-  getChannelConfigSchema(channelType: string): z.ZodObject<any> {
+  getChannelConfigSchema(channelType: string): z.ZodType {
     return this.getChannel(channelType).getConfigSchema();
   }
 }

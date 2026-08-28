@@ -123,6 +123,27 @@ describe('Slack Provider API', () => {
       expect(res.status).to.equal(201);
       expect(res.body.config.mode).to.equal('events_api');
     });
+
+    it('creates an explicit events_api provider without appToken/projectId (optional in events_api)', async () => {
+      const res = await authed().post('/api/providers').send({
+        name: 'Test Slack Events Explicit',
+        providerType: 'channel',
+        apiType: 'slack',
+        config: { mode: 'events_api', botToken: BOT_TOKEN, signingSecret: SIGNING_SECRET },
+      });
+      expect(res.status).to.equal(201);
+      expect(res.body.config.mode).to.equal('events_api');
+    });
+
+    it('rejects an events_api provider missing botToken (400)', async () => {
+      const res = await authed().post('/api/providers').send({
+        name: 'Broken Slack Events',
+        providerType: 'channel',
+        apiType: 'slack',
+        config: { mode: 'events_api', signingSecret: SIGNING_SECRET },
+      });
+      expect(res.status).to.equal(400);
+    });
   });
 
   describe('socket mode config', () => {
@@ -140,6 +161,30 @@ describe('Slack Provider API', () => {
       expect(res.body.config.appToken).to.not.equal(appToken);
       // projectId is not a secret: stored and returned as-is
       expect(res.body.config.projectId).to.equal(fix.projectId);
+    });
+
+    it('creates a socket-mode provider with botToken + appToken + projectId (signingSecret optional)', async () => {
+      const appToken = 'xapp-socket-only';
+      const res = await authed().post('/api/providers').send({
+        name: 'Test Slack Socket Only',
+        providerType: 'channel',
+        apiType: 'slack',
+        config: { mode: 'socket_mode', botToken: BOT_TOKEN, appToken, projectId: fix.projectId },
+      });
+      expect(res.status).to.equal(201);
+      expect(res.body.config.mode).to.equal('socket_mode');
+      expect(res.body.config.appToken).to.match(/^@sec:/);
+      expect(res.body.config.projectId).to.equal(fix.projectId);
+    });
+
+    it('rejects a socket-mode provider missing botToken (400)', async () => {
+      const res = await authed().post('/api/providers').send({
+        name: 'Broken Slack Socket',
+        providerType: 'channel',
+        apiType: 'slack',
+        config: { mode: 'socket_mode', appToken: 'xapp-broken', projectId: fix.projectId },
+      });
+      expect(res.status).to.equal(400);
     });
 
     it('returns a socket-mode provider with mode and projectId intact on get by id', async () => {
@@ -162,6 +207,16 @@ describe('Slack Provider API', () => {
         providerType: 'channel',
         apiType: 'slack',
         config: { mode: 'socket_mode', botToken: BOT_TOKEN, signingSecret: SIGNING_SECRET, appToken: 'xapp-broken' },
+      });
+      expect(res.status).to.equal(400);
+    });
+
+    it('rejects a socket-mode provider missing appToken (400)', async () => {
+      const res = await authed().post('/api/providers').send({
+        name: 'Broken Slack Socket',
+        providerType: 'channel',
+        apiType: 'slack',
+        config: { mode: 'socket_mode', botToken: BOT_TOKEN, projectId: fix.projectId },
       });
       expect(res.status).to.equal(400);
     });

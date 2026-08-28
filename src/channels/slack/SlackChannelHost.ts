@@ -368,6 +368,15 @@ export class SlackChannelHost {
     }
     const { botToken, signingSecret, processingDelayMinMs, processingDelayMaxMs } = configResult.data;
 
+    // The webhook is the events_api transport and needs the bot token + signing
+    // secret to verify signatures and post replies. A socket_mode provider (which
+    // now parses without them) pointed at this endpoint is a misconfiguration.
+    if (!botToken || !signingSecret) {
+      logger.error({ channelProviderId, projectId }, 'Slack webhook: channel provider is not configured for the Events API transport (missing botToken/signingSecret)');
+      res.status(500).json({ error: 'Channel provider is not configured for the Events API transport' });
+      return;
+    }
+
     // Validate X-Slack-Signature (HMAC-SHA256 over `v0:<timestamp>:<raw-body>`)
     const rawBody: Buffer | undefined = (req as any).rawBody;
     if (!rawBody) {
@@ -494,6 +503,10 @@ export class SlackChannelHost {
     }
     const { mode, appToken, projectId, botToken, processingDelayMinMs, processingDelayMaxMs } = configResult.data;
     if (mode !== 'socket_mode') return null;
+    if (!botToken) {
+      logger.error({ providerId: record.id }, 'Slack socket: mode is socket_mode but botToken is missing, no socket connection');
+      return null;
+    }
     if (!appToken) {
       logger.error({ providerId: record.id }, 'Slack socket: mode is socket_mode but appToken is missing, no socket connection');
       return null;
