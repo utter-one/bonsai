@@ -24449,14 +24449,7 @@
             "description": "Check name (db, process, service_heartbeat:<name>, provider:<id>)"
           },
           "status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "degraded",
-              "down",
-              "unknown"
-            ],
-            "description": "Check status"
+            "$ref": "#/components/schemas/HealthCheckStatus"
           },
           "latencyMs": {
             "type": "integer",
@@ -24478,6 +24471,16 @@
         ],
         "description": "One health check result"
       },
+      "HealthCheckStatus": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "degraded",
+          "down",
+          "unknown"
+        ],
+        "description": "Check status"
+      },
       "HealthMonitoringResponse": {
         "type": "object",
         "properties": {
@@ -24495,14 +24498,14 @@
             "description": "All checks from the last completed cycle"
           },
           "overall": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "degraded",
-              "down",
-              "unknown"
-            ],
-            "description": "Global health status: the worst non-unknown check status (down > degraded > ok). Unknown checks (never ticked, no call data) are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no checks or all are unknown"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthCheckStatus"
+              },
+              {
+                "description": "Global health status: the worst non-unknown check status (down > degraded > ok). Unknown checks (never ticked, no call data) are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no checks or all are unknown"
+              }
+            ]
           }
         },
         "required": [
@@ -25407,6 +25410,333 @@
           "step",
           "series"
         ]
+      },
+      "StatusWindow": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of health_checks rows for this check in the window"
+          },
+          "ok": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status ok"
+          },
+          "degraded": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status degraded"
+          },
+          "down": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status down"
+          },
+          "unknown": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status unknown"
+          },
+          "worstStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthCheckStatus"
+              },
+              {
+                "description": "Worst non-unknown status among window rows (down > degraded > ok); unknown when the window has no non-unknown rows"
+              }
+            ]
+          }
+        },
+        "required": [
+          "total",
+          "ok",
+          "degraded",
+          "down",
+          "unknown",
+          "worstStatus"
+        ],
+        "description": "Windowed status aggregation for one check"
+      },
+      "StatusDaily": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "UTC calendar day (YYYY-MM-DD)"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of health_checks rows for that day (all checks and providers)"
+          },
+          "ok": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status ok"
+          },
+          "degraded": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status degraded"
+          },
+          "down": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status down"
+          },
+          "unknown": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rows with status unknown"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthCheckStatus"
+              },
+              {
+                "description": "Worst non-unknown status across the rows of the day (down > degraded > ok); unknown when the day has no non-unknown rows"
+              }
+            ]
+          },
+          "uptimePct": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Strict uptime: share of non-unknown rows that were ok, percent, 2 decimals (degraded and down count as non-uptime); null when the day has no non-unknown rows"
+          }
+        },
+        "required": [
+          "date",
+          "total",
+          "ok",
+          "degraded",
+          "down",
+          "unknown",
+          "status",
+          "uptimePct"
+        ],
+        "description": "Per-day aggregate (all checks and providers)"
+      },
+      "StatusCheckGroup": {
+        "type": "string",
+        "enum": [
+          "core",
+          "service",
+          "other"
+        ],
+        "description": "'core' = db/process, 'service' = service_heartbeat:*, 'other' = any future check type"
+      },
+      "StatusCheck": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Raw check name (db, process, service_heartbeat:<name>)"
+          },
+          "label": {
+            "type": "string",
+            "description": "Display label for the Console"
+          },
+          "group": {
+            "$ref": "#/components/schemas/StatusCheckGroup"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthCheckStatus"
+              },
+              {
+                "description": "Latest check status; unknown when the check has never run"
+              }
+            ]
+          },
+          "latencyMs": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Latest check duration in ms, when measured"
+          },
+          "detail": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Latest check detail payload (raw jsonb passthrough)"
+          },
+          "checkedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the latest check ran; null when the check has never run"
+          },
+          "window": {
+            "$ref": "#/components/schemas/StatusWindow"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "group",
+          "status",
+          "latencyMs",
+          "detail",
+          "checkedAt",
+          "window"
+        ],
+        "description": "Current state of one system/background-service check"
+      },
+      "StatusProvider": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Provider id"
+          },
+          "name": {
+            "type": "string",
+            "description": "Provider display name"
+          },
+          "providerType": {
+            "type": "string",
+            "enum": [
+              "asr",
+              "tts",
+              "llm",
+              "embeddings",
+              "storage",
+              "channel"
+            ],
+            "description": "Provider category: asr, tts, llm, embeddings, storage, channel"
+          },
+          "apiType": {
+            "type": "string",
+            "description": "API vendor (openai, azure, elevenlabs, ...)"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthCheckStatus"
+              },
+              {
+                "description": "Latest provider:<id> check status; unknown when the provider has never been checked"
+              }
+            ]
+          },
+          "latencyMs": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Latest probe duration in ms, when measured"
+          },
+          "detail": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Latest probe detail payload (raw jsonb passthrough)"
+          },
+          "checkedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the latest probe ran; null when never checked"
+          },
+          "window": {
+            "$ref": "#/components/schemas/StatusWindow"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "providerType",
+          "apiType",
+          "status",
+          "latencyMs",
+          "detail",
+          "checkedAt",
+          "window"
+        ],
+        "description": "Current state of one configured provider"
+      },
+      "StatusPageQuery": {
+        "type": "object",
+        "properties": {
+          "windowMinutes": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 1440,
+            "default": 60,
+            "description": "Window for status-count aggregation in minutes (default 60)"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "When set, include per-day aggregates for the last N UTC days (today + the preceding N-1 days)"
+          }
+        }
+      },
+      "StatusPageResponse": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Server time when the response was built"
+          },
+          "windowMinutes": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 1440,
+            "description": "Applied window (defaulted)"
+          },
+          "overall": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthCheckStatus"
+              },
+              {
+                "description": "Global status: the worst non-unknown status across all checks and providers (down > degraded > ok). Unknown entries are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no entries or all are unknown"
+              }
+            ]
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusCheck"
+            },
+            "description": "Core + background-service checks (never provider:* rows)"
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusProvider"
+            },
+            "description": "One entry per row in the providers table"
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusDaily"
+            },
+            "description": "Per-day aggregates — present only when ?days=N is provided; exactly N buckets, oldest first, today (UTC) last; days without rows are zero-filled"
+          }
+        },
+        "required": [
+          "generatedAt",
+          "windowMinutes",
+          "overall",
+          "checks",
+          "providers"
+        ],
+        "description": "Current status page payload"
       },
       "LatencyStatsResponse": {
         "type": "object",
@@ -68392,14 +68722,14 @@
                       "description": "All checks from the last completed cycle"
                     },
                     "overall": {
-                      "type": "string",
-                      "enum": [
-                        "ok",
-                        "degraded",
-                        "down",
-                        "unknown"
-                      ],
-                      "description": "Global health status: the worst non-unknown check status (down > degraded > ok). Unknown checks (never ticked, no call data) are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no checks or all are unknown"
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/HealthCheckStatus"
+                        },
+                        {
+                          "description": "Global health status: the worst non-unknown check status (down > degraded > ok). Unknown checks (never ticked, no call data) are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no checks or all are unknown"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -70541,6 +70871,63 @@
           },
           "400": {
             "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/status": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Current status page payload",
+        "description": "Aggregated current state of core checks, background-service heartbeats, and all configured providers, plus per-check status counts over the window (default 60 min). Data source: health_checks (60 s cadence).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 5,
+              "maximum": 1440,
+              "default": 60,
+              "description": "Window for status-count aggregation in minutes (default 60)"
+            },
+            "required": false,
+            "description": "Window for status-count aggregation in minutes (default 60)",
+            "name": "windowMinutes",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "description": "When set, include per-day aggregates for the last N UTC days (today + the preceding N-1 days)"
+            },
+            "required": false,
+            "description": "When set, include per-day aggregates for the last N UTC days (today + the preceding N-1 days)",
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current status page payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
           },
           "401": {
             "description": "Authentication required"

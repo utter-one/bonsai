@@ -192,11 +192,19 @@ export type AlertingSettings = z.infer<typeof alertingSettingsSchema>;
 // P1-08 — read-only monitoring endpoints
 // ==================
 
+/** Health check status — the health_checks.status vocabulary. */
+export const healthCheckStatusSchema = z
+  .enum(['ok', 'degraded', 'down', 'unknown'])
+  .openapi('HealthCheckStatus')
+  .describe('Check status');
+
+export type HealthCheckStatus = z.infer<typeof healthCheckStatusSchema>;
+
 /** One health check result (in-memory snapshot or persisted row). */
 export const healthCheckItemSchema = z
   .object({
     name: z.string().describe('Check name (db, process, service_heartbeat:<name>, provider:<id>)'),
-    status: z.enum(['ok', 'degraded', 'down', 'unknown']).describe('Check status'),
+    status: healthCheckStatusSchema,
     latencyMs: z.number().int().nullable().optional().describe('Check duration in milliseconds, when measured (absent for unmeasured checks)'),
     detail: z.record(z.string(), z.unknown()).nullable().optional().describe('Check-specific detail payload (absent when none)'),
   })
@@ -207,9 +215,7 @@ export const healthCheckItemSchema = z
 export const healthSnapshotResponseSchema = z.object({
   checkedAt: z.coerce.date().nullable().describe('When the last check cycle ran (null before the first cycle)'),
   checks: z.array(healthCheckItemSchema).describe('All checks from the last completed cycle'),
-  overall: z
-    .enum(['ok', 'degraded', 'down', 'unknown'])
-    .describe('Global health status: the worst non-unknown check status (down > degraded > ok). Unknown checks (never ticked, no call data) are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no checks or all are unknown'),
+  overall: healthCheckStatusSchema.describe('Global health status: the worst non-unknown check status (down > degraded > ok). Unknown checks (never ticked, no call data) are ignored so a healthy system with not-yet-known checks still reports ok; unknown only when there are no checks or all are unknown'),
 });
 
 export type HealthCheckItem = z.infer<typeof healthCheckItemSchema>;
@@ -266,8 +272,7 @@ export const providerOverviewSchema = z.object({
   name: z.string().describe('Provider name'),
   providerType: z.string().describe('Provider type (llm, asr, tts, embeddings, storage)'),
   apiType: z.string().describe('API type (openai, anthropic, elevenlabs, s3, ...)'),
-  probeStatus: z
-    .enum(['ok', 'degraded', 'down', 'unknown'])
+  probeStatus: healthCheckStatusSchema
     .nullable()
     .describe('Latest health-check status for this provider (provider:<id> check); null when not checked yet'),
   rolling: providerRollingSchema.describe('Rolling 15-minute call-log window'),
