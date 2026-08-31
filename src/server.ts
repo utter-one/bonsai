@@ -32,6 +32,7 @@ import { ChannelCatalogController } from './http/controllers/ChannelCatalogContr
 import { AuditController } from './http/controllers/AuditController';
 import { AnalyticsController } from './http/controllers/AnalyticsController';
 import { MonitoringController } from './http/controllers/MonitoringController';
+import { StatusPageController } from './http/controllers/StatusPageController';
 import { SavedSliceQueryController } from './http/controllers/SavedSliceQueryController';
 import { FunnelController } from './http/controllers/FunnelController';
 import { ApiKeyController } from './http/controllers/ApiKeyController';
@@ -275,6 +276,9 @@ export async function createApp(): Promise<express.Application> {
 
   const monitoringController = container.resolve(MonitoringController);
   monitoringController.registerRoutes(app);
+
+  const statusPageController = container.resolve(StatusPageController);
+  statusPageController.registerRoutes(app);
 
   const analyticsController = container.resolve(AnalyticsController);
   analyticsController.registerRoutes(app);

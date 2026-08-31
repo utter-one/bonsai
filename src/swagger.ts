@@ -141,6 +141,8 @@ import {
   metricSeriesResponseSchema,
 } from './http/contracts/monitoring';
 import { MonitoringController } from './http/controllers/MonitoringController';
+import { StatusPageController } from './http/controllers/StatusPageController';
+import { statusWindowSchema, statusDailySchema, statusCheckGroupSchema, statusCheckSchema, statusProviderSchema, statusPageQuerySchema, statusPageResponseSchema } from './http/contracts/statusPage';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
@@ -815,6 +817,17 @@ export function getOpenAPISpec(): any {
   registry.register('MetricSeriesMonitoringResponse', metricSeriesResponseSchema);
   const monitoringPaths = MonitoringController.getOpenAPIPaths();
   for (const path of monitoringPaths) {
+    registry.registerPath(path);
+  }
+  registry.register('StatusWindow', statusWindowSchema);
+  registry.register('StatusDaily', statusDailySchema);
+  registry.register('StatusCheckGroup', statusCheckGroupSchema);
+  registry.register('StatusCheck', statusCheckSchema);
+  registry.register('StatusProvider', statusProviderSchema);
+  registry.register('StatusPageQuery', statusPageQuerySchema);
+  registry.register('StatusPageResponse', statusPageResponseSchema);
+  const statusPagePaths = StatusPageController.getOpenAPIPaths();
+  for (const path of statusPagePaths) {
     registry.registerPath(path);
   }
 

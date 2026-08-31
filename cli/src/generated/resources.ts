@@ -4274,6 +4274,27 @@ export const RESOURCES: Record<string, ResourceDef> = {
       },
     ],
   },
+  "monitoring": {
+    name: "monitoring",
+    scope: "global",
+    operations: [
+      {
+        method: "get",
+        path: "/api/monitoring/status",
+        pathTemplate: "/api/monitoring/status",
+        pathParams: [],
+        queryParamNames: ["windowMinutes","days"],
+        repeatableParams: [],
+        hasBody: false,
+        bodySchemaRef: null,
+        action: "status",
+        summary: "Current status page payload",
+        description: "Aggregated current state of core checks, background-service heartbeats, and all configured providers, plus per-check status counts over the window (default 60 min). Data source: health_checks (60 s cadence).",
+        isPaginated: false,
+        isUpdateOrDelete: false,
+      },
+    ],
+  },
 };
 
 export function getResourceNames(): string[] {
