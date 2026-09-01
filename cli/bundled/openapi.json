@@ -27836,6 +27836,65 @@
           "summary",
           "defaultParams"
         ]
+      },
+      "MetricCatalogResponse": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetricCatalogItem"
+            },
+            "description": "All registered metrics (static — no query params, no pagination), sorted by name"
+          }
+        },
+        "required": [
+          "metrics"
+        ]
+      },
+      "MetricCatalogItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Metric name — the `name` param of GET /api/monitoring/metrics"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "counter",
+              "gauge",
+              "histogram"
+            ],
+            "description": "Metric kind"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human description — the same text as the Prometheus # HELP line"
+          },
+          "buckets": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "description": "Histogram bucket upper bounds (ms), ascending — present for histograms only"
+          },
+          "maxSeries": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Effective cardinality cap (max distinct label sets; 50 unless overridden)"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "description",
+          "maxSeries"
+        ]
       }
     },
     "parameters": {},
@@ -70711,6 +70770,36 @@
                     "step",
                     "series"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters or request body"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient permissions (requires system:monitoring)"
+          }
+        }
+      }
+    },
+    "/api/monitoring/metric-catalog": {
+      "get": {
+        "tags": [
+          "Monitoring"
+        ],
+        "summary": "Metric catalog",
+        "description": "Static catalog of all registered metrics (name, kind, description, histogram buckets, effective cardinality cap). Served from the closed MetricsRegistry config — the same map the registry enforces — so the Console can build dashboards from the live catalog instead of hardcoding metric names.",
+        "responses": {
+          "200": {
+            "description": "All registered metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricCatalogResponse"
                 }
               }
             }

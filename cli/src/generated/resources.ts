@@ -4274,6 +4274,27 @@ export const RESOURCES: Record<string, ResourceDef> = {
       },
     ],
   },
+  "monitoring_metric_catalog": {
+    name: "monitoring_metric_catalog",
+    scope: "global",
+    operations: [
+      {
+        method: "get",
+        path: "/api/monitoring/metric-catalog",
+        pathTemplate: "/api/monitoring/metric-catalog",
+        pathParams: [],
+        queryParamNames: [],
+        repeatableParams: [],
+        hasBody: false,
+        bodySchemaRef: null,
+        action: "list",
+        summary: "Metric catalog",
+        description: "Static catalog of all registered metrics (name, kind, description, histogram buckets, effective cardinality cap). Served from the closed MetricsRegistry config — the same map the registry enforces — so the Console can build dashboards from the live catalog instead of hardcoding metric names.",
+        isPaginated: false,
+        isUpdateOrDelete: false,
+      },
+    ],
+  },
   "monitoring": {
     name: "monitoring",
     scope: "global",

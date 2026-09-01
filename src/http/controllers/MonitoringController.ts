@@ -20,6 +20,7 @@ import {
   providerCallListResponseSchema,
   providerStatsQuerySchema,
   providerStatsResponseSchema,
+  metricCatalogResponseSchema,
   metricSeriesQuerySchema,
   metricSeriesResponseSchema,
 } from '../contracts/monitoring';
@@ -28,7 +29,7 @@ import {
  * Controller for the monitoring API (P1-08 read-only, PROPOSAL §3.6; P2-03
  * alerts history/acknowledge + config management).
  *
- * All eleven endpoints require `system:monitoring` (super_admin until P2-04
+ * Every endpoint requires `system:monitoring` (super_admin until P2-04
  * finalizes the role matrix). Fallback events land in P3-06.
  */
 @singleton()
@@ -339,6 +340,24 @@ export class MonitoringController {
           ...commonResponses,
         },
       },
+      {
+        method: 'get',
+        path: '/api/monitoring/metric-catalog',
+        tags: ['Monitoring'],
+        summary: 'Metric catalog',
+        description: 'Static catalog of all registered metrics (name, kind, description, histogram buckets, effective cardinality cap). Served from the closed MetricsRegistry config — the same map the registry enforces — so the Console can build dashboards from the live catalog instead of hardcoding metric names.',
+        responses: {
+          200: {
+            description: 'All registered metrics',
+            content: {
+              'application/json': {
+                schema: metricCatalogResponseSchema,
+              },
+            },
+          },
+          ...commonResponses,
+        },
+      },
     ];
   }
 
@@ -353,6 +372,7 @@ export class MonitoringController {
     router.get('/api/monitoring/fallback-events', asyncHandler(this.listFallbackEvents.bind(this)));
     router.get('/api/monitoring/provider-stats', asyncHandler(this.getProviderStats.bind(this)));
     router.get('/api/monitoring/metrics', asyncHandler(this.getMetrics.bind(this)));
+    router.get('/api/monitoring/metric-catalog', asyncHandler(this.getMetricCatalog.bind(this)));
     router.get('/api/monitoring/alerts', asyncHandler(this.listAlerts.bind(this)));
     router.get('/api/monitoring/alerts/:id', asyncHandler(this.getAlert.bind(this)));
     router.post('/api/monitoring/alerts/:id/acknowledge', asyncHandler(this.acknowledgeAlert.bind(this)));
@@ -428,6 +448,15 @@ export class MonitoringController {
     const query = metricSeriesQuerySchema.parse(req.query);
     const series = await this.monitoringService.getMetricSeries(req.context, query);
     res.status(200).json(series);
+  }
+
+  /**
+   * GET /api/monitoring/metric-catalog
+   */
+  private async getMetricCatalog(req: Request, res: Response): Promise<void> {
+    checkPermissions(req, [PERMISSIONS.SYSTEM_MONITORING]);
+    const catalog = this.monitoringService.getMetricCatalog(req.context);
+    res.status(200).json(catalog);
   }
 
   /**

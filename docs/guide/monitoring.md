@@ -500,7 +500,10 @@ The endpoint bypasses auth / rate-limit / outcome middleware by design (it is
 a scrape target, not an API route): it never burns rate-limit budget and never
 appears in `api_requests_total`. History (pre-aggregated buckets over time)
 lives in `GET /api/monitoring/metrics?name=...&from=...&to=...&step=...` —
-window capped at 14 days.
+window capped at 14 days. The valid metric names (with kind, `# HELP`
+description, histogram buckets and cardinality cap) are served at
+`GET /api/monitoring/metric-catalog` — build UIs from it instead of
+hardcoding metric names.
 
 ## 8. Retention & storage
 

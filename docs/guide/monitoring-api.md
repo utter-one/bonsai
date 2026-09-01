@@ -15,7 +15,7 @@ poll it, and what the panels map to.
 
 | | |
 |---|---|
-| **Base path** | `/api/monitoring/*` (13 endpoints) |
+| **Base path** | `/api/monitoring/*` (14 endpoints) |
 | **Auth** | `Authorization: Bearer <accessToken>` — the same JWT as every other API call |
 | **Permission** | Every monitoring endpoint requires `system:monitoring` |
 | **Effective access** | **`super_admin` only** (P2-04). `content_manager`, `support`, `developer` and `viewer` all get **403** on every monitoring endpoint — including the config read. If Console shows a monitoring section, gate it on the operator having the `super_admin` role. |
@@ -567,6 +567,44 @@ Monitoring interplay: a **saved** test writes an ordinary
 firing) but is **excluded from the circuit breaker**. A **draft** test leaves
 zero rows. Saved tests write a `CONNECTION_TEST` audit row; drafts write none.
 See [On-demand connection tests](./monitoring.md#on-demand-connection-tests).
+
+### 4.15 `GET /api/monitoring/metric-catalog`
+
+The static metric catalog (35 metrics) — use it to **build dashboards
+from the live catalog** instead of hardcoding metric names and drifting
+from the registry. Standard auth, no params, no pagination.
+
+```json
+{
+  "metrics": [
+    {
+      "name": "health_check_latency_ms",
+      "kind": "histogram",
+      "description": "Health check duration in milliseconds (db ping and provider probes only — heartbeats and inferred provider status have no latency measurement).",
+      "buckets": [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+      "maxSeries": 500
+    },
+    {
+      "name": "active_conversations",
+      "kind": "gauge",
+      "description": "Number of currently active conversations.",
+      "maxSeries": 50
+    }
+  ]
+}
+```
+
+Served from the closed `MetricsRegistry` config — the same map the series
+endpoint and the Prometheus exporter enforce — so it cannot drift:
+every `name` is a valid `GET /api/monitoring/metrics?name=...` value, and
+each `description` is the Prometheus `# HELP` text for that metric.
+
+- `kind` is `counter` | `gauge` | `histogram`.
+- `buckets` (ms upper bounds, ascending) is present **for histograms only** —
+  absent on counters and gauges.
+- `maxSeries` is the *effective* cardinality cap (default 50, raised for
+  high-cardinality series such as `api_requests_total` = 4000).
+- The list is static (no `from`/`to`), sorted by `name`, not paginated.
 
 ---
 

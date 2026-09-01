@@ -21,7 +21,7 @@ import { monitoringConfigSchema } from '../../src/http/contracts/monitoring';
 const TEST_OPERATOR_ID = 'test@example.com';
 const WEBHOOK_TOKEN = 'SECRET404TOKEN';
 
-// The monitoring routes (6 P1-08 reads + 3 alerts + 2 config + 1 rule catalog).
+// The monitoring routes (6 P1-08 reads + 1 metric catalog + 3 alerts + 2 config + 1 rule catalog).
 // provider-stats requires a bounded from/to window — supplied per request.
 type MatrixRoute = { method: 'GET' | 'POST' | 'PUT'; path: string; query?: Record<string, string> | (() => Record<string, string>) };
 const ROUTES: MatrixRoute[] = [
@@ -50,6 +50,7 @@ const ROUTES: MatrixRoute[] = [
       };
     },
   },
+  { method: 'GET', path: '/api/monitoring/metric-catalog' },
   { method: 'GET', path: '/api/monitoring/alerts' },
   { method: 'GET', path: '/api/monitoring/alerts/alrt_rbac' },
   { method: 'POST', path: '/api/monitoring/alerts/alrt_rbac/acknowledge' },

@@ -3,6 +3,9 @@ import { expect } from 'chai';
 import {
   MetricsRegistry,
   METRIC_CONFIGS,
+  METRIC_DESCRIPTIONS,
+  DEFAULT_MAX_SERIES,
+  buildMetricCatalog,
   type MetricSampleRow,
 } from '../../../src/services/monitoring/MetricsRegistry';
 
@@ -283,5 +286,61 @@ describe('MetricsRegistry (P1-02)', () => {
         expect(cfg.buckets?.length, `histogram ${name} needs buckets`).to.be.greaterThan(0);
       }
     }
+  });
+
+  describe('buildMetricCatalog (GET /api/monitoring/metric-catalog)', () => {
+    it('covers exactly the registered metric set, sorted by name', () => {
+      const catalog = buildMetricCatalog();
+      expect(catalog.map((entry) => entry.name)).to.deep.equal(Object.keys(METRIC_CONFIGS).sort());
+      // exact-count pin: adding/removing a metric must update this test deliberately
+      expect(catalog.length).to.equal(35);
+    });
+
+    it('projects kind, description and the effective maxSeries from the config', () => {
+      const byName = new Map(buildMetricCatalog().map((entry) => [entry.name, entry] as const));
+      for (const [name, cfg] of Object.entries(METRIC_CONFIGS)) {
+        expect(byName.has(name), `catalog contains ${name}`).to.equal(true);
+        const entry = byName.get(name)!;
+        expect(entry.kind).to.equal(cfg.kind);
+        expect(entry.description, `description of ${name}`).to.equal(METRIC_DESCRIPTIONS[name]);
+        expect(entry.description).to.be.a('string').and.not.empty;
+        expect(entry.maxSeries).to.equal(cfg.maxSeries ?? DEFAULT_MAX_SERIES);
+      }
+    });
+
+    it('carries buckets for histograms only — ascending, no extra keys leak', () => {
+      for (const entry of buildMetricCatalog()) {
+        const cfg = METRIC_CONFIGS[entry.name];
+        if (cfg.kind === 'histogram') {
+          expect(entry.buckets, `buckets of ${entry.name}`).to.deep.equal(cfg.buckets);
+          for (let i = 1; i < entry.buckets!.length; i++) {
+            expect(entry.buckets![i], `bucket order of ${entry.name}`).to.be.greaterThan(entry.buckets![i - 1]);
+          }
+        } else {
+          expect(entry.buckets, `buckets of non-histogram ${entry.name}`).to.be.undefined;
+        }
+        expect(Object.keys(entry).sort()).to.deep.equal(
+          cfg.kind === 'histogram'
+            ? ['buckets', 'description', 'kind', 'maxSeries', 'name']
+            : ['description', 'kind', 'maxSeries', 'name']
+        );
+      }
+    });
+
+    it('spot-checks the effective caps: explicit overrides and the 50 default', () => {
+      const byName = new Map(buildMetricCatalog().map((entry) => [entry.name, entry] as const));
+      expect(byName.get('api_requests_total')?.maxSeries).to.equal(4000);
+      expect(byName.get('provider_calls_total')?.maxSeries).to.equal(2000);
+      expect(byName.get('health_check_status')?.maxSeries).to.equal(500);
+      expect(byName.get('health_check_latency_ms')?.maxSeries).to.equal(500);
+      expect(byName.get('rate_limit_rejections_total')?.maxSeries).to.equal(DEFAULT_MAX_SERIES);
+      expect(byName.get('active_conversations')?.maxSeries).to.equal(DEFAULT_MAX_SERIES);
+    });
+
+    it('spot-checks histogram bucket boundaries for the health-check and API histograms', () => {
+      const byName = new Map(buildMetricCatalog().map((entry) => [entry.name, entry] as const));
+      expect(byName.get('health_check_latency_ms')?.buckets).to.deep.equal([5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]);
+      expect(byName.get('api_request_duration_ms')?.buckets).to.deep.equal([50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000]);
+    });
   });
 });
