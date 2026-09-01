@@ -36,6 +36,10 @@ import type { ProbeSettings } from '../../http/contracts/monitoring';
  * snapshot for the API (P1-08) and the rule engine (P2-01). `checkReady()`
  * backs the unauthenticated `/health/ready` endpoint.
  *
+ * Every cycle also publishes `health_check_status` (gauge, 0=ok/1=degraded/
+ * 2=down/3=unknown) and `health_check_latency_ms` (histogram, observed only
+ * where a real measurement exists) per check — specs/health-check-metrics-spec.md.
+ *
  * Probe policy (P1-06, extended P1-05b): `monitoring_config.probeSettings`
  * drives the LLM probe mode (`models` | `one_token` | `off`), the ASR/TTS
  * probe toggle (`free` | `off`), and the per-provider cooldown; the settings
@@ -88,6 +92,8 @@ export interface HealthSnapshot {
 
 interface HealthCheck {
   name: string;
+  /** Labels for `health_check_status` / `health_check_latency_ms` (specs/health-check-metrics-spec.md §3.1). */
+  labels?: Record<string, unknown>;
   run: () => Promise<HealthCheckResult>;
 }
 
@@ -110,6 +116,13 @@ const RECENT_SUCCESS_SKIP_MS = 10 * 60_000;
 const INFERENCE_WINDOW_MS = 30 * 60_000;
 const CHECK_TIMEOUT_MS = 10_000;
 const READY_TIMEOUT_MS = 3_000;
+
+/**
+ * `health_check_status` gauge encoding (specs/health-check-metrics-spec.md §3.1).
+ * `unknown` is published too so the series exists and consumers can tell
+ * "check ran and was unknown" from "no data".
+ */
+const HEALTH_CHECK_STATUS_CODES: Record<HealthCheckStatus, number> = { ok: 0, degraded: 1, down: 2, unknown: 3 };
 const EVENT_LOOP_LAG_THRESHOLD_MS = 250;
 const SELF_HEARTBEAT_NAME = 'health-checks';
 
@@ -140,6 +153,8 @@ export class HealthCheckService {
 
   private readonly intervalMs: number;
   private readonly probesEnabled: boolean;
+  /** Per-check timeout. Protected seam: unit tests shorten it to exercise the timeout path deterministically. */
+  protected checkTimeoutMs: number = CHECK_TIMEOUT_MS;
 
   constructor(
     @inject(HeartbeatRegistry) private readonly heartbeatRegistry: HeartbeatRegistry,
@@ -237,6 +252,7 @@ export class HealthCheckService {
       const results = await Promise.all(checks.map((check) => this.runCheckWithTimeout(check)));
       await this.persistResults(results);
       this.snapshot = { checkedAt: new Date(), checks: results, overall: overallHealthStatus(results) };
+      this.publishMetrics(checks, results);
       logger.debug({ count: results.length, down: results.filter((r) => r.status === 'down').length }, 'HealthCheckService cycle completed');
     } finally {
       this.isProcessing = false;
@@ -245,14 +261,18 @@ export class HealthCheckService {
 
   private async buildChecks(): Promise<HealthCheck[]> {
     const checks: HealthCheck[] = [
-      { name: 'db', run: () => this.runDbCheck() },
-      { name: 'process', run: () => this.runProcessCheck() },
+      { name: 'db', labels: { check: 'db' }, run: () => this.runDbCheck() },
+      { name: 'process', labels: { check: 'process' }, run: () => this.runProcessCheck() },
     ];
 
     const states = this.heartbeatRegistry.serviceStates();
     const heartbeatNames = Array.from(new Set([...KNOWN_SERVICE_HEARTBEATS, ...Object.keys(states)])).sort();
     for (const name of heartbeatNames) {
-      checks.push({ name: `service_heartbeat:${name}`, run: () => Promise.resolve(this.runHeartbeatCheck(name)) });
+      checks.push({
+        name: `service_heartbeat:${name}`,
+        labels: { check: 'service_heartbeat', service: name },
+        run: () => Promise.resolve(this.runHeartbeatCheck(name)),
+      });
     }
 
     let providerList: Provider[] = [];
@@ -268,9 +288,33 @@ export class HealthCheckService {
     // cycle's probes to defaults, not per-provider.
     const probeSettings = await this.getProbeSettings();
     for (const provider of providerList) {
-      checks.push({ name: `provider:${provider.id}`, run: () => this.runProviderCheck(provider, callStats[provider.id], probeSettings) });
+      checks.push({
+        name: `provider:${provider.id}`,
+        labels: { check: 'provider', provider_id: provider.id, provider_type: provider.providerType },
+        run: () => this.runProviderCheck(provider, callStats[provider.id], probeSettings),
+      });
     }
     return checks;
+  }
+
+  /**
+   * Publishes `health_check_status` (gauge) and `health_check_latency_ms`
+   * (histogram) for every check (specs/health-check-metrics-spec.md). Label
+   * sets come from the check definitions so series stay bounded: providers
+   * expose `provider_id` + `provider_type`, never the raw `provider:<id>`
+   * check name. Latency is observed only where a real measurement exists
+   * (db ping, provider probes) — heartbeats and inferred provider status
+   * have none.
+   */
+  private publishMetrics(checks: HealthCheck[], results: HealthCheckResult[]): void {
+    results.forEach((result, index) => {
+      const labels = checks[index].labels;
+      if (!labels) return;
+      this.metricsRegistry.setGauge('health_check_status', labels, HEALTH_CHECK_STATUS_CODES[result.status]);
+      if (result.latencyMs !== undefined) {
+        this.metricsRegistry.observe('health_check_latency_ms', labels, result.latencyMs);
+      }
+    });
   }
 
   /**
@@ -292,7 +336,7 @@ export class HealthCheckService {
 
   private async runCheckWithTimeout(check: HealthCheck): Promise<HealthCheckResult> {
     try {
-      return await this.withTimeout(check.run(), CHECK_TIMEOUT_MS);
+      return await this.withTimeout(check.run(), this.checkTimeoutMs);
     } catch (error) {
       return { name: check.name, status: 'down', detail: { error: (error as Error)?.message ?? String(error) } };
     }

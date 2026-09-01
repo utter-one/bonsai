@@ -19,7 +19,7 @@ Single-package Express 5.x backend (no monorepo). Entry: `src/index.ts`. App fac
 | `src/http/controllers/` | REST API controllers (45 controllers) |
 | `src/http/contracts/` | Zod schemas for HTTP request/response validation + OpenAPI |
 | `src/services/` | Business logic (one per domain entity) |
-| `src/services/monitoring/` | Monitoring module: `CallLogger`, `MetricsRegistry`, `HealthCheckService`, `AlertRuleEngine`, `RetentionService`, `MonitoringConfigService`, circuit breakers + fallback wrappers (see `PROPOSAL-production-monitoring.md`) |
+| `src/services/monitoring/` | Monitoring module: `CallLogger`, `MetricsRegistry`, `HealthCheckService`, `AlertRuleEngine`, `RetentionService`, `MonitoringConfigService`, circuit breakers + fallback wrappers (see `specs/PROPOSAL-production-monitoring.md`) |
 | `src/services/monitoring/notifiers/` | Alert notifiers: webhook, email, and the shared `ChannelNotifier` (telegram/twilio_sms/whatsapp strategy table) |
 | `src/channels/` | Communication channels: websocket, webrtc, twilio-voice, twilio-messaging, whatsapp, telegram |
 | `src/channels/websocket/contracts/` | WebSocket message Zod schemas |
@@ -115,7 +115,7 @@ Nine services run continuously after startup (all resolved from the IoC containe
 - `ImapInboundService` — polls IMAP inboxes
 - `OAuth2TokenRefreshService` — refreshes OAuth2 channel tokens
 - `ProcessingDeferralService` — re-processes deferred conversations
-- `HealthCheckService` — monitoring: db/process/background-service/provider health checks every `MONITORING_HEALTH_INTERVAL_MS` (default 60s) into `health_checks` + gauges; probes llm (`enumerateModels()`/1-token `generate()`), storage (`list`), ASR/TTS (`ping()` — zero-cost liveness endpoints, P1-05b) per `monitoring_config.probeSettings` (`llmProbe`/`asrProbe`/`ttsProbe` + cooldown; env `MONITORING_HEALTH_PROBES=off` is a hard kill switch); providers without a free liveness endpoint (Azure ASR/TTS, Cartesia TTS) fall back to `provider_call_logs` inference; serves `GET /health/ready`
+- `HealthCheckService` — monitoring: db/process/background-service/provider health checks every `MONITORING_HEALTH_INTERVAL_MS` (default 60s) into `health_checks` + gauges; also publishes per-check `health_check_status` (gauge, 0=ok/1=degraded/2=down/3=unknown) and `health_check_latency_ms` (histogram, db ping + provider probes only — specs/health-check-metrics-spec.md); probes llm (`enumerateModels()`/1-token `generate()`), storage (`list`), ASR/TTS (`ping()` — zero-cost liveness endpoints, P1-05b) per `monitoring_config.probeSettings` (`llmProbe`/`asrProbe`/`ttsProbe` + cooldown; env `MONITORING_HEALTH_PROBES=off` is a hard kill switch); providers without a free liveness endpoint (Azure ASR/TTS, Cartesia TTS) fall back to `provider_call_logs` inference; serves `GET /health/ready`
 - `RetentionService` — monitoring: hourly rollup of `provider_call_logs` → `provider_call_stats_hourly` (`0 * * * *`) + daily purge of retention-aged rows at 03:00 (`0 3 * * *`); `retentionDays` from `monitoring_config`
 - `AlertRuleEngine` — monitoring: evaluates the built-in alert rules (provider down/degraded/rate-limited/auth, db down/pool, 429 spikes, streaming health, etc.) on `setInterval` (`MONITORING_ALERT_ENGINE_INTERVAL_MS`, default from `monitoring_config.alerting.engineIntervalMinutes`); anti-flap state machine (pending→firing→resolved, cooldown, maxUnresolvedHours); persists to `alert_events` via the `AlertEventPublisher` DI token (`NotifyingPublisher` since P2-02 — persists via `LogAndPersistPublisher`, then fans out to the notifiers from `monitoring_config` — webhook, email, and a shared `ChannelNotifier` (strategy table) for telegram/twilio_sms/whatsapp — with a 15 s cap; delivery results land in `alert_events.notifications`); windowed counter reads via an in-memory delta ring (cumulative `MetricsRegistry` counters are not windowable directly)
 
@@ -229,6 +229,8 @@ Fresh install without Console requires POST to `/api/setup/initial-operator` to 
 ## Documentation
 
 VitePress docs (`docs/`): never use bare `{{ }}` outside fenced code blocks (Vue interpolation breaks build). Wrap in `<code v-pre>`.
+
+Specs & proposals live in `specs/` (feature specs, implementation proposals, per-issue spec folders `specs/monitoring/` and `specs/provider-test/`). `.issues/` keeps only severity-tracked issues (critical/high/medium/low/verified).
 
 ## Branch / PR
 

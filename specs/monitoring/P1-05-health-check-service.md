@@ -38,7 +38,7 @@ Replace the static `/health` illusion with real, persisted, per-check health: DB
 ## Implementation requirements
 
 ### Check registry
-Each check = `{ name, run(): Promise<HealthCheckResult> }` where `HealthCheckResult = { status: 'ok' | 'degraded' | 'down' | 'unknown', latencyMs?, detail? }`. A check throwing → `{ status: 'down', detail: message }`.
+Each check = `{ name, labels?, run(): Promise<HealthCheckResult> }` where `HealthCheckResult = { status: 'ok' | 'degraded' | 'down' | 'unknown', latencyMs?, detail? }`. A check throwing → `{ status: 'down', detail: message }`.
 
 | Check name | Logic |
 |---|---|
@@ -46,6 +46,8 @@ Each check = `{ name, run(): Promise<HealthCheckResult> }` where `HealthCheckRes
 | `provider:{id}` | per row in `providers` table (all 6 `provider_type` values: `asr, tts, llm, embeddings, storage, channel`): **llm** → `init()` + `enumerateModels()` probe (fixed to `models` in P1-05; P1-06's `probeSettings.llmProbe` later makes this config-driven — see soundness review #1); **storage** → `list('', 1)` probe (same gates); **asr / tts** → zero-cost `ping()` probe (P1-05b addendum — 10 of 13 providers have a free liveness endpoint; Azure ASR/TTS + Cartesia TTS have no `ping()` and fall through to inference); **channel / embeddings** → status *inferred* from `provider_call_logs`: ≥1 success in last 30 min → `ok`; else ≥1 failure in last 30 min → `degraded`; else any row in last 24 h → `unknown` (stale activity); no rows in 24 h → `unknown` (detail distinguishes). Probed providers: probe success → `ok`; probe failure → `degraded` (detail: error + consecutive probe-failure count); probe skipped (cooldown / recent success) → inference rules apply |
 | `service_heartbeat:{name}` | `HeartbeatRegistry.serviceStates()` (per-service declared interval, threshold 3×): never ticked → `unknown` (a service with no work — e.g. IMAP with zero providers — must not read as down); stale → `down`; else `ok`. Detail includes last-run age, threshold, cumulative error count |
 | `process` | ok; **degraded** when RSS > `MONITORING_MEMORY_THRESHOLD_MB` (default 1536) or event-loop lag p95 (perf_hooks `monitorEventLoopDelay`) > 250 ms; detail carries uptime, rss, heapUsed. **Every cycle** this check publishes the gauges the P2-01 rules read: `rss_bytes` (the `high-memory` rule) and `event_loop_lag_p95_ms` — the p95 over an in-memory 60 s window of delay samples kept by this check (the `event-loop-lag` rule) |
+
+**Per-check metrics (2026-09-01 addendum — `specs/health-check-metrics-spec.md`):** every cycle the service also publishes `health_check_status` (gauge, 0=ok/1=degraded/2=down/3=unknown — `unknown` published too so the series exists) and `health_check_latency_ms` (histogram, buckets 5…10000 ms) for *every* check. The `labels?` field on the check definition carries the bounded label sets — `{check: "db"}`, `{check: "process"}`, `{check: "service_heartbeat", service: <name>}`, `{check: "provider", provider_id: <id>, provider_type: <type>}` — so providers never leak the raw unbounded `provider:<id>` name into label space. Latency is observed only where a real measurement exists (db ping, provider probes); heartbeats and inferred provider status have none, so those series never appear in the histogram. Both metrics cap at 500 series. Alert rules keep reading the health snapshot directly — the metrics are the dashboard/trend surface.
 
 ### Probe policy (cost control)
 - Cooldown: max 1 probe per provider per 10 min; skip probe entirely when `provider_call_logs` shows a success within the last 10 min.

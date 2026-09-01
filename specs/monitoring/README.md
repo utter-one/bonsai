@@ -10,7 +10,7 @@ tags: [monitoring, spec, index]
 
 # Monitoring & Resilience — Issue Specs
 
-Issue-level breakdown of `PROPOSAL-production-monitoring.md` (repo root). One file per implementation step; IDs (`P{phase}-{nn}`) match the filename prefix and are used for cross-referencing in this folder.
+Issue-level breakdown of `specs/PROPOSAL-production-monitoring.md`. One file per implementation step; IDs (`P{phase}-{nn}`) match the filename prefix and are used for cross-referencing in this folder.
 
 ## Conventions
 

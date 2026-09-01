@@ -12,6 +12,7 @@ const MONITORING_ENDPOINTS: Array<{ path: string; query?: Record<string, string>
   { path: '/api/monitoring/provider-calls' },
   { path: '/api/monitoring/provider-stats', query: { from: '2026-08-17T00:00:00.000Z', to: '2026-08-17T03:00:00.000Z' } },
   { path: '/api/monitoring/metrics', query: { name: 'provider_calls_total', from: '2026-08-17T00:00:00.000Z', to: '2026-08-17T01:00:00.000Z' } },
+  { path: '/api/monitoring/metric-catalog' },
 ];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,21 +71,21 @@ describe('Monitoring endpoints (P1-08)', () => {
   });
 
   describe('RBAC', () => {
-    it('rejects unauthenticated requests with 401 on all six endpoints', async () => {
+    it('rejects unauthenticated requests with 401 on all read-only endpoints', async () => {
       for (const { path, query } of MONITORING_ENDPOINTS) {
         const res = await unauthed().get(path).query(query ?? {});
         expect(res.status, `GET ${path} unauthenticated`).to.equal(401);
       }
     });
 
-    it('rejects viewer role with 403 on all six endpoints', async () => {
+    it('rejects viewer role with 403 on all read-only endpoints', async () => {
       for (const { path, query } of MONITORING_ENDPOINTS) {
         const res = await viewerAgent.get(path).query(query ?? {});
         expect(res.status, `GET ${path} viewer`).to.equal(403);
       }
     });
 
-    it('allows super_admin on all six endpoints', async () => {
+    it('allows super_admin on all read-only endpoints', async () => {
       for (const { path, query } of MONITORING_ENDPOINTS) {
         const res = await authed().get(path).query(query ?? {});
         expect(res.status, `GET ${path} super_admin`).to.equal(200);
@@ -481,6 +482,95 @@ describe('Monitoring endpoints (P1-08)', () => {
         .query({ name: 'provider_calls_total', from: '2026-08-01T00:00:00.000Z', to: '2026-08-20T00:00:00.000Z' });
       expect(tooWide.status).to.equal(400);
       expect(tooWide.body.error).to.match(/14 days/);
+    });
+  });
+
+  describe('GET /api/monitoring/metric-catalog', () => {
+    const EXPECTED_METRIC_NAMES = [
+      'active_conversations',
+      'active_voice_media_streams',
+      'active_websocket_connections',
+      'ai_turn_ttft_ms',
+      'api_request_duration_ms',
+      'api_requests_total',
+      'asr_eos_to_final_ms',
+      'asr_setup_ms',
+      'background_service_last_run_ts',
+      'circuit_breaker_state',
+      'circuit_open_skips_total',
+      'circuit_opens_total',
+      'db_pool_idle',
+      'db_pool_total',
+      'db_pool_waiting',
+      'event_loop_lag_max_ms',
+      'event_loop_lag_p95_ms',
+      'fallback_attempts_total',
+      'fallback_incompatible_total',
+      'fallbacks_executed_total',
+      'health_check_latency_ms',
+      'health_check_status',
+      'imap_poll_total',
+      'llm_stream_duration_ms',
+      'llm_ttft_ms',
+      'oauth_refresh_total',
+      'provider_call_duration_ms',
+      'provider_calls_total',
+      'provider_chain_exhausted_total',
+      'rate_limit_rejections_total',
+      'rss_bytes',
+      'tts_synthesis_ms',
+      'tts_ttfa_ms',
+      'voice_media_bytes_total',
+      'voice_media_max_frame_gap_ms',
+    ];
+
+    it('returns the full static catalog (35 metrics, exact name set)', async () => {
+      const res = await authed().get('/api/monitoring/metric-catalog');
+      expect(res.status).to.equal(200);
+      expect(res.body).to.have.property('metrics').that.is.an('array');
+      // Exact-set pin: adding/removing a registered metric must update this test deliberately
+      expect(res.body.metrics.map((m: { name: string }) => m.name)).to.deep.equal(EXPECTED_METRIC_NAMES);
+    });
+
+    it('serves name, kind, description and the effective maxSeries per metric — buckets for histograms only', async () => {
+      const res = await authed().get('/api/monitoring/metric-catalog');
+      expect(res.status).to.equal(200);
+      const metrics: Array<Record<string, unknown>> = res.body.metrics;
+      for (let i = 1; i < metrics.length; i++) {
+        expect(metrics[i].name > metrics[i - 1].name, `sorted by name at ${metrics[i].name}`).to.equal(true);
+      }
+      for (const metric of metrics) {
+        expect(metric.name).to.be.a('string').and.not.empty;
+        expect(metric.kind).to.be.oneOf(['counter', 'gauge', 'histogram']);
+        expect(metric.description).to.be.a('string').and.not.empty;
+        expect(metric.maxSeries).to.be.a('number').and.above(0);
+        if (metric.kind === 'histogram') {
+          expect(metric.buckets, `buckets of ${metric.name}`).to.be.an('array').that.is.not.empty;
+          for (let i = 1; i < metric.buckets.length; i++) {
+            expect(metric.buckets[i], `bucket order of ${metric.name}`).to.be.greaterThan(metric.buckets[i - 1]);
+          }
+        } else {
+          expect(metric.buckets, `buckets of non-histogram ${metric.name}`).to.be.undefined;
+        }
+        // no registry internals leak through the projection
+        expect(Object.keys(metric).sort()).to.deep.equal(
+          metric.kind === 'histogram'
+            ? ['buckets', 'description', 'kind', 'maxSeries', 'name']
+            : ['description', 'kind', 'maxSeries', 'name']
+        );
+      }
+    });
+
+    it('matches the registry config for sampled metrics', async () => {
+      const res = await authed().get('/api/monitoring/metric-catalog');
+      const byName = new Map(res.body.metrics.map((m: { name: string }) => [m.name, m]));
+      expect(byName.get('health_check_latency_ms')?.buckets).to.deep.equal([5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]);
+      expect(byName.get('health_check_latency_ms')?.maxSeries).to.equal(500);
+      expect(byName.get('health_check_status')?.kind).to.equal('gauge');
+      expect(byName.get('circuit_breaker_state')?.maxSeries).to.equal(500);
+      expect(byName.get('api_requests_total')?.maxSeries).to.equal(4000);
+      expect(byName.get('provider_call_duration_ms')?.buckets).to.deep.equal([5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000]);
+      expect(byName.get('rate_limit_rejections_total')?.maxSeries).to.equal(50); // effective default
     });
   });
 });

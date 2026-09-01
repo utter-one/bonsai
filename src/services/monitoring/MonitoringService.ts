@@ -16,6 +16,7 @@ import type {
   AlertRuleCatalogResponse,
   HealthHistoryListResponse,
   HealthSnapshotResponse,
+  MetricCatalogResponse,
   MetricSeriesQuery,
   MetricSeriesResponse,
   FallbackEventListResponse,
@@ -27,9 +28,10 @@ import type {
   ProviderStatsResponse,
   ProvidersMonitoringResponse,
 } from '../../http/contracts/monitoring';
-import { alertEventListResponseSchema, alertEventResponseSchema, alertRuleCatalogResponseSchema, fallbackEventListResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
+import { alertEventListResponseSchema, alertEventResponseSchema, alertRuleCatalogResponseSchema, fallbackEventListResponseSchema, healthCheckResponseSchema, healthHistoryListResponseSchema, healthSnapshotResponseSchema, metricCatalogResponseSchema, metricSeriesResponseSchema, monitoringConfigResponseSchema, monitoringConfigSchema, providerCallListResponseSchema, providerStatsResponseSchema, providersMonitoringResponseSchema } from '../../http/contracts/monitoring';
 import { AuditService } from '../AuditService';
 import { buildRuleCatalog } from './AlertEvents';
+import { buildMetricCatalog } from './MetricsRegistry';
 import { CircuitBreakerRegistry } from './CircuitBreakerRegistry';
 import { HealthCheckService } from './HealthCheckService';
 import { MonitoringConfigService } from './MonitoringConfigService';
@@ -557,6 +559,18 @@ export class MonitoringService extends BaseService {
       step: query.step,
       series: [...seriesMap.values()],
     });
+  }
+
+  /**
+   * GET /api/monitoring/metric-catalog
+   * Static catalog of every registered metric — served from the closed
+   * MetricsRegistry config so it never drifts from what the series endpoint
+   * and the Prometheus exporter accept (same pattern as getRuleCatalog).
+   */
+  getMetricCatalog(context: RequestContext): MetricCatalogResponse {
+    this.requirePermission(context, PERMISSIONS.SYSTEM_MONITORING);
+    logger.debug({ operatorId: context.operatorId }, 'Getting metric catalog');
+    return metricCatalogResponseSchema.parse({ metrics: buildMetricCatalog() });
   }
 
   // ---------------------------------------------------------------------

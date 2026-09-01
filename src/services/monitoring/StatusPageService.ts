@@ -9,7 +9,7 @@ import { statusPageResponseSchema } from '../../http/contracts/statusPage';
 import type { StatusCheck, StatusDaily, StatusPageResponse, StatusProvider, StatusWindow } from '../../http/contracts/statusPage';
 import type { HealthCheckStatus } from '../../http/contracts/monitoring';
 
-/** Display labels for the checks the live HealthCheckService writes (SPEC-status-page-v1 §5.7). */
+/** Display labels for the checks the live HealthCheckService writes (specs/SPEC-status-page-v1.md §5.7). */
 const CHECK_LABELS: Record<string, string> = {
   db: 'Database',
   process: 'Application',
@@ -28,7 +28,7 @@ const CORE_CHECKS = new Set(['db', 'process']);
 const GROUP_RANK: Record<StatusCheck['group'], number> = { core: 0, service: 1, other: 2 };
 
 /**
- * Worst non-unknown status in the set (SPEC-status-page-v1 §4.3): `down > degraded > ok`,
+ * Worst non-unknown status in the set (specs/SPEC-status-page-v1.md §4.3): `down > degraded > ok`,
  * with `unknown` neutral — returned only when the set holds no non-unknown status.
  * Exported for direct testing (the live 1 s test-loop makes an all-unknown API scenario racy).
  */
@@ -88,7 +88,7 @@ interface DailyAggRow {
 }
 
 /**
- * Status page service (SPEC-status-page-v1) — aggregates `health_checks` + `providers`
+ * Status page service (specs/SPEC-status-page-v1.md) — aggregates `health_checks` + `providers`
  * into the current-state payload rendered by the Console Status page.
  *
  * Read-only. No caching (the Console polls at ~30 s and the queries are indexed

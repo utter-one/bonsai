@@ -4,7 +4,7 @@ On-demand "test connection" for every provider type, exercising the
 provider's **own communication protocol** (same code path as the main
 functionality) to verify authentication and availability.
 
-Proposal: [`PROPOSAL-provider-test-connection.md`](../../PROPOSAL-provider-test-connection.md)
+Proposal: [`PROPOSAL-provider-test-connection.md`](../PROPOSAL-provider-test-connection.md)
 
 ## Specs
 

@@ -28,6 +28,11 @@ interface CallStats {
 
 /** HealthCheckService with every external boundary stubbed. */
 class TestHealthCheckService extends HealthCheckService {
+  /** Seam: shorten the per-check timeout so the timeout path is testable in <1 s. */
+  setCheckTimeoutMs(ms: number): void {
+    this.checkTimeoutMs = ms;
+  }
+
   pingDbMode: 'ok' | 'error' | 'hang' = 'ok';
   poolStats = { poolTotal: 5, poolIdle: 3, poolWaiting: 0 };
   providers: Provider[] = [];
@@ -477,6 +482,91 @@ describe('HealthCheckService (P1-05)', () => {
     service.pingDbMode = 'error';
     await service.runNow();
     expect(service.getSnapshot().overall).to.equal('down');
+  });
+});
+
+describe('HealthCheckService health-check metrics (specs/health-check-metrics-spec.md)', () => {
+  let restoreEnv: (() => void) | undefined;
+
+  afterEach(() => {
+    restoreEnv?.();
+    restoreEnv = undefined;
+  });
+
+  it('runCheckCycle publishes health_check_status with the exact label sets and encoded values', async () => {
+    const { service, registry, hb, restoreEnv: restore } = makeService('off');
+    restoreEnv = restore;
+    hb.tick('conversation-timeout', 60_000);
+    service.providers = [providerRow('prov_llm', 'llm')];
+    service.callStats = { prov_llm: { lastSuccessAt: new Date(), lastFailureAt: null, lastCallAt: new Date() } };
+
+    await service.runNow();
+
+    const status = registry.snapshot().gauges.health_check_status;
+    expect(status?.['check=db']).to.equal(0); // ok
+    expect(status?.['check=process']).to.be.oneOf([0, 1]); // load-dependent, never down/unknown
+    expect(status?.['check=service_heartbeat,service=conversation-timeout']).to.equal(0);
+    expect(status?.['check=service_heartbeat,service=health-checks']).to.equal(0);
+    expect(status?.['check=provider,provider_id=prov_llm,provider_type=llm']).to.equal(0);
+    // Label sets come from the check definitions — raw check names never leak into label values.
+    expect(Object.keys(status ?? {})).to.not.include('check=service_heartbeat:health-checks');
+    expect(Object.keys(status ?? {})).to.not.include('check=provider:prov_llm');
+  });
+
+  it('health_check_latency_ms is observed on the db check only — not on heartbeats or inferred providers', async () => {
+    const { service, registry, restoreEnv: restore } = makeService('off');
+    restoreEnv = restore;
+    service.providers = [providerRow('prov_llm', 'llm')];
+    service.callStats = { prov_llm: { lastSuccessAt: new Date(), lastFailureAt: null, lastCallAt: new Date() } };
+
+    await service.runNow();
+
+    const latency = registry.snapshot().histograms.health_check_latency_ms;
+    const db = latency?.['check=db'];
+    expect(db?.count).to.be.gte(1);
+    expect(db?.buckets).to.have.length(12); // 11 configured boundaries + +Inf
+    expect(latency).to.not.have.property('check=service_heartbeat,service=health-checks');
+    expect(latency).to.not.have.property('check=provider,provider_id=prov_llm,provider_type=llm');
+  });
+
+  it('unknown status publishes gauge 3 (never-ticked heartbeats and providers without call history)', async () => {
+    const { service, registry, hb, restoreEnv: restore } = makeService('off');
+    restoreEnv = restore;
+    hb.declareInterval('imap-inbound', 60_000); // known service, never ticked
+    service.providers = [providerRow('prov_none', 'channel')]; // no call stats
+
+    await service.runNow();
+
+    const status = registry.snapshot().gauges.health_check_status;
+    expect(status?.['check=service_heartbeat,service=imap-inbound']).to.equal(3);
+    expect(status?.['check=provider,provider_id=prov_none,provider_type=channel']).to.equal(3);
+  });
+
+  it('degraded publishes 1 and down publishes 2', async () => {
+    const { service, registry, restoreEnv: restore } = makeService();
+    restoreEnv = restore;
+    service.poolStats = { poolTotal: 5, poolIdle: 0, poolWaiting: 2 };
+    await service.runNow();
+    expect(registry.snapshot().gauges.health_check_status?.['check=db']).to.equal(1);
+
+    service.pingDbMode = 'error';
+    await service.runNow();
+    expect(registry.snapshot().gauges.health_check_status?.['check=db']).to.equal(2);
+  });
+
+  it('check timeout publishes gauge 2 with no histogram observation', async () => {
+    const { service, registry, restoreEnv: restore } = makeService();
+    restoreEnv = restore;
+    service.setCheckTimeoutMs(300); // seam: production checks time out at 10 s
+    service.pingDbMode = 'hang'; // pingDb hangs 10 s ≫ 300 ms
+
+    await service.runNow();
+
+    const rows = byName(service.persisted[0]);
+    expect(rows['db']?.status).to.equal('down');
+    expect(rows['db']?.detail).to.deep.equal({ error: 'timeout' });
+    expect(registry.snapshot().gauges.health_check_status?.['check=db']).to.equal(2);
+    expect(registry.snapshot().histograms.health_check_latency_ms).to.equal(undefined); // no observation
   });
 });
 

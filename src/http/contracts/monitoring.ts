@@ -436,6 +436,36 @@ export type MetricSeries = z.infer<typeof metricSeriesSchema>;
 export type MetricSeriesResponse = z.infer<typeof metricSeriesResponseSchema>;
 
 // ==================
+// P1-08 addendum — metric catalog (GET /api/monitoring/metric-catalog)
+// ==================
+
+/**
+ * One registered metric. Static catalog served from the closed MetricsRegistry
+ * config (single source of truth — the service projects METRIC_CONFIGS +
+ * METRIC_DESCRIPTIONS), so the Console can build dashboards from the live
+ * catalog instead of hardcoding metric names and drifting from the registry.
+ */
+export const metricCatalogItemSchema = z
+  .object({
+    name: z.string().min(1).describe('Metric name — the `name` param of GET /api/monitoring/metrics'),
+    kind: z.enum(['counter', 'gauge', 'histogram']).describe('Metric kind'),
+    description: z.string().describe('Human description — the same text as the Prometheus # HELP line'),
+    buckets: z.array(z.number().positive()).optional().describe('Histogram bucket upper bounds (ms), ascending — present for histograms only'),
+    maxSeries: z.number().int().positive().describe('Effective cardinality cap (max distinct label sets; 50 unless overridden)'),
+  })
+  .openapi('MetricCatalogItem');
+
+/** GET /api/monitoring/metric-catalog response — the full static metric catalog. */
+export const metricCatalogResponseSchema = z
+  .object({
+    metrics: z.array(metricCatalogItemSchema).describe('All registered metrics (static — no query params, no pagination), sorted by name'),
+  })
+  .openapi('MetricCatalogResponse');
+
+export type MetricCatalogItem = z.infer<typeof metricCatalogItemSchema>;
+export type MetricCatalogResponse = z.infer<typeof metricCatalogResponseSchema>;
+
+// ==================
 // P2-03 — alerts + monitoring config endpoints
 // ==================
 

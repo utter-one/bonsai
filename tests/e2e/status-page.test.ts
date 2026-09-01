@@ -8,7 +8,7 @@ import { healthChecks, providers } from '../../src/db/schema';
 import { worstNonUnknownStatus } from '../../src/services/monitoring/StatusPageService';
 
 /**
- * Status page v1 e2e (SPEC-status-page-v1 §7).
+ * Status page v1 e2e (specs/SPEC-status-page-v1.md §7).
  *
  * Live-loop hazard: in the test env HealthCheckService ticks every 1 s and writes real
  * db / process / service_heartbeat:* / provider:<id> rows (probes off → provider rows
@@ -78,7 +78,7 @@ async function seedCheck(
   });
 }
 
-describe('Status page v1 (SPEC-status-page-v1)', () => {
+describe('Status page v1 (specs/SPEC-status-page-v1.md)', () => {
   let viewerAgent: ReturnType<typeof request.agent>;
 
   before(async () => {
