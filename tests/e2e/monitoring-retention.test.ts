@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { resetDatabase } from '../utils';
 import { db } from '../../src/db/index';
 import {
@@ -159,6 +159,42 @@ describe('Monitoring config + retention (P1-06)', () => {
     const after = await db.select().from(providerCallStatsHourly).where(eq(providerCallStatsHourly.providerId, 'prov_rollup'));
     expect(after.length).to.equal(3);
     expect(after.find((r) => r.operation === 'llm.generate')?.count).to.equal(5);
+  });
+
+  it('rollupPreviousHour() (cron path) aggregates the previous complete hour end-to-end', async () => {
+    // Regression: the cron entry used to fetch the boundary as timestamptz
+    // ::text ('2026-09-01 12:00:00+00') and append a literal 'Z', producing
+    // an invalid date (RangeError: Invalid time value) on every hourly tick.
+    // This test exercises the full cron path, not just runRollupForHour().
+    const windowRes = await db.execute(sql`
+      SELECT date_trunc('hour', now()) - interval '1 hour' AS start
+    `);
+    const windowStart = new Date((windowRes.rows[0] as { start: Date }).start);
+    // Fixture inside the window: window start + 60 s.
+    await db.insert(providerCallLogs).values({
+      id: 'clgl_cron',
+      providerId: 'prov_cron',
+      providerType: 'llm',
+      apiType: 'openai',
+      operation: 'llm.generate',
+      ok: true,
+      durationMs: 1234,
+      createdAt: new Date(windowStart.getTime() + 60_000),
+    });
+
+    await retention().rollupPreviousHour();
+
+    const rows = await db.select().from(providerCallStatsHourly).where(eq(providerCallStatsHourly.providerId, 'prov_cron'));
+    expect(rows.length).to.equal(1);
+    expect(rows[0]).to.include({ count: 1, sumDurationMs: 1234, minDurationMs: 1234, maxDurationMs: 1234 });
+    // hour_bucket must be exactly the window start (tz-less column stores UTC
+    // digits — compare via to_char so host timezone cannot skew the assertion).
+    const bucketRes = await db.execute(sql`
+      SELECT to_char(hour_bucket, 'YYYY-MM-DD HH24:MI:SS') AS bucket
+      FROM provider_call_stats_hourly
+      WHERE provider_id = 'prov_cron'
+    `);
+    expect((bucketRes.rows[0] as { bucket: string }).bucket).to.equal(windowStart.toISOString().slice(0, 19).replace('T', ' '));
   });
 
   it('runPurgeNow() deletes retention-aged rows from the four purge targets and never touches alert_events', async () => {
