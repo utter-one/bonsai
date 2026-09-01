@@ -59,19 +59,19 @@ export class RetentionService {
 
   /** Cron entry: roll up the previous complete hour (boundary computed in SQL). */
   async rollupPreviousHour(): Promise<void> {
-    // The timestamp columns are tz-less; compute the boundary inside Postgres
-    // so the app clock's timezone can never disagree with date_trunc().
-    //
-    // TZ gotcha (verified e2e on a non-UTC host): pg parses naive-timestamp
-    // results as host-local time, which would shift the boundary by the host
-    // offset. Fetch the boundary as text and mark it UTC explicitly — the DB
-    // session runs in UTC (postgres image default + test container), so the
-    // wall clock IS UTC.
+    // The boundary is an absolute instant: `now()` is timestamptz, and pg
+    // parses it into a JS Date with the rendered offset respected — correct
+    // for any session/host timezone. Do NOT cast to ::text here: a timestamptz
+    // always renders WITH an offset ('... 12:00:00+00'), and the previous
+    // "strip the space, append Z" hack produced '...T12:00:00+00Z' — an invalid
+    // date that threw RangeError: Invalid time value in runRollupForHour.
+    // (The pool pins every session to UTC, so the instant is the UTC wall
+    // clock that tz-less created_at stores — pg sends Dates with an explicit
+    // offset, which Postgres converts to the UTC session digits on insert.)
     const result = await db.execute(sql`
-      SELECT (date_trunc('hour', now()) - interval '1 hour')::text AS start
+      SELECT date_trunc('hour', now()) - interval '1 hour' AS start
     `);
-    const hourStartText = (result.rows[0] as { start: string }).start;
-    const hourStart = new Date(`${hourStartText.replace(' ', 'T')}Z`);
+    const hourStart = new Date((result.rows[0] as { start: Date }).start);
     await this.runRollupForHour(hourStart);
   }
 
