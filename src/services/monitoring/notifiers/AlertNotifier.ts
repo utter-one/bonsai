@@ -14,7 +14,7 @@ import { ChannelNotifier } from './ChannelNotifier';
 
 /**
  * P2-02 — alert notifiers (spec + soundness review findings in
- * .issues/proposal/monitoring/P2-02-notifiers.md).
+ * specs/monitoring/P2-02-notifiers.md).
  *
  * `NotifyingPublisher` is the active `ALERT_EVENT_PUBLISHER_TOKEN`
  * implementation: it persists exactly like P2-01's `LogAndPersistPublisher`,

@@ -11,7 +11,7 @@ tags: [performance, monitoring, database, scale]
 # Partition provider_call_logs (and metric_samples) for scale
 
 - **Filed by:** P4-05 load sanity check (pre-agreed decision rule triggered)
-- **Related:** `.issues/proposal/monitoring/P4-05-docs-env-load-sanity.md`
+- **Related:** `specs/monitoring/P4-05-docs-env-load-sanity.md`
 
 ## Context
 

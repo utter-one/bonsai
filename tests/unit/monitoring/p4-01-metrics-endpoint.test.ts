@@ -150,6 +150,55 @@ describe('p4-01: prometheus metrics endpoint', () => {
       ]);
     });
 
+    it('renders health check metrics (specs/health-check-metrics-spec.md): status gauge + latency histogram', () => {
+      const snapshot: MetricsSnapshot = {
+        counters: {},
+        gauges: {
+          health_check_status: {
+            'check=db': 0,
+            'check=service_heartbeat,service=imap-inbound': 3,
+            'check=provider,provider_id=prov1,provider_type=llm': 2,
+          },
+        },
+        histograms: {
+          health_check_latency_ms: {
+            'check=db': {
+              count: 2,
+              sum: 7,
+              min: 2,
+              max: 5,
+              // boundaries [5,10,25,50,100,250,500,1000,2500,5000,10000] — values 2 and 5 both land in the first bucket
+              buckets: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            },
+          },
+        },
+      };
+      const out = renderPrometheusExposition(snapshot, processStats);
+      const lines = out.split('\n');
+      expect(lines).to.include('# HELP health_check_status Latest status of each health check (0=ok, 1=degraded, 2=down, 3=unknown).');
+      expect(lines).to.include('# TYPE health_check_status gauge');
+      expect(lines).to.include('health_check_status{check="db"} 0');
+      expect(lines).to.include('health_check_status{check="service_heartbeat",service="imap-inbound"} 3');
+      expect(lines).to.include('health_check_status{check="provider",provider_id="prov1",provider_type="llm"} 2');
+      const histLines = lines.filter((l) => l.startsWith('health_check_latency_ms'));
+      expect(histLines).to.deep.equal([
+        'health_check_latency_ms_bucket{check="db",le="5"} 2',
+        'health_check_latency_ms_bucket{check="db",le="10"} 2',
+        'health_check_latency_ms_bucket{check="db",le="25"} 2',
+        'health_check_latency_ms_bucket{check="db",le="50"} 2',
+        'health_check_latency_ms_bucket{check="db",le="100"} 2',
+        'health_check_latency_ms_bucket{check="db",le="250"} 2',
+        'health_check_latency_ms_bucket{check="db",le="500"} 2',
+        'health_check_latency_ms_bucket{check="db",le="1000"} 2',
+        'health_check_latency_ms_bucket{check="db",le="2500"} 2',
+        'health_check_latency_ms_bucket{check="db",le="5000"} 2',
+        'health_check_latency_ms_bucket{check="db",le="10000"} 2',
+        'health_check_latency_ms_bucket{check="db",le="+Inf"} 2',
+        'health_check_latency_ms_sum{check="db"} 7',
+        'health_check_latency_ms_count{check="db"} 2',
+      ]);
+    });
+
     it('escapes label values (backslash, quote, newline)', () => {
       const snapshot: MetricsSnapshot = {
         counters: {},

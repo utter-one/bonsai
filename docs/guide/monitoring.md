@@ -6,8 +6,8 @@ failover works, and what to do when something is wrong.
 
 - **API contract for the Console UI:** see [Monitoring API (frontend)](/guide/monitoring-api)
   (endpoints, params, response shapes, samples).
-- **Design history:** `PROPOSAL-production-monitoring.md` + the per-issue specs in
-  `.issues/proposal/monitoring/` in the repo root.
+- **Design history:** `specs/PROPOSAL-production-monitoring.md` + the per-issue
+  specs in `specs/monitoring/`.
 
 ## 1. Overview
 
@@ -18,8 +18,8 @@ failover works, and what to do when something is wrong.
 | Third-party provider calls (LLM, TTS, ASR, storage, channel sends) | instrumented call sites | `provider_call_logs` (rows) + `metric_samples` (aggregates) + `provider_call_stats_hourly` (hourly rollups) |
 | Streaming phases (TTFT, chunk gaps, RTF, eos→final) | stream observers | `provider_call_logs.metrics` (jsonb) + histograms in `metric_samples` |
 | API request outcomes (status, duration, 429s) | request-outcome middleware | `metric_samples` only (no per-request rows) |
-| Database + process + background-service health | `HealthCheckService` (60 s cycle) | `health_checks` + gauges |
-| Provider liveness probes (LLM/ASR/TTS) | free "enumerate/ping" endpoints, same cycle | `health_checks` + probe-failure counters |
+| Database + process + background-service health | `HealthCheckService` (60 s cycle) | `health_checks` + gauges + `health_check_status` / `health_check_latency_ms` |
+| Provider liveness probes (LLM/ASR/TTS) | free "enumerate/ping" endpoints, same cycle | `health_checks` + probe-failure counters + `health_check_latency_ms` (probe latency) |
 | Alert state | `AlertRuleEngine` (1 min tick) | `alert_events` (fired + resolved, with notification trail) |
 | Failover transitions | failover wrappers + circuit breakers | `fallback_events` + metrics |
 
@@ -90,6 +90,32 @@ the `HealthCheckService` runs, in order:
    never fire alerts.
 4. **Provider probes** (see below) — one check per configured provider where a
    free liveness endpoint exists.
+
+### Per-check metrics
+
+Every cycle the service publishes two registered metrics per check
+(`specs/health-check-metrics-spec.md`) — they power dashboards and trends; the
+alert rules keep reading the health snapshot directly.
+
+- **`health_check_status`** (gauge) — the latest status per check, encoded
+  **0 = ok, 1 = degraded, 2 = down, 3 = unknown**. `unknown` is published too,
+  so the series exists and a dashboard can tell "check ran and was unknown"
+  from "no data".
+- **`health_check_latency_ms`** (histogram, buckets 5…10000 ms) — observed
+  only where a real measurement exists: the db ping and provider probes.
+  Heartbeats and inferred provider statuses have no latency, so those series
+  never appear for the histogram.
+
+Label strategy keeps the series bounded: `{check: "db"}`, `{check:
+"process"}`, `{check: "service_heartbeat", service: <name>}` and
+`{check: "provider", provider_id: <id>, provider_type: <type>}` — providers
+expose `provider_id` + `provider_type`, **never the raw `provider:<id>` check
+name** (unbounded). Both metrics cap at 500 series (the registry's
+cardinality guardrail).
+
+Both land in `metric_samples` with the regular ≤60 s flush, render in
+`GET /metrics`, and are queryable through
+`GET /api/monitoring/metrics?name=health_check_status&labels[check]=db`.
 
 ### Provider probe policy + cost
 

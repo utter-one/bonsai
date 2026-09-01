@@ -6,7 +6,7 @@ import { healthCheckStatusSchema } from './monitoring';
 extendZodWithOpenApi(z);
 
 /**
- * Status page contracts (SPEC-status-page-v1) — GET /api/monitoring/status.
+ * Status page contracts (specs/SPEC-status-page-v1.md) — GET /api/monitoring/status.
  *
  * Aggregates `health_checks` (60 s cadence) + `providers` into the payload the
  * Console Status page renders: current status per check/provider, status counts

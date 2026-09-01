@@ -1,6 +1,6 @@
 # Frontend Monitoring API — Reference
 
-Companion to the P4-04 spec (`.issues/proposal/monitoring/P4-04-console-hooks.md` in the repo root).
+Companion to the P4-04 spec (`specs/monitoring/P4-04-console-hooks.md`).
 Everything the Console "system health" views need to talk to the backend, with
 **real** (redacted) response samples captured from a running instance.
 
@@ -305,7 +305,7 @@ params:
 
 | Param | Notes |
 |---|---|
-| `name` | **Required.** Registered metric name, e.g. `provider_calls_total`, `api_requests_total`, `auth_attempts_total` |
+| `name` | **Required.** Registered metric name, e.g. `provider_calls_total`, `api_requests_total`, `auth_attempts_total`, `health_check_status`, `health_check_latency_ms` |
 | `from` / `to` | **Required.** ISO 8601, same semantics as provider-stats |
 | `step` | `1m` | `15m` (default) | `1h` |
 | `labels[k]=v` | Optional — exact label-set match (all provided labels must match; e.g. `labels[provider_id]=prov_2x&labels[ok]=true`) |

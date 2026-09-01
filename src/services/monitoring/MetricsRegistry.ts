@@ -122,6 +122,17 @@ export const METRIC_CONFIGS: Record<string, MetricConfig> = {
   rate_limit_rejections_total: { kind: 'counter' },
   oauth_refresh_total: { kind: 'counter', maxSeries: 500 },
   imap_poll_total: { kind: 'counter', maxSeries: 500 },
+  // Health checks (specs/health-check-metrics-spec.md): per-check status + db-ping/probe latency.
+  // Labels are bounded by construction ({check} + service / provider_id+provider_type) — the
+  // 500-series cap matches other provider-labeled metrics and is the guardrail, not the expectation.
+  health_check_status: { kind: 'gauge', maxSeries: 500 },
+  health_check_latency_ms: {
+    kind: 'histogram',
+    // Fine buckets for db pings (single-digit ms), coarse buckets for provider probes
+    // (hundreds–thousands of ms), up to the 10 s per-check timeout.
+    buckets: [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+    maxSeries: 500,
+  },
 };
 
 /**
@@ -163,6 +174,8 @@ export const METRIC_DESCRIPTIONS: Record<string, string> = {
   rate_limit_rejections_total: 'Total requests rejected by Bonsai own rate limiters.',
   oauth_refresh_total: 'Total OAuth2 token refresh attempts by provider and result.',
   imap_poll_total: 'Total IMAP inbox poll attempts by provider and result.',
+  health_check_status: 'Latest status of each health check (0=ok, 1=degraded, 2=down, 3=unknown).',
+  health_check_latency_ms: 'Health check duration in milliseconds (db ping and provider probes only — heartbeats and inferred provider status have no latency measurement).',
 };
 
 /**

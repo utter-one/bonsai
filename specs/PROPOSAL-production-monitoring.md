@@ -435,7 +435,7 @@ Each phase is independently shippable and keeps the build green (`npm run build`
 ## 7. Implementation status & deltas (2026-08-21)
 
 **All four phases are implemented and tested** on branch `advanced-monitoring`
-(unit + e2e suites green; spec index: `.issues/proposal/monitoring/README.md`).
+(unit + e2e suites green; spec index: `specs/monitoring/README.md`).
 Operator guide: `docs/guide/monitoring.md`; frontend contract:
 `docs/guide/monitoring-api.md`. Answers to §6's open questions, as shipped:
 

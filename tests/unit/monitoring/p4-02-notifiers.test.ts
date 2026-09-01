@@ -1,6 +1,6 @@
 /**
  * P4-02 — telegram / twilio_sms / whatsapp alert notifiers (spec:
- * .issues/proposal/monitoring/P4-02-telegram-sms-notifiers.md).
+ * specs/monitoring/P4-02-telegram-sms-notifiers.md).
  *
  * Hermetic: no DB, no network. Provider reads go through
  * `setProviderLoaderForTests`, sends through `setFetchForTests` /

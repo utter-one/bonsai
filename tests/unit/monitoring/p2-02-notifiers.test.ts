@@ -1,6 +1,6 @@
 /**
  * P2-02 — notifiers: webhook + email delivery, publisher fan-out, severity
- * floor, retries, and caps (spec: .issues/proposal/monitoring/P2-02-notifiers.md).
+ * floor, retries, and caps (spec: specs/monitoring/P2-02-notifiers.md).
  *
  * No network: `fetch` is stubbed globally, and email delivery goes through
  * the `EmailNotifier` test seams (provider loader + connection builder).

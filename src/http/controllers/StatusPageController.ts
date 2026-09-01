@@ -8,7 +8,7 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { statusPageQuerySchema, statusPageResponseSchema } from '../contracts/statusPage';
 
 /**
- * Controller for the status page (SPEC-status-page-v1) — aggregates health_checks +
+ * Controller for the status page (specs/SPEC-status-page-v1.md) — aggregates health_checks +
  * providers into the current-state payload rendered by the Console Status page.
  *
  * GET /api/monitoring/status requires `system:monitoring` (enforced at both layers —

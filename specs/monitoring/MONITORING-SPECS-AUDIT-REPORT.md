@@ -2,7 +2,7 @@
 
 - **Date:** 2026-08-21
 - **Branch:** `advanced-monitoring` @ `a475625` (clean working tree)
-- **Scope:** all 24 issue specs in `.issues/proposal/monitoring/` (22 `resolved`, 2 `closed`)
+- **Scope:** all 24 issue specs in `specs/monitoring/` (22 `resolved`, 2 `closed`)
 - **Method:** read-only audit — every spec's acceptance criteria (ACs) re-verified against the current
   worktree (files, routes, wiring, test files, docs, git history). Test/build gates re-run live during
   the audit. **No code was changed.**
@@ -76,7 +76,7 @@ by the green runs in §1.
 
 ## 3. Cross-cutting checks
 
-- **README index** (`.issues/proposal/monitoring/README.md`): 24 rows, all present; P3-05 and P4-03 rows
+- **README index** (`specs/monitoring/README.md`): 24 rows, all present; P3-05 and P4-03 rows
   struck through with closure notes. Statuses live in spec frontmatter only (the table has no status
   column) — frontmatter is consistent: 22 `resolved`, 2 `closed`, 0 `open`.
 - **Proposal doc:** status header "implemented" + §7 delta log consistent with what shipped

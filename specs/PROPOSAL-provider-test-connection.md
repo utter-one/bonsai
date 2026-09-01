@@ -3,7 +3,7 @@
 - **Status:** proposed
 - **Branch:** `provider-test-connection`
 - **Date:** 2026-08-24
-- **Issue specs:** `.issues/proposal/provider-test/` (TPC-01 … TPC-09)
+- **Issue specs:** `specs/provider-test/` (TPC-01 … TPC-09)
 - **Prerequisite line:** `advanced-monitoring` (P1-03 call logs, P1-05b probes, P2-01 alert engine incl. the 2026-08-24 last-signal branch)
 
 ## 1. Problem
@@ -324,7 +324,7 @@ provider quota") is a frontend concern.
   using the existing public lifecycle methods (`getSupportedInputFormats()`
   / `getSupportedFormats()` are already public).
 - `docs/guide/monitoring.md` (Option A cross-ref), `docs/frontend-monitoring-api.md`
-  (endpoint reference for the Console), specs in `.issues/proposal/provider-test/`.
+  (endpoint reference for the Console), specs in `specs/provider-test/`.
 
 ## 8. Phases & specs
 
