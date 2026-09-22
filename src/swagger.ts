@@ -49,6 +49,7 @@ import { xAILlmSettingsSchema } from './services/providers/llm/XAILlmProvider';
 import { ollamaLlmSettingsSchema } from './services/providers/llm/OllamaLlmProvider';
 import { ovhLlmSettingsSchema } from './services/providers/llm/OVHLlmProvider';
 import { scalewayLlmSettingsSchema } from './services/providers/llm/ScalewayLlmProvider';
+import { typesafeLlmSettingsSchema } from './services/providers/llm/TypeSafeLlmProvider';
 import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from './services/providers/tts/DeepgramTtsProvider';
@@ -193,6 +194,7 @@ export function getOpenAPISpec(): any {
   registry.register('OllamaLlmSettings', ollamaLlmSettingsSchema);
   registry.register('OVHLlmSettings', ovhLlmSettingsSchema);
   registry.register('ScalewayLlmSettings', scalewayLlmSettingsSchema);
+  registry.register('TypeSafeLlmSettings', typesafeLlmSettingsSchema);
   registry.register('LlmSettings', llmSettingsSchema);
 
   // TTS settings schemas (provider-specific)

@@ -16,6 +16,7 @@ import { xAILlmSettingsSchema } from '../../services/providers/llm/XAILlmProvide
 import { ollamaLlmSettingsSchema } from '../../services/providers/llm/OllamaLlmProvider';
 import { ovhLlmSettingsSchema } from '../../services/providers/llm/OVHLlmProvider';
 import { scalewayLlmSettingsSchema } from '../../services/providers/llm/ScalewayLlmProvider';
+import { typesafeLlmSettingsSchema } from '../../services/providers/llm/TypeSafeLlmProvider';
 import { elevenLabsTtsSettingsSchema } from '../../services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from '../../services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from '../../services/providers/tts/DeepgramTtsProvider';
@@ -131,6 +132,7 @@ export const llmSettingsSchema = z.union([
   ollamaLlmSettingsSchema.catchall(z.unknown()),
   ovhLlmSettingsSchema.catchall(z.unknown()),
   scalewayLlmSettingsSchema.catchall(z.unknown()),
+  typesafeLlmSettingsSchema.catchall(z.unknown()),
 ]).openapi('LlmSettings').nullable().optional().describe('LLM provider-specific settings for this stage');
 
 // ====================

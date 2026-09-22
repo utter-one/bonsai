@@ -401,6 +401,9 @@ export class ConversationRunner {
       if (llmProviderEntity) {
         stageData.completionLlmProvider = await this.createLlmProviderWithFailover(llmProviderEntity, stage.llmSettings);
         stageData.completionLlmProviderInfo = { id: llmProviderEntity.id, apiType: llmProviderEntity.apiType };
+        if (llmProviderEntity.apiType === 'typesafe') {
+          logger.warn({ stageId: stage.id, providerId: llmProviderEntity.id }, 'Jev (TypeSafe) is the stage conversation model; Jev is a decision model and cannot generate free-form responses.');
+        }
       }
     }
 
@@ -525,6 +528,9 @@ export class ConversationRunner {
           llmProvider: await this.createLlmProviderWithFailover(guardrailLlmProviderEntity, guardrailClassifierEntity.llmSettings),
           llmProviderInfo: { id: guardrailLlmProviderEntity.id, apiType: guardrailLlmProviderEntity.apiType },
         };
+        if (guardrailLlmProviderEntity.apiType === 'typesafe' && stageData.guardrails.length > 1) {
+          logger.warn({ projectId: project.id, classifierId: guardrailClassifierEntity.id, guardrailCount: stageData.guardrails.length }, 'Jev (TypeSafe) guardrail classifier with multiple guardrails: only the first guardrail can be triggered.');
+        }
       } else {
         logger.warn({ projectId: project.id, classifierId: project.defaultGuardrailClassifierId }, 'Guardrail classifier not found, guardrails will be skipped');
       }
