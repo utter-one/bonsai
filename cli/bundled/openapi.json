@@ -973,6 +973,37 @@
           "model"
         ]
       },
+      "TypeSafeLlmSettings": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Model name (e.g., jev-latest, jev-preview, jev-1.13.0)"
+          },
+          "defaultMaxTokens": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Default maximum tokens for generation (unused by Jev; present for LlmSettings union compatibility)"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Request timeout in milliseconds (SDK default 10000)"
+          },
+          "classificationThreshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Noul probability at or above which the classifier emits the configured action (default 0.5)"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
       "LlmSettings": {
         "anyOf": [
           {
@@ -1022,6 +1053,9 @@
           },
           {
             "$ref": "#/components/schemas/ScalewayLlmSettings"
+          },
+          {
+            "$ref": "#/components/schemas/TypeSafeLlmSettings"
           },
           {
             "nullable": true
@@ -2544,6 +2578,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
               },
               {
                 "nullable": true
@@ -5602,6 +5639,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ScalewayLlmSettings"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TypeSafeLlmSettings"
                   },
                   {
                     "nullable": true
@@ -9422,6 +9462,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -9630,6 +9673,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TypeSafeLlmSettings"
                     },
                     {
                       "nullable": true
@@ -9996,6 +10042,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -10134,6 +10183,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TypeSafeLlmSettings"
                     },
                     {
                       "nullable": true
@@ -10452,6 +10504,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -10599,6 +10654,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TypeSafeLlmSettings"
                     },
                     {
                       "nullable": true
@@ -10791,6 +10849,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
               },
               {
                 "nullable": true
@@ -11105,6 +11166,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -11401,6 +11465,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -11615,6 +11682,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TypeSafeLlmSettings"
                     },
                     {
                       "nullable": true
@@ -15067,6 +15137,10 @@
           "supportsReasoning": {
             "type": "boolean",
             "description": "Whether this model supports reasoning/thinking modes for deeper analysis"
+          },
+          "isDecisionModel": {
+            "type": "boolean",
+            "description": "Whether this model is a decision/classification model (e.g., TypeSafe Jev) that answers structured yes/no questions rather than generating free-form text"
           },
           "contextWindow": {
             "type": "number",
@@ -19149,6 +19223,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -19557,6 +19634,9 @@
                     "$ref": "#/components/schemas/ScalewayLlmSettings"
                   },
                   {
+                    "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                  },
+                  {
                     "nullable": true
                   }
                 ],
@@ -19687,6 +19767,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
               },
               {
                 "nullable": true
@@ -19879,6 +19962,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -20014,6 +20100,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
               },
               {
                 "nullable": true
@@ -20154,6 +20243,9 @@
               },
               {
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
+              },
+              {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
               },
               {
                 "nullable": true
@@ -20992,6 +21084,9 @@
                 "$ref": "#/components/schemas/ScalewayLlmSettings"
               },
               {
+                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+              },
+              {
                 "nullable": true
               }
             ],
@@ -21141,6 +21236,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ScalewayLlmSettings"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TypeSafeLlmSettings"
                     },
                     {
                       "nullable": true
@@ -33749,6 +33847,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -34042,6 +34143,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -34247,6 +34351,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -34487,6 +34594,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -34798,6 +34908,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -35037,6 +35150,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -35341,6 +35457,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -35555,6 +35674,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -35811,6 +35933,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -36129,6 +36254,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -41699,6 +41827,9 @@
                           },
                           {
                             "$ref": "#/components/schemas/ScalewayLlmSettings"
+                          },
+                          {
+                            "$ref": "#/components/schemas/TypeSafeLlmSettings"
                           },
                           {
                             "nullable": true
@@ -52528,6 +52659,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -52891,6 +53025,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -53167,6 +53304,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -53539,6 +53679,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -53923,6 +54066,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -54187,6 +54333,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -54558,6 +54707,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -54842,6 +54994,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -55121,6 +55276,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -55509,6 +55667,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -58683,6 +58844,9 @@
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
                         },
                         {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                        },
+                        {
                           "nullable": true
                         }
                       ],
@@ -58984,6 +59148,9 @@
                                 "$ref": "#/components/schemas/ScalewayLlmSettings"
                               },
                               {
+                                "$ref": "#/components/schemas/TypeSafeLlmSettings"
+                              },
+                              {
                                 "nullable": true
                               }
                             ],
@@ -59197,6 +59364,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
@@ -59460,6 +59630,9 @@
                         },
                         {
                           "$ref": "#/components/schemas/ScalewayLlmSettings"
+                        },
+                        {
+                          "$ref": "#/components/schemas/TypeSafeLlmSettings"
                         },
                         {
                           "nullable": true
