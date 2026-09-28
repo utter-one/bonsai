@@ -54,7 +54,7 @@ export class ScalewayLlmProvider extends OpenAILegacyLlmProvider<ScalewayLlmProv
    * Enumerate available models via the Scaleway OpenAI-compatible models API.
    * Falls back to a static list if the API call fails.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();

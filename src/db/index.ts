@@ -78,13 +78,17 @@ function createPool(): Pool {
   });
 
   pool.on('error', (err) => {
-    // Don't exit during tests — the container is being torn down
+    // pg-pool emits 'error' for idle clients whose connection was dropped by the
+    // server (postgres restart, OOM kill, network blip). This is routine and
+    // recoverable: the pool discards the dead client and opens a fresh one on
+    // the next query. Never exit here — a transient DB hiccup must not take
+    // down the whole backend (health checks report db-down, alerts keep firing
+    // from in-memory data, and buffers retry on the next interval).
     if (process.env.NODE_ENV === 'test') {
       logger.debug({ err }, 'Database connection error (ignored in test mode)');
       return;
     }
-    logger.error({ err }, '❌ Database connection error:');
-    process.exit(1);
+    logger.error({ err }, 'Database connection error (pool will reconnect)');
   });
 
   return pool;
@@ -129,6 +133,20 @@ export const db = new Proxy({}, {
 // Export pool accessor for teardown (tests, graceful shutdown)
 export function getPoolRef(): Pool {
   return getPool();
+}
+
+/**
+ * Closes the pool and releases all connections (graceful shutdown, P1-09).
+ * Idempotent: no-ops when the pool was never created or already ended.
+ * Nulls the lazy refs so getDb() cannot resurrect the pool mid-shutdown.
+ */
+export async function endPool(): Promise<void> {
+  if (!_pool) return;
+  const pool = _pool;
+  _pool = null;
+  _db = null;
+  await pool.end();
+  logger.info('Database pool closed');
 }
 
 // Export schema for use in other modules

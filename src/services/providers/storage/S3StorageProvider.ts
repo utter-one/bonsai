@@ -57,7 +57,7 @@ export class S3StorageProvider extends StorageProviderBase<S3StorageProviderConf
     logger.info(`S3 storage provider initialized for bucket: ${this.settings.bucket}`);
   }
 
-  async upload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
+  protected async doUpload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const input: PutObjectCommandInput = {
@@ -82,7 +82,7 @@ export class S3StorageProvider extends StorageProviderBase<S3StorageProviderConf
     });
   }
 
-  async download(key: string): Promise<Buffer> {
+  protected async doDownload(key: string): Promise<Buffer> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const command = new GetObjectCommand({

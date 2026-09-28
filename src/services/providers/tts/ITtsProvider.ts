@@ -71,6 +71,17 @@ export interface ITtsProvider<TChunk extends GeneratedAudioChunk = GeneratedAudi
   init(): Promise<void>;
 
   /**
+   * Optional zero-cost liveness check (P1-05b). Called by the HealthCheckService provider
+   * probe to verify the stored credentials still work while no synthesis traffic flows.
+   * Providers without a free liveness endpoint (e.g. Azure, Cartesia with a standard key)
+   * omit this; the probe then falls back to call-log inference. Implementations must hit a
+   * zero-cost, side-effect-free endpoint, record the call via the base recorder (operation
+   * `tts.ping`), and throw on any non-2xx response, network error, or timeout.
+   * @returns Promise that resolves when the endpoint accepts the stored credentials
+   */
+  ping?(): Promise<void>;
+
+  /**
    * Starts the speech generation session for the given context
    * Prepares the TTS provider to receive text input and generate audio output
    * @returns Promise that resolves when the generation session is successfully started
@@ -134,4 +145,11 @@ export interface ITtsProvider<TChunk extends GeneratedAudioChunk = GeneratedAudi
    * Must be called when the provider is no longer needed (e.g. on client disconnect).
    */
   cleanup(): Promise<void>;
+
+  /**
+   * Marks this instance as a fallback for another provider (P3-04).
+   * Implemented by the provider bases so their call-log rows carry
+   * `fallback_provider_id`. Absent on plain test doubles.
+   */
+  setFallbackOf?(providerId: string): void;
 }

@@ -49,6 +49,7 @@ import { xAILlmSettingsSchema } from './services/providers/llm/XAILlmProvider';
 import { ollamaLlmSettingsSchema } from './services/providers/llm/OllamaLlmProvider';
 import { ovhLlmSettingsSchema } from './services/providers/llm/OVHLlmProvider';
 import { scalewayLlmSettingsSchema } from './services/providers/llm/ScalewayLlmProvider';
+import { typesafeLlmSettingsSchema } from './services/providers/llm/TypeSafeLlmProvider';
 import { elevenLabsTtsSettingsSchema } from './services/providers/tts/ElevenLabsTtsProvider';
 import { openAiTtsSettingsSchema } from './services/providers/tts/OpenAiTtsProvider';
 import { deepgramTtsSettingsSchema } from './services/providers/tts/DeepgramTtsProvider';
@@ -122,11 +123,33 @@ import { DeferredProcessingController } from './http/controllers/DeferredProcess
 import { ProjectSnapshotController } from './http/controllers/ProjectSnapshotController';
 import { createQuickPromptSchema, createProjectQuickPromptSchema, updateQuickPromptBodySchema, deleteQuickPromptBodySchema, cloneQuickPromptSchema, quickPromptResponseSchema, quickPromptListResponseSchema, quickPromptRouteParamsSchema, quickPromptProjectRouteParamsSchema } from './http/contracts/quickPrompt';
 import { deferredProcessingResponseSchema, deferredProcessingListResponseSchema, rescheduleDeferredProcessingBodySchema, cancelDeferredProcessingBodySchema } from './http/contracts/deferredProcessing';
+import {
+  healthCheckItemSchema,
+  healthSnapshotResponseSchema,
+  healthCheckResponseSchema,
+  healthHistoryListResponseSchema,
+  providerRollingSchema,
+  providerOverviewSchema,
+  providersMonitoringResponseSchema,
+  providerCallResponseSchema,
+  providerCallListResponseSchema,
+  providerStatsQuerySchema,
+  providerStatsBucketSchema,
+  providerStatsResponseSchema,
+  metricSeriesQuerySchema,
+  metricSeriesPointSchema,
+  metricSeriesSchema,
+  metricSeriesResponseSchema,
+} from './http/contracts/monitoring';
+import { MonitoringController } from './http/controllers/MonitoringController';
+import { StatusPageController } from './http/controllers/StatusPageController';
+import { statusWindowSchema, statusDailySchema, statusCheckGroupSchema, statusCheckSchema, statusProviderSchema, statusPageQuerySchema, statusPageResponseSchema } from './http/contracts/statusPage';
 import { WebRTCChannelHost } from './channels/webrtc/WebRTCChannelHost';
 import { TwilioVoiceChannelHost } from './channels/twilio-voice/TwilioVoiceChannelHost';
 import { TwilioMessagingChannelHost } from './channels/twilio-messaging/TwilioMessagingChannelHost';
 import { WhatsAppChannelHost } from './channels/whatsapp/WhatsAppChannelHost';
 import { TelegramChannelHost } from './channels/telegram/TelegramChannelHost';
+import { SlackChannelHost } from './channels/slack/SlackChannelHost';
 // import { SesChannelHost } from './channels/email/ses/SesChannelHost';
 // import { SendGridChannelHost } from './channels/email/sendgrid/SendGridChannelHost';
 import { SmtpImapChannelHost } from './channels/email/smtp-imap/SmtpImapChannelHost';
@@ -171,6 +194,7 @@ export function getOpenAPISpec(): any {
   registry.register('OllamaLlmSettings', ollamaLlmSettingsSchema);
   registry.register('OVHLlmSettings', ovhLlmSettingsSchema);
   registry.register('ScalewayLlmSettings', scalewayLlmSettingsSchema);
+  registry.register('TypeSafeLlmSettings', typesafeLlmSettingsSchema);
   registry.register('LlmSettings', llmSettingsSchema);
 
   // TTS settings schemas (provider-specific)
@@ -681,6 +705,12 @@ export function getOpenAPISpec(): any {
     registry.registerPath(path);
   }
 
+  // Register Slack webhook route
+  const slackPaths = SlackChannelHost.getOpenAPIPaths();
+  for (const path of slackPaths) {
+    registry.registerPath(path);
+  }
+
   // Register SES outgoing send route
   // const sesPaths = SesChannelHost.getOpenAPIPaths();
   // for (const path of sesPaths) {
@@ -774,6 +804,39 @@ export function getOpenAPISpec(): any {
   // Register ProjectSnapshot schemas and routes
   const snapshotPaths = ProjectSnapshotController.getOpenAPIPaths();
   for (const path of snapshotPaths) {
+    registry.registerPath(path);
+  }
+
+  // Register Monitoring schemas and routes (P1-08 read-only endpoints)
+  registry.register('HealthCheckItem', healthCheckItemSchema);
+  registry.register('HealthMonitoringResponse', healthSnapshotResponseSchema);
+  registry.register('HealthCheckResponse', healthCheckResponseSchema);
+  registry.register('HealthMonitoringListResponse', healthHistoryListResponseSchema);
+  registry.register('ProviderRolling', providerRollingSchema);
+  registry.register('ProviderMonitoringItem', providerOverviewSchema);
+  registry.register('ProvidersMonitoringResponse', providersMonitoringResponseSchema);
+  registry.register('ProviderCallResponse', providerCallResponseSchema);
+  registry.register('ProviderCallListResponse', providerCallListResponseSchema);
+  registry.register('ProviderStatsQuery', providerStatsQuerySchema);
+  registry.register('ProviderStatsBucket', providerStatsBucketSchema);
+  registry.register('ProviderStatsMonitoringResponse', providerStatsResponseSchema);
+  registry.register('MetricSeriesQuery', metricSeriesQuerySchema);
+  registry.register('MetricSeriesPoint', metricSeriesPointSchema);
+  registry.register('MetricSeries', metricSeriesSchema);
+  registry.register('MetricSeriesMonitoringResponse', metricSeriesResponseSchema);
+  const monitoringPaths = MonitoringController.getOpenAPIPaths();
+  for (const path of monitoringPaths) {
+    registry.registerPath(path);
+  }
+  registry.register('StatusWindow', statusWindowSchema);
+  registry.register('StatusDaily', statusDailySchema);
+  registry.register('StatusCheckGroup', statusCheckGroupSchema);
+  registry.register('StatusCheck', statusCheckSchema);
+  registry.register('StatusProvider', statusProviderSchema);
+  registry.register('StatusPageQuery', statusPageQuerySchema);
+  registry.register('StatusPageResponse', statusPageResponseSchema);
+  const statusPagePaths = StatusPageController.getOpenAPIPaths();
+  for (const path of statusPagePaths) {
     registry.registerPath(path);
   }
 

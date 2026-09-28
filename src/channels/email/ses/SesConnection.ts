@@ -27,8 +27,10 @@ export class SesConnection extends EmailConnectionBase {
     private readonly region: string,
     cc: string | undefined,
     bcc: string | undefined,
+    /** P1-03: provider id for call-log attribution. */
+    providerId: string | undefined,
   ) {
-    super(fromAddress, threadingStrategy, sessionManager, 'ses');
+    super(fromAddress, threadingStrategy, sessionManager, 'ses', providerId);
     this.sesClient = new SESClient({
       region,
       credentials: { accessKeyId, secretAccessKey },
@@ -111,7 +113,7 @@ export class SesConnection extends EmailConnectionBase {
     await this.sendEmail(this.toAddress, this.subject, body, attachments, headers);
   }
 
-  protected async sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
+  protected async doSendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
     const messageId = headers?.messageId ?? this.generateMessageId();
     const rawEmail = this.buildRawEmail(
       headers?.from ?? this.fromAddress,

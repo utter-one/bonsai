@@ -60,7 +60,7 @@ export interface ICommunicationChannel {
   getName(): string;
 
   /** Gets the Zod schema for validating the channel configuration. */
-  getConfigSchema(): z.ZodObject<any>;
+  getConfigSchema(): z.ZodType;
 
   /** Returns the channel capabilities */
   getCapabilities(): ChannelCapabilities;

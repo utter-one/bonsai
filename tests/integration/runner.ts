@@ -34,6 +34,7 @@ async function main() {
   // Load integration test files
   mocha.addFile('tests/integration/live/conversationRunner.test.ts');
   mocha.addFile('tests/integration/live/infrastructure.test.ts');
+  mocha.addFile('tests/integration/live/providerInstrumentation.test.ts');
 
   // Run
   const runner = mocha.run((failures) => {

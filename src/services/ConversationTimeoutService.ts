@@ -7,6 +7,7 @@ import { conversations, projects } from '../db/schema';
 import { ConversationService } from './ConversationService';
 import { DeferredProcessingService } from './DeferredProcessingService';
 import { SessionManager } from '../channels/SessionManager';
+import { HeartbeatRegistry } from './monitoring/HeartbeatRegistry';
 import type { ConversationAbortedEventData } from '../types/conversationEvents';
 import logger from '../utils/logger';
 
@@ -29,6 +30,7 @@ export class ConversationTimeoutService {
     @inject(ConversationService) private readonly conversationService: ConversationService,
     @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
     @inject(SessionManager) private readonly sessionManager: SessionManager,
+    @inject(HeartbeatRegistry) private readonly heartbeatRegistry: HeartbeatRegistry,
   ) { }
 
   /**
@@ -37,7 +39,11 @@ export class ConversationTimeoutService {
   start(): void {
     logger.info('Starting ConversationTimeoutService (runs every 1 minute)');
     this.scheduledTask = schedule('* * * * *', () => {
-      this.processTimeouts().catch((error) => logger.error({ error }, 'Unhandled error in ConversationTimeoutService.processTimeouts'));
+      this.heartbeatRegistry.tick('conversation-timeout', 60_000);
+      this.processTimeouts().catch((error) => {
+        this.heartbeatRegistry.recordError('conversation-timeout');
+        logger.error({ error }, 'Unhandled error in ConversationTimeoutService.processTimeouts');
+      });
     });
   }
 

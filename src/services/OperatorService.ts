@@ -10,7 +10,7 @@ import type { ListParams } from '../http/contracts/common';
 import { operatorResponseSchema, operatorListResponseSchema, profileResponseSchema } from '../http/contracts/operator';
 import { AuditService } from './AuditService';
 import { AuthService } from './AuthService';
-import { OptimisticLockError, NotFoundError, InvalidOperationError, ValidationError } from '../errors';
+import { OptimisticLockError, NotFoundError, InvalidOperationError, UnauthorizedError, ValidationError } from '../errors';
 import { buildFilterCondition, buildOrderBy } from '../utils/queryBuilder';
 import { countRows, normalizeListLimit } from '../utils/pagination';
 import { logger } from '../utils/logger';
@@ -305,6 +305,9 @@ export class OperatorService extends BaseService {
    * @throws {NotFoundError} When operator is not found
    */
   async getProfile(context: RequestContext): Promise<ProfileResponse> {
+    if (!context?.operatorId) {
+      throw new UnauthorizedError('Authentication required');
+    }
     logger.debug({ operatorId: context.operatorId }, 'Fetching profile for logged-in operator');
 
     try {
@@ -333,6 +336,9 @@ export class OperatorService extends BaseService {
    * @throws {Error} When old password is invalid
    */
   async updateProfile(input: UpdateProfileRequest, context: RequestContext): Promise<ProfileResponse> {
+    if (!context?.operatorId) {
+      throw new UnauthorizedError('Authentication required');
+    }
     logger.info({ operatorId: context.operatorId }, 'Updating profile for logged-in operator');
 
     try {

@@ -3,6 +3,7 @@ import { createSpeechmaticsJWT } from '@speechmatics/auth';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -15,7 +16,7 @@ extendZodWithOpenApi(z);
  */
 export const speechmaticsAsrProviderConfigSchema = z.strictObject({
   apiKey: z.string().describe('API key for authenticating with Speechmatics'),
-  region: z.enum(['us', 'eu', 'apac']).default('us').describe('Speechmatics region endpoint: "us" for neu.rt.speechmatics.com, "eu" for eu2.rt.speechmatics.com, or "apac" for au.rt.speechmatics.com'),
+  region: z.enum(['us', 'eu', 'apac']).default('us').describe('Speechmatics region endpoint: "us" for us.rt.speechmatics.com, "eu" for eu.rt.speechmatics.com, or "apac" for the global router (global.rt.speechmatics.com — no dedicated AU realtime host exists)'),
 });
 
 export type SpeechmaticsAsrProviderConfig = z.infer<typeof speechmaticsAsrProviderConfigSchema>;
@@ -93,9 +94,57 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
   }
 
   /**
+   * Zero-cost liveness probe (P1-05b): lists jobs from the Batch REST API using a
+   * short-lived JWT (`type: 'batch'`). The Batch REST bases are region-scoped like
+   * the realtime endpoints.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    const authRegion = this.getAuthRegion(this.config.region);
+    const url = `${this.getBatchApiBase(this.config.region)}/jobs`;
+    try {
+      // clientRef is mandatory for batch JWTs (SDK validation) — any stable id works.
+      const jwtToken = await createSpeechmaticsJWT({
+        type: 'batch',
+        apiKey: this.config.apiKey,
+        region: authRegion,
+        clientRef: 'bonsai-health-check',
+        ttl: 60,
+      });
+      await httpPing(url, { Authorization: `Bearer ${jwtToken}` });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets the Batch REST API base URL for the specified region (P1-05b probe).
+   * Hosts follow the Batch "Supported endpoints" table in the Speechmatics docs
+   * (docs.speechmatics.com/get-started/authentication, verified 2026-08-24):
+   * eu1/us1/au1 are the all-customer production hosts. eu2/us2 are
+   * enterprise-only, and the legacy `asr.api…`/`usa.asr.api…` hosts are
+   * deprecated (`usa.asr.api…` no longer resolves in DNS).
+   * @param region Region identifier
+   * @returns Batch REST API base URL
+   */
+  private getBatchApiBase(region: string): string {
+    switch (region) {
+      case 'eu':
+        return 'https://eu1.asr.api.speechmatics.com/v2';
+      case 'apac':
+        return 'https://au1.asr.api.speechmatics.com/v2';
+      case 'us':
+      default:
+        return 'https://us1.asr.api.speechmatics.com/v2';
+    }
+  }
+
+  /**
    * Starts the Speechmatics speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required Speechmatics API key';
       logger.error(`[Speechmatics ASR] ${errorMessage}`);
@@ -214,7 +263,7 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
   /**
    * Stops the Speechmatics speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[Speechmatics ASR] Stopping recognition`);
 
     if (!this.client) {
@@ -237,7 +286,7 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[Speechmatics ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }
@@ -389,19 +438,21 @@ export class SpeechmaticsAsrProvider extends AsrProviderBase<SpeechmaticsAsrProv
   }
 
   /**
-   * Gets the WebSocket URL for the specified region
-   * @param region Region identifier
-   * @returns WebSocket endpoint URL for the specified region
+   * Gets the WebSocket URL for the specified region.
+   * Hosts follow the Realtime "Supported endpoints" table (verified 2026-08-24):
+   * eu/us are the all-customer regional pins. There is no dedicated AU realtime
+   * host (the old `au.rt…` no longer resolves), so APAC uses the global router,
+   * which pins each connection to the nearest region.
    */
   private getWebSocketUrl(region: string): string {
     switch (region) {
       case 'eu':
-        return 'wss://eu2.rt.speechmatics.com/v2';
+        return 'wss://eu.rt.speechmatics.com/v2';
       case 'apac':
-        return 'wss://au.rt.speechmatics.com/v2';
+        return 'wss://global.rt.speechmatics.com/v2';
       case 'us':
       default:
-        return 'wss://neu.rt.speechmatics.com/v2';
+        return 'wss://us.rt.speechmatics.com/v2';
     }
   }
 

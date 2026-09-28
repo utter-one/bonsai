@@ -69,7 +69,7 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
   /**
    * Generate a non-streaming response
    */
-  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async doGenerate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -195,7 +195,7 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
   /**
    * Generate a streaming response
    */
-  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+  protected async doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -283,7 +283,7 @@ export class AnthropicLlmProvider extends LlmProviderBase<AnthropicLlmProviderCo
    * Enumerate available models using the Anthropic models API.
    * Falls back to a static list of well-known Claude models if the API call fails or the client is not yet initialized.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();

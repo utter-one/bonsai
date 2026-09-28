@@ -2,7 +2,7 @@ import { injectable, inject } from 'tsyringe';
 import { eq, and, SQL, desc, inArray, sql } from 'drizzle-orm';
 import { buildTextSearchCondition } from '../utils/textSearch';
 import { db } from '../db/index';
-import { stages, agents, classifiers, contextTransformers, globalActions, knowledgeCategories } from '../db/schema';
+import { stages, agents, classifiers, contextTransformers, globalActions, knowledgeCategories, providers } from '../db/schema';
 import type { CreateStageRequest, UpdateStageRequest, StageResponse, StageListResponse, CloneStageRequest } from '../http/contracts/stage';
 import type { ListParams } from '../http/contracts/common';
 import { stageResponseSchema, stageListResponseSchema } from '../http/contracts/stage';
@@ -92,6 +92,7 @@ export class StageService extends BaseService {
     try {
       // Validate referenced entities exist
       await this.validateReferencedEntities(projectId, input.agentId, input.defaultClassifierId, input.transformerIds, input.globalActions);
+      await this.warnIfJevConversationModel(projectId, stageId, input.name, input.llmProviderId);
 
       const stage = await db.insert(stages).values({ id: stageId, projectId, name: input.name, description: input.description ?? null, prompt: input.prompt, llmProviderId: input.llmProviderId ?? null, llmSettings: input.llmSettings ?? null, agentId: input.agentId, enterBehavior: input.enterBehavior ?? 'generate_response', useKnowledge: input.useKnowledge ?? false, knowledgeTags: input.knowledgeTags ?? [], useGlobalActions: input.useGlobalActions ?? true, globalActions: input.globalActions ?? [], variableDescriptors: input.variableDescriptors ?? [], actions: input.actions ?? {}, defaultClassifierId: input.defaultClassifierId ?? null, transformerIds: input.transformerIds ?? [], tags: input.tags ?? [], metadata: input.metadata ?? null, version: 1 }).returning();
 
@@ -239,6 +240,7 @@ export class StageService extends BaseService {
       const globalActionsToValidate = updateData.globalActions !== undefined ? updateData.globalActions : existingStage.globalActions;
 
       await this.validateReferencedEntities(projectId, agentIdToValidate, defaultClassifierIdToValidate, transformerIdsToValidate, globalActionsToValidate);
+      await this.warnIfJevConversationModel(projectId, id, existingStage.name, updateData.llmProviderId !== undefined ? updateData.llmProviderId : existingStage.llmProviderId);
 
       const updatePayload: any = { version: existingStage.version + 1, updatedAt: new Date() };
       if (updateData.name !== undefined) updatePayload.name = updateData.name;
@@ -358,6 +360,23 @@ export class StageService extends BaseService {
     } catch (error) {
       logger.error({ error, id, projectId }, 'Failed to fetch stage audit logs');
       throw error;
+    }
+  }
+
+  /**
+   * Logs a warning when a stage is configured with a Jev (TypeSafe) provider as its
+   * conversation model. Jev is a decision model, not a chat model, so it cannot generate
+   * the free-form responses a stage expects. Informational only — does not block the save.
+   * @param projectId - the project ID
+   * @param stageId - the stage ID
+   * @param stageName - the stage name
+   * @param llmProviderId - the stage's conversation model provider ID (may be null/undefined)
+   */
+  private async warnIfJevConversationModel(projectId: string, stageId: string, stageName: string, llmProviderId: string | null | undefined): Promise<void> {
+    if (!llmProviderId) return;
+    const provider = await db.query.providers.findFirst({ where: eq(providers.id, llmProviderId) });
+    if (provider?.apiType === 'typesafe') {
+      logger.warn({ projectId, stageId, stageName, llmProviderId }, 'Jev (TypeSafe) is set as the stage conversation model; Jev is a decision model and cannot generate free-form responses.');
     }
   }
 }

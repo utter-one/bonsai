@@ -12,11 +12,22 @@ import { ClassificationEventData, SampleCopySelectionEventData } from "../../typ
 import { parseJsonFromMarkdown } from "../../utils/jsonParser";
 import { classificationResultSchema, ActionClassificationResult, ActionClassificationResultWithClassifier, SampleCopyClassificationResult, sampleCopyClassificationResultSchema } from "../../types/classification";
 import { extractTextFromContent } from "../../utils/llm";
+import { MonitoringContext } from "../monitoring/MonitoringContext";
 import type { KnowledgeCategoryResponse } from "../../http/contracts/knowledge";
 import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
 import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
 import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
 import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
+import type { Guardrail, Stage, GlobalAction } from "../../types/models";
+
+/** A classifier result enriched with the rendered prompt and per-call timing/usage metadata. */
+type ClassifierResultWithMeta = ActionClassificationResultWithClassifier & {
+  renderedPrompt: string;
+  llmUsage?: LlmUsageMetadata;
+  durationMs: number;
+  startMs: number;
+  endMs: number;
+};
 
 /** Result of processing user input, including actions and timing metadata */
 export type ProcessTextInputResult = {
@@ -103,7 +114,8 @@ export class UserInputProcessor {
       const guardrailPromise = guardrailClassifier && guardrails.length > 0
         ? (async () => {
           const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput, getEffectiveChannelType(session));
-          return this.classifyTextInput(session, guardrailClassifier, guardrailContext);
+          const guardrailResult = await this.classifyTextInput(session, guardrailClassifier, guardrailContext);
+          return this.bindJevGuardrailAction(guardrailResult, guardrailClassifier, guardrails);
         })()
         : Promise.resolve(null);
 
@@ -123,8 +135,18 @@ export class UserInputProcessor {
         this.transformerExecutor.executeTransformers(session, userInput, originalUserInput),
       ]);
 
+      // Jev (TypeSafe) classifiers emit a fixed "match" sentinel instead of an action name.
+      // Bind that sentinel to the stage/global action(s) that reference the classifier via
+      // overrideClassifierId; non-TypeSafe results pass through unchanged.
+      const boundClassificationResults = this.bindJevStageResults(
+        classificationResultsWithClassifiers,
+        classifiers,
+        stage,
+        globalActions,
+      );
+
       // Register classification events for stage classifiers
-      for (const result of classificationResultsWithClassifiers) {
+      for (const result of boundClassificationResults) {
         const classifier = classifiers.find(c => c.classifier.id === result.classifierId);
         const eventData: ClassificationEventData = {
           classifierId: result.classifierId,
@@ -191,7 +213,7 @@ export class UserInputProcessor {
       }
 
       const allActions = [
-        ...classificationResultsWithClassifiers.map(x => x.actions).flat(),
+        ...boundClassificationResults.map(x => x.actions).flat(),
         ...(guardrailResult?.actions ?? []),
         ...transformerTriggeredActions,
       ];
@@ -262,7 +284,8 @@ export class UserInputProcessor {
       const copyMaxTokens = resolveOutputCap(classifierData.classifier.llmSettings?.defaultMaxTokens, copyLimits, 'classification');
       const copyInputCap = copyLimits?.inputTokensLimits?.classification;
       const { messages: truncatedCopyMessages, ...copyTruncation } = truncateMessagesToTokenBudget(messages, copyInputCap, copyModel);
-      const result = await llmProvider.generate(truncatedCopyMessages, copyMaxTokens !== undefined ? { maxTokens: copyMaxTokens } : undefined);
+      // P1-03: tag the call as llm.classify (nested in the turn context, which supplies attribution)
+      const result = await MonitoringContext.run({ operation: 'llm.classify' }, () => llmProvider.generate(truncatedCopyMessages, copyMaxTokens !== undefined ? { maxTokens: copyMaxTokens } : undefined));
       const textContent = extractTextFromContent(result.content);
 
       logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received sample copy classification result from LLM provider: ${textContent}`);
@@ -317,7 +340,8 @@ export class UserInputProcessor {
       const classifyMaxTokens = resolveOutputCap(classifierData.classifier.llmSettings?.defaultMaxTokens, classifyLimits, 'classification');
       const classifyInputCap = classifyLimits?.inputTokensLimits?.classification;
       const { messages: truncatedClassifyMessages, ...classifyTruncation } = truncateMessagesToTokenBudget(messages, classifyInputCap, classifyModel);
-      const result = await llmProvider.generate(truncatedClassifyMessages, classifyMaxTokens !== undefined ? { maxTokens: classifyMaxTokens } : undefined);
+      // P1-03: tag the call as llm.classify (nested in the turn context, which supplies attribution)
+      const result = await MonitoringContext.run({ operation: 'llm.classify' }, () => llmProvider.generate(truncatedClassifyMessages, classifyMaxTokens !== undefined ? { maxTokens: classifyMaxTokens } : undefined));
       const textContent = extractTextFromContent(result.content);
 
       logger.info({ sessionId: session.id, classifierId: classifier.id }, `Received classification result from LLM provider: ${textContent}`);
@@ -353,5 +377,94 @@ export class UserInputProcessor {
         endMs,
       };
     }
+  }
+  /**
+   * For a Jev (TypeSafe) guardrail classifier, bind the emitted `match` action to the first guardrail's name so the
+   * classifier triggers that guardrail when its probability exceeds the threshold. The classifier and the first
+   * guardrail form a pair; the classifier does not carry an action name of its own.
+   * @param result - the raw classification result from the guardrail classifier
+   * @param guardrailClassifier - the guardrail classifier runtime data
+   * @param guardrails - all project guardrails
+   * @returns the result, with the emitted action name remapped to the first guardrail's name
+   */
+  private bindJevGuardrailAction(result: ClassifierResultWithMeta, guardrailClassifier: ClassifierRuntimeData, guardrails: Guardrail[]): ClassifierResultWithMeta {
+    if (guardrailClassifier.llmProviderInfo.apiType !== 'typesafe') return result;
+    if (guardrails.length === 0) return result;
+    const targetName = guardrails[0].name;
+    logger.info({ classifierId: guardrailClassifier.classifier.id, targetName }, 'Jev guardrail classifier: binding emitted action to the first guardrail');
+    return { ...result, actions: result.actions.map((a) => (a.name === 'match' ? { ...a, name: targetName } : a)) };
+  }
+  /**
+   * For a Jev (TypeSafe) stage classifier, bind the emitted `match` action to the name(s) of the stage or global
+   * action(s) that reference this classifier via `overrideClassifierId`. A classifier does not own an action name;
+   * the action references the classifier, and when the classifier's probability exceeds the threshold, those actions fire.
+   * @param result - the raw classification result from the classifier
+   * @param classifier - the classifier runtime data
+   * @param classifierActionMap - map of classifier ID to the action names that reference it
+   * @returns the result, with `match` remapped to the referencing action name(s)
+   */
+  private bindJevStageAction(result: ClassifierResultWithMeta, classifier: ClassifierRuntimeData, classifierActionMap: Record<string, string[]>): ClassifierResultWithMeta {
+    if (classifier.llmProviderInfo.apiType !== 'typesafe') return result;
+    const actionNames = classifierActionMap[result.classifierId];
+    if (!actionNames || actionNames.length === 0) return result;
+    logger.info({ classifierId: result.classifierId, actionNames }, 'Jev stage classifier: binding emitted action to the referencing action(s)');
+    return { ...result, actions: result.actions.flatMap((a) => (a.name === 'match' ? actionNames.map((name) => ({ name, parameters: a.parameters })) : [a])) };
+  }
+  /**
+   * Bind the `match` sentinel emitted by Jev (TypeSafe) stage classifiers to the stage/global
+   * action(s) that reference the classifier via `overrideClassifierId`. A Jev classifier does not
+   * own an action name — the action references the classifier, and when the classifier fires,
+   * those actions trigger. Non-TypeSafe results are returned unchanged (by reference).
+   *
+   * @param results - raw classification results from all stage classifiers
+   * @param classifiers - the stage's classifier runtime data
+   * @param stage - the current stage (provides its stage actions)
+   * @param globalActions - the stage's loaded non-meta global actions
+   * @returns the results, with each Jev `match` remapped to the referencing action name(s)
+   */
+  private bindJevStageResults(
+    results: ClassifierResultWithMeta[],
+    classifiers: ClassifierRuntimeData[],
+    stage: Stage,
+    globalActions: GlobalAction[],
+  ): ClassifierResultWithMeta[] {
+    // Nothing to bind when no Jev classifier is in play — return the input as-is.
+    if (!classifiers.some((c) => c.llmProviderInfo.apiType === 'typesafe')) {
+      return results;
+    }
+
+    const classifierActionMap = this.buildJevClassifierActionMap(stage, globalActions);
+    const classifierById = new Map(classifiers.map((c) => [c.classifier.id, c]));
+
+    return results.map((result) => {
+      const classifier = classifierById.get(result.classifierId);
+      return classifier ? this.bindJevStageAction(result, classifier, classifierActionMap) : result;
+    });
+  }
+
+  /**
+   * Build a map from classifier ID to the names of the stage/global actions that reference it via
+   * `overrideClassifierId`. A single classifier can gate multiple actions. Used to resolve where a
+   * Jev classifier's `match` sentinel should be bound.
+   *
+   * @param stage - the current stage (provides its stage actions)
+   * @param globalActions - the stage's loaded non-meta global actions
+   * @returns classifierId → referencing action names
+   */
+  private buildJevClassifierActionMap(stage: Stage, globalActions: GlobalAction[]): Record<string, string[]> {
+    const map: Record<string, string[]> = {};
+    for (const action of Object.values(stage.actions)) {
+      if (action.overrideClassifierId) {
+        (map[action.overrideClassifierId] ??= []).push(action.name);
+      }
+    }
+    if (stage.useGlobalActions) {
+      for (const globalAction of globalActions) {
+        if (globalAction.overrideClassifierId) {
+          (map[globalAction.overrideClassifierId] ??= []).push(globalAction.name);
+        }
+      }
+    }
+    return map;
   }
 }

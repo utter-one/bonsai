@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-09-22
+
+### Added
+
+- **Production monitoring module** — full observability and resilience layer (no new infrastructure; Postgres remains the only state store):
+  - **Instrumentation** — every 3rd-party call (LLM, ASR, TTS, storage, channels, OAuth, IMAP) is logged with provider, operation, latency, outcome, and classified error; hourly rollups into `provider_call_stats_hourly`; request-outcome metrics with `requestId`; rate-limit 429 instrumentation; pino redaction of sensitive fields.
+  - **Health checks** — `HealthCheckService` (db / process / background-service / provider probes) persisted to `health_checks`; DB-backed readiness probe at `GET /health/ready`; background-service heartbeats; zero-cost ASR/TTS liveness probes (10 of 13 providers); per-check status gauges and latency histograms.
+  - **Alerting** — `AlertRuleEngine` with 20 built-in rules and an anti-flap state machine (pending → firing → resolved, cooldown, maxUnresolvedHours), persisted to `alert_events`; notifiers via webhook, email, and a shared channel notifier (telegram / twilio_sms / whatsapp) reusing existing channel provider rows; history, acknowledge, and delete endpoints; static rule catalog (`GET /api/monitoring/rules`).
+  - **Failover** — per-provider circuit breakers plus ordered fallback provider chains for LLM, TTS, ASR, and storage, so a broken 3rd-party service no longer kills the conversation; fallback events endpoint and `provider-chain-exhausted` alert rule.
+  - **Monitoring REST API** — health, health history, providers, provider calls, fallback events, provider stats, alerts, config (GET/PUT with optimistic locking), metrics, metric catalog, and a Prometheus `/metrics` exposition endpoint with a per-request token gate.
+  - **Status page v1** — `GET /api/monitoring/status` aggregates health checks and providers into a current-state payload with per-entry status counts over `windowMinutes` (5–1440) and per-UTC-day aggregates for the last N days (1–90, zero-filled buckets).
+  - **Retention** — hourly rollup and daily purge of retention-aged rows; `retentionDays` from the monitoring config.
+- **Graceful shutdown** — ordered drain on `SIGTERM`/`SIGINT`: background services stop, WebSocket/voice sockets closed with 1001 "going away", grace drain with force-terminate of stragglers, bounded logger flush/settle, then pool close; a second signal forces immediate exit.
+- **Provider connection test** — `POST /api/providers/test-connection` with RBAC and audit: per-type strategies (LLM, ASR, TTS, storage, channels including Slack), error sanitization, circuit-breaker guard, and live provider testing via a test-only factory seam.
+- **Slack channel provider** — new channel with two inbound transports selected by `mode`: `events_api` (signed HTTP webhook events, production) and `socket_mode` (outbound WebSocket via app-level token, no public URL needed); config fields mutually exclusive per transport mode; connection-test support.
+- **TypeSafe (Jev) LLM provider** — new LLM provider type for structured classification and guardrail conditions using the native `@typesafe-ai/sdk`; `classificationThreshold` (0–1, default 0.5); Jev classifier binding via `overrideClassifierId`; non-blocking warnings for Jev misuse (Jev as a stage conversation model, Jev guardrail classifier with multiple guardrails).
+
+### Fixed
+
+- **RetentionService hourly rollup** — no longer crashes with `RangeError: Invalid time value`.
+- **Groq streaming** — fixed recursion; hardened against crashes.
+- **Event loop lag** — values now converted ns → µs (the process check was permanently degraded).
+- **ASR probe endpoints** — corrected; probe semantics documented.
+- **Global health status** — unknown checks are now ignored.
+- **Auth alerts** — kept persistent; live circuit breaker wired into provider-down alerts.
+- **Connection test** — LLM `maxTokens` floor; ElevenLabs TTS voice guard.
+- **CORS** — credentials-compatible origin echo, `CORS_ORIGIN` allowlist, `X-Request-Id` preflight + exposed headers.
+- **`/api/profile`** — unauthenticated requests now return 401 instead of 500 (auth guard + service defense in depth).
+
+### Testing
+
+- New e2e suites for the monitoring module: alert rule engine, alert notifiers (webhook / email / channel), monitoring endpoints, RBAC, retention, circuit breaker, LLM / TTS / ASR / storage failover, provider connection test (incl. monitoring interplay), status page, Slack provider.
+- Unit test layers for fallback chains and failover providers (P3-02 / P3-03 / P3-04).
+- CLI artifacts regenerated (new `monitoring.status` resource, connection-test and Slack endpoints).
+
+### Documentation
+
+- Production monitoring proposal with implementation status and deltas (`specs/PROPOSAL-production-monitoring.md`).
+- Provider connection test proposal + task-sized mini specs (`specs/provider-test/`).
+- Status page v1 spec (`specs/SPEC-status-page-v1.md`, incl. v2/v3 roadmap).
+- Health-check metrics spec (`specs/health-check-metrics-spec.md`) + metric catalog.
+- Frontend monitoring API contract documentation.
+- `AGENTS.md` updates (background services, graceful shutdown, monitoring test conventions) and `.env.example` updates.
+
 ## [0.7.2] - 2026-08-12
 
 ### Added

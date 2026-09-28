@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
+import { httpPing } from '../providerPing';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import type { AudioFormat } from '../../../types/audio';
@@ -132,6 +133,24 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   }
 
   /**
+   * Zero-cost liveness probe (P1-05b): lists a single project from the key-management
+   * API via raw fetch — deliberately does NOT call init(), which opens the persistent
+   * synthesis WebSocket.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.deepgram.com/v1/projects?limit=1', {
+        Authorization: `Token ${this.config.apiKey}`,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * Gets the list of supported audio output formats for Deepgram
    * Supported formats are PCM variants (8/16/24/48 kHz), μ-law, and A-law.
    */
@@ -154,7 +173,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.flushTimestamps = [];
@@ -202,7 +221,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
   /**
    * Stops and finalizes the speech generation session
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.socket) {
       logger.warn(`[Deepgram] No speech generation instance to end`);
       return;
@@ -241,7 +260,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
    * Cancels the ongoing speech generation without finalizing it.
    * Used when a user barge-in interrupts the AI's response.
    */
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     if (!this.socket) {
       logger.info(`[Deepgram] No active session to cancel`);
       return;
@@ -263,7 +282,7 @@ export class DeepgramTtsProvider extends TtsProviderBase<DeepgramTtsProviderConf
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.addText(text);
     } else {

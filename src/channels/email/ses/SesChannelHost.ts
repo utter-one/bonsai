@@ -13,6 +13,7 @@ import { SesConnection } from './SesConnection';
 import { sesChannelProviderConfigSchema } from '../../../services/providers/channel/SesChannelProvider';
 import { sessionSettingsSchema } from '../../websocket/contracts/auth';
 import { logger } from '../../../utils/logger';
+import { trackWebhookOutcome } from '../../../services/monitoring/ProviderCallRecorder';
 import { asyncHandler } from '../../../utils/asyncHandler';
 import type { CALInputMessage } from '../../messages';
 import type { ClientMessageHandlerContext } from '../../ClientMessageHandlerContext';
@@ -137,6 +138,7 @@ export class SesChannelHost {
       return;
     }
     const { apiKey: rawApiKey, stageId, agentId, channelProviderId } = queryResult.data;
+    trackWebhookOutcome(res, channelProviderId, 'ses');
 
     const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
     if (!apiKeyRecord || !apiKeyRecord.isActive) {
@@ -260,6 +262,7 @@ export class SesChannelHost {
       region,
       undefined,
       undefined,
+      channelProviderId,
     );
     connection.setUserEmail(senderEmail);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
@@ -369,6 +372,7 @@ export class SesChannelHost {
       region,
       resolvedCc,
       resolvedBcc,
+      channelProviderId,
     );
     connection.setUserEmail(body.to);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });

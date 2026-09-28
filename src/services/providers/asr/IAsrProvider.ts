@@ -40,10 +40,29 @@ export interface IAsrProvider {
   init(): Promise<void>;
 
   /**
+   * Optional zero-cost liveness check (P1-05b). Called by the HealthCheckService provider
+   * probe to verify the stored credentials still work while no recognition traffic flows.
+   * Providers without a free liveness endpoint (e.g. Azure) omit this; the probe then
+   * falls back to call-log inference. Implementations must hit a zero-cost,
+   * side-effect-free endpoint, record the call via the base recorder (operation
+   * `asr.ping`), and throw on any non-2xx response, network error, or timeout.
+   * @returns Promise that resolves when the endpoint accepts the stored credentials
+   */
+  ping?(): Promise<void>;
+
+  /**
    * Starts the speech recognition session for the given context
    * @returns Promise that resolves when recognition session is successfully started
    */
   start(): Promise<void>;
+
+  /**
+   * Marks the user end-of-speech timestamp for the active session (P1-03).
+   * Called by the ConversationRunner at VAD end-of-utterance so the base can
+   * compute `eosToFinalMs` (end-of-speech -> final transcript) per session.
+   * @param ts Unix timestamp in ms; defaults to now
+   */
+  markInputEnded(ts?: number): void;
 
   /**
    * Stops the speech recognition session for the given context
@@ -114,4 +133,11 @@ export interface IAsrProvider {
    * Must be called when the provider is no longer needed (e.g. on client disconnect).
    */
   cleanup(): Promise<void>;
+
+  /**
+   * Marks this instance as a fallback for another provider (P3-04).
+   * Implemented by the provider bases so their call-log rows carry
+   * `fallback_provider_id`. Absent on plain test doubles.
+   */
+  setFallbackOf?(providerId: string): void;
 }

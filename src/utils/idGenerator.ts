@@ -18,6 +18,7 @@ export const ID_PREFIXES = {
   GLOBAL_ACTION: 'gact',
   GUARDRAIL: 'gurl',
   PROVIDER: 'prov',
+  FALLBACK_EVENT: 'fbev',
   ENVIRONMENT: 'env',
   API_KEY: 'akey',
   CONVERSATION: 'conv',

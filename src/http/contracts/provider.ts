@@ -29,6 +29,7 @@ import { azureBlobStorageProviderConfigSchema } from '../../services/providers/s
 import { gcsStorageProviderConfigSchema } from '../../services/providers/storage/GcsStorageProvider';
 import { localStorageProviderConfigSchema } from '../../services/providers/storage/LocalStorageProvider';
 import { telegramChannelProviderConfigSchema } from '../../services/providers/channel/TelegramChannelProvider';
+import { slackChannelProviderConfigSchema } from '../../services/providers/channel/SlackChannelProvider';
 import { twilioMessagingChannelProviderConfigSchema } from '../../services/providers/channel/TwilioMessagingChannelProvider';
 import { twilioVoiceChannelProviderConfigSchema } from '../../services/providers/channel/TwilioVoiceChannelProvider';
 import { whatsAppChannelProviderConfigSchema } from '../../services/providers/channel/WhatsAppChannelProvider';
@@ -94,6 +95,7 @@ export type StorageProviderConfig = z.infer<typeof storageProviderConfigSchema>;
  */
 export const channelProviderConfigSchema = z.union([
   telegramChannelProviderConfigSchema,
+  slackChannelProviderConfigSchema,
   twilioMessagingChannelProviderConfigSchema,
   twilioVoiceChannelProviderConfigSchema,
   whatsAppChannelProviderConfigSchema,
@@ -133,6 +135,19 @@ export const providerTypeSchema = z.enum(['asr', 'tts', 'llm', 'embeddings', 'st
 export const providerNameSchema = z.string().describe('Specific provider implementation');
 
 /**
+ * One entry in a provider's ordered fallback chain
+ */
+export const providerFallbackSchema = z.object({
+  providerId: z.string().min(1).openapi('ProviderId').describe('Id of the fallback provider (same providerType)'),
+  settings: z.record(z.string(), z.unknown()).optional().nullable().describe('Per-fallback LLM settings override (model, temperature, ...)'),
+}).openapi('ProviderFallback');
+
+/**
+ * Ordered fallback chain (1st tried first). Max 3, flat — no transitive chains.
+ */
+export const providerFallbacksSchema = z.array(providerFallbackSchema).max(3).openapi('ProviderFallbacks').describe('Ordered fallback providers used when the primary fails during setup phase');
+
+/**
  * Schema for creating a new provider
  * Required fields: id, displayName, type, providerName, config
  * Optional fields: description, createdBy, tags
@@ -144,6 +159,7 @@ export const createProviderSchema = z.object({
   providerType: providerTypeSchema.describe('Provider category: asr, tts, llm, or embeddings'),
   apiType: providerNameSchema.describe('Specific provider implementation (e.g., openai, anthropic, azure, elevenlabs)'),
   config: providerConfigSchema.describe('Provider-specific configuration object (varies by providerType and apiType)'),
+  fallbacks: providerFallbacksSchema.default([]),
   tags: z.array(z.string()).optional().describe('Searchable tags for organization (e.g., ["production", "low-latency"])'),
 });
 
@@ -159,6 +175,8 @@ export const updateProviderBodySchema = z.object({
   providerType: providerTypeSchema.optional().describe('Updated provider category'),
   apiType: providerNameSchema.optional().describe('Updated specific provider implementation'),
   config: providerConfigSchema.optional().describe('Updated provider-specific configuration'),
+  // Optional (no default): omitting leaves the stored chain untouched, [] clears it.
+  fallbacks: providerFallbacksSchema.optional().describe('Updated ordered fallback chain ([] clears it)'),
   tags: z.array(z.string()).optional().nullable().describe('Updated searchable tags'),
 });
 
@@ -181,6 +199,7 @@ export const providerResponseSchema = z.object({
   providerType: providerTypeSchema.describe('Provider category (asr, tts, llm, embeddings)'),
   apiType: providerNameSchema.describe('Specific provider implementation'),
   config: providerConfigSchema.describe('Provider-specific configuration object'),
+  fallbacks: z.array(providerFallbackSchema).describe('Ordered fallback providers (empty when none)'),
   createdBy: z.string().nullable().describe('Operator user ID who created the provider'),
   tags: z.array(z.string()).nullable().describe('Tags for organization and search'),
   version: z.number().int().describe('Current version number for optimistic locking'),

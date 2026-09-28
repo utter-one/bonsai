@@ -54,7 +54,7 @@ export class TogetherAILlmProvider extends OpenAILegacyLlmProvider<TogetherAILlm
    * Enumerate available models via the Together AI models API.
    * Falls back to a static list if the API call fails.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();

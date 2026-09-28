@@ -43,7 +43,7 @@ export class SmtpImapConnection extends EmailConnectionBase {
     cc: string | undefined,
     bcc: string | undefined,
   ) {
-    super(fromAddress, threadingStrategy, sessionManager, 'smtp_imap');
+    super(fromAddress, threadingStrategy, sessionManager, 'smtp_imap', providerId);
     this.smtpAuthUser = smtpAuthUser;
     this.smtpHost = smtpHost;
     this.smtpPort = smtpPort;
@@ -211,7 +211,7 @@ export class SmtpImapConnection extends EmailConnectionBase {
     await this.sendEmail(this.toAddress, this.subject, body, attachments, headers);
   }
 
-  protected async sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
+  protected async doSendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
     await this.ensureTransporter();
     const messageId = headers?.messageId ?? this.generateMessageId();
     const from = headers?.from ?? this.replyFromAddress ?? this.fromAddress ?? this.smtpAuthUser;

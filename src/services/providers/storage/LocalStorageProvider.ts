@@ -55,7 +55,7 @@ export class LocalStorageProvider extends StorageProviderBase<LocalStorageProvid
     logger.info(`Local storage provider initialized at: ${fullPath}`);
   }
 
-  async upload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
+  protected async doUpload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
     return this.withErrorHandling(async () => {
       const fullPath = this.getFullPath(key);
       const dir = path.dirname(fullPath);
@@ -74,7 +74,7 @@ export class LocalStorageProvider extends StorageProviderBase<LocalStorageProvid
     });
   }
 
-  async download(key: string): Promise<Buffer> {
+  protected async doDownload(key: string): Promise<Buffer> {
     return this.withErrorHandling(async () => {
       const fullPath = this.getFullPath(key);
       const buffer = await fs.readFile(fullPath);

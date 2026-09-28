@@ -9,6 +9,7 @@ import { ChannelHandlerDispatcher } from '../channels/ChannelHandlerDispatcher';
 import type { CALInputMessage } from '../channels/messages';
 import type { ClientMessageHandlerContext } from '../channels/ClientMessageHandlerContext';
 import { DeferredProcessingService } from './DeferredProcessingService';
+import { HeartbeatRegistry } from './monitoring/HeartbeatRegistry';
 import { logger } from '../utils/logger';
 
 /** Maximum deferred entries processed per poll cycle */
@@ -36,6 +37,7 @@ export class ProcessingDeferralService {
     @inject(DeferredProcessingService) private readonly deferredProcessingService: DeferredProcessingService,
     @inject(SessionManager) private readonly sessionManager: SessionManager,
     @inject(ChannelHandlerDispatcher) private readonly dispatcher: ChannelHandlerDispatcher,
+    @inject(HeartbeatRegistry) private readonly heartbeatRegistry: HeartbeatRegistry,
   ) {}
 
   /**
@@ -44,8 +46,11 @@ export class ProcessingDeferralService {
   start(): void {
     logger.info('Starting ProcessingDeferralService (polls every 15 seconds)');
     this.scheduledTask = schedule('*/15 * * * * *', () => {
-      this.processQueue().catch((error) =>
-        logger.error({ error }, 'ProcessingDeferralService unhandled error'));
+      this.heartbeatRegistry.tick('processing-deferral', 15_000);
+      this.processQueue().catch((error) => {
+        this.heartbeatRegistry.recordError('processing-deferral');
+        logger.error({ error }, 'ProcessingDeferralService unhandled error');
+      });
     });
   }
 

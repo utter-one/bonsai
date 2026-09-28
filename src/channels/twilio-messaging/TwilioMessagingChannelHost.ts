@@ -23,6 +23,7 @@ import { UserService } from '../../services/UserService';
 import { SecretRefUtils } from '../../services/secrets/SecretRefUtils';
 import { NotFoundError } from '../../errors';
 import { DeferredProcessingService } from '../../services/DeferredProcessingService';
+import { trackWebhookOutcome } from '../../services/monitoring/ProviderCallRecorder';
 import { randomBetween } from '../../utils/randomBetween';
 import { twilioMessagingSendBodySchema, twilioMessagingSendResponseSchema } from '../../http/contracts/twilio-messaging-outgoing';
 import type { TwilioMessagingSendResponse } from '../../http/contracts/twilio-messaging-outgoing';
@@ -147,6 +148,7 @@ export class TwilioMessagingChannelHost {
       return;
     }
     const { apiKey: rawApiKey, stageId, agentId, channelProviderId } = queryResult.data;
+    trackWebhookOutcome(res, channelProviderId, 'twilio_messaging');
 
     // Validate API key
     const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
@@ -223,7 +225,7 @@ export class TwilioMessagingChannelHost {
       this.scheduleTimeout(sessionId, phoneKey);
       await this.dispatchTextInput(sessionId, messageText, channelProviderId, processingDelayMinMs, processingDelayMaxMs);
     } else {
-      const connection = new TwilioMessagingConnection(senderNumber, recipientNumber, accountSid, authToken, this.sessionManager);
+      const connection = new TwilioMessagingConnection(senderNumber, recipientNumber, accountSid, authToken, this.sessionManager, channelProviderId);
       const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
       const sessionId = this.sessionManager.registerSession(connection);
       const session = this.sessionManager.getSession(sessionId);
@@ -334,7 +336,7 @@ export class TwilioMessagingChannelHost {
     // Create virtual connection and register a real session so inbound replies
     // are routed to this conversation instead of spawning a new session.
     const phoneKey = `${projectId}:${body.to}`;
-    const connection = new TwilioMessagingConnection(body.to, fromNumber, accountSid, authToken, this.sessionManager);
+    const connection = new TwilioMessagingConnection(body.to, fromNumber, accountSid, authToken, this.sessionManager, channelProviderId);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
     const sessionId = this.sessionManager.registerSession(connection);
     const session = this.sessionManager.getSession(sessionId);

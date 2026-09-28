@@ -2,6 +2,7 @@ import { singleton, inject } from 'tsyringe';
 import { logger } from '../../../utils/logger';
 import type { Provider } from '../../../types/models';
 import type { ITtsProvider } from './ITtsProvider';
+import { TtsProviderBase } from './TtsProviderBase';
 import { ElevenLabsTtsProvider, ElevenLabsTtsProviderConfig, elevenLabsTtsProviderConfigSchema, ElevenLabsTtsSettings } from './ElevenLabsTtsProvider';
 import { OpenAiTtsProvider, OpenAiTtsProviderConfig, openAiTtsProviderConfigSchema, OpenAiTtsSettings } from './OpenAiTtsProvider';
 import { DeepgramTtsProvider, DeepgramTtsProviderConfig, deepgramTtsProviderConfigSchema, DeepgramTtsSettings } from './DeepgramTtsProvider';
@@ -10,6 +11,7 @@ import { AzureTtsProvider, AzureTtsProviderConfig, azureTtsProviderConfigSchema,
 import { AmazonPollyTtsProvider, AmazonPollyTtsProviderConfig, amazonPollyTtsProviderConfigSchema, AmazonPollyTtsSettings } from './AmazonPollyTtsProvider';
 import { SonioxTtsProvider, SonioxTtsProviderConfig, sonioxTtsProviderConfigSchema, SonioxTtsSettings } from './SonioxTtsProvider';
 import { SecretRefUtils } from '../../secrets/SecretRefUtils';
+import { CONNECTION_TEST_DRAFT_ID } from '../connectionTest/types';
 
 /**
  * Supported TTS provider API types
@@ -50,36 +52,107 @@ export class TtsProviderFactory {
     }
 
     const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
-    const resolvedProvider = { ...provider, config: resolvedConfig as typeof provider.config };
+    const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings);
 
+    // Stamp provider identity for call-log attribution (P1-03)
+    if (instance instanceof TtsProviderBase) {
+      instance.providerId = provider.id;
+      instance.providerApiType = provider.apiType;
+    }
+
+    return instance;
+  }
+
+  /**
+   * Creates a TTS provider instance for a connection test (TPC-04).
+   * Same construction as `createProvider`, but call-log stamping is skipped
+   * for draft tests — un-stamped instances record nothing, so plaintext
+   * draft secrets never produce attributed rows. The instance is NOT
+   * initialised: the strategy drives the full lifecycle (`init → start →
+   * sendText → end`), and an init failure must surface as a classified test
+   * result.
+   * @param provider - Provider entity (saved row or synthetic draft)
+   * @param settings - TTS provider-specific settings
+   * @returns Configured TTS provider instance (stamped only for saved providers)
+   */
+  async createForTest(provider: Provider, settings: unknown): Promise<ITtsProvider> {
+    if (provider.providerType !== 'tts') {
+      const errorMessage = `Provider ${provider.id} is not a TTS provider. Expected providerType 'tts', got '${provider.providerType}'`;
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    logger.info(`Creating test TTS provider instance (${provider.apiType}) for provider ${provider.id}`);
+    const resolvedConfig = await this.secretRefUtils.resolveObject(provider.config as Record<string, unknown>);
+    const instance = this.instantiateProvider({ ...provider, config: resolvedConfig as typeof provider.config }, settings as TtsSettings);
+
+    // Stamp only for saved providers — draft tests must not produce call-log rows.
+    if (instance instanceof TtsProviderBase && provider.id !== CONNECTION_TEST_DRAFT_ID) {
+      instance.providerId = provider.id;
+      instance.providerApiType = provider.apiType;
+    }
+
+    return instance;
+  }
+
+  /**
+   * Constructs the concrete provider for an apiType (shared by
+   * `createProvider` and `createForTest` — one code path).
+   */
+  private instantiateProvider(provider: Provider, settings: TtsSettings): ITtsProvider {
     // Create provider instance based on API type
+    let instance: ITtsProvider;
     switch (provider.apiType) {
       case 'elevenlabs':
-        return this.createElevenLabsProvider(resolvedProvider, settings as ElevenLabsTtsSettings);
+        instance = this.createElevenLabsProvider(provider, settings as ElevenLabsTtsSettings);
+        break;
 
       case 'openai':
-        return this.createOpenAiProvider(resolvedProvider, settings as OpenAiTtsSettings);
+        instance = this.createOpenAiProvider(provider, settings as OpenAiTtsSettings);
+        break;
 
       case 'deepgram':
-        return this.createDeepgramProvider(resolvedProvider, settings as DeepgramTtsSettings);
+        instance = this.createDeepgramProvider(provider, settings as DeepgramTtsSettings);
+        break;
 
       case 'cartesia':
-        return this.createCartesiaProvider(resolvedProvider, settings as CartesiaTtsSettings);
+        instance = this.createCartesiaProvider(provider, settings as CartesiaTtsSettings);
+        break;
 
       case 'azure':
-        return this.createAzureProvider(resolvedProvider, settings as AzureTtsSettings);
+        instance = this.createAzureProvider(provider, settings as AzureTtsSettings);
+        break;
 
       case 'amazon-polly':
-        return this.createAmazonPollyProvider(resolvedProvider, settings as AmazonPollyTtsSettings);
+        instance = this.createAmazonPollyProvider(provider, settings as AmazonPollyTtsSettings);
+        break;
 
       case 'soniox':
-        return this.createSonioxProvider(resolvedProvider, settings as SonioxTtsSettings);
+        instance = this.createSonioxProvider(provider, settings as SonioxTtsSettings);
+        break;
 
       default:
         const errorMessage = `Unsupported TTS provider API type: ${provider.apiType}. Supported types: elevenlabs, openai, deepgram, cartesia, azure, amazon-polly, soniox`;
         logger.error(errorMessage);
         throw new Error(errorMessage);
     }
+
+    return instance;
+  }
+
+  /**
+   * Creates a TTS provider instance for the HealthCheckService liveness probe (P1-05b).
+   * Resolves secrets and constructs the instance with minimal settings — every TTS
+   * settings schema requires the `provider` literal (it equals `apiType`); all other
+   * fields take schema defaults. `ping()` implementations never read session settings.
+   * The instance is NOT initialised: probe `ping()` methods must be self-contained on
+   * a fresh instance (Deepgram TTS' init() opens a persistent WebSocket).
+   * @param provider - Provider entity from database containing configuration
+   * @returns TTS provider instance suitable for calling `ping()`
+   * @throws {Error} When provider type is not 'tts' or when API type is not supported
+   */
+  async createProviderForProbing(provider: Provider): Promise<ITtsProvider> {
+    return this.createProvider(provider, { provider: provider.apiType } as TtsSettings);
   }
 
   /**

@@ -106,7 +106,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    * If the push stream was closed by a previous stop() call (e.g. in multi-turn VAD mode),
    * a new push stream, audio config, and recognizer are created before starting.
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (this.recognising) {
       logger.warn(`[ASR] Recognition session is already started`);
       return;
@@ -211,7 +211,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    * text. The sessionStopped handler already calls stopContinuousRecognitionAsync and
    * handleRecognitionStopped when Azure is truly done.
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     if (!this.speechRecognizer) {
       logger.warn(`[ASR] No Azure speech recognition instance to stop`);
       return;
@@ -251,7 +251,7 @@ export class AzureAsrProvider extends AsrProviderBase<AzureAsrProviderConfig> {
    * @param conversation The conversation context for the audio data
    * @param audio Binary audio data buffer to be processed
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

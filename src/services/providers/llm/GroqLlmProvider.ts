@@ -122,10 +122,12 @@ export class GroqLlmProvider extends OpenAILegacyLlmProvider<GroqLlmProviderConf
   /**
    * Generates a streaming response, injecting Groq reasoning parameters when configured.
    */
-  override async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+  protected override async doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
     const reasoningParams = this.buildGroqReasoningParams();
     if (Object.keys(reasoningParams).length === 0) {
-      return super.generateStream(messages, options);
+      // super.doGenerateStream — the implementation. super.generateStream is the
+      // base template wrapper and would re-dispatch this override (infinite recursion).
+      return super.doGenerateStream(messages, options);
     }
 
     this.ensureInitialized();
@@ -214,7 +216,7 @@ export class GroqLlmProvider extends OpenAILegacyLlmProvider<GroqLlmProviderConf
    * Enumerate available models via the Groq models API.
    * Falls back to a static list if the API call fails.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();

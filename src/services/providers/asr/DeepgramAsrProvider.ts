@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { AsrProviderBase } from './AsrProviderBase';
+import { httpPing } from '../providerPing';
 import { logger } from '../../../utils/logger';
 import type { AudioFormat } from '../../../types/audio';
 import { generateId, ID_PREFIXES } from '../../../utils/idGenerator';
@@ -88,9 +89,25 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
   }
 
   /**
+   * Zero-cost liveness probe (P1-05b): lists a single project from the key-management API.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await httpPing('https://api.deepgram.com/v1/projects?limit=1', {
+        Authorization: `Token ${this.config.apiKey}`,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * Starts the Deepgram speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required Deepgram API key';
       logger.error(`[Deepgram ASR] ${errorMessage}`);
@@ -191,7 +208,7 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
   /**
    * Stops the Deepgram speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[Deepgram ASR] Stopping recognition`);
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
@@ -220,7 +237,7 @@ export class DeepgramAsrProvider extends AsrProviderBase<DeepgramAsrProviderConf
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[Deepgram ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }
