@@ -54,6 +54,7 @@ export const llmModelInfoSchema = z.object({
   supportsVision: z.boolean().optional().describe('Whether this model supports vision/image input'),
   supportsImageGeneration: z.boolean().optional().describe('Whether this model supports image generation output'),
   supportsReasoning: z.boolean().optional().describe('Whether this model supports reasoning/thinking modes for deeper analysis'),
+  isDecisionModel: z.boolean().optional().describe('Whether this model is a decision/classification model (e.g., TypeSafe Jev) that answers structured yes/no questions rather than generating free-form text'),
   contextWindow: z.number().optional().describe('Context window size (in tokens) for this model'),
 }).openapi('LlmModelInfo');
 
@@ -12060,6 +12061,15 @@ export class ProviderCatalogService {
           { id: 'mixtral-8x7b-instruct-v0.1', displayName: 'Mixtral 8x7B Instruct', description: 'Mistral Mixtral MoE model for balanced performance', supportsToolCalling: true, supportsJsonOutput: true, supportsStreaming: true, supportsReasoning: false, contextWindow: 32768 },
         ],
       },
+      {
+        apiType: 'typesafe',
+        displayName: 'TypeSafe (Jev)',
+        description: 'TypeSafe "System One" decision models (Jev). Fast, calibrated structured answers for classification and guardrail conditions. Text input only — not for free-form generation, parameterized tools, or multi-action prompts.',
+        models: [
+          { id: 'jev-latest', displayName: 'Jev (Latest)', recommended: true, description: 'Flagship System One decision model — single-condition classification and guardrail conditions. No free-form generation.', isDecisionModel: true, supportsToolCalling: false, supportsJsonOutput: true, supportsStreaming: false, supportsVision: false, supportsReasoning: false, contextWindow: 64000 },
+          { id: 'jev-preview', displayName: 'Jev (Preview)', description: 'Latest Jev release (preview alias).', isDecisionModel: true, supportsToolCalling: false, supportsJsonOutput: true, supportsStreaming: false, supportsVision: false, supportsReasoning: false, contextWindow: 64000 },
+        ],
+      },
     ];
   }
 
@@ -12183,6 +12193,12 @@ export class ProviderCatalogService {
         displayName: 'Telegram (Bot API)',
         description: 'Telegram Bot API for text-based conversations via Telegram bots',
         features: ['Telegram messaging', 'Webhook support', 'Inbound/outbound text messages', 'Slash-command interface'],
+      },
+      {
+        apiType: 'slack',
+        displayName: 'Slack (Events API)',
+        description: 'Slack Events API webhook for text-based, reply-only conversations in direct messages and @-mentioned channels',
+        features: ['Slack messaging', 'Events API webhook', 'Webhook signature validation', 'Reply-only text messages with threading'],
       },
       // {
       //   apiType: 'sendgrid',

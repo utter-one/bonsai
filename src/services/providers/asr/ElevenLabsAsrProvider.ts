@@ -40,6 +40,11 @@ export type ElevenLabsAsrSettings = z.infer<typeof elevenLabsAsrSettingsSchema>;
  * ElevenLabs ASR provider implementation
  * Provides real-time speech recognition using ElevenLabs streaming API
  */
+const REALTIME_WS_BASE_URL = 'wss://api.elevenlabs.io/v1/speech-to-text/realtime';
+
+/** WS handshake budget for the liveness probe (the health service adds its own on top). */
+const PING_TIMEOUT_MS = 10_000;
+
 export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProviderConfig> {
   /** WebSocket connection to ElevenLabs streaming API */
   private socket: WebSocket | null = null;
@@ -61,6 +66,9 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
 
   /** ASR settings for this provider instance */
   private settings: ElevenLabsAsrSettings;
+
+  /** Realtime endpoint base URL; overridable in tests (points at a local mock). */
+  protected realtimeWsUrl: string = REALTIME_WS_BASE_URL;
 
   constructor(config: ElevenLabsAsrProviderConfig, settings: ElevenLabsAsrSettings) {
     super(config);
@@ -89,9 +97,71 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   }
 
   /**
+   * Zero-cost liveness probe (P1-05b): a WebSocket handshake against the
+   * realtime endpoint — the same auth/permission path as live transcription,
+   * with no audio sent. REST endpoints such as GET /v1/models require the
+   * `models_read` permission, which restricted keys lack (HTTP 401) even
+   * though transcription works — so the probe must not use them.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await this.probeRealtimeHandshake(PING_TIMEOUT_MS);
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Opens the realtime WebSocket, waits for `session_started`, then closes.
+   * Resolves when the session starts; rejects on auth rejection, any other
+   * close without a session, or timeout.
+   */
+  private probeRealtimeHandshake(timeoutMs: number): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const params = new URLSearchParams({
+        model_id: this.settings.modelId,
+        audio_format: this.settings.audioFormat,
+      });
+      const socket = new WebSocket(`${this.realtimeWsUrl}?${params.toString()}`, {
+        headers: {
+          'xi-api-key': this.config.apiKey,
+        },
+      });
+      let settled = false;
+      const finish = (fn: () => void): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        socket.removeAllListeners();
+        socket.close();
+        fn();
+      };
+      const timer = setTimeout(() => {
+        finish(() => reject(new Error(`Liveness probe failed: realtime handshake timed out after ${timeoutMs} ms`)));
+      }, timeoutMs);
+      socket.on('message', (data: Buffer) => {
+        if (data.toString().includes('session_started')) {
+          finish(resolve);
+        }
+      });
+      socket.on('error', (error: Error) => {
+        finish(() => reject(new Error(`Liveness probe failed: ${error.message}`)));
+      });
+      socket.on('close', (code: number, reason: Buffer) => {
+        finish(() => reject(new Error(`Liveness probe failed: realtime connection closed ${code} ${reason.toString()}`.trim())));
+      });
+    });
+  }
+
+  /**
    * Starts the ElevenLabs speech recognition session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.config.apiKey) {
       const errorMessage = 'Missing required ElevenLabs API key';
       logger.error(`[ElevenLabs ASR] ${errorMessage}`);
@@ -124,11 +194,21 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
       params.append('language_code', this.settings.languageCode);
     }
 
-    const wsUrl = `wss://api.elevenlabs.io/v1/speech-to-text/realtime?${params.toString()}`;
+    // realtimeWsUrl is the test seam (defaults to the production endpoint —
+    // the same URL as before, overridable to point at a local mock, TPC-03).
+    const wsUrl = `${this.realtimeWsUrl}?${params.toString()}`;
 
     logger.info(`[ElevenLabs ASR] Connecting to WebSocket with model: ${modelId}, audioFormat: ${audioFormat}`);
 
     return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const settle = (fn: () => void): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        fn();
+      };
       this.socket = new WebSocket(wsUrl, {
         headers: {
           'xi-api-key': this.config.apiKey,
@@ -150,7 +230,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
             }
             // Send buffered audio chunks
             await this.flushAudioBuffer();
-            resolve();
+            settle(resolve);
           }
         } catch (error) {
           logger.error(`[ElevenLabs ASR] Error handling message: ${error}`);
@@ -161,7 +241,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
       this.socket.on('error', async (error: Error) => {
         logger.error(`[ElevenLabs ASR] WebSocket error: ${error.message}`);
         await this.handleError(error);
-        reject(error);
+        settle(() => reject(error));
       });
 
       this.socket.on('close', async (code: number, reason: Buffer) => {
@@ -174,6 +254,14 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         if (wasRecognizing) {
           this.handleRecognitionStopped();
         }
+
+        // An early close (before session_started) must reject start() instead of
+        // hanging it forever — e.g. ElevenLabs closes 4401 'invalid api key'
+        // on bad credentials, which the connection test must classify as auth
+        // (TPC-03). The close code/reason travel in the message for classification.
+        if (!settled) {
+          settle(() => reject(new Error(`ElevenLabs realtime WebSocket closed before session started: ${code} ${reason.toString()}`.trim())));
+        }
       });
     });
   }
@@ -181,10 +269,14 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
   /**
    * Stops the ElevenLabs speech recognition session
    */
-  async stop(): Promise<void> {
+  protected async doStop(): Promise<void> {
     logger.info(`[ElevenLabs ASR] Stopping recognition`);
 
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    // Capture the socket once: the close handler nulls this.socket, and an
+    // inbound close during the 100 ms finalization window must not turn the
+    // close() below into a null dereference (TPC-03 mid-stream close).
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       logger.warn(`[ElevenLabs ASR] Socket not open, cannot stop`);
       return;
     }
@@ -198,7 +290,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
         sample_rate: sampleRate,
         commit: true,
       };
-      this.socket.send(JSON.stringify(finalMessage));
+      socket.send(JSON.stringify(finalMessage));
       logger.info(`[ElevenLabs ASR] Sent final commit message`);
     } catch (error) {
       logger.error(`[ElevenLabs ASR] Error sending final commit: ${error}`);
@@ -208,7 +300,9 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Now close the socket (this will trigger handleRecognitionStopped in the close handler)
-    this.socket.close();
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      socket.close();
+    }
   }
 
   /**
@@ -216,7 +310,7 @@ export class ElevenLabsAsrProvider extends AsrProviderBase<ElevenLabsAsrProvider
    * @param audio Binary audio data buffer to be processed
    * @param format Optional audio format (should match configured format)
    */
-  async sendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
+  protected async doSendAudio(audio: Buffer, format?: AudioFormat): Promise<void> {
     if (format && format !== this.audioFormat) {
       logger.warn(`[ElevenLabs ASR] Received audio format ${format} does not match configured format ${this.audioFormat}. Using ${this.audioFormat}.`);
     }

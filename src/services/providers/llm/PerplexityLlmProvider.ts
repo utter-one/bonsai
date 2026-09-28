@@ -54,7 +54,7 @@ export class PerplexityLlmProvider extends OpenAILegacyLlmProvider<PerplexityLlm
    * Enumerate available Perplexity models using static list.
    * Perplexity does not expose a models list endpoint.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     return PerplexityLlmProvider.getPerplexityStaticModels();
   }
 

@@ -13,6 +13,7 @@ import { SendGridConnection } from './SendGridConnection';
 import { sendGridChannelProviderConfigSchema } from '../../../services/providers/channel/SendGridChannelProvider';
 import { sessionSettingsSchema } from '../../websocket/contracts/auth';
 import { logger } from '../../../utils/logger';
+import { trackWebhookOutcome } from '../../../services/monitoring/ProviderCallRecorder';
 import { asyncHandler } from '../../../utils/asyncHandler';
 import type { CALInputMessage } from '../../messages';
 import type { ClientMessageHandlerContext } from '../../ClientMessageHandlerContext';
@@ -110,6 +111,7 @@ export class SendGridChannelHost {
       return;
     }
     const { apiKey: rawApiKey, stageId, agentId, channelProviderId } = queryResult.data;
+    trackWebhookOutcome(res, channelProviderId, 'sendgrid');
 
     const apiKeyRecord = await db.query.apiKeys.findFirst({ where: eq(apiKeys.key, rawApiKey) });
     if (!apiKeyRecord || !apiKeyRecord.isActive) {
@@ -201,7 +203,7 @@ export class SendGridChannelHost {
       }
     }
 
-    const connection = new SendGridConnection(senderEmail, fromAddress, threadingStrategy ?? 'messageId', this.sessionManager, payload.subject ?? 'Re: Conversation', apiKey, undefined, undefined);
+    const connection = new SendGridConnection(senderEmail, fromAddress, threadingStrategy ?? 'messageId', this.sessionManager, payload.subject ?? 'Re: Conversation', apiKey, undefined, undefined, channelProviderId);
     connection.setUserEmail(senderEmail);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
     const sessionId = this.sessionManager.registerSession(connection);
@@ -308,6 +310,7 @@ export class SendGridChannelHost {
       apiKey,
       resolvedCc,
       resolvedBcc,
+      channelProviderId,
     );
     connection.setUserEmail(body.to);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });

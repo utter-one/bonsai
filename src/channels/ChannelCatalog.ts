@@ -8,6 +8,7 @@ import { TwilioMessagingCommunicationChannel } from './twilio-messaging/TwilioMe
 import { TwilioVoiceCommunicationChannel } from './twilio-voice/TwilioVoiceCommunicationChannel';
 import { WhatsAppCommunicationChannel } from './whatsapp/WhatsAppCommunicationChannel';
 import { TelegramCommunicationChannel } from './telegram/TelegramCommunicationChannel';
+import { SlackCommunicationChannel } from './slack/SlackCommunicationChannel';
 // import { SendGridCommunicationChannel } from './email/sendgrid/SendGridCommunicationChannel';
 // import { SesCommunicationChannel } from './email/ses/SesCommunicationChannel';
 import { SmtpImapCommunicationChannel } from './email/smtp-imap/SmtpImapCommunicationChannel';
@@ -29,11 +30,12 @@ export class ChannelCatalog {
     @inject(TwilioVoiceCommunicationChannel) twilioVoice: TwilioVoiceCommunicationChannel,
     @inject(WhatsAppCommunicationChannel) whatsApp: WhatsAppCommunicationChannel,
     @inject(TelegramCommunicationChannel) telegram: TelegramCommunicationChannel,
+    @inject(SlackCommunicationChannel) slack: SlackCommunicationChannel,
     // @inject(SendGridCommunicationChannel) sendgrid: SendGridCommunicationChannel,
     // @inject(SesCommunicationChannel) ses: SesCommunicationChannel,
     @inject(SmtpImapCommunicationChannel) smtpImap: SmtpImapCommunicationChannel,
   ) {
-    const entries: ICommunicationChannel[] = [websocket, webrtc, twilioMessaging, twilioVoice, whatsApp, telegram, smtpImap];
+    const entries: ICommunicationChannel[] = [websocket, webrtc, twilioMessaging, twilioVoice, whatsApp, telegram, slack, smtpImap];
     this.channels = new Map(entries.map((c) => [c.getType(), c]));
   }
 
@@ -68,10 +70,10 @@ export class ChannelCatalog {
   /**
    * Returns the Zod schema for validating the configuration of a given channel type.
    * @param channelType - The type of channel to get the config schema for.
-   * @returns A Zod object schema for the channel configuration.
+   * @returns A Zod schema for the channel configuration.
    * @throws Error if the channel type is not supported.
    */
-  getChannelConfigSchema(channelType: string): z.ZodObject<any> {
+  getChannelConfigSchema(channelType: string): z.ZodType {
     return this.getChannel(channelType).getConfigSchema();
   }
 }

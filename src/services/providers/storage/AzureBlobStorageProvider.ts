@@ -49,7 +49,7 @@ export class AzureBlobStorageProvider extends StorageProviderBase<AzureBlobStora
     logger.info(`Azure Blob Storage provider initialized for container: ${this.settings.containerName}`);
   }
 
-  async upload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
+  protected async doUpload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const containerClient = this.serviceClient!.getContainerClient(this.settings.containerName);
@@ -73,7 +73,7 @@ export class AzureBlobStorageProvider extends StorageProviderBase<AzureBlobStora
     });
   }
 
-  async download(key: string): Promise<Buffer> {
+  protected async doDownload(key: string): Promise<Buffer> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const containerClient = this.serviceClient!.getContainerClient(this.settings.containerName);

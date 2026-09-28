@@ -24,8 +24,10 @@ export class SendGridConnection extends EmailConnectionBase {
     private readonly apiKey: string,
     cc: string | undefined,
     bcc: string | undefined,
+    /** P1-03: provider id for call-log attribution. */
+    providerId: string | undefined,
   ) {
-    super(fromAddress, threadingStrategy, sessionManager, 'sendgrid');
+    super(fromAddress, threadingStrategy, sessionManager, 'sendgrid', providerId);
     this.cc = cc;
     this.bcc = bcc;
   }
@@ -104,7 +106,7 @@ export class SendGridConnection extends EmailConnectionBase {
     await this.sendEmail(this.toAddress, this.subject, body, attachments, headers);
   }
 
-  protected async sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
+  protected async doSendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
     const sg = new MailService();
     sg.setApiKey(this.apiKey);
 

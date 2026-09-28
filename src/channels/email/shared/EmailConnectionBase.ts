@@ -4,6 +4,7 @@ import type { Session, SessionManager } from '../../SessionManager';
 import type { IClientConnection } from '../../IClientConnection';
 import { extractDomainFromEmail } from './MessageIdUtils';
 import { logger } from '../../../utils/logger';
+import { getProviderCallRecorder } from '../../../services/monitoring/ProviderCallRecorder';
 
 export type ThreadingStrategy = 'messageId' | 'senderSubject';
 
@@ -44,6 +45,8 @@ export abstract class EmailConnectionBase implements IClientConnection {
     protected readonly threadingStrategy: ThreadingStrategy,
     protected readonly sessionManager: SessionManager,
     connectionType: 'sendgrid' | 'ses' | 'smtp_imap',
+    /** P1-03: provider id for call-log attribution (passed by the channel host). */
+    protected readonly callLogProviderId?: string,
   ) {
     this.connectionType = connectionType;
   }
@@ -131,6 +134,39 @@ export abstract class EmailConnectionBase implements IClientConnection {
   /** Gets the channel label for logging. Override in subclasses. */
   protected abstract getChannelLabel(): string;
 
+  /**
+   * P1-03 template wrapper: records one channel.send call-log row per email send,
+   * then delegates to the provider-specific implementation.
+   *
+   * Public (P2-02): the alert EmailNotifier reuses this as the raw-send entry
+   * point for per-delivery connection instances — the call-log row is desired
+   * so alert-mail provider failures feed provider-degraded.
+   */
+  public async sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      await this.doSendEmail(to, subject, body, attachments, headers);
+      this.recordEmailSend(Date.now() - startedAt, null);
+    } catch (error) {
+      this.recordEmailSend(Date.now() - startedAt, error);
+      throw error;
+    }
+  }
+
   /** Sends an email via the provider API. Override in subclasses. */
-  protected abstract sendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void>;
+  protected abstract doSendEmail(to: string, subject: string, body: string, attachments: EmailAttachment[], headers?: EmailHeaders): Promise<void>;
+
+  /** P1-03: one channel.send call-log row per email send. Never throws. */
+  private recordEmailSend(durationMs: number, error: unknown): void {
+    if (!this.callLogProviderId) return;
+    getProviderCallRecorder().record({
+      providerId: this.callLogProviderId,
+      providerType: 'channel',
+      apiType: this.connectionType,
+      operation: 'channel.send_message',
+      durationMs,
+      ok: error === null,
+      error: error ?? undefined,
+    });
+  }
 }

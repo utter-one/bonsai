@@ -1,4 +1,4 @@
-import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { PollyClient, DescribeVoicesCommand, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
 import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { logger } from '../../../utils/logger';
@@ -100,6 +100,25 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
   }
 
   /**
+   * Zero-cost liveness probe (P1-05b): lists voices via DescribeVoices — validates
+   * AWS credentials and network reachability without any synthesis. Probe instances
+   * skip the service-level init, so the client is built lazily here.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      if (!this.pollyClient) {
+        await this.init();
+      }
+      await this.pollyClient.send(new DescribeVoicesCommand({}));
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * Gets the list of supported audio output formats for Amazon Polly
    */
   getSupportedFormats(): AudioFormat[] {
@@ -116,7 +135,7 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.pollyClient) {
       throw new Error('Amazon Polly client not initialized. Call init() first.');
     }
@@ -150,7 +169,7 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
    * Stops and finalizes the speech generation session.
    * Flushes remaining buffered text and synthesizes it before ending.
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.isStarted) {
       logger.warn(`[Amazon Polly TTS] No speech generation instance to end`);
       return;
@@ -178,7 +197,7 @@ export class AmazonPollyTtsProvider extends TtsProviderBase<AmazonPollyTtsProvid
    * Text is buffered until end() is called (or per sentence when sentence splitter is enabled).
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (!this.isStarted) {
       logger.warn(`[Amazon Polly TTS] Cannot send text, generation not started`);
       return;

@@ -8,6 +8,7 @@ import { ConversationRunner } from '../../../src/services/live/ConversationRunne
 import type { Session } from '../../../src/channels/SessionManager';
 import type { IClientConnection } from '../../../src/channels/IClientConnection';
 import { LlmProviderFactory } from '../../../src/services/providers/llm/LlmProviderFactory';
+import { resetMonitoringAccessorsForTests } from '../../../src/services/monitoring/ProviderCallRecorder';
 import type { LlmSettings } from '../../../src/services/providers/llm/LlmProviderFactory';
 import { MockLlmProvider } from './mockLlmProvider';
 import { EventCollectorClientConnection } from './eventCollectorClientConnection';
@@ -129,7 +130,7 @@ export class ConversationTestHarness {
     });
 
     // Override LlmProviderFactory to return our mock
-    this.overrideLlmProvider();
+    this.overrideLlmProvider(stageConfig.llmSettings.model);
 
     // Build session
     this.session = this.buildSession();
@@ -265,13 +266,22 @@ export class ConversationTestHarness {
       this.runner = null;
     }
     container.reset();
+    // P1-03: the monitoring accessors cache container-resolved singletons —
+    // clear them so the next file's fresh container is picked up (otherwise
+    // call-log rows would land in the orphaned pre-reset CallLogger).
+    resetMonitoringAccessorsForTests();
     this.mockLlm.reset();
     this.events.reset();
   }
 
   // ── Private helpers ──────────────────────────────────────────────
 
-  private overrideLlmProvider(): void {
+  private overrideLlmProvider(model?: string): void {
+    // P1-03: stamp provider identity so the mock's base-class wrappers record
+    // real provider_call_logs rows during integration tests.
+    this.mockLlm.providerId = this._providerId;
+    this.mockLlm.providerApiType = 'openai';
+    this.mockLlm.providerModel = model;
     container.register(LlmProviderFactory, {
       useValue: {
         createProvider: async () => this.mockLlm,

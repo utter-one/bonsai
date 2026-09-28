@@ -13,6 +13,7 @@ extendZodWithOpenApi(z);
 export const gcsStorageProviderConfigSchema = z.strictObject({
   projectId: z.string().describe('Google Cloud project ID'),
   keyFileJson: z.string().describe('Service account key file content as JSON string'),
+  apiEndpoint: z.string().optional().describe('Custom API endpoint (e.g. an emulator or proxy) — defaults to storage.googleapis.com'),
 }).openapi('GcsStorageConfig');
 
 /**
@@ -45,11 +46,12 @@ export class GcsStorageProvider extends StorageProviderBase<GcsStorageProviderCo
     this.storage = new Storage({
       projectId: this.config!.projectId,
       credentials,
+      apiEndpoint: this.config!.apiEndpoint,
     });
     logger.info(`Google Cloud Storage provider initialized for bucket: ${this.settings.bucketName}`);
   }
 
-  async upload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
+  protected async doUpload(key: string, data: Buffer, metadata?: StorageMetadata): Promise<string> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const bucket = this.storage!.bucket(this.settings.bucketName);
@@ -75,7 +77,7 @@ export class GcsStorageProvider extends StorageProviderBase<GcsStorageProviderCo
     });
   }
 
-  async download(key: string): Promise<Buffer> {
+  protected async doDownload(key: string): Promise<Buffer> {
     return this.withErrorHandling(async () => {
       const fullKey = this.getFullKey(key);
       const bucket = this.storage!.bucket(this.settings.bucketName);

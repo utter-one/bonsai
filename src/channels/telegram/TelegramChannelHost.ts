@@ -13,6 +13,7 @@ import { TelegramConnection } from './TelegramConnection';
 import { telegramChannelProviderConfigSchema } from '../../services/providers/channel/TelegramChannelProvider';
 import { sessionSettingsSchema } from '../websocket/contracts/auth';
 import { logger } from '../../utils/logger';
+import { trackWebhookOutcome } from '../../services/monitoring/ProviderCallRecorder';
 import { asyncHandler } from '../../utils/asyncHandler';
 import type { CALInputMessage, CALStartConversationResponse } from '../messages';
 import type { ClientMessageHandlerContext } from '../ClientMessageHandlerContext';
@@ -262,6 +263,7 @@ export class TelegramChannelHost {
   private async handleWebhook(req: Request, res: Response): Promise<void> {
     const ctx = await this.extractWebhookData(req, res);
     if (!ctx) return;
+    trackWebhookOutcome(res, ctx.channelProviderId, 'telegram');
 
     const userKey = `${ctx.projectId}:${ctx.senderId}`;
     const existingSessionId = this.userSessionMap.get(userKey);
@@ -400,7 +402,7 @@ export class TelegramChannelHost {
    * Creates a new virtual session and starts a conversation for the user.
    */
   private async createNewSession(ctx: WebhookContext, userKey: string): Promise<void> {
-    const connection = new TelegramConnection(ctx.senderId, ctx.botToken, this.sessionManager);
+    const connection = new TelegramConnection(ctx.senderId, ctx.botToken, this.sessionManager, ctx.channelProviderId);
     const defaultSettings = sessionSettingsSchema.parse({ sendVoiceInput: false, receiveVoiceOutput: false, receiveTranscriptionUpdates: false, receiveEvents: false });
     const sessionId = this.sessionManager.registerSession(connection);
     const session = this.sessionManager.getSession(sessionId);

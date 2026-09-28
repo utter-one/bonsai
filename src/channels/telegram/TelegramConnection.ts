@@ -2,6 +2,7 @@ import type { Session, SessionManager } from '../SessionManager';
 import type { IClientConnection } from '../IClientConnection';
 import type { CALOutputMessage } from '../messages';
 import { logger } from '../../utils/logger';
+import { getProviderCallRecorder } from '../../services/monitoring/ProviderCallRecorder';
 
 /** Telegram Bot API base URL. */
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
@@ -28,6 +29,8 @@ export class TelegramConnection implements IClientConnection {
     /** Bot token for authenticating Bot API calls. */
     private readonly botToken: string,
     private readonly sessionManager: SessionManager,
+    /** P1-03: provider id for call-log attribution (passed by the channel host). */
+    private readonly providerId?: string,
   ) {}
 
   /**
@@ -66,6 +69,7 @@ export class TelegramConnection implements IClientConnection {
       parse_mode: 'Markdown',
     };
 
+    const startedAt = Date.now();
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -77,12 +81,30 @@ export class TelegramConnection implements IClientConnection {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Telegram Bot API responded with ${response.status}: ${errorText}`);
+        const error = new Error(`Telegram Bot API responded with ${response.status}: ${errorText}`) as Error & { status?: number };
+        error.status = response.status; // consumed by classifyThirdPartyError for the call-log row
+        throw error;
       }
 
       logger.info({ chatId: this.userId, sessionId: this.session?.id }, 'Telegram message sent');
+      this.recordSend(Date.now() - startedAt, null);
     } catch (error) {
       logger.error({ error, chatId: this.userId, sessionId: this.session?.id }, 'Failed to send Telegram message');
+      this.recordSend(Date.now() - startedAt, error);
     }
+  }
+
+  /** P1-03: one channel.send call-log row per outbound message. Never throws. */
+  private recordSend(durationMs: number, error: unknown): void {
+    if (!this.providerId) return;
+    getProviderCallRecorder().record({
+      providerId: this.providerId,
+      providerType: 'channel',
+      apiType: 'telegram',
+      operation: 'channel.send_message',
+      durationMs,
+      ok: error === null,
+      error: error ?? undefined,
+    });
   }
 }

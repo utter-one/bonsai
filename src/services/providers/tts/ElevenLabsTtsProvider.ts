@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { extendZodWithOpenApi } from '@asteasolutions/zod-to-openapi';
 import { logger } from '../../../utils/logger';
 import { TtsProviderBase } from './TtsProviderBase';
+import { httpPing } from '../providerPing';
 import { GeneratedAudioChunk, NoSpeechMarker } from './ITtsProvider';
 import { SentenceSplitter } from './SentenceSplitter';
 import type { AudioFormat } from '../../../types/audio';
@@ -66,12 +67,38 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /** Audio output format for the current session */
   private audioFormat: AudioFormat = 'pcm_16000';
 
+  /** Test seam (TPC-04): overrides the WS base URL for connection tests; null → production behavior. */
+  protected wsBaseUrlOverride: string | null = null;
+
   constructor(config: ElevenLabsTtsProviderConfig, settings: ElevenLabsTtsSettings) {
     super(config);
     this.settings = settings;
   }
 
   async init(): Promise<void> { }
+
+  /**
+   * Zero-cost liveness probe (P1-05b): checks access to the configured voice
+   * (or the voice list when none is configured). REST endpoints such as
+   * GET /v1/models require the `models_read` permission, which TTS-only
+   * keys lack (HTTP 401) even though synthesis works — so the probe must
+   * not use them.
+   */
+  async ping(): Promise<void> {
+    const startedAt = Date.now();
+    const url = this.settings.voiceId
+      ? `https://api.elevenlabs.io/v1/voices/${this.settings.voiceId}`
+      : 'https://api.elevenlabs.io/v1/voices';
+    try {
+      await httpPing(url, {
+        'xi-api-key': this.config.apiKey,
+      });
+      this.recordPingCall(startedAt);
+    } catch (error) {
+      this.recordPingCall(startedAt, error as Error);
+      throw error;
+    }
+  }
 
   /**
    * Gets the list of supported audio output formats for ElevenLabs
@@ -90,7 +117,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.audioChunks = [];
@@ -124,7 +151,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
     logger.info(`[ElevenLabs] Starting speech generation with voiceId: ${effectiveVoiceId}, model: ${effectiveModel}, speed: ${effectiveSpeed}, stability: ${this.settings.stability}, similarityBoost: ${this.settings.similarityBoost}, audioFormat: ${this.audioFormat}`);
 
     const useGlobalPreview = this.settings.useGlobalPreview ?? true;
-    const baseUrl = useGlobalPreview ? 'wss://api-global-preview.elevenlabs.io' : 'wss://api.elevenlabs.io';
+    const baseUrl = this.wsBaseUrlOverride ?? (useGlobalPreview ? 'wss://api-global-preview.elevenlabs.io' : 'wss://api.elevenlabs.io');
     const inactivityTimeout = this.settings.inactivityTimeout ?? 180;
     const wsUrl = `${baseUrl}/v1/text-to-speech/${effectiveVoiceId}/stream-input?model_id=${effectiveModel}&output_format=${this.audioFormat}&inactivity_timeout=${inactivityTimeout}`;
 
@@ -154,7 +181,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
   /**
    * Stops and finalizes the speech generation session
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.socket) {
       logger.warn(`[ElevenLabs] No speech generation instance to end`);
       return;
@@ -178,7 +205,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
    * Cancels the ongoing speech generation without finalizing it.
    * Used when a user barge-in interrupts the AI's response.
    */
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     if (!this.socket) {
       logger.info(`[ElevenLabs] No active session to cancel`);
       return;
@@ -196,7 +223,7 @@ export class ElevenLabsTtsProvider extends TtsProviderBase<ElevenLabsTtsProvider
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.addText(text);
     } else {

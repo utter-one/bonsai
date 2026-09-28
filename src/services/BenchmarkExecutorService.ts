@@ -18,6 +18,7 @@ import type { BenchmarkStats, TimingStats } from '../http/contracts/benchmark';
 import type { BenchmarkIterationResult, LlmBenchmarkInput, TtsBenchmarkInput, AsrBenchmarkInput } from '../types/benchmark';
 import { generateId, ID_PREFIXES } from '../utils/idGenerator';
 import { logger } from '../utils/logger';
+import { HeartbeatRegistry } from './monitoring/HeartbeatRegistry';
 
 /**
  * Background service that executes benchmark runs sequentially.
@@ -36,6 +37,7 @@ export class BenchmarkExecutorService {
     @inject(TtsProviderFactory) private readonly ttsFactory: TtsProviderFactory,
     @inject(AsrProviderFactory) private readonly asrFactory: AsrProviderFactory,
     @inject(BenchmarkRunService) private readonly runService: BenchmarkRunService,
+    @inject(HeartbeatRegistry) private readonly heartbeatRegistry: HeartbeatRegistry,
   ) { }
 
   /**
@@ -45,8 +47,17 @@ export class BenchmarkExecutorService {
   start(): void {
     logger.info('Starting BenchmarkExecutorService');
     this.runService.registerNewRunListener((runId) => this.onNewRun(runId));
-    this.resetStuckRuns().then(() => this.checkAndProcess());
-    this.pollingTimer = setInterval(() => { this.checkAndProcess(); }, this.pollingIntervalMs);
+    this.heartbeatRegistry.tick('benchmark-executor', this.pollingIntervalMs);
+    this.resetStuckRuns()
+      .catch((err) => {
+        this.heartbeatRegistry.recordError('benchmark-executor');
+        logger.error({ err }, 'Failed to reset stuck benchmark runs on startup');
+      })
+      .then(() => this.checkAndProcess());
+    this.pollingTimer = setInterval(() => {
+      this.heartbeatRegistry.tick('benchmark-executor', this.pollingIntervalMs);
+      this.checkAndProcess();
+    }, this.pollingIntervalMs);
     this.loadCronSchedules().catch((err) => logger.error({ err }, 'Failed to load benchmark cron schedules'));
   }
 
@@ -107,7 +118,10 @@ export class BenchmarkExecutorService {
     if (this.isProcessing) return;
     this.isProcessing = true;
     this.processNextPendingRun()
-      .catch((err) => logger.error({ err }, 'Unhandled error in BenchmarkExecutorService.processNextPendingRun'))
+      .catch((err) => {
+        this.heartbeatRegistry.recordError('benchmark-executor');
+        logger.error({ err }, 'Unhandled error in BenchmarkExecutorService.processNextPendingRun');
+      })
       .finally(() => { this.isProcessing = false; });
   }
 

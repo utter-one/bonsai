@@ -477,6 +477,13 @@
       "when": 1785413572610,
       "tag": "0067_add_project_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1786966859018,
+      "tag": "0068_lively_rage",
+      "breakpoints": true
     }
   ]
 }

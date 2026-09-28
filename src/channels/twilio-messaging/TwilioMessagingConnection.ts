@@ -2,6 +2,7 @@ import type { Session, SessionManager } from '../SessionManager';
 import type { IClientConnection } from '../IClientConnection';
 import type { CALOutputMessage } from '../messages';
 import { logger } from '../../utils/logger';
+import { getProviderCallRecorder } from '../../services/monitoring/ProviderCallRecorder';
 import * as _twilio from 'twilio';
 const _twilioModule = (_twilio as any).default ?? _twilio;
 const TwilioClient = _twilioModule.Twilio as typeof import('twilio').Twilio;
@@ -31,6 +32,8 @@ export class TwilioMessagingConnection implements IClientConnection {
     private readonly accountSid: string,
     private readonly authToken: string,
     private readonly sessionManager: SessionManager,
+    /** P1-03: provider id for call-log attribution (passed by the channel host). */
+    private readonly providerId?: string,
   ) {}
 
   /**
@@ -64,14 +67,31 @@ export class TwilioMessagingConnection implements IClientConnection {
     const body = msg.fullText?.trim();
     if (!body) return;
 
+    const startedAt = Date.now();
     try {
       if (!this.twilioClient) {
         this.twilioClient = new TwilioClient(this.accountSid, this.authToken);
       }
       await this.twilioClient.messages.create({ body, from: this.toNumber, to: this.fromNumber });
       logger.info({ to: this.fromNumber, sessionId: this.session?.id }, 'Twilio message sent');
+      this.recordSend(Date.now() - startedAt, null);
     } catch (error) {
       logger.error({ error, to: this.fromNumber, sessionId: this.session?.id }, 'Failed to send Twilio message');
+      this.recordSend(Date.now() - startedAt, error);
     }
+  }
+
+  /** P1-03: one channel.send call-log row per outbound message. Never throws. */
+  private recordSend(durationMs: number, error: unknown): void {
+    if (!this.providerId) return;
+    getProviderCallRecorder().record({
+      providerId: this.providerId,
+      providerType: 'channel',
+      apiType: 'twilio_messaging',
+      operation: 'channel.send_message',
+      durationMs,
+      ok: error === null,
+      error: error ?? undefined,
+    });
   }
 }

@@ -60,7 +60,7 @@ export class MistralLlmProvider extends LlmProviderBase<MistralLlmProviderConfig
   /**
    * Generate a non-streaming response using the native Mistral SDK.
    */
-  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async doGenerate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -137,7 +137,7 @@ export class MistralLlmProvider extends LlmProviderBase<MistralLlmProviderConfig
   /**
    * Generate a streaming response using the native Mistral SDK.
    */
-  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+  protected async doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -237,7 +237,7 @@ export class MistralLlmProvider extends LlmProviderBase<MistralLlmProviderConfig
    * Enumerate available models using the native Mistral SDK.
    * Falls back to a static list if the API call fails.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const modelList = await this.client.models.list();
@@ -267,7 +267,7 @@ export class MistralLlmProvider extends LlmProviderBase<MistralLlmProviderConfig
    * @param input - User input text to moderate
    * @returns Flagged status and list of violated categories
    */
-  async moderateUserInput(input: string): Promise<{ flagged: boolean; categories: string[] }> {
+  protected async doModerateUserInput(input: string): Promise<{ flagged: boolean; categories: string[] }> {
     this.ensureInitialized();
     const response = await this.client!.classifiers.moderate({ model: 'mistral-moderation-latest', inputs: [input] });
     const result = response.results[0];

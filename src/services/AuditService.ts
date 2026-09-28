@@ -77,6 +77,35 @@ export class AuditService {
   }
 
   /**
+   * Log a non-CRUD event against an entity (e.g. a provider connection test).
+   * The event payload (a result summary, never secrets) is carried in `newEntity`.
+   * @param entityType - The type of the entity (e.g., 'provider')
+   * @param entityId - The unique identifier of the entity
+   * @param action - The event action (e.g., 'CONNECTION_TEST')
+   * @param result - The event payload carried in `newEntity`
+   * @param userId - Optional ID of the user who triggered the event
+   * @param projectId - Optional project ID scoping the event
+   * @returns The created audit log entry
+   */
+  async logEvent(
+    entityType: string,
+    entityId: string,
+    action: string,
+    result: Record<string, any>,
+    userId?: string,
+    projectId?: string
+  ): Promise<AuditLog> {
+    return this.logChange({
+      userId,
+      action,
+      entityType,
+      entityId,
+      newEntity: result,
+      projectId,
+    });
+  }
+
+  /**
    * Log entity creation
    * @param entityType - The type of entity being created (e.g., 'operator')
    * @param entityId - The unique identifier of the created entity

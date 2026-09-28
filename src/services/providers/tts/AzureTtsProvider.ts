@@ -116,7 +116,7 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     if (!this.speechConfig) {
       throw new Error('Azure Speech config not initialized. Call init() first.');
     }
@@ -155,7 +155,7 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
   /**
    * Stops and finalizes the speech generation session
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.isStarted) {
       logger.warn(`[Azure TTS] No speech generation instance to end`);
       return;
@@ -186,7 +186,7 @@ export class AzureTtsProvider extends TtsProviderBase<AzureTtsProviderConfig> {
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (!this.isStarted) {
       logger.warn(`[Azure TTS] Cannot send text, generation not started`);
       return;

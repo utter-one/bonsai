@@ -1,6 +1,6 @@
 import { describe, it, beforeEach } from 'mocha';
 import { expect } from 'chai';
-import { authed, resetDatabase } from '../utils';
+import { authed, unauthed, resetDatabase } from '../utils';
 
 describe('Operator API', () => {
   beforeEach(async () => {
@@ -205,6 +205,13 @@ describe('Operator API', () => {
     it('rejects password change without oldPassword (400)', async () => {
       const res = await authed().post('/api/profile').send({ newPassword: 'newpass123' });
       expect(res.status).to.equal(400);
+    });
+
+    it('rejects unauthenticated profile access with 401 (not 500)', async () => {
+      const get = await unauthed().get('/api/profile');
+      expect(get.status).to.equal(401);
+      const post = await unauthed().post('/api/profile').send({ name: 'Nope' });
+      expect(post.status).to.equal(401);
     });
   });
 

@@ -83,7 +83,7 @@ export class OpenAILegacyLlmProvider<TConfig extends OpenAICompatibleConfig = Op
   /**
    * Generate a non-streaming response using Chat Completions API
    */
-  async generate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
+  protected async doGenerate(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<LlmGenerationResult> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -206,7 +206,7 @@ export class OpenAILegacyLlmProvider<TConfig extends OpenAICompatibleConfig = Op
   /**
    * Generate a streaming response using Chat Completions API
    */
-  async generateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
+  protected async doGenerateStream(messages: LlmMessage[], options?: LlmGenerationOptions): Promise<void> {
     this.ensureInitialized();
     this.validateMessages(messages);
 
@@ -306,7 +306,7 @@ export class OpenAILegacyLlmProvider<TConfig extends OpenAICompatibleConfig = Op
    * Useful for OpenAI-compatible APIs (e.g. Groq) that expose their own model list.
    * Falls back to a static list of well-known OpenAI models if the API call fails or the client is not yet initialized.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();

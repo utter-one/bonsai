@@ -61,7 +61,7 @@ export class OpenRouterLlmProvider extends OpenAILegacyLlmProvider<OpenRouterLlm
    * Enumerate available models via the OpenRouter models API.
    * Falls back to a static list of popular models if the API call fails.
    */
-  async enumerateModels(): Promise<LlmModelInfo[]> {
+  protected async doEnumerateModels(): Promise<LlmModelInfo[]> {
     if (this.client) {
       try {
         const page = await this.client.models.list();

@@ -175,7 +175,7 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
   /**
    * Starts the speech generation session
    */
-  async start(): Promise<void> {
+  protected async doStart(): Promise<void> {
     this.resetOrdinal();
     this.inNoSpeechSection = undefined;
     this.textBuffer = '';
@@ -235,7 +235,7 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
   /**
    * Signals end of input text - flushes remaining buffered text without closing WebSocket
    */
-  async end(): Promise<void> {
+  protected async doEnd(): Promise<void> {
     if (!this.socket) {
       logger.warn(`[Cartesia] No active WebSocket connection`);
       return;
@@ -261,7 +261,7 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
    * Cancels the ongoing speech generation without finalizing it.
    * Used when a user barge-in interrupts the AI's response.
    */
-  async cancel(): Promise<void> {
+  protected async doCancel(): Promise<void> {
     if (!this.socket) {
       logger.info(`[Cartesia] No active session to cancel`);
       return;
@@ -286,7 +286,7 @@ export class CartesiaTtsProvider extends TtsProviderBase<CartesiaTtsProviderConf
    * Sends text to the speech generation service
    * @param text The text content to be converted to speech
    */
-  async sendText(text: string): Promise<void> {
+  protected async doSendText(text: string): Promise<void> {
     if (this.sentenceSplitter) {
       await this.sentenceSplitter.addText(text);
     } else {

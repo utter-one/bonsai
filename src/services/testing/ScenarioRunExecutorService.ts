@@ -8,6 +8,7 @@ import { TestRunner } from './TestRunner';
 import { ConversationService } from '../ConversationService';
 import { SYSTEM_CONTEXT } from '../RequestContext';
 import { UserService } from '../UserService';
+import { HeartbeatRegistry } from '../monitoring/HeartbeatRegistry';
 import { logger } from '../../utils/logger';
 import { generateId, ID_PREFIXES } from '../../utils/idGenerator';
 import type { ScenarioRunResponse } from '../../http/contracts/scenarioRun';
@@ -59,6 +60,7 @@ export class ScenarioRunExecutorService {
     @inject(TestRunner) private readonly testRunner: TestRunner,
     @inject(ConversationService) private readonly conversationService: ConversationService,
     @inject(UserService) private readonly userService: UserService,
+    @inject(HeartbeatRegistry) private readonly heartbeatRegistry: HeartbeatRegistry,
   ) {
     this.enabled = process.env.TESTING_SCHEDULER_ENABLED !== 'false';
     this.maxParallel = parseInt(process.env.TESTING_MAX_PARALLEL_CONVERSATIONS ?? '5', 10);
@@ -131,6 +133,7 @@ export class ScenarioRunExecutorService {
   private checkAndProcessQueue(): void {
     if (!this.enabled) return;
 
+    this.heartbeatRegistry.tick('scenario-run-executor', this.pollingIntervalMs);
     this.scenarioRunService.findQueuedRuns().then((runs) => {
       for (const run of runs) {
         if (!this.enabled) break;
@@ -138,7 +141,10 @@ export class ScenarioRunExecutorService {
         if (this.activeSlots >= this.maxParallel) break;
         this.executeRun(run).catch((error) => logger.error({ error, runId: run.id }, 'Unhandled error in ScenarioRunExecutorService.executeRun'));
       }
-    }).catch((error) => logger.error({ error }, 'Failed to fetch queued scenario runs'));
+    }).catch((error) => {
+      this.heartbeatRegistry.recordError('scenario-run-executor');
+      logger.error({ error }, 'Failed to fetch queued scenario runs');
+    });
   }
 
   /**
