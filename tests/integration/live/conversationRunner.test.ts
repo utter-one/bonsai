@@ -19,6 +19,86 @@ describe('ConversationRunner', () => {
     await harness.teardown();
   });
 
+  describe('terminal guardrails', () => {
+    const guardrailName = 'illegal-activity';
+    const fixedResponse = 'This conversation has ended.';
+
+    beforeEach(async () => {
+      await harness.setup({
+        name: 'Chat',
+        prompt: 'Ordinary response',
+        llmSettings: { model: 'gpt-4' },
+      });
+      const projectPath = `/api/projects/${harness.projectId}`;
+      const classifier = await authed().post(`${projectPath}/classifiers`).send({
+        name: 'Safety', prompt: 'Classify safety', llmProviderId: harness._providerId, llmSettings: { model: 'gpt-4' },
+      });
+      const transformer = await authed().post(`${projectPath}/context-transformers`).send({
+        name: 'Director', prompt: 'Transform ordinary input', contextFields: ['direction'],
+        llmProviderId: harness._providerId, llmSettings: { model: 'gpt-4' },
+      });
+      const guardrail = await authed().post(`${projectPath}/guardrails`).send({
+        name: guardrailName, classificationTrigger: 'Illegal activity', effects: [
+          { type: 'generate_response', responseMode: 'prescripted', prescriptedResponses: [fixedResponse] },
+          { type: 'end_conversation', reason: guardrailName },
+        ],
+      });
+      expect(classifier.status).to.equal(201);
+      expect(transformer.status).to.equal(201);
+      expect(guardrail.status).to.equal(201);
+      const project = await authed().get(projectPath);
+      const updatedProject = await authed().put(projectPath).send({ version: project.body.version, defaultGuardrailClassifierId: classifier.body.id });
+      expect(updatedProject.status).to.equal(200);
+      const stagePath = `${projectPath}/stages/${harness.stageId}`;
+      const stage = await authed().get(stagePath);
+      const updatedStage = await authed().put(stagePath).send({ version: stage.body.version, transformerIds: [transformer.body.id] });
+      expect(updatedStage.status).to.equal(200);
+      harness.mockLlm.queueResponse('Welcome.');
+      await harness.start();
+    });
+
+    it('delivers fixed text and ends once when the Director would reject the same turn', async () => {
+      const provider = harness.mockLlm;
+      const original = provider.generate.bind(provider);
+      provider.queueResponse(JSON.stringify({ actions: { [guardrailName]: {} } }));
+      const prompts: unknown[] = [];
+      provider.generate = async (messages, options) => {
+        const prompt = messages[0].content;
+        prompts.push(prompt);
+        if (prompt === 'Transform ordinary input') throw new Error('Director provider refusal');
+        return original(messages, options);
+      };
+
+      const response = await harness.sendInput('I plan to steal someone else’s credentials.');
+
+      expect(response).to.equal(fixedResponse);
+      expect(harness.events.aiResponses.filter(text => text === fixedResponse)).to.have.length(1);
+      expect(harness.events.getEventsByType('conversation_end')).to.have.length(1);
+      expect(prompts).to.deep.equal(['Classify safety']);
+      harness.assertNoEvent('conversation_failed');
+      await harness.assertConversationStatus('finished');
+    });
+
+    it('records a neutral failure after a clear result if the Director refuses', async () => {
+      const provider = harness.mockLlm;
+      const original = provider.generate.bind(provider);
+      provider.queueResponse('{"actions":{}}');
+      provider.generate = async (messages, options) => {
+        if (messages[0].content === 'Transform ordinary input') throw new Error('Director provider refusal');
+        return original(messages, options);
+      };
+
+      await harness.sendInput('I reported a security incident at work.');
+
+      const failures = harness.events.getEventsByType('conversation_failed');
+      expect(failures).to.have.length(1);
+      expect(failures[0].eventData.reason).to.equal('Unable to prepare a response.');
+      harness.assertNoEvent('conversation_end');
+      expect(harness.events.aiResponses).to.deep.equal(['Welcome.']);
+      await harness.assertConversationStatus('failed');
+    });
+  });
+
   describe('conversation lifecycle', () => {
     it('starts conversation and emits conversation_start event', async () => {
       await harness.setup({

@@ -288,6 +288,80 @@ describe('UserInputProcessor', () => {
   });
 
   describe('guardrail classification', () => {
+    const stopName = 'illegal-activity';
+    const terminalGuardrail = {
+      id: 'guard_stop',
+      name: stopName,
+      effects: [
+        { type: 'generate_response', responseMode: 'prescripted', prescriptedResponses: ['Conversation ended.'] },
+        { type: 'end_conversation', reason: stopName },
+      ],
+    };
+
+    function protectedSession(provider: ILlmProvider, availableActions = [{ name: stopName }]) {
+      contextBuilder.buildContextForGuardrailClassifier = async () => ({ userInput: 'hello', stage: { availableActions } });
+      return makeSession({
+        classifiers: [makeClassifier('clf_1', 'Main', makeMockProvider(['book_flight']))],
+        stage: makeStage(),
+        conversation: makeConversation(),
+        globalActions: [],
+        guardrails: [terminalGuardrail],
+        guardrailClassifier: makeClassifier('guard_clf', 'Guardrail', provider),
+        sampleCopies: [],
+        sampleCopyClassifier: null,
+        costManagementConfig: null,
+      });
+    }
+
+    it('returns only the fixed stop even when the Director would fail', async () => {
+      let directorCalls = 0;
+      transformerExecutor.executeTransformers = async () => {
+        directorCalls++;
+        throw new Error('Director provider rejected the input');
+      };
+      const events: string[] = [];
+      conversationService.saveConversationEvent = async (_project, _conversation, type) => events.push(type);
+      const session = protectedSession(makeMockProvider([stopName]));
+
+      const check = await processor.checkTerminalGuardrails(session, 'hello', 'hello');
+      const result = await processor.processTextInput(session, 'hello', 'hello', check);
+
+      expect(result.actions.map(action => action.name)).to.deep.equal([stopName]);
+      expect(result.terminalGuardrail?.name).to.equal(stopName);
+      expect(directorCalls).to.equal(0);
+      expect(events).to.deep.equal(['classification']);
+    });
+
+    it('runs normal action selection and transformations after a clear result', async () => {
+      let directorCalls = 0;
+      transformerExecutor.executeTransformers = async () => { directorCalls++; return []; };
+      const session = protectedSession(makeMockProvider());
+
+      const result = await processor.processTextInput(session, 'hello', 'hello');
+
+      expect(result.actions.map(action => action.name)).to.deep.equal(['book_flight']);
+      expect(result.terminalGuardrail).to.equal(undefined);
+      expect(directorCalls).to.equal(1);
+    });
+
+    it('reports a guardrail provider refusal as unavailable without selecting a category', async () => {
+      const provider = makeMockProvider();
+      provider.generate = async () => { throw new Error('Provider refused to classify'); };
+      const session = protectedSession(provider);
+
+      const result = await processor.checkTerminalGuardrails(session, 'hello', 'hello');
+
+      expect(result).to.deep.equal({ status: 'unavailable' });
+    });
+
+    it('rejects classifier names that were not available for the current turn', async () => {
+      const session = protectedSession(makeMockProvider(['unlisted-action']));
+
+      const result = await processor.checkTerminalGuardrails(session, 'hello', 'hello');
+
+      expect(result).to.deep.equal({ status: 'unavailable' });
+    });
+
     it('does not run guardrail classifier when no guardrails', async () => {
       const provider = makeMockProvider();
       const classifier = makeClassifier('clf_1', 'Main', provider);

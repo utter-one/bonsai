@@ -32,7 +32,7 @@ import { AsrProviderFactory } from "../providers/asr/AsrProviderFactory";
 import { TtsProviderFactory } from "../providers/tts/TtsProviderFactory";
 import { MonitoringContext } from "../monitoring/MonitoringContext";
 import { getMetricsRegistry } from "../monitoring/ProviderCallRecorder";
-import { UserInputProcessor } from "./UserInputProcessor";
+import { hasFixedEnd, UserInputProcessor } from "./UserInputProcessor";
 import { TtsSettings } from "../providers/tts/TtsProviderFactory";
 import { ActionsExecutionOutcome, ActionsExecutor, EffectEventCallback } from "./ActionsExecutor";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
@@ -1039,12 +1039,14 @@ export class ConversationRunner {
       }
     }
 
+    // On guarded stages the awaited processor owns transformer failures, including timeouts.
+    const usesTerminalGuardrail = Boolean(this.stageData.guardrailClassifier) && this.stageData.guardrails.some(hasFixedEnd);
     // Wire up transformer LLM providers
     for (const transformerData of this.stageData.transformers) {
       try {
         transformerData.llmProvider.setOnError(async (error: Error) => {
           logger.error({ conversationId, transformerId: transformerData.transformer.id, error: error.message }, `LLM transformer error for conversation ${conversationId}: ${error.message}`);
-          await this.markAsFailed(`LLM transformer error: ${error.message}`);
+          if (!usesTerminalGuardrail) await this.markAsFailed(`LLM transformer error: ${error.message}`);
         });
 
         logger.info({ conversationId, transformerId: transformerData.transformer.id }, `Transformer LLM provider wired up for transformer ${transformerData.transformer.name}`);
@@ -2543,10 +2545,15 @@ export class ConversationRunner {
       userInput = newUserInput;
     }
 
-    // Filler delivery and classification run concurrently: filler LLM + TTS connect/send are
-    // independent of classification (processTextInput), so both can start simultaneously.
-    // The Promise.all below is the single synchronisation point; nothing that classificationor
-    // filler reads/writes conflicts before that barrier.
+    const processingStartMs = Date.now();
+    const terminalGuardrailCheck = await this.userInputProcessor.checkTerminalGuardrails(this.session, userInput, userInput);
+    if (terminalGuardrailCheck?.status === 'unavailable') {
+      await this.markAsFailed('Safety checks are temporarily unavailable.');
+      return;
+    }
+    const guardrailStoppedTurn = terminalGuardrailCheck?.status === 'stop';
+
+    // Run ordinary classification and filler concurrently after any terminal safety check.
     this.lastFillerSentence = null;
     this.lastFillerPrompt = null;
     const fillerStartMs = Date.now();
@@ -2555,6 +2562,7 @@ export class ConversationRunner {
     // as the filler LLM responds, while classification proceeds in parallel.
     let fillerEndMs: number | null = null;
     const fillerDeliveryPromise: Promise<string | null> = (async () => {
+      if (guardrailStoppedTurn) return null;
       const fillerPrep = await this.prepareFillerMessages(userInput);
       if (!fillerPrep) return null;
 
@@ -2657,15 +2665,26 @@ export class ConversationRunner {
     })();
 
     // Standard mode: fire moderation in parallel with both filler delivery and classification.
-    const parallelModerationPromise = isStrictModerationMode ? null : this.moderationService.moderate(userInput, this.stageData.moderationProvider, this.stageData.project.moderationConfig, this.conversation.projectId);
+    const parallelModerationPromise = isStrictModerationMode || guardrailStoppedTurn ? null : this.moderationService.moderate(userInput, this.stageData.moderationProvider, this.stageData.project.moderationConfig, this.conversation.projectId);
 
     // Kick off classification concurrently with filler delivery — neither depends on the other.
-    const processingStartMs = Date.now();
-    const processingPromise = this.userInputProcessor.processTextInput(this.session, userInput, userInput);
+    const processingPromise = this.userInputProcessor.processTextInput(this.session, userInput, userInput, terminalGuardrailCheck);
 
     // Wait for both filler delivery and classification to complete before proceeding.
-    await Promise.all([fillerDeliveryPromise, processingPromise]);
-    const processingResult = await processingPromise; // already resolved, no extra round-trip
+    let processingResult: Awaited<typeof processingPromise>;
+    try {
+      [processingResult] = await Promise.all([processingPromise, fillerDeliveryPromise]);
+    } catch (error) {
+      if (!terminalGuardrailCheck) throw error;
+      logger.error({ error, conversationId: this.conversation.id }, 'Guarded turn processing failed');
+      if (this.conversation.status === 'processing_user_input') {
+        await this.markAsFailed('Unable to prepare a response.');
+      }
+      return;
+    }
+    // A provider error may terminate the turn while the remaining tasks unwind.
+    // Do not reopen a failed conversation or generate output from stale progress.
+    if (this.conversation.status !== 'processing_user_input') return;
     const processingEndMs = Date.now();
     const processingDurationMs = processingEndMs - processingStartMs;
 
@@ -2745,6 +2764,13 @@ export class ConversationRunner {
         return null;
       }
       seenActionNames.add(r.name);
+
+      if (processingResult.terminalGuardrail) {
+        const guardrail = guardrailActionsMap.get(r.name);
+        if (!guardrail) throw new InvalidOperationError('The selected terminal guardrail is unavailable.');
+        context.actions[guardrail.name] = { parameters: r.parameters };
+        return guardrail;
+      }
 
       // First check stage actions
       const stageAction = stageActionMap.get(r.name);

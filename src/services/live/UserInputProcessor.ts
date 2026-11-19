@@ -18,7 +18,8 @@ import { ContextTransformerExecutor } from "./ContextTransformerExecutor";
 import { buildLlmUsage, type LlmUsageMetadata } from '../../utils/llmUsage';
 import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
 import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
-import type { Guardrail, Stage, GlobalAction } from "../../types/models";
+import { withTimeout } from '../../utils/withTimeout';
+import type { Conversation, Guardrail, Stage, GlobalAction } from "../../types/models";
 
 /** A classifier result enriched with the rendered prompt and per-call timing/usage metadata. */
 type ClassifierResultWithMeta = ActionClassificationResultWithClassifier & {
@@ -29,9 +30,25 @@ type ClassifierResultWithMeta = ActionClassificationResultWithClassifier & {
   endMs: number;
 };
 
+const TERMINAL_GUARDRAIL_TIMEOUT_MS = 10_000;
+const GUARDED_TRANSFORMER_TIMEOUT_MS = 25_000;
+
+export type TerminalGuardrailCheck =
+  | { status: 'clear'; result: ClassifierResultWithMeta | null }
+  | { status: 'stop'; action: ActionClassificationResult }
+  | { status: 'unavailable' };
+
+export function hasFixedEnd(guardrail: Guardrail): boolean {
+  return guardrail.effects.some(effect => effect.type === 'end_conversation')
+    && guardrail.effects.some(effect => effect.type === 'generate_response'
+      && effect.responseMode === 'prescripted'
+      && effect.prescriptedResponses?.some(text => text.trim()));
+}
+
 /** Result of processing user input, including actions and timing metadata */
 export type ProcessTextInputResult = {
   actions: ActionClassificationResult[];
+  terminalGuardrail?: ActionClassificationResult;
   /** Duration of the knowledge category retrieval in milliseconds; undefined when knowledge is not used */
   knowledgeRetrievalDurationMs?: number;
   /** Unix timestamp (ms) when knowledge retrieval started; undefined when knowledge is not used */
@@ -55,16 +72,42 @@ export class UserInputProcessor {
     @inject(ContextTransformerExecutor) private transformerExecutor: ContextTransformerExecutor,
   ) { }
 
-  /** Processes text input from the user within a session.
-   * @param session - The session in which the input was received.
-   * @param text - The text input from the user.
-   * @returns A promise that resolves to the processing result with actions and timing metadata.
-   */
-  async processTextInput(session: Session, userInput: string, originalUserInput: string): Promise<ProcessTextInputResult> {
-    // How to process:
-    // - Get all classifiers for the current stage.
-    // - For each classifier, run the text through it to determine actions with filtered actions based on overrideClassifierId. Do this in parallel.
-    // - Collect and return all detected actions from classifiers.
+  /** Resolve fixed terminal guardrails before starting any ordinary turn work. */
+  async checkTerminalGuardrails(session: Session, userInput: string, originalUserInput: string): Promise<TerminalGuardrailCheck | undefined> {
+    const { conversation, stage, guardrails, guardrailClassifier } = session.runner.getRuntimeData();
+    if (!guardrailClassifier || !guardrails.some(hasFixedEnd)) return undefined;
+
+    try {
+      const check = async () => {
+        const context = await this.contextBuilder.buildContextForGuardrailClassifier(
+          conversation, stage, guardrails, userInput, originalUserInput, getEffectiveChannelType(session),
+        );
+        const activeNames = new Set(context.stage.availableActions.map(action => action.name));
+        if (activeNames.size === 0) return { result: null, activeNames };
+        const result = await this.classifyTextInput(session, guardrailClassifier, context);
+        return { result, activeNames };
+      };
+      const { result, activeNames } = await withTimeout(check(), TERMINAL_GUARDRAIL_TIMEOUT_MS, 'Guardrail classification');
+      if (!result) return { status: 'clear', result };
+      await this.recordGuardrailClassification(session, conversation, stage, userInput, result);
+      if (result.renderedPrompt === null) return { status: 'unavailable' };
+
+      const action = result.actions.find(action => activeNames.has(action.name)
+        && guardrails.some(guardrail => guardrail.name === action.name && hasFixedEnd(guardrail)));
+      if (action) return { status: 'stop', action };
+      if (result.actions.some(action => !activeNames.has(action.name))) return { status: 'unavailable' };
+      return { status: 'clear', result };
+    } catch (error) {
+      logger.warn({ error, conversationId: conversation.id }, 'Terminal guardrail classification unavailable');
+      return { status: 'unavailable' };
+    }
+  }
+
+  /** Processes text input from the user within a session. */
+  async processTextInput(session: Session, userInput: string, originalUserInput: string, guardrailCheck?: TerminalGuardrailCheck): Promise<ProcessTextInputResult> {
+    guardrailCheck ??= await this.checkTerminalGuardrails(session, userInput, originalUserInput);
+    if (guardrailCheck?.status === 'stop') return { actions: [guardrailCheck.action], terminalGuardrail: guardrailCheck.action };
+    if (guardrailCheck?.status === 'unavailable') throw new InvalidOperationError('Safety checks are temporarily unavailable.');
 
     try {
       const classifiers = session.runner.getRuntimeData().classifiers;
@@ -111,7 +154,7 @@ export class UserInputProcessor {
       });
 
       // Build guardrail classification promise if a guardrail classifier is configured and there are active guardrails
-      const guardrailPromise = guardrailClassifier && guardrails.length > 0
+      const guardrailPromise = guardrailCheck ? Promise.resolve(guardrailCheck.result) : guardrailClassifier && guardrails.length > 0
         ? (async () => {
           const guardrailContext = await this.contextBuilder.buildContextForGuardrailClassifier(conversation, stage, guardrails, userInput, originalUserInput, getEffectiveChannelType(session));
           const guardrailResult = await this.classifyTextInput(session, guardrailClassifier, guardrailContext);
@@ -132,7 +175,7 @@ export class UserInputProcessor {
         Promise.all(actionPromises),
         guardrailPromise,
         sampleCopyPromise,
-        this.transformerExecutor.executeTransformers(session, userInput, originalUserInput),
+        this.transformerExecutor.executeTransformers(session, userInput, originalUserInput, guardrailCheck ? GUARDED_TRANSFORMER_TIMEOUT_MS : undefined),
       ]);
 
       // Jev (TypeSafe) classifiers emit a fixed "match" sentinel instead of an action name.
@@ -168,26 +211,8 @@ export class UserInputProcessor {
         await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
       }
 
-      // Register classification event for guardrail classifier
-      if (guardrailResult) {
-        const eventData: ClassificationEventData = {
-          classifierId: guardrailResult.classifierId,
-          input: userInput || '',
-          actions: [guardrailResult],
-          metadata: {
-            classifierName: guardrailResult.classifierName,
-            actionCount: guardrailResult.actions.length,
-            systemPrompt: guardrailResult.renderedPrompt,
-            llmUsage: guardrailResult.llmUsage,
-            currentVariables: conversation?.stageVars[stage.id] || {},
-            stageName: stage.name,
-            durationMs: guardrailResult.durationMs,
-            startMs: guardrailResult.startMs,
-            endMs: guardrailResult.endMs,
-          },
-        };
-        await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData, stage.id);
-        await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
+      if (guardrailResult && !guardrailCheck) {
+        await this.recordGuardrailClassification(session, conversation, stage, userInput, guardrailResult);
       }
 
       // Register sample copy selection event
@@ -253,6 +278,27 @@ export class UserInputProcessor {
       logger.error({ error, sessionId: session.id }, 'Error processing text input using classifiers');
       throw error;
     }
+  }
+
+  private async recordGuardrailClassification(session: Session, conversation: Conversation, stage: Stage, userInput: string, result: ClassifierResultWithMeta): Promise<void> {
+    const eventData: ClassificationEventData = {
+      classifierId: result.classifierId,
+      input: userInput || '',
+      actions: [result],
+      metadata: {
+        classifierName: result.classifierName,
+        actionCount: result.actions.length,
+        systemPrompt: result.renderedPrompt,
+        llmUsage: result.llmUsage,
+        currentVariables: conversation.stageVars[stage.id] || {},
+        stageName: stage.name,
+        durationMs: result.durationMs,
+        startMs: result.startMs,
+        endMs: result.endMs,
+      },
+    };
+    await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'classification', eventData, stage.id);
+    await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'classification', eventData });
   }
 
   private async classifyCopyForInput(session: Session, context: ConversationContext): Promise<SampleCopyClassificationResult & { renderedPrompt: string; result: string; llmUsage?: LlmUsageMetadata; durationMs: number; startMs: number; endMs: number }> {
