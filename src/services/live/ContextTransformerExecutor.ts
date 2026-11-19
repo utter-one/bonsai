@@ -18,6 +18,7 @@ import type { ActionClassificationResult } from '../../types/classification';
 import { StageAction } from '../../types/actions';
 import { resolveProviderModelLimits, resolveOutputCap } from '../../utils/costManagement';
 import { truncateMessagesToTokenBudget } from '../../utils/contextTruncation';
+import { withTimeout } from '../../utils/withTimeout';
 
 /**
  * Map of variable names to their change event type after a transformer run.
@@ -77,7 +78,7 @@ export class ContextTransformerExecutor {
    * @param originalUserInput - The original user input before any processing
    * @returns Triggered stage actions based on variable changes
    */
-  async executeTransformers(session: Session, userInput: string, originalUserInput: string): Promise<ActionClassificationResult[]> {
+  async executeTransformers(session: Session, userInput: string, originalUserInput: string, guardedTimeoutMs?: number): Promise<ActionClassificationResult[]> {
     const { transformers, stage, conversation, globalActions } = session.runner.getRuntimeData();
 
     if (transformers.length === 0) {
@@ -98,7 +99,7 @@ export class ContextTransformerExecutor {
         originalUserInput,
         getEffectiveChannelType(session),
       );
-      return this.executeTransformer(session, transformerData, context);
+      return this.executeTransformer(session, transformerData, context, guardedTimeoutMs);
     });
 
     const results = await Promise.all(transformerPromises);
@@ -147,6 +148,10 @@ export class ContextTransformerExecutor {
       };
       await this.conversationService.saveConversationEvent(conversation.projectId, conversation.id, 'transformation', eventData, stage.id);
       await session.clientConnection.sendMessage({ type: 'conversation_event', conversationId: conversation.id, eventType: 'transformation', eventData });
+    }
+
+    if (guardedTimeoutMs !== undefined && results.some(result => result.error)) {
+      throw new Error('A required context transformation failed.');
     }
 
     // Build a raw context with the updated stage vars for condition evaluation
@@ -239,7 +244,7 @@ export class ContextTransformerExecutor {
    * @param transformerData - Runtime data containing the transformer config and its LLM provider
    * @param context - The conversation context built for this transformer
    */
-  private async executeTransformer(session: Session, transformerData: TransformerRuntimeData, context: ConversationContext): Promise<TransformerExecutionResult> {
+  private async executeTransformer(session: Session, transformerData: TransformerRuntimeData, context: ConversationContext, timeoutMs?: number): Promise<TransformerExecutionResult> {
     const { transformer, llmProvider } = transformerData;
     const startMs = Date.now();
 
@@ -265,7 +270,8 @@ export class ContextTransformerExecutor {
       const transformerInputCap = transformerLimits?.inputTokensLimits?.transformation;
       const { messages: truncatedTransformerMessages, ...transformerTruncation } = truncateMessagesToTokenBudget(messages, transformerInputCap, transformerModel);
       // P1-03: tag the call as llm.transform (nested in the turn context, which supplies attribution)
-      const result = await MonitoringContext.run({ operation: 'llm.transform' }, () => llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined));
+      const generation = MonitoringContext.run({ operation: 'llm.transform' }, () => llmProvider.generate(truncatedTransformerMessages, transformerMaxTokens !== undefined ? { maxTokens: transformerMaxTokens } : undefined));
+      const result = await (timeoutMs === undefined ? generation : withTimeout(generation, timeoutMs, 'Context transformation'));
       const textContent = extractTextFromContent(result.content);
       rawResponse = JSON.stringify(result, null, 2);
 
@@ -285,6 +291,10 @@ export class ContextTransformerExecutor {
             logger.warn({ sessionId: session.id, transformerId: transformer.id, field: key }, `Transformer returned unrecognized field "${key}" not listed in contextFields — ignoring`);
           }
         }
+      }
+
+      if (timeoutMs !== undefined && declaredFields.length > 0 && appliedFields.length === 0) {
+        throw new Error('Context transformation did not return any declared fields.');
       }
 
       const endMs = Date.now();

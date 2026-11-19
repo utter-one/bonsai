@@ -4,7 +4,7 @@
 
 ## How Guardrails Work
 
-Each guardrail is evaluated through a **shared project-level classifier** (set via `defaultGuardrailClassifierId` on the project). On every user input turn, the guardrail classifier runs in **parallel** with the stage's own classifiers and context transformers — it does not add sequential latency to the pipeline.
+Each guardrail is evaluated through a **shared project-level classifier** (set via `defaultGuardrailClassifierId` on the project). On each user input turn, the project evaluates its active guardrails. Projects with a guardrail that combines a nonempty prescripted response and an end effect evaluate guardrails before ordinary turn processing.
 
 When the classifier matches a guardrail's `classificationTrigger`, its effects are executed immediately as part of that turn's action processing.
 
@@ -87,7 +87,9 @@ See [Actions & Effects](./actions-and-effects) for details on each effect type.
 
 ## Pipeline Position
 
-The guardrail classifier runs **in parallel** with the stage's own classifiers and context transformers. The resulting guardrail actions are merged with other classification results and processed together in the same turn — there is no sequential overhead compared to having an additional stage classifier.
+When a guardrail has both a nonempty prescripted response and an `end_conversation` effect, the runtime checks the project’s guardrails first. If the classifier selects such a guardrail, the runtime processes its effects alone. The fixed response and ending can therefore run without calling stage classifiers, context transformers, sample copy, or filler generation for that turn.
+
+If that safety check fails or times out, the runtime records a conversation failure with a neutral reason. It does not infer a safety category from the failure. If the check clears the turn but a context transformer fails, the runtime records a neutral processing failure. Projects without this type of guardrail continue evaluating guardrails in parallel with ordinary turn processing.
 
 ```mermaid
 flowchart TD
