@@ -152,6 +152,8 @@ A background job runs every minute and checks all active conversations (`initial
 
 The connected client receives a `conversation_aborted` WebSocket event with the reason `"Conversation timed out due to inactivity"`.
 
+The check is database-driven, not connection-driven: conversations abandoned by a client disconnect — where no conversation runner is left in memory — are swept as well. If the project defines the [`__conversation_abort`](./global-actions#conversation-lifecycle-hooks) lifecycle action it runs for timed-out conversations too, with the `conversation_abort` lifecycle context.
+
 See [Projects — Conversation Timeout](./projects#conversation-timeout) for configuration details.
 
 ## Audio Recordings

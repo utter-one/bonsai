@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { eq, and, like, SQL, desc } from 'drizzle-orm';
+import { eq, and, like, SQL, desc, notInArray } from 'drizzle-orm';
 import { db } from '../db/index';
 import { conversations, conversationEvents, conversationArtifacts, projects } from '../db/schema';
 import type { ConversationResponse, ConversationListResponse, ConversationEventResponse, ConversationEventListResponse, ArtifactResponse, ArtifactListResponse, ListArtifactsQuery } from '../http/contracts/conversation';
@@ -436,8 +436,9 @@ export class ConversationService extends BaseService {
    * @param projectId - The project the conversation belongs to
    * @param id - The unique identifier of the conversation
    * @param reason - Human-readable description of why the conversation was aborted
+   * @returns true when this call performed the transition; false when the conversation was already terminal
    */
-  async abortConversation(projectId: string, id: string, reason: string): Promise<void> {
+  async abortConversation(projectId: string, id: string, reason: string): Promise<boolean> {
     logger.info({ conversationId: id, reason }, `Aborting conversation: ${reason}`);
 
     try {
@@ -449,20 +450,34 @@ export class ConversationService extends BaseService {
 
       if (existingConversation.status === 'finished' || existingConversation.status === 'failed' || existingConversation.status === 'aborted') {
         logger.info({ conversationId: id }, 'Conversation is already ended, skipping abort');
-        return;
+        return false;
       }
 
       const abortedAt = new Date();
-      await db.update(conversations)
+      // Conditional transition: only the caller that actually flips a non-terminal row owns the abort,
+      // so overlapping sweeps (concurrent replicas or ticks) cannot both report a transition and emit
+      // two conversation_aborted events for the same conversation.
+      const transitioned = await db.update(conversations)
         .set({
           status: 'aborted',
           statusDetails: reason,
           endingStageId: existingConversation.stageId,
           updatedAt: abortedAt,
         })
-        .where(and(eq(conversations.projectId, projectId), eq(conversations.id, id)));
+        .where(and(
+          eq(conversations.projectId, projectId),
+          eq(conversations.id, id),
+          notInArray(conversations.status, ['finished', 'failed', 'aborted']),
+        ))
+        .returning({ id: conversations.id });
+
+      if (transitioned.length === 0) {
+        logger.info({ conversationId: id }, 'Conversation was terminalised concurrently, skipping abort');
+        return false;
+      }
 
       logger.info({ conversationId: id }, 'Conversation aborted successfully');
+      return true;
     } catch (error) {
       logger.error({ error, conversationId: id, reason }, 'Failed to abort conversation');
       throw error;

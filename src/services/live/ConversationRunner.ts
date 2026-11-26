@@ -35,6 +35,7 @@ import { getMetricsRegistry } from "../monitoring/ProviderCallRecorder";
 import { UserInputProcessor } from "./UserInputProcessor";
 import { TtsSettings } from "../providers/tts/TtsProviderFactory";
 import { ActionsExecutionOutcome, ActionsExecutor, EffectEventCallback } from "./ActionsExecutor";
+import { ConversationLifecycleActionService } from "./ConversationLifecycleActionService";
 import { ConversationContext, ConversationContextBuilder } from "./ConversationContextBuilder";
 import { and, eq, notInArray } from "drizzle-orm";
 import { ResponseGenerator } from "./ResponseGenerator";
@@ -312,6 +313,7 @@ export class ConversationRunner {
     @inject(CircuitBreakerRegistry) private breakerRegistry: CircuitBreakerRegistry,
     @inject(FallbackEventService) private fallbackEventService: FallbackEventService,
     @inject(MetricsRegistry) private metricsRegistry: MetricsRegistry,
+    @inject(ConversationLifecycleActionService) private lifecycleActionService: ConversationLifecycleActionService,
   ) { }
 
   public getRuntimeData(): StageRuntimeData {
@@ -346,15 +348,7 @@ export class ConversationRunner {
 
     // Load conversation lifecycle global actions (by reserved ID) once — they are project-level and
     // must not appear in stage-level global action processing.
-    const lifecycleActionsList = await db.query.globalActions.findMany({
-      where: (globalActions, { and, eq, inArray }) => and(
-        eq(globalActions.projectId, session.projectId),
-        inArray(globalActions.id, Object.values(CONVERSATION_LIFECYCLE_ACTION_IDS))
-      )
-    });
-    for (const action of lifecycleActionsList) {
-      this.conversationLifecycleActions.set(action.id, action);
-    }
+    this.conversationLifecycleActions = await this.lifecycleActionService.loadConversationLifecycleActions(session.projectId);
 
     await this.wireUpProviders();
   }
@@ -1196,6 +1190,43 @@ export class ConversationRunner {
     await this.applyActionOutcome(endContext, endOutcome);
   }
 
+  /**
+   * Executes the `__conversation_abort` conversation-lifecycle global action (when the project defines one)
+   * for an abort that originates outside the turn loop — e.g. the inactivity-timeout sweeper.
+   *
+   * Deliberately not taken under the runner mutex: an abort triggered by the timeout sweeper must not
+   * queue behind the very turn that is stuck and being terminated. Action effects restricted in the
+   * `conversation_abort` lifecycle context are dropped by ActionsExecutor.
+   */
+  async executeAbortLifecycleAction(reason: string): Promise<boolean> {
+    return MonitoringContext.run(this.monitoringContextData(), () => this.doExecuteAbortLifecycleAction(reason));
+  }
+
+  private async doExecuteAbortLifecycleAction(reason: string): Promise<boolean> {
+    logger.info({ conversationId: this.conversation.id }, `Executing __conversation_abort lifecycle action (external abort: ${reason})`);
+    return this.lifecycleActionService.executeAbortAction({
+      projectId: this.conversation.projectId,
+      conversationId: this.conversation.id,
+      conversation: this.conversation,
+      channel: getEffectiveChannelType(this.session),
+      emitEvent: this.saveAndSendEvent.bind(this),
+      // Only state persistence: this abort path is driven from outside the turn loop, so the caller
+      // (the timeout sweeper) owns the terminal transition and must remain the one that writes it.
+      applyOutcome: async (context, outcome) => { await this.persistActionOutcomeState(context, outcome); },
+    });
+  }
+
+  /**
+   * Flushes buffered call recordings to storage without tearing the runner down. Terminal transitions
+   * that happen outside the turn loop never reach the normal flush points, and cleanup() discards the
+   * buffer. Safe to call repeatedly.
+   */
+  async flushRecording(): Promise<void> {
+    if (!this.recorder) return;
+    await this.recorder.flush();
+    this.recorder = null;
+  }
+
   async receiveUserTextInput(userInput: string): Promise<string> {
     return await this.withMutex(async () => {
       if (this.conversation.status !== 'awaiting_user_input') {
@@ -1885,23 +1916,8 @@ export class ConversationRunner {
       return false;
     }
 
-    // Apply variable modifications if any
-    if (outcome.hasModifiedVars) {
-      logger.debug({ conversationId, stageId: this.stageData.id }, `Variables were modified during action execution`);
-      const updatedStageVars = { ...this.conversation.stageVars, [this.stageData.id]: context.vars };
-      await db.update(conversations)
-        .set({ stageVars: updatedStageVars, updatedAt: new Date() })
-        .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
-      this.conversation.stageVars = updatedStageVars;
-    }
-
-    // Apply user profile modifications if any
-    if (outcome.hasModifiedUserProfile) {
-      logger.debug({ conversationId, userId: this.conversation.userId }, `User profile was modified during action execution`);
-      await db.update(users)
-        .set({ profile: context.userProfile, updatedAt: new Date() })
-        .where(and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)));
-    }
+    // Apply variable and user-profile modifications
+    await this.persistActionOutcomeState(context, outcome);
 
     // Apply stage navigation if specified
     if (outcome.goToStageId && outcome.goToStageId !== this.stageData.id) {
@@ -1926,6 +1942,30 @@ export class ConversationRunner {
 
     logger.debug({ conversationId, hasModifiedVars: outcome.hasModifiedVars, hasModifiedUserInput: outcome.hasModifiedUserInput, hasModifiedUserProfile: outcome.hasModifiedUserProfile, shouldEndConversation: outcome.shouldEndConversation, shouldAbortConversation: outcome.shouldAbortConversation }, `Action outcome applied successfully`);
     return true;
+  }
+
+  /**
+   * Persists the variable and user-profile changes an action made. Split out of applyActionOutcome for
+   * callers that own navigation and terminal state themselves (e.g. the inactivity-timeout sweeper).
+   */
+  private async persistActionOutcomeState(context: ConversationContext, outcome: ActionsExecutionOutcome): Promise<void> {
+    const conversationId = this.conversation.id;
+
+    if (outcome.hasModifiedVars) {
+      logger.debug({ conversationId, stageId: this.stageData.id }, `Variables were modified during action execution`);
+      const updatedStageVars = { ...this.conversation.stageVars, [this.stageData.id]: context.vars };
+      await db.update(conversations)
+        .set({ stageVars: updatedStageVars, updatedAt: new Date() })
+        .where(and(eq(conversations.projectId, this.conversation.projectId), eq(conversations.id, this.conversation.id)));
+      this.conversation.stageVars = updatedStageVars;
+    }
+
+    if (outcome.hasModifiedUserProfile) {
+      logger.debug({ conversationId, userId: this.conversation.userId }, `User profile was modified during action execution`);
+      await db.update(users)
+        .set({ profile: context.userProfile, updatedAt: new Date() })
+        .where(and(eq(users.projectId, this.conversation.projectId), eq(users.id, this.conversation.userId)));
+    }
   }
 
   /**

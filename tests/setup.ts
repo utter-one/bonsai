@@ -124,6 +124,12 @@ export async function globalSetup(): Promise<void> {
   (globalThis as any).__TEST_FAILOVER_ASR__ = AppFailoverAsrProvider;
   (globalThis as any).__TEST_FAILOVER_STORAGE__ = AppFailoverStorageProvider;
 
+  // Conversation-timeout sweeper: the cron is minute-granular, so tests drive
+  // processTimeouts() deterministically through the app-world singleton (it owns
+  // the SessionManager and the lifecycle-action service).
+  const { ConversationTimeoutService } = await import('../src/services/ConversationTimeoutService');
+  (globalThis as any).__TEST_CONVERSATION_TIMEOUT_SERVICE__ = iocContainer.resolve(ConversationTimeoutService);
+
   // 5. Create initial operator and capture tokens
   const res = await request(app)
     .post('/api/setup/initial-operator')
