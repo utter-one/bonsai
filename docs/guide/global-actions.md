@@ -47,7 +47,7 @@ Global actions with reserved IDs act as **conversation-level lifecycle hooks**. 
 | `__conversation_start` | Once, after the conversation and first stage are initialised |
 | `__conversation_resume` | When a previously-interrupted conversation is resumed |
 | `__conversation_end` | When the conversation is gracefully ended |
-| `__conversation_abort` | When the conversation is aborted (immediate stop) |
+| `__conversation_abort` | When the conversation is aborted (immediate stop), including the inactivity timeout |
 | `__conversation_failed` | When the conversation encounters a fatal error |
 
 Only one action per hook type is supported per project. These IDs are reserved and excluded from stage-level global action classification.
@@ -69,7 +69,7 @@ Each lifecycle context restricts effects that would be meaningless or harmful in
 - **`__conversation_start`** — Initialise analytics, set default variables, log a session start
 - **`__conversation_resume`** — Restore session state, refresh tokens, notify a backend
 - **`__conversation_end`** — Persist conversation summary, send a satisfaction survey, clean up resources
-- **`__conversation_abort`** — Log an unexpected exit, flag the session for review
+- **`__conversation_abort`** — Log an unexpected exit, flag the session for review. Also runs when the inactivity timeout sweeps the conversation away, so it is the place for "the user went silent" bookkeeping.
 - **`__conversation_failed`** — Send an error alert, trigger fallback notifications
 
 ## Content Moderation Hook

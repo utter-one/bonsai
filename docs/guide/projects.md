@@ -97,10 +97,14 @@ The `conversationTimeoutSeconds` setting controls how long a conversation can re
 A background job checks all active conversations every minute. Inactivity is measured from the timestamp of the **last conversation event** (falling back to `updatedAt` if no events have been recorded yet).
 
 When a conversation is timed out:
-1. Its status is set to `aborted`.
-2. A `conversation_aborted` event is saved.
-3. Any connected WebSocket clients receive a `conversation_aborted` event message.
-4. The session is detached from the conversation.
+1. The project's [`__conversation_abort`](./global-actions#conversation-lifecycle-hooks) lifecycle action runs, if defined.
+2. Its status is set to `aborted`.
+3. A `conversation_aborted` event is saved.
+4. Any connected clients receive a `conversation_aborted` event message and their connection is closed.
+5. Buffered call recordings are flushed to storage.
+6. The session and its conversation runner are detached, releasing provider resources, and any pending deferred messages are cancelled.
+
+The transition is claim-based: if two instances (or two sweeps) pick up the same conversation, only one performs it, so exactly one `conversation_aborted` event is written. A failing `__conversation_abort` action never prevents the abort itself.
 
 ```json
 {
